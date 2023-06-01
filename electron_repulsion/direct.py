@@ -1,36 +1,37 @@
-import matplotlib.pyplot as plt 
-import numpy 
-import numpy as np 
+import matplotlib.pyplot as plt
+import numpy
+import numpy as np
 import math
-import pyscf 
+import pyscf
 import pyscf.dft
-import time 
-import jax.numpy as jnp 
-import matplotlib.pyplot as plt 
-from tqdm import tqdm 
+import time
+import jax.numpy as jnp
+import matplotlib.pyplot as plt
+from tqdm import tqdm
 import os
 from functools import partial
 import jax
-from jax_ipu_research.tile import create_ipu_tile_primitive, ipu_hw_cycle_count, tile_map_primitive, tile_put_sharded, tile_put_replicated
-import ctypes 
+import ctypes
 import _ctypes
-from icecream import ic 
+from icecream import ic
 
 from ctypes import *
 import os
 import os.path as osp
-try:    libcgto = cdll.LoadLibrary( os.getcwd() + "/gen.so" ) 
-except: pass 
+try:
+        libcgto = cdll.LoadLibrary( os.getcwd() + "/gen.so" )
+        from jax_ipu_research.tile import create_ipu_tile_primitive, ipu_hw_cycle_count, tile_map_primitive, tile_put_sharded, tile_put_replicated
+except: pass
 from pyscf import lib
 
-import re 
+import re
 def get_atom_string(atoms, locs):
-    atom_string = atoms 
+    atom_string = atoms
     atoms = re.findall('[a-zA-Z][^A-Z]*', atoms)
     str = ""
-    for atom, loc in zip(atoms, locs): 
+    for atom, loc in zip(atoms, locs):
       str += "%s %4f %4f %4f; "%((atom,) + tuple(loc) )
-    return atom_string, str 
+    return atom_string, str
 
 def num_tiles():
         #from jaxlib.ipu_xla_client_pybind import IpuDevice
@@ -39,27 +40,27 @@ def num_tiles():
         #return device.num_tiles
         return 1472
 
-NUM_TILES = num_tiles() # there was a bug with jax.devices returning CPU, moving to here fixed that. 
+NUM_TILES = num_tiles() # there was a bug with jax.devices returning CPU, moving to here fixed that.
 
 @partial(jax.jit, backend="ipu", static_argnums=(3,))
-def single(input_floats, input_ints, input_ijkl, tiles): 
+def single(input_floats, input_ints, input_ijkl, tiles):
 
         vertex_filename = osp.join(osp.dirname(__file__), "int2e_sph.cpp")
         #vertex_filename = osp.join(osp.dirname(__file__), "outfile.gp")
         int2e_sph = create_ipu_tile_primitive(
                 "poplar_int2e_sph",
-                "poplar_int2e_sph", 
+                "poplar_int2e_sph",
                 inputs=["ipu_floats", "ipu_ints", "ipu_ij", "ipu_output", "tile_g", "tile_idx", "tile_buf"],
                 outputs={"ipu_output": 3, "tile_g": 4, "tile_idx": 5, "tile_buf": 6},
                 gp_filename=vertex_filename,
-                perf_estimate=100,  
+                perf_estimate=100,
         )
 
         cpu_output = jnp.zeros((1, 625))
-        
+
         tile_floats = tile_put_replicated(input_floats, tiles)
         tile_ints   = tile_put_replicated(input_ints,   tiles)
-        cpu_output  = tile_put_replicated(cpu_output,   tiles)  
+        cpu_output  = tile_put_replicated(cpu_output,   tiles)
         tile_ijkl   = tile_put_replicated(input_ijkl,   tiles)
 
         tile_g      = tile_put_replicated(jnp.zeros(3888+1),                      tiles)
@@ -73,7 +74,7 @@ def single(input_floats, input_ints, input_ijkl, tiles):
         return cpu_output, start, stop
 
 # only remaining problem with direct mult
-# [ ] if we use more threads we copy the output "num_threads" times which blows memory 
+# [ ] if we use more threads we copy the output "num_threads" times which blows memory
 #     if we can fix this we aught to be able to use all the threads (even in the odd case)
 
 def ipu_direct_mult_v0(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, indxs, threads=0):
@@ -81,21 +82,21 @@ def ipu_direct_mult_v0(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, i
         #vertex_filename = osp.join(osp.dirname(__file__), "outfile.gp")
         poplar_direct_s1 = create_ipu_tile_primitive(
                 "poplar_direct_s1",
-                "poplar_direct_s1", 
+                "poplar_direct_s1",
                 #inputs=["integral", "indices", "do_list", "dm", "in_vj", "in_vk", "disable_cache"],
                 inputs=["integral", "indices", "do_list", "dm", "in_vj", "in_vk"],
                 outputs={ "vj": 3, "vk": 3},
                 gp_filename=vertex_filename,
-                perf_estimate=100,  
+                perf_estimate=100,
         )
 
         indxs = np.array(indxs)
- 
-        #vj, vk = jnp.zeros((N,N)), jnp.zeros((N,N)) 
 
-        #num_threads = 1 
+        #vj, vk = jnp.zeros((N,N)), jnp.zeros((N,N))
+
+        #num_threads = 1
         print(threads)
-        num_threads = threads 
+        num_threads = threads
         num_tiles = NUM_TILES-1
 
         tiles = tuple((np.arange(num_tiles*num_threads)%num_tiles+1).tolist())
@@ -103,28 +104,28 @@ def ipu_direct_mult_v0(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, i
         dm    = tile_put_replicated(    dm,             tiles=tiles)
 
         # TODO;
-        # 1. pairprogram multivertex with Paul. 
+        # 1. pairprogram multivertex with Paul.
 
         # matrix = list of matrices __out3
         # vector = vector  # (30, 30)
         # vj, vk outputs => same size as vector
 
-        # store (vj,vk,dm) num_thread times too many 
+        # store (vj,vk,dm) num_thread times too many
         # need to rewrite to multivertex and sort work so tiles don't touch the same entries in the output
-        # ok in input but not input. 
+        # ok in input but not input.
 
         # write multivertex that takes one input but then spits out 6 outputs
 
         # we can save all energyes from all iterations, and then train a transformer autoregresively to predict "next iterations energy"
-        # then during inference we have to generate from transformer "token by token". 
-        # it's basically "next energy predict" lol. 
+        # then during inference we have to generate from transformer "token by token".
+        # it's basically "next energy predict" lol.
 
-        print_sizes = False 
-        if print_sizes: 
+        print_sizes = False
+        if print_sizes:
                 print("input",[(a.shape, np.prod(a.shape)/10**6) for a in __out3])
                 print("dm", np.prod(dm.shape)*4/10**6)
 
-        _vj = tile_put_replicated(jnp.zeros((N, N)), tiles=tiles) # perhaps re-use this? 
+        _vj = tile_put_replicated(jnp.zeros((N, N)), tiles=tiles) # perhaps re-use this?
         _vk = tile_put_replicated(jnp.zeros((N, N)), tiles=tiles)
 
         start = 0
@@ -134,47 +135,47 @@ def ipu_direct_mult_v0(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, i
                 _indices  = np.array(indices). reshape(-1, 8)[indxs][start:stop]
                 _do_lists = np.array(do_lists).reshape(-1, 8)[indxs][start:stop]
 
-                chunk_size = len(tiles) 
+                chunk_size = len(tiles)
                 count      = eri_s8.shape[0]
 #
-                if print_sizes: 
+                if print_sizes:
                         print("vj", np.prod(_vj.shape)*4/10**6)
                         print("vk", np.prod(_vk.shape)*4/10**6)
 
-                # We could jax.lax.foriloop this. 
+                # We could jax.lax.foriloop this.
                 for j in range( count // chunk_size + 1 ):
                         _start, _stop = j*chunk_size, (j+1)*chunk_size
 
-                        __indices  = _indices [_start: _stop] 
-                        __do_lists = _do_lists[_start: _stop] 
+                        __indices  = _indices [_start: _stop]
+                        __do_lists = _do_lists[_start: _stop]
                         _eri_s8    = eri_s8   [_start: _stop]
 
                         n = __indices.shape[0]
-                        if n != len(tiles): 
-                                # pad 
+                        if n != len(tiles):
+                                # pad
                                 __indices  = np.concatenate( (__indices,  np.zeros((len(tiles)-n, 8), dtype=__indices.dtype)))
                                 __do_lists = np.concatenate( (__do_lists, np.zeros((len(tiles)-n, 8), dtype=__do_lists.dtype)))
                                 _eri_s8    = jnp.concatenate((_eri_s8,    np.zeros((len(tiles)-n, _eri_s8.shape[1]))))
 
 
-                                if print_sizes: 
+                                if print_sizes:
                                         print("indices", np.prod(__indices.shape)*4/10**6)
                                         print("do_lists", np.prod(__do_lists.shape)*4/10**6)
                                         print("eri", np.prod(_eri_s8.shape)*4/10**6)
 
 
-                        _vj, _vk = tile_map_primitive(          poplar_direct_s1, 
+                        _vj, _vk = tile_map_primitive(          poplar_direct_s1,
                                         tile_put_sharded(       _eri_s8.  reshape(len(tiles), -1),             tiles=tiles),
                                         tile_put_sharded(       np.array(__indices). reshape(len(tiles), 8),   tiles=tiles),
                                         tile_put_sharded(       np.array(__do_lists).reshape(len(tiles), 8),   tiles=tiles),
-                                                                dm, 
+                                                                dm,
                                                                 _vj,
                                                                 _vk
                         )
 
-                start = stop 
+                start = stop
 
-        vj = jnp.sum(_vj.array, axis=0)  
+        vj = jnp.sum(_vj.array, axis=0)
         vk = jnp.sum(_vk.array, axis=0)
 
         return vj, vk
@@ -185,46 +186,46 @@ def ipu_direct_mult_v1(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, i
         #vertex_filename = osp.join(osp.dirname(__file__), "outfile.gp")
         poplar_direct_s1 = create_ipu_tile_primitive(
                 "poplar_direct_s1",
-                "poplar_direct_s1", 
+                "poplar_direct_s1",
                 inputs=["integral", "indices", "do_list", "dm", "in_vj", "in_vk"],
                 outputs={ "vj": 3, "vk": 3},
                 gp_filename=vertex_filename,
-                perf_estimate=100,  
+                perf_estimate=100,
         )
         poplar_direct_s1_forloop = create_ipu_tile_primitive(
                 "poplar_direct_s1_forloop",
-                "poplar_direct_s1_forloop", 
+                "poplar_direct_s1_forloop",
                 inputs=["integral", "indices", "do_list", "dm", "in_vj", "in_vk", "chunk_size"],
                 outputs={ "vj": 3, "vk": 3},
                 gp_filename=vertex_filename,
-                perf_estimate=100,  
+                perf_estimate=100,
         )
 
         indxs = np.array(indxs)
 
-        #num_threads = 1 
+        #num_threads = 1
         print(threads)
-        num_threads = threads 
+        num_threads = threads
         num_tiles = NUM_TILES-1
 
         tiles = tuple((np.arange(num_tiles*num_threads)%num_tiles+1).tolist())
 
-        # consider removing that! 
-        tiles = tuple([a for a in tiles if a != 847] ) # remove a specific tile; jnp.roll get's put there and makes it OOM. 
+        # consider removing that!
+        tiles = tuple([a for a in tiles if a != 847] ) # remove a specific tile; jnp.roll get's put there and makes it OOM.
         num_tiles = len(tiles)//num_threads
 
         dm    = tile_put_replicated(    dm,             tiles=tiles)
 
-        print_sizes = False 
-        if print_sizes: 
+        print_sizes = False
+        if print_sizes:
                 print("input",[(a.shape, np.prod(a.shape)/10**6) for a in __out3])
                 print("dm", np.prod(dm.shape)*4/10**6)
 
         # make it sequential on say rows of vj and vk?
-        # if we do that we may even be able to push to gdb11? 
+        # if we do that we may even be able to push to gdb11?
         # we can also do vj, vk sequentially, this reduces by 89*2MB for gdb9 631G*
 
-        _vj = tile_put_replicated(jnp.zeros((N, N)), tiles=tiles) 
+        _vj = tile_put_replicated(jnp.zeros((N, N)), tiles=tiles)
         _vk = tile_put_replicated(jnp.zeros((N, N)), tiles=tiles)
 
         start = 0
@@ -235,107 +236,107 @@ def ipu_direct_mult_v1(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, i
                 _do_lists = np.array(do_lists).reshape(-1, 8)[indxs][start:stop]
                 print(num, eri_s8.shape, _indices.shape, _do_lists.shape)
 
-                chunk_size = len(tiles) 
+                chunk_size = len(tiles)
                 count      = eri_s8.shape[0]
 #
-                if print_sizes: 
+                if print_sizes:
                         print("vj", np.prod(_vj.shape)*4/10**6)
                         print("vk", np.prod(_vk.shape)*4/10**6)
 
                 # move this forlopp inside C++ vertex
-                # basically we have to copy (vj,vk) for every single multiplicatiion. 
-                # This obviously kills everything.. 
+                # basically we have to copy (vj,vk) for every single multiplicatiion.
+                # This obviously kills everything..
 
                 #all_stop = (count//chunk_size)*
                 #all_indices = indices[0: all_stop]
 
-                # we'll have to go to -C 4 to have enough for three iterations. 
+                # we'll have to go to -C 4 to have enough for three iterations.
                 # compile time is slow for integrals (but not mult).
-                #integral size ]  [ 1  3  9 27 81]                                                                                                                                 
+                #integral size ]  [ 1  3  9 27 81]
                 # [integral count]  [1590 2812 2121  750  120]
                 # [integral size ]  [ 1  3  9 27 81]
-                # [integral count]  [32408 28013  9939  1651   120] # so the hydrogens basically 30x the small work; 
+                # [integral count]  [32408 28013  9939  1651   120] # so the hydrogens basically 30x the small work;
                 chunks = count // chunk_size
                 for __j in range(chunks):
                         _start, _stop = __j*chunk_size, (__j+1)*chunk_size
 
 
-                if chunks > 0: 
+                if chunks > 0:
 
-                        all_stop     = _stop 
-                        print(_indices.shape, len(tiles), chunks, 8, all_stop) #(32408, 8)                                                                                                                                                         
+                        all_stop     = _stop
+                        print(_indices.shape, len(tiles), chunks, 8, all_stop) #(32408, 8)
                         #exit()
 
                         all_indices  = _indices [0:all_stop].reshape( len(tiles), chunks, 8 )
                         all_do_lists = _do_lists[0:all_stop].reshape( len(tiles), chunks, 8 )
                         all_eri_s8   = eri_s8   [0:all_stop].reshape( len(tiles), chunks, eri_s8.shape[1] )
                         _chunk_size   = tile_put_replicated( np.ones((1,chunks)), tiles=tiles)
-                        
+
                         #all_indices = _indices[0:stop]
-                        _vj, _vk = tile_map_primitive(          poplar_direct_s1_forloop, 
+                        _vj, _vk = tile_map_primitive(          poplar_direct_s1_forloop,
                                                 tile_put_sharded(       all_eri_s8,             tiles=tiles),
                                                 tile_put_sharded(       all_indices,   tiles=tiles),
                                                 tile_put_sharded(       all_do_lists,   tiles=tiles),
-                                                                        dm, 
+                                                                        dm,
                                                                         _vj,
-                                                                        _vk, 
+                                                                        _vk,
                                                                         _chunk_size
                         )
 
 
 
-                # do main part of for loop; this is what we want to do in one vertex call. 
+                # do main part of for loop; this is what we want to do in one vertex call.
                 '''for j in range( count // chunk_size ):
                         _start, _stop = j*chunk_size, (j+1)*chunk_size
 
-                        __indices  = _indices [_start: _stop] 
-                        __do_lists = _do_lists[_start: _stop] 
+                        __indices  = _indices [_start: _stop]
+                        __do_lists = _do_lists[_start: _stop]
                         _eri_s8    = eri_s8   [_start: _stop]
 
-                        #_vj, _vk = tile_map_primitive(          poplar_direct_s1, 
-                        _vj, _vk = tile_map_primitive(          poplar_direct_s1_forloop, 
+                        #_vj, _vk = tile_map_primitive(          poplar_direct_s1,
+                        _vj, _vk = tile_map_primitive(          poplar_direct_s1_forloop,
                                         tile_put_sharded(       _eri_s8.  reshape(len(tiles), -1),             tiles=tiles),
                                         tile_put_sharded(       np.array(__indices). reshape(len(tiles), 8),   tiles=tiles),
                                         tile_put_sharded(       np.array(__do_lists).reshape(len(tiles), 8),   tiles=tiles),
-                                                                dm, 
+                                                                dm,
                                                                 _vj,
                                                                 _vk
                         )'''
 
                 # do last iteration that might not fit size-wise
-                for j in range( count//chunk_size, count // chunk_size + 1 ): 
+                for j in range( count//chunk_size, count // chunk_size + 1 ):
                         _start, _stop = j*chunk_size, (j+1)*chunk_size
 
-                        __indices  = _indices [_start: _stop] 
-                        __do_lists = _do_lists[_start: _stop] 
+                        __indices  = _indices [_start: _stop]
+                        __do_lists = _do_lists[_start: _stop]
                         _eri_s8    = eri_s8   [_start: _stop]
 
                         n = __indices.shape[0]
-                        if n != len(tiles): 
-                                # pad 
+                        if n != len(tiles):
+                                # pad
                                 __indices  = np.concatenate( (__indices,  np.zeros((len(tiles)-n, 8), dtype=__indices.dtype)))
                                 __do_lists = np.concatenate( (__do_lists, np.zeros((len(tiles)-n, 8), dtype=__do_lists.dtype)))
                                 _eri_s8    = jnp.concatenate((_eri_s8,    np.zeros((len(tiles)-n, _eri_s8.shape[1]))))
 
 
-                                if print_sizes: 
+                                if print_sizes:
                                         print("indices", np.prod(__indices.shape)*4/10**6)
                                         print("do_lists", np.prod(__do_lists.shape)*4/10**6)
                                         print("eri", np.prod(_eri_s8.shape)*4/10**6)
 
 
-                        _vj, _vk = tile_map_primitive(          poplar_direct_s1, 
+                        _vj, _vk = tile_map_primitive(          poplar_direct_s1,
                                         tile_put_sharded(       _eri_s8.  reshape(len(tiles), -1),             tiles=tiles),
                                         tile_put_sharded(       np.array(__indices). reshape(len(tiles), 8),   tiles=tiles),
                                         tile_put_sharded(       np.array(__do_lists).reshape(len(tiles), 8),   tiles=tiles),
-                                                                dm, 
+                                                                dm,
                                                                 _vj,
                                                                 _vk
                         )
 
-                start = stop 
+                start = stop
 
-        vj = jnp.sum(_vj.array, axis=0)  
+        vj = jnp.sum(_vj.array, axis=0)
         vk = jnp.sum(_vk.array, axis=0)
 
         return vj, vk
@@ -346,64 +347,64 @@ def ipu_direct_mult_v2(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, i
         #vertex_filename = osp.join(osp.dirname(__file__), "outfile.gp")
         poplar_direct_s1_vj = create_ipu_tile_primitive(
                 "poplar_direct_s1_vj",
-                "poplar_direct_s1_vj", 
+                "poplar_direct_s1_vj",
                 inputs=["integral", "indices", "do_list", "dm", "in_vj"],
                 outputs={ "vj": 3,},
                 gp_filename=vertex_filename,
-                perf_estimate=100,  
+                perf_estimate=100,
         )
         poplar_direct_s1_vk = create_ipu_tile_primitive(
                 "poplar_direct_s1_vk",
-                "poplar_direct_s1_vk", 
+                "poplar_direct_s1_vk",
                 inputs=["integral", "indices", "do_list", "dm",  "in_vk"],
                 outputs={ "vk": 3},
                 gp_filename=vertex_filename,
-                perf_estimate=100,  
+                perf_estimate=100,
         )
         poplar_direct_s1_forloop_vj = create_ipu_tile_primitive(
                 "poplar_direct_s1_forloop_vj",
-                "poplar_direct_s1_forloop_vj", 
+                "poplar_direct_s1_forloop_vj",
                 inputs=["integral", "indices", "do_list", "dm", "in_vj",  "chunk_size"],
                 outputs={ "vj": 3},
                 gp_filename=vertex_filename,
-                perf_estimate=100,  
+                perf_estimate=100,
         )
         poplar_direct_s1_forloop_vk = create_ipu_tile_primitive(
                 "poplar_direct_s1_forloop_vk",
-                "poplar_direct_s1_forloop_vk", 
+                "poplar_direct_s1_forloop_vk",
                 inputs=["integral", "indices", "do_list", "dm",  "in_vk", "chunk_size"],
                 outputs={  "vk": 3},
                 gp_filename=vertex_filename,
-                perf_estimate=100,  
+                perf_estimate=100,
         )
 
         indxs = np.array(indxs)
 
-        #num_threads = 1 
+        #num_threads = 1
         print(threads)
-        num_threads = threads 
+        num_threads = threads
         num_tiles = NUM_TILES-1
 
         tiles = tuple((np.arange(num_tiles*num_threads)%num_tiles+1).tolist())
 
-        # consider removing that! 
-        #tiles = tuple([a for a in tiles if a != 847] ) # remove a specific tile; jnp.roll get's put there and makes it OOM. 
-        tiles = tuple([a for a in tiles if a != 847 and a%64 !=0] ) # remove a specific tile; jnp.roll get's put there and makes it OOM. ; also, remove all powers of two. 
+        # consider removing that!
+        #tiles = tuple([a for a in tiles if a != 847] ) # remove a specific tile; jnp.roll get's put there and makes it OOM.
+        tiles = tuple([a for a in tiles if a != 847 and a%64 !=0] ) # remove a specific tile; jnp.roll get's put there and makes it OOM. ; also, remove all powers of two.
         num_tiles = len(tiles)//num_threads
 
         dm    = tile_put_replicated(    dm,             tiles=tiles)
 
-        print_sizes = False 
-        if print_sizes: 
+        print_sizes = False
+        if print_sizes:
                 print("input",[(a.shape, np.prod(a.shape)/10**6) for a in __out3])
                 print("dm", np.prod(dm.shape)*4/10**6)
 
         # make it sequential on say rows of vj and vk?
-        # if we do that we may even be able to push to gdb11? 
+        # if we do that we may even be able to push to gdb11?
         # we can also do vj, vk sequentially, this reduces by 89*2MB for gdb9 631G*
         def get_vj():
 
-                _vj = tile_put_replicated(jnp.zeros((N, N)), tiles=tiles) 
+                _vj = tile_put_replicated(jnp.zeros((N, N)), tiles=tiles)
 
                 start = 0
                 for num, eri_s8 in enumerate(__out3):
@@ -413,35 +414,35 @@ def ipu_direct_mult_v2(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, i
                         _do_lists = np.array(do_lists).reshape(-1, 8)[indxs][start:stop]
                         print(num, eri_s8.shape, _indices.shape, _do_lists.shape)
 
-                        chunk_size = len(tiles) 
+                        chunk_size = len(tiles)
                         count      = eri_s8.shape[0]
         #
-                        if print_sizes: 
+                        if print_sizes:
                                 print("vj", np.prod(_vj.shape)*4/10**6)
                                 print("vk", np.prod(_vk.shape)*4/10**6)
 
                         # move this forlopp inside C++ vertex
-                        # basically we have to copy (vj,vk) for every single multiplicatiion. 
-                        # This obviously kills everything.. 
+                        # basically we have to copy (vj,vk) for every single multiplicatiion.
+                        # This obviously kills everything..
 
                         #all_stop = (count//chunk_size)*
                         #all_indices = indices[0: all_stop]
 
-                        # we'll have to go to -C 4 to have enough for three iterations. 
+                        # we'll have to go to -C 4 to have enough for three iterations.
                         # compile time is slow for integrals (but not mult).
-                        #integral size ]  [ 1  3  9 27 81]                                                                                                                                 
+                        #integral size ]  [ 1  3  9 27 81]
                         # [integral count]  [1590 2812 2121  750  120]
                         # [integral size ]  [ 1  3  9 27 81]
-                        # [integral count]  [32408 28013  9939  1651   120] # so the hydrogens basically 30x the small work; 
+                        # [integral count]  [32408 28013  9939  1651   120] # so the hydrogens basically 30x the small work;
                         chunks = count // chunk_size
                         for __j in range(chunks):
                                 _start, _stop = __j*chunk_size, (__j+1)*chunk_size
 
 
-                        if chunks > 0: 
+                        if chunks > 0:
 
-                                all_stop     = _stop 
-                                print(_indices.shape, len(tiles), chunks, 8, all_stop) #(32408, 8)                                                                                                                                                         
+                                all_stop     = _stop
+                                print(_indices.shape, len(tiles), chunks, 8, all_stop) #(32408, 8)
                                 #exit()
 
                                 all_indices  = _indices [0:all_stop].reshape( len(tiles), chunks, 8 )
@@ -450,52 +451,52 @@ def ipu_direct_mult_v2(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, i
                                 _chunk_size   = tile_put_replicated( np.ones((1,chunks)), tiles=tiles)
 
 
-                                # multivertex share the input. 
-                                # 
-                                
+                                # multivertex share the input.
+                                #
+
                                 #all_indices = _indices[0:stop]
-                                _vj= tile_map_primitive(          poplar_direct_s1_forloop_vj, 
+                                _vj= tile_map_primitive(          poplar_direct_s1_forloop_vj,
                                                         tile_put_sharded(       all_eri_s8,             tiles=tiles),
                                                         tile_put_sharded(       all_indices,   tiles=tiles),
                                                         tile_put_sharded(       all_do_lists,   tiles=tiles),
-                                                                                dm, 
+                                                                                dm,
                                                                                 _vj,
                                                                                 _chunk_size
                                 )
 
                         # do last iteration that might not fit size-wise
-                        for j in range( count//chunk_size, count // chunk_size + 1 ): 
+                        for j in range( count//chunk_size, count // chunk_size + 1 ):
                                 _start, _stop = j*chunk_size, (j+1)*chunk_size
 
-                                __indices  = _indices [_start: _stop] 
-                                __do_lists = _do_lists[_start: _stop] 
+                                __indices  = _indices [_start: _stop]
+                                __do_lists = _do_lists[_start: _stop]
                                 _eri_s8    = eri_s8   [_start: _stop]
 
                                 n = __indices.shape[0]
-                                if n != len(tiles): 
-                                        # pad 
+                                if n != len(tiles):
+                                        # pad
                                         __indices  = np.concatenate( (__indices,  np.zeros((len(tiles)-n, 8), dtype=__indices.dtype)))
                                         __do_lists = np.concatenate( (__do_lists, np.zeros((len(tiles)-n, 8), dtype=__do_lists.dtype)))
                                         _eri_s8    = jnp.concatenate((_eri_s8,    np.zeros((len(tiles)-n, _eri_s8.shape[1]))))
 
 
-                                        if print_sizes: 
+                                        if print_sizes:
                                                 print("indices", np.prod(__indices.shape)*4/10**6)
                                                 print("do_lists", np.prod(__do_lists.shape)*4/10**6)
                                                 print("eri", np.prod(_eri_s8.shape)*4/10**6)
 
 
-                                _vj= tile_map_primitive(          poplar_direct_s1_vj, 
+                                _vj= tile_map_primitive(          poplar_direct_s1_vj,
                                                 tile_put_sharded(       _eri_s8.  reshape(len(tiles), -1),             tiles=tiles),
                                                 tile_put_sharded(       np.array(__indices). reshape(len(tiles), 8),   tiles=tiles),
                                                 tile_put_sharded(       np.array(__do_lists).reshape(len(tiles), 8),   tiles=tiles),
-                                                                        dm, 
+                                                                        dm,
                                                                         _vj,
                                 )
 
-                        start = stop 
+                        start = stop
 
-                return jnp.sum(_vj.array, axis=0)  
+                return jnp.sum(_vj.array, axis=0)
 
         vj = get_vj()
 
@@ -511,88 +512,88 @@ def ipu_direct_mult_v2(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, i
                         _do_lists = np.array(do_lists).reshape(-1, 8)[indxs][start:stop]
                         print(num, eri_s8.shape, _indices.shape, _do_lists.shape)
 
-                        chunk_size = len(tiles) 
+                        chunk_size = len(tiles)
                         count      = eri_s8.shape[0]
         #
-                        if print_sizes: 
+                        if print_sizes:
                                 print("vj", np.prod(_vj.shape)*4/10**6)
                                 print("vk", np.prod(_vk.shape)*4/10**6)
 
                         # move this forlopp inside C++ vertex
-                        # basically we have to copy (vj,vk) for every single multiplicatiion. 
-                        # This obviously kills everything.. 
+                        # basically we have to copy (vj,vk) for every single multiplicatiion.
+                        # This obviously kills everything..
 
                         #all_stop = (count//chunk_size)*
                         #all_indices = indices[0: all_stop]
 
-                        # we'll have to go to -C 4 to have enough for three iterations. 
+                        # we'll have to go to -C 4 to have enough for three iterations.
                         # compile time is slow for integrals (but not mult).
-                        #integral size ]  [ 1  3  9 27 81]                                                                                                                                 
+                        #integral size ]  [ 1  3  9 27 81]
                         # [integral count]  [1590 2812 2121  750  120]
                         # [integral size ]  [ 1  3  9 27 81]
-                        # [integral count]  [32408 28013  9939  1651   120] # so the hydrogens basically 30x the small work; 
+                        # [integral count]  [32408 28013  9939  1651   120] # so the hydrogens basically 30x the small work;
                         chunks = count // chunk_size
                         for __j in range(chunks):
                                 _start, _stop = __j*chunk_size, (__j+1)*chunk_size
 
 
-                        if chunks > 0: 
+                        if chunks > 0:
 
-                                all_stop     = _stop 
-                                print(_indices.shape, len(tiles), chunks, 8, all_stop) #(32408, 8)                                                                                                                                                         
+                                all_stop     = _stop
+                                print(_indices.shape, len(tiles), chunks, 8, all_stop) #(32408, 8)
                                 #exit()
 
                                 all_indices  = _indices [0:all_stop].reshape( len(tiles), chunks, 8 )
                                 all_do_lists = _do_lists[0:all_stop].reshape( len(tiles), chunks, 8 )
                                 all_eri_s8   = eri_s8   [0:all_stop].reshape( len(tiles), chunks, eri_s8.shape[1] )
                                 _chunk_size   = tile_put_replicated( np.ones((1,chunks)), tiles=tiles)
-                                
+
                                 #all_indices = _indices[0:stop]
-                                _vk= tile_map_primitive(          poplar_direct_s1_forloop_vk, 
+                                _vk= tile_map_primitive(          poplar_direct_s1_forloop_vk,
                                                         tile_put_sharded(       all_eri_s8,             tiles=tiles),
                                                         tile_put_sharded(       all_indices,   tiles=tiles),
                                                         tile_put_sharded(       all_do_lists,   tiles=tiles),
-                                                                                dm, 
+                                                                                dm,
                                                                                 _vk,
                                                                                 _chunk_size
                                 )
 
                         # do last iteration that might not fit size-wise
-                        for j in range( count//chunk_size, count // chunk_size + 1 ): 
+                        for j in range( count//chunk_size, count // chunk_size + 1 ):
                                 _start, _stop = j*chunk_size, (j+1)*chunk_size
 
-                                __indices  = _indices [_start: _stop] 
-                                __do_lists = _do_lists[_start: _stop] 
+                                __indices  = _indices [_start: _stop]
+                                __do_lists = _do_lists[_start: _stop]
                                 _eri_s8    = eri_s8   [_start: _stop]
 
                                 n = __indices.shape[0]
-                                if n != len(tiles): 
-                                        # pad 
+                                if n != len(tiles):
+                                        # pad
                                         __indices  = np.concatenate( (__indices,  np.zeros((len(tiles)-n, 8), dtype=__indices.dtype)))
                                         __do_lists = np.concatenate( (__do_lists, np.zeros((len(tiles)-n, 8), dtype=__do_lists.dtype)))
                                         _eri_s8    = jnp.concatenate((_eri_s8,    np.zeros((len(tiles)-n, _eri_s8.shape[1]))))
 
 
-                                        if print_sizes: 
+                                        if print_sizes:
                                                 print("indices", np.prod(__indices.shape)*4/10**6)
                                                 print("do_lists", np.prod(__do_lists.shape)*4/10**6)
                                                 print("eri", np.prod(_eri_s8.shape)*4/10**6)
 
 
-                                _vk = tile_map_primitive(          poplar_direct_s1_vk, 
+                                _vk = tile_map_primitive(          poplar_direct_s1_vk,
                                                 tile_put_sharded(       _eri_s8.  reshape(len(tiles), -1),             tiles=tiles),
                                                 tile_put_sharded(       np.array(__indices). reshape(len(tiles), 8),   tiles=tiles),
                                                 tile_put_sharded(       np.array(__do_lists).reshape(len(tiles), 8),   tiles=tiles),
-                                                                        dm, 
+                                                                        dm,
                                                                         _vk
                                 )
 
-                        start = stop 
+                        start = stop
 
-                return jnp.sum(_vk.array, axis=0) # sum together logarithmically instead of all in one go? i.e., build a logadd where tilex next to each other add? 
+                return jnp.sum(_vk.array, axis=0) # sum together logarithmically instead of all in one go? i.e., build a logadd where tilex next to each other add?
 
 
-        vk = get_vk(vj) # add argument to trick compiler to do this sequentially. 
+        vk = get_vk(vj) # add argument to trick compiler to do this sequentially.
 
         return vj, vk
         #return jnp.sum(_vj.array), jnp.sum(_vk.array)
@@ -601,108 +602,108 @@ def ipu_direct_mult_v2(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, i
 def ipu_direct_mult(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, indxs, threads=1, v=2):
         print("THREADS!", threads)
 
-        if v == 0: 
+        if v == 0:
                 return ipu_direct_mult_v0(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, indxs, threads=threads)
-        elif v == 1: 
+        elif v == 1:
                 return ipu_direct_mult_v1(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, indxs, threads=threads)
 
-        elif v == 2: # does vj, vk sequentially to save memory! might be a little slower! 
+        elif v == 2: # does vj, vk sequentially to save memory! might be a little slower!
                 return ipu_direct_mult_v2(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, indxs, threads=threads)
 
-# Generate a c20 dataset? 
-# move the molecules a bit all the ways, that'd be kind of fun! 
-# for this pre=init makes more sense! 
+# Generate a c20 dataset?
+# move the molecules a bit all the ways, that'd be kind of fun!
+# for this pre=init makes more sense!
 
-@partial(jax.jit, backend="ipu", static_argnums=(2,3,4,5,6,7,8))  
-def compute_integrals_2(input_floats, input_ints, input_ijkl, shapes, sizes, counts, indxs_inv, num_threads=3, v=1):    
+@partial(jax.jit, backend="ipu", static_argnums=(2,3,4,5,6,7,8))
+def compute_integrals_2(input_floats, input_ints, input_ijkl, shapes, sizes, counts, indxs_inv, num_threads=3, v=1):
         print("[version]", v)
         print("[threads]", num_threads)
-        if v == 0: 
+        if v == 0:
                 return integrals_v0(input_floats, input_ints, input_ijkl, shapes, sizes, counts, indxs_inv, num_threads=num_threads)
 
-        if v == 1: 
+        if v == 1:
                 return integrals_v1(input_floats, input_ints, input_ijkl, shapes, sizes, counts, indxs_inv, num_threads=num_threads)
 
-def integrals_v0(input_floats, input_ints, input_ijkl, shapes, sizes, counts, indxs_inv, num_threads=3):    
-        # i don't specify threads, they've just been fixed all the time. 
+def integrals_v0(input_floats, input_ints, input_ijkl, shapes, sizes, counts, indxs_inv, num_threads=3):
+        # i don't specify threads, they've just been fixed all the time.
 
         vertex_filename = osp.join(osp.dirname(__file__), "int2e_sph.cpp")
         #vertex_filename = osp.join(osp.dirname(__file__), "outfile.gp")
         int2e_sph = create_ipu_tile_primitive(
                 "poplar_int2e_sph",
-                "poplar_int2e_sph", 
+                "poplar_int2e_sph",
                 inputs=["ipu_floats", "ipu_ints", "ipu_ij", "ipu_output", "tile_g", "tile_idx", "tile_buf"],
                 outputs={"ipu_output": 3, "tile_g": 4, "tile_idx": 5, "tile_buf": 6},
                 gp_filename=vertex_filename,
-                perf_estimate=100,  
+                perf_estimate=100,
         )
 
         cpu_outputs = []
-        start_index = 0 
-        start, stop = 0, 0 
-        np.random.seed(42) # 
+        start_index = 0
+        start, stop = 0, 0
+        np.random.seed(42) #
 
-        # Would more threads work? 
-        # Compare compile time with 
+        # Would more threads work?
+        # Compare compile time with
 
-        num_tiles = NUM_TILES-1 # jax.devices()[0].num_tiles # this returns CPU device ? i think because of jitting? 
+        num_tiles = NUM_TILES-1 # jax.devices()[0].num_tiles # this returns CPU device ? i think because of jitting?
 
-        # we replicate stuff on everything without using it => blows up compile time! 
+        # we replicate stuff on everything without using it => blows up compile time!
 
-        # replicate input for integral computation. 
-        # API: would be amazing if replicate allows us to use once and other threads then read it. 
-        num_calls = len(indxs_inv) 
+        # replicate input for integral computation.
+        # API: would be amazing if replicate allows us to use once and other threads then read it.
+        num_calls = len(indxs_inv)
         print(num_calls)
 
-        if num_calls < num_tiles*num_threads:  
-                tiles       = tuple((np.arange(num_calls)+1).tolist()) 
-        else:                           
-                tiles       = tuple((np.arange(num_tiles*num_threads)%(num_tiles)+1).tolist()) 
+        if num_calls < num_tiles*num_threads:
+                tiles       = tuple((np.arange(num_calls)+1).tolist())
+        else:
+                tiles       = tuple((np.arange(num_tiles*num_threads)%(num_tiles)+1).tolist())
 
         tile_floats = tile_put_replicated(input_floats, tiles)
         tile_ints   = tile_put_replicated(input_ints,   tiles)
 
-        for i, (size, count) in enumerate(zip(sizes, counts)): 
-                glen, nf, buflen = shapes[i] 
+        for i, (size, count) in enumerate(zip(sizes, counts)):
+                glen, nf, buflen = shapes[i]
 
-                tiles       = tuple((np.arange(num_tiles*num_threads)%(num_tiles)+1).tolist()) 
+                tiles       = tuple((np.arange(num_tiles*num_threads)%(num_tiles)+1).tolist())
                 tile_g      = tile_put_replicated(jnp.empty(min(int(glen), 3888)+1),                     tiles)
                 tile_idx    = tile_put_replicated(jnp.empty(max(256, min(int(nf*3), 3888)+1), dtype = jnp.int32) ,  tiles)
                 tile_buf    = tile_put_replicated(jnp.empty(1080*4+1) ,                   tiles)
 
                 list_cpu_output = []
-                chunk_size = num_tiles*num_threads 
-                for j in range(count // (chunk_size) + 1): 
-                        start, stop = j*chunk_size, (j+1)*chunk_size 
+                chunk_size = num_tiles*num_threads
+                for j in range(count // (chunk_size) + 1):
+                        start, stop = j*chunk_size, (j+1)*chunk_size
                         indices = np.array(input_ijkl[i][start:stop])
-                        if indices.shape[0] != len(tiles): 
-                                tiles = tuple((np.arange(indices.shape[0])%(num_tiles)+1).tolist()) 
+                        if indices.shape[0] != len(tiles):
+                                tiles = tuple((np.arange(indices.shape[0])%(num_tiles)+1).tolist())
 
                         cpu_output = jnp.empty((len(tiles), size))
 
-                        cpu_output  = tile_put_sharded(   cpu_output+j,   tiles)   
+                        cpu_output  = tile_put_sharded(   cpu_output+j,   tiles)
                         tile_ijkl   = tile_put_sharded(   indices ,     tiles)
 
-                        _cpu_output, _, _, _= tile_map_primitive(int2e_sph, 
-                                                                 tile_floats[:len(tiles)], 
-                                                                 tile_ints[:len(tiles)], 
-                                                                 tile_ijkl, 
-                                                                 cpu_output, 
-                                                                 tile_g[:len(tiles)], 
-                                                                 tile_idx[:len(tiles)], 
+                        _cpu_output, _, _, _= tile_map_primitive(int2e_sph,
+                                                                 tile_floats[:len(tiles)],
+                                                                 tile_ints[:len(tiles)],
+                                                                 tile_ijkl,
+                                                                 cpu_output,
+                                                                 tile_g[:len(tiles)],
+                                                                 tile_idx[:len(tiles)],
                                                                  tile_buf[:len(tiles)]
                                                                 )
                         list_cpu_output.append(_cpu_output.array)
 
                 cpu_outputs.append(jnp.concatenate(list_cpu_output)  )
-                #cpu_outputs.append(list_cpu_output)  
+                #cpu_outputs.append(list_cpu_output)
 
         #__out3 = [jnp.asarray(jnp.concatenate([b for b in a])) for a in cpu_outputs]
         # the code below can be removed
         '''__out3 = cpu_outputs
 
         outs = []
-        for out in __out3: 
+        for out in __out3:
                 a = jnp.concatenate([out.astype(jnp.float32), jnp.zeros((out.shape[0], 625-out.shape[1]), dtype=jnp.float32)], axis=1)
                 outs.append( a)
         ___out3 = jnp.concatenate(outs, axis=0)
@@ -711,76 +712,76 @@ def integrals_v0(input_floats, input_ints, input_ijkl, shapes, sizes, counts, in
 
         #out3 = jnp.zeros((5,5))
 
-        #return out3, start, stop, indxs_inv, cpu_outputs 
+        #return out3, start, stop, indxs_inv, cpu_outputs
         return cpu_outputs, start, stop
 
-def integrals_v1(input_floats, input_ints, input_ijkl, shapes, sizes, counts, indxs_inv, num_threads=3):    
-        # i don't specify threads, they've just been fixed all the time. 
-        # we can add cache and it'll redo the mult 
-        # so with -cache -fast we'd get something like 30s iteration time? 
+def integrals_v1(input_floats, input_ints, input_ijkl, shapes, sizes, counts, indxs_inv, num_threads=3):
+        # i don't specify threads, they've just been fixed all the time.
+        # we can add cache and it'll redo the mult
+        # so with -cache -fast we'd get something like 30s iteration time?
 
         vertex_filename = osp.join(osp.dirname(__file__), "int2e_sph.cpp")
         #vertex_filename = osp.join(osp.dirname(__file__), "outfile.gp")
 
         int2e_sph = create_ipu_tile_primitive(
                 "poplar_int2e_sph",
-                "poplar_int2e_sph", 
+                "poplar_int2e_sph",
                 inputs=["ipu_floats", "ipu_ints", "ipu_ij", "ipu_output", "tile_g", "tile_idx", "tile_buf"],
-                outputs={"ipu_output": 3, "tile_g": 4, "tile_idx": 5, "tile_buf": 6},  # this is kind of weird, we only use ipu_output intput to get shape? 
+                outputs={"ipu_output": 3, "tile_g": 4, "tile_idx": 5, "tile_buf": 6},  # this is kind of weird, we only use ipu_output intput to get shape?
                 gp_filename=vertex_filename,
-                perf_estimate=100,  
+                perf_estimate=100,
         )
         int2e_sph_forloop = create_ipu_tile_primitive(
                 "poplar_int2e_sph_forloop",
-                "poplar_int2e_sph_forloop", 
+                "poplar_int2e_sph_forloop",
                 inputs=["ipu_floats", "ipu_ints", "ipu_ij", "ipu_output", "tile_g", "tile_idx", "tile_buf", "chunks", "integral_size"],
-                outputs={"ipu_output": 3, "tile_g": 4, "tile_idx": 5, "tile_buf": 6},  # this is kind of weird, we only use ipu_output intput to get shape? 
+                outputs={"ipu_output": 3, "tile_g": 4, "tile_idx": 5, "tile_buf": 6},  # this is kind of weird, we only use ipu_output intput to get shape?
                 gp_filename=vertex_filename,
-                perf_estimate=100,  
+                perf_estimate=100,
         )
 
         cpu_outputs = []
-        start_index = 0 
-        start, stop = 0, 0 
-        np.random.seed(42) # 
+        start_index = 0
+        start, stop = 0, 0
+        np.random.seed(42) #
 
-        num_tiles = NUM_TILES-1  # change num_tiles to force recompile! 
-        #num_tiles = NUM_TILES-2  # change num_tiles to force recompile! 
-        #num_tiles = NUM_TILES-3  # change num_tiles to force recompile! 
+        num_tiles = NUM_TILES-1  # change num_tiles to force recompile!
+        #num_tiles = NUM_TILES-2  # change num_tiles to force recompile!
+        #num_tiles = NUM_TILES-3  # change num_tiles to force recompile!
 
-        num_calls = len(indxs_inv) 
+        num_calls = len(indxs_inv)
         print(num_calls)
 
-        if num_calls < num_tiles*num_threads:  tiles       = tuple((np.arange(num_calls)+1).tolist()) 
-        else:                                  tiles       = tuple((np.arange(num_tiles*num_threads)%(num_tiles)+1).tolist()) 
+        if num_calls < num_tiles*num_threads:  tiles       = tuple((np.arange(num_calls)+1).tolist())
+        else:                                  tiles       = tuple((np.arange(num_tiles*num_threads)%(num_tiles)+1).tolist())
 
         tile_floats = tile_put_replicated(input_floats, tiles)
         tile_ints   = tile_put_replicated(input_ints,   tiles)
 
-        for i, (size, count) in enumerate(zip(sizes, counts)): 
-                glen, nf, buflen = shapes[i] 
+        for i, (size, count) in enumerate(zip(sizes, counts)):
+                glen, nf, buflen = shapes[i]
 
-                # can we make it use all threads without 6x memory consumption? 
-                # this is important mainly for the large dataset. 
-                # for the big dataset; can we have it run on a single IPU? 
-                # -gdb 9 631g works; -gdb 9 631g* runs, but it yields error 
+                # can we make it use all threads without 6x memory consumption?
+                # this is important mainly for the large dataset.
+                # for the big dataset; can we have it run on a single IPU?
+                # -gdb 9 631g works; -gdb 9 631g* runs, but it yields error
 
-                tiles       = tuple((np.arange(num_tiles*num_threads)%(num_tiles)+1).tolist()) 
+                tiles       = tuple((np.arange(num_tiles*num_threads)%(num_tiles)+1).tolist())
                 tile_g      = tile_put_replicated(jnp.empty(min(int(glen), 3888)+1),                     tiles)
                 tile_idx    = tile_put_replicated(jnp.empty(max(256, min(int(nf*3), 3888)+1), dtype = jnp.int32) ,  tiles)
                 tile_buf    = tile_put_replicated(jnp.empty(1080*4+1) ,                   tiles)
 
                 list_cpu_output = []
-                chunk_size      = num_tiles * num_threads 
+                chunk_size      = num_tiles * num_threads
 
-                if count // chunk_size > 0: 
+                if count // chunk_size > 0:
 
                         cpu_output = jnp.empty((len(tiles), count//chunk_size, size))
-                        cpu_output  = tile_put_sharded(   cpu_output,   tiles)   
+                        cpu_output  = tile_put_sharded(   cpu_output,   tiles)
 
                         _indices = []
-                        for j in range( count // (chunk_size) ): 
-                                start, stop = j*chunk_size, (j+1)*chunk_size 
+                        for j in range( count // (chunk_size) ):
+                                start, stop = j*chunk_size, (j+1)*chunk_size
                                 indices = np.array(input_ijkl[i][start:stop])
                                 _indices.append(indices.reshape(indices.shape[0], 1, indices.shape[1]))
                         _indices = np.concatenate(_indices, axis=1)
@@ -790,75 +791,75 @@ def integrals_v1(input_floats, input_ints, input_ijkl, shapes, sizes, counts, in
                         #chunks = tile_put_replicated( jnp.zeros(count//chunk_size)+np.random.normal(0,1,(count//chunk_size)), tiles)  # make it recompile; doesn't change anything.
                         #chunks = tile_put_replicated( jnp.zeros(count//chunk_size), tiles)  # make it recompile; doesn't change anything.
                         chunks = tile_put_replicated( jnp.zeros(count//chunk_size), tiles)  # make it recompile; doesn't change anything.
-                        integral_size = tile_put_replicated( jnp.zeros(size), tiles) 
+                        integral_size = tile_put_replicated( jnp.zeros(size), tiles)
 
                         #_input_ijkl = tile_put_sharded(input_ijkl[i][:stop].reshape(len(tiles), count//chunk_size))
                         #_input_ijkl = np.array(input_ijkl[i][:stop]).reshape(len(tiles), count//chunk_size, 4)
                         #_input_ijkl = np.concatenate( [input_ij])
 
-                        # move this for loop into the C code. 
-                        # start by allocaitng the entire output and just sharding whatever is needed? 
-                        if False: 
-                                _cpu_output, _, _, _= tile_map_primitive(int2e_sph_forloop, 
+                        # move this for loop into the C code.
+                        # start by allocaitng the entire output and just sharding whatever is needed?
+                        if False:
+                                _cpu_output, _, _, _= tile_map_primitive(int2e_sph_forloop,
                                                                                 tile_floats,
                                                                                 tile_ints,
                                                                                 _indices[:, :, :],
-                                                                                cpu_output[:, :, :], 
+                                                                                cpu_output[:, :, :],
                                                                                 tile_g,
                                                                                 tile_idx,
-                                                                                tile_buf, 
-                                                                                chunks[:,:], 
+                                                                                tile_buf,
+                                                                                chunks[:,:],
                                                                                 integral_size
                                                                                 )
 
-                                for j in range( count // chunk_size ): 
+                                for j in range( count // chunk_size ):
                                         print("!!", _cpu_output.shape)
-                                        list_cpu_output.append(_cpu_output.array[:, j]) # compute one but only store 1 
+                                        list_cpu_output.append(_cpu_output.array[:, j]) # compute one but only store 1
                                 batched_out = jnp.concatenate(list_cpu_output)
                                 print(batched_out.shape)
-                        else: 
-                                #print(count//chunk_size, integral_size) 
+                        else:
+                                #print(count//chunk_size, integral_size)
                                 print(">>", cpu_output.shape, _indices.shape , chunks.shape, integral_size.shape)
 
-                                batched_out , _, _, _= tile_map_primitive(int2e_sph_forloop, 
+                                batched_out , _, _, _= tile_map_primitive(int2e_sph_forloop,
                                                                         tile_floats,
                                                                         tile_ints,
                                                                         _indices,#[:, j],
-                                                                        cpu_output,#[:, j, :], 
+                                                                        cpu_output,#[:, j, :],
                                                                         tile_g,
                                                                         tile_idx,
-                                                                        tile_buf, 
-                                                                        chunks, 
+                                                                        tile_buf,
+                                                                        chunks,
                                                                         integral_size
                                                                         )
                                 #print(">>", batched_out.shape)
                                 batched_out = jnp.transpose(batched_out.array, (1, 0, 2)).reshape(-1, size)
                                 #print(">>", batched_out.shape)
-                                #for j in range( count // chunk_size ): 
+                                #for j in range( count // chunk_size ):
                                 #        print("!!", batched_out.shape)
-                                #        list_cpu_output.append(batched_out.array[:, j]) # compute one but only store 1 
+                                #        list_cpu_output.append(batched_out.array[:, j]) # compute one but only store 1
                                 #batched_out = jnp.concatenate(list_cpu_output)
                                 #print(batched_out.shape)
 
 
-                # do last iteration normally. 
-                for j in range(count // chunk_size, count // (chunk_size) + 1): 
-                        start, stop = j*chunk_size, (j+1)*chunk_size 
+                # do last iteration normally.
+                for j in range(count // chunk_size, count // (chunk_size) + 1):
+                        start, stop = j*chunk_size, (j+1)*chunk_size
                         indices = np.array(input_ijkl[i][start:stop])
-                        if indices.shape[0] != len(tiles): 
-                                tiles = tuple((np.arange(indices.shape[0])%(num_tiles)+1).tolist()) 
+                        if indices.shape[0] != len(tiles):
+                                tiles = tuple((np.arange(indices.shape[0])%(num_tiles)+1).tolist())
 
                         tile_ijkl   = tile_put_sharded(   indices ,     tiles)
                         cpu_output = jnp.empty((len(tiles), size))
-                        cpu_output  = tile_put_sharded(   cpu_output+j,   tiles)   
+                        cpu_output  = tile_put_sharded(   cpu_output+j,   tiles)
 
-                        _cpu_output, _, _, _= tile_map_primitive(int2e_sph, 
-                                                                 tile_floats[:len(tiles)], 
-                                                                 tile_ints[:len(tiles)], 
-                                                                 tile_ijkl, 
-                                                                 cpu_output, 
-                                                                 tile_g[:len(tiles)], 
-                                                                 tile_idx[:len(tiles)], 
+                        _cpu_output, _, _, _= tile_map_primitive(int2e_sph,
+                                                                 tile_floats[:len(tiles)],
+                                                                 tile_ints[:len(tiles)],
+                                                                 tile_ijkl,
+                                                                 cpu_output,
+                                                                 tile_g[:len(tiles)],
+                                                                 tile_idx[:len(tiles)],
                                                                  tile_buf[:len(tiles)]
                                                                 )
                         #list_cpu_output.append(_cpu_output.array)
@@ -869,25 +870,25 @@ def integrals_v1(input_floats, input_ints, input_ijkl, shapes, sizes, counts, in
         return cpu_outputs, start, stop
 
 
-def prepare_int_floats(mol): 
+def prepare_int_floats(mol):
         # Shapes/sizes.
         atm, bas, env   = mol._atm, mol._bas, mol._env
         n_atm, n_bas, N = atm.shape[0], bas.shape[0], mol.nao_nr()
         ao_loc          = np.cumsum(np.concatenate([np.zeros(1), (bas[:,1]*2+1) * bas[:,3] ])).astype(np.int32)
         n_ao_loc        = np.prod(ao_loc.shape)
         shls_slice      = (0, n_bas, 0, n_bas, 0, n_bas, 0, n_bas)
-        shape           = [1, N, N, N, N] 
+        shape           = [1, N, N, N, N]
 
-        # The padded shape used to store output from all tiles. 
+        # The padded shape used to store output from all tiles.
         n_buf, n_eri, n_env = 81, 81, np.prod(env.shape)
         if mol.basis == "6-31G*":
                 print(">>>", mol.basis)
-                n_buf = 5**4 
-                n_eri = 5**4 
+                n_buf = 5**4
+                n_eri = 5**4
 
-        # Prepare IPU inputs. 
-        # Merge all int/float inputs in seperate arrays. 
-        input_floats = env.reshape(1, -1) 
+        # Prepare IPU inputs.
+        # Merge all int/float inputs in seperate arrays.
+        input_floats = env.reshape(1, -1)
         input_ints   = np.zeros((1, 6+n_ao_loc +n_atm*6+n_bas*8), dtype=np.int32)
         start, stop = 0, 6
         input_ints[:, start:stop] = np.array( [n_eri, n_buf, n_atm, n_bas, n_env, n_ao_loc] )
@@ -900,62 +901,62 @@ def prepare_int_floats(mol):
 
         return input_floats, input_ints
 
-def prepare_integrals_2_inputs(mol): 
+def prepare_integrals_2_inputs(mol):
         # Shapes/sizes.
         atm, bas, env   = mol._atm, mol._bas, mol._env
         n_atm, n_bas, N = atm.shape[0], bas.shape[0], mol.nao_nr()
         ao_loc          = np.cumsum(np.concatenate([np.zeros(1), (bas[:,1]*2+1) * bas[:,3] ])).astype(np.int32)
         n_ao_loc        = np.prod(ao_loc.shape)
         shls_slice      = (0, n_bas, 0, n_bas, 0, n_bas, 0, n_bas)
-        shape           = [1, N, N, N, N] 
+        shape           = [1, N, N, N, N]
 
-        # Initialize tensors for CPU libcint computation. 
+        # Initialize tensors for CPU libcint computation.
         buf     = np.zeros(np.prod(shape)*2)
         out     = np.zeros(shape)
         eri     = np.zeros(shape).reshape(-1)
         ipu_eri = np.zeros(shape).reshape(-1)
 
-        # Fetch dtype from cpp file and cast tensors correspondingly. 
-        try: 
+        # Fetch dtype from cpp file and cast tensors correspondingly.
+        try:
                 _type = open("cpu_int2e_sph.cpp", "r").read().split("#define input_type")[1].split("\n")[0]
-        except: 
+        except:
                 _type = open("electron_repulsion/cpu_int2e_sph.cpp", "r").read().split("#define input_type")[1].split("\n")[0]
         if "double" in _type: dtype = np.float64
-        else:                 dtype = np.float32 
+        else:                 dtype = np.float32
         #print("[dtype] %s"%(str(dtype)))
         buf, out, eri, ipu_eri, env = buf.astype(dtype), out.astype(dtype), eri.astype(dtype), ipu_eri.astype(dtype), env.astype(dtype)
-        
-        # The padded shape used to store output from all tiles. 
+
+        # The padded shape used to store output from all tiles.
         n_buf, n_eri, n_env = 81, 81, np.prod(env.shape)
         if mol.basis == "6-31G*":
-                n_buf = 5**4 
-                n_eri = 5**4 
+                n_buf = 5**4
+                n_eri = 5**4
 
         # Compute how many distinc integrals after 8x symmetry.
         num_calls = 0
-        for i in range(n_bas): 
+        for i in range(n_bas):
                 for j in range(n_bas):
                         for k in range(n_bas):
                                 for l in range(n_bas):
-                                        # * 8-fold symmetry, k>=l, k>=i>=j, 
-                                        if not ( i >= j and k >= l and i*j >= k * l): continue 
+                                        # * 8-fold symmetry, k>=l, k>=i>=j,
+                                        if not ( i >= j and k >= l and i*j >= k * l): continue
                                         num_calls+=1
 
 
 
-        # Input/outputs for calling the IPU vertex. 
+        # Input/outputs for calling the IPU vertex.
         input_ijkl   = np.zeros((num_calls, 4),     dtype=np.int32)
         cpu_output   = np.zeros((num_calls, n_eri), dtype=np.float32)
         output_sizes = np.zeros((num_calls, 5))
 
-        # Fill input_ijkl and output_sizes with the necessary indices. 
+        # Fill input_ijkl and output_sizes with the necessary indices.
         c = 0
-        for i in range(n_bas): 
+        for i in range(n_bas):
                 for j in range(n_bas):
                         for k in range(n_bas):
                                 for l in range(n_bas):
-                                        # * 8-fold symmetry, k>=l, k>=i>=j, 
-                                        if not ( i >= j and k >= l and i*j >= k * l): continue 
+                                        # * 8-fold symmetry, k>=l, k>=i>=j,
+                                        if not ( i >= j and k >= l and i*j >= k * l): continue
 
                                         input_ijkl[c] = [i, j, k, l]
 
@@ -969,9 +970,9 @@ def prepare_integrals_2_inputs(mol):
 
                                         c += 1
 
-        # Prepare IPU inputs. 
-        # Merge all int/float inputs in seperate arrays. 
-        input_floats = env.reshape(1, -1) 
+        # Prepare IPU inputs.
+        # Merge all int/float inputs in seperate arrays.
+        input_floats = env.reshape(1, -1)
         input_ints   = np.zeros((1, 6+n_ao_loc +n_atm*6+n_bas*8), dtype=np.int32)
         start, stop = 0, 6
         input_ints[:, start:stop] = np.array( [n_eri, n_buf, n_atm, n_bas, n_env, n_ao_loc] )
@@ -983,14 +984,14 @@ def prepare_integrals_2_inputs(mol):
         input_ints[:, start:stop] = bas.reshape(-1)
 
 
-        
-        def get_shapes(input_ijkl): 
+
+        def get_shapes(input_ijkl):
                 i_sh, j_sh, k_sh, l_sh  = input_ijkl[0]
-                BAS_SLOTS = 8 
+                BAS_SLOTS = 8
                 NPRIM_OF = 2
                 NCTR_OF = 3
                 ANG_OF = 1
-                GSHIFT = 4 
+                GSHIFT = 4
 
                 i_prim  = bas.reshape(-1)[BAS_SLOTS*i_sh + NPRIM_OF]
                 j_prim  = bas.reshape(-1)[BAS_SLOTS*j_sh + NPRIM_OF]
@@ -1015,11 +1016,11 @@ def prepare_integrals_2_inputs(mol):
                 n_comp = 1
 
                 nc = i_ctr * j_ctr * k_ctr * l_ctr;
-                lenl = nf * nc * n_comp; 
-                lenk = nf * i_ctr * j_ctr * k_ctr * n_comp; 
-                lenj = nf * i_ctr * j_ctr * n_comp; 
-                leni = nf * i_ctr * n_comp; 
-                len0 = nf * n_comp; 
+                lenl = nf * nc * n_comp;
+                lenk = nf * i_ctr * j_ctr * k_ctr * n_comp;
+                lenj = nf * i_ctr * j_ctr * n_comp;
+                leni = nf * i_ctr * n_comp;
+                len0 = nf * n_comp;
 
                 ng = [0, 0, 0, 0, 0, 1, 1, 1];
 
@@ -1037,7 +1038,7 @@ def prepare_integrals_2_inputs(mol):
 
                 ibase = li_ceil > lj_ceil;
                 kbase = lk_ceil > ll_ceil;
-                if (nrys_roots <= 2): 
+                if (nrys_roots <= 2):
                         ibase = 0;
                         kbase = 0;
                 if (kbase) :
@@ -1053,7 +1054,7 @@ def prepare_integrals_2_inputs(mol):
                 else :
                         dli = li_ceil + 1;
                         dlj = li_ceil + lj_ceil + 1;
-                
+
                 g_stride_i = nrys_roots;
                 g_stride_k = nrys_roots * dli;
                 g_stride_l = nrys_roots * dli * dlk;
@@ -1084,7 +1085,7 @@ def prepare_integrals_2_inputs(mol):
 
                 return len, nf, buflen
 
-        
+
         sizes, counts  = np.unique(output_sizes[:, -1], return_counts=True)
         sizes, counts = sizes.astype(np.int32), counts.astype(np.int32)
 
@@ -1094,10 +1095,10 @@ def prepare_integrals_2_inputs(mol):
 
         sizes, counts  = np.unique(output_sizes[:, -1], return_counts=True)
         sizes, counts = sizes.astype(np.int32), counts.astype(np.int32)
-        start_index = 0 
+        start_index = 0
         inputs = []
         shapes = []
-        for i, (size, count) in enumerate(zip(sizes, counts)): 
+        for i, (size, count) in enumerate(zip(sizes, counts)):
                 a = input_ijkl[start_index: start_index+count]
                 tuples = tuple(map(tuple, a))
                 inputs.append(tuples)
@@ -1106,7 +1107,7 @@ def prepare_integrals_2_inputs(mol):
         tuple_ijkl = tuple(inputs)
         input_ijkl = inputs
 
-        for i in range(len(sizes)): 
+        for i in range(len(sizes)):
                 shapes.append( get_shapes(input_ijkl[i]) )
 
         def inverse_permutation(a):
@@ -1121,25 +1122,25 @@ def prepare_ipu_direct_mult_inputs(num_calls, mol):
         atm, bas, env   = mol._atm, mol._bas, mol._env
         n_atm, n_bas, N = atm.shape[0], bas.shape[0], mol.nao_nr()
         ao_loc          = np.cumsum(np.concatenate([np.zeros(1), (bas[:,1]*2+1) * bas[:,3] ])).astype(np.int32)
-        n = n_bas 
-        c = 0 
+        n = n_bas
+        c = 0
         dct = {}
         lst = []
 
         do_lists = np.zeros((num_calls, 8), dtype=np.int32)
         indices  = np.zeros((num_calls, 8))
 
-        for i in tqdm(range(n)): 
-                for j in range(n): 
+        for i in tqdm(range(n)):
+                for j in range(n):
                         for k in range(n):
-                                for l in range(n): 
+                                for l in range(n):
 
-                                        if not (i >= j and k >= l and i*j >= k * l): continue 
+                                        if not (i >= j and k >= l and i*j >= k * l): continue
 
 
                                         # the output of integral (i,j,k,l) has shape (di, dj, dk, dl)
-                                        # where di,dj,dk,dl are in {1,2,3,4,5} because we  
-                                        #  - only use {c,h,o,n} 
+                                        # where di,dj,dk,dl are in {1,2,3,4,5} because we
+                                        #  - only use {c,h,o,n}
                                         #  - represent electrons as pcq dataset 6-31G*
                                         di = ao_loc[i+1] - ao_loc[i]
                                         dj = ao_loc[j+1] - ao_loc[j]
@@ -1149,18 +1150,18 @@ def prepare_ipu_direct_mult_inputs(num_calls, mol):
                                         # knowing the shape of integral (i,j,k,l) we can fetch it.
                                         #integral = np.transpose( eri_s1[c][ :di*dj*dk*dl].reshape(dl,dk,dj,di), (3,2,1,0) )
 
-                                        # we now need to compute where the current integral 'block' goes in 
-                                        # the final output matrix. 
-                                        i0 = ao_loc[i] - ao_loc[0]  
+                                        # we now need to compute where the current integral 'block' goes in
+                                        # the final output matrix.
+                                        i0 = ao_loc[i] - ao_loc[0]
                                         j0 = ao_loc[j] - ao_loc[0]
                                         k0 = ao_loc[k] - ao_loc[0]
                                         l0 = ao_loc[l] - ao_loc[0]
-                                        #print(i0,j0,k0,l0) # this is different! 
+                                        #print(i0,j0,k0,l0) # this is different!
 
                                         indices[c] = np.array([ di, dj, dk, dl, i0, j0, k0, l0 ])
 
                                         do_list = [False]*8
-                                
+
                                         if not ( i0,j0,k0,l0 ) in dct:
                                                 dct [ i0, j0, k0, l0 ] = 8
                                                 do_list[0] = True
@@ -1185,19 +1186,19 @@ def prepare_ipu_direct_mult_inputs(num_calls, mol):
                                                 dct[ k0, l0, j0, i0 ]  = 13
                                                 do_list[5] = True
 
-                                        if not ( l0, k0, i0, j0  ) in dct: 
+                                        if not ( l0, k0, i0, j0  ) in dct:
                                                 dct[ l0, k0, i0, j0 ]  = 14
                                                 do_list[6] = True
                                         if not ( l0, k0, j0, i0 ) in dct:
                                                 dct [ l0, k0, j0, i0 ]  = 15
                                                 do_list[7] = True
-                                        
+
                                         do_lists[c] = np.array(do_list)
                                         c += 1
 
 
         tuple_indices  = tuple(map(tuple, indices.astype(np.int32).tolist()))
-        tuple_do_lists = tuple(map(tuple, do_lists.astype(np.int32).tolist()))                
+        tuple_do_lists = tuple(map(tuple, do_lists.astype(np.int32).tolist()))
         return tuple_indices, tuple_do_lists, N
 
 def compute_eri(mol, atom_str, eri_them, eri_them_s8):
@@ -1212,52 +1213,52 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
         ao_loc          = np.cumsum(np.concatenate([np.zeros(1), (bas[:,1]*2+1) * bas[:,3] ])).astype(np.int32)
         n_ao_loc        = np.prod(ao_loc.shape)
         shls_slice      = (0, n_bas, 0, n_bas, 0, n_bas, 0, n_bas)
-        shape           = [1, N, N, N, N] 
+        shape           = [1, N, N, N, N]
 
-        # Initialize tensors for CPU libcint computation. 
+        # Initialize tensors for CPU libcint computation.
         buf     = np.zeros(np.prod(shape)*2)
         out     = np.zeros(shape)
         eri     = np.zeros(shape).reshape(-1)
         ipu_eri = np.zeros(shape).reshape(-1)
 
-        # Fetch dtype from cpp file and cast tensors correspondingly. 
+        # Fetch dtype from cpp file and cast tensors correspondingly.
         _type = open("cpu_int2e_sph.cpp", "r").read().split("#define input_type")[1].split("\n")[0]
         if "double" in _type: dtype = np.float64
-        else:                 dtype = np.float32 
+        else:                 dtype = np.float32
         print("[dtype] %s"%(str(dtype)))
         buf, out, eri, ipu_eri, env = buf.astype(dtype), out.astype(dtype), eri.astype(dtype), ipu_eri.astype(dtype), env.astype(dtype)
-        
-        # The padded shape used to store output from all tiles. 
+
+        # The padded shape used to store output from all tiles.
         n_buf, n_eri, n_env = 81, 81, np.prod(env.shape)
         if args.basis == "6-31G*" or args.basis=="631gs": #631gs doesn't work; I think the code is hardwrited for 6-31G* arguemtn
-                n_buf = 5**4 
-                n_eri = 5**4 
+                n_buf = 5**4
+                n_eri = 5**4
 
         # Compute how many distinc integrals after 8x symmetry.
         num_calls = 0
-        for i in range(n_bas): 
+        for i in range(n_bas):
                 for j in range(n_bas):
                         for k in range(n_bas):
                                 for l in range(n_bas):
-                                        # * 8-fold symmetry, k>=l, k>=i>=j, 
-                                        if not ( i >= j and k >= l and i*j >= k * l): continue 
+                                        # * 8-fold symmetry, k>=l, k>=i>=j,
+                                        if not ( i >= j and k >= l and i*j >= k * l): continue
                                         num_calls+=1
 
-        print("[num calls] %i -> %i (with/without symmetry)"%(n_bas**4, num_calls)) 
+        print("[num calls] %i -> %i (with/without symmetry)"%(n_bas**4, num_calls))
 
-        # Input/outputs for calling the IPU vertex. 
+        # Input/outputs for calling the IPU vertex.
         input_ijkl   = np.zeros((num_calls, 4),     dtype=np.int32)
         cpu_output   = np.zeros((num_calls, n_eri), dtype=np.float32)
         output_sizes = np.zeros((num_calls, 5))
 
-        # Fill input_ijkl and output_sizes with the necessary indices. 
+        # Fill input_ijkl and output_sizes with the necessary indices.
         c = 0
-        for i in range(n_bas): 
+        for i in range(n_bas):
                 for j in range(n_bas):
                         for k in range(n_bas):
                                 for l in range(n_bas):
-                                        # * 8-fold symmetry, k>=l, k>=i>=j, 
-                                        if not ( i >= j and k >= l and i*j >= k * l): continue 
+                                        # * 8-fold symmetry, k>=l, k>=i>=j,
+                                        if not ( i >= j and k >= l and i*j >= k * l): continue
 
                                         input_ijkl[c] = [i, j, k, l]
 
@@ -1271,9 +1272,9 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
 
                                         c += 1
 
-        # Prepare IPU inputs. 
-        # Merge all int/float inputs in seperate arrays. 
-        input_floats = env.reshape(1, -1) 
+        # Prepare IPU inputs.
+        # Merge all int/float inputs in seperate arrays.
+        input_floats = env.reshape(1, -1)
         input_ints   = np.zeros((1, 6+n_ao_loc +n_atm*6+n_bas*8), dtype=np.int32)
         start, stop = 0, 6
         input_ints[:, start:stop] = np.array( [n_eri, n_buf, n_atm, n_bas, n_env, n_ao_loc] )
@@ -1284,29 +1285,29 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
         start, stop = start+n_atm*6, stop + n_bas*8
         input_ints[:, start:stop] = bas.reshape(-1)
 
-        # Load vertex using TileJax. 
+        # Load vertex using TileJax.
         vertex_filename = osp.join(osp.dirname(__file__), "int2e_sph.cpp")
         #vertex_filename = osp.join(osp.dirname(__file__), "outfile.gp")
         int2e_sph = create_ipu_tile_primitive(
                 "poplar_int2e_sph",
-                "poplar_int2e_sph", 
+                "poplar_int2e_sph",
                 inputs=["ipu_floats", "ipu_ints", "ipu_ij", "ipu_output", "tile_g", "tile_idx", "tile_buf"],
                 outputs={"ipu_output": 3, "tile_g": 4, "tile_idx": 5, "tile_buf": 6},
                 gp_filename=vertex_filename,
-                perf_estimate=100,  
+                perf_estimate=100,
         )
 
-        # When num_calls < num_tiles*num_threads we can call the vertex once. 
-        # When num_calls > num_tiles*num_threads we need an additional for loop. 
-        # The two functions below handle this. 
+        # When num_calls < num_tiles*num_threads we can call the vertex once.
+        # When num_calls > num_tiles*num_threads we need an additional for loop.
+        # The two functions below handle this.
 
-        def get_shapes(input_ijkl): 
+        def get_shapes(input_ijkl):
                 i_sh, j_sh, k_sh, l_sh  = input_ijkl[0]
-                BAS_SLOTS = 8 
+                BAS_SLOTS = 8
                 NPRIM_OF = 2
                 NCTR_OF = 3
                 ANG_OF = 1
-                GSHIFT = 4 
+                GSHIFT = 4
 
                 i_prim  = bas.reshape(-1)[BAS_SLOTS*i_sh + NPRIM_OF]
                 j_prim  = bas.reshape(-1)[BAS_SLOTS*j_sh + NPRIM_OF]
@@ -1331,11 +1332,11 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
                 n_comp = 1
 
                 nc = i_ctr * j_ctr * k_ctr * l_ctr;
-                lenl = nf * nc * n_comp; 
-                lenk = nf * i_ctr * j_ctr * k_ctr * n_comp; 
-                lenj = nf * i_ctr * j_ctr * n_comp; 
-                leni = nf * i_ctr * n_comp; 
-                len0 = nf * n_comp; 
+                lenl = nf * nc * n_comp;
+                lenk = nf * i_ctr * j_ctr * k_ctr * n_comp;
+                lenj = nf * i_ctr * j_ctr * n_comp;
+                leni = nf * i_ctr * n_comp;
+                len0 = nf * n_comp;
 
                 ng = [0, 0, 0, 0, 0, 1, 1, 1];
 
@@ -1353,7 +1354,7 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
 
                 ibase = li_ceil > lj_ceil;
                 kbase = lk_ceil > ll_ceil;
-                if (nrys_roots <= 2): 
+                if (nrys_roots <= 2):
                         ibase = 0;
                         kbase = 0;
                 if (kbase) :
@@ -1369,7 +1370,7 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
                 else :
                         dli = li_ceil + 1;
                         dlj = li_ceil + lj_ceil + 1;
-                
+
                 g_stride_i = nrys_roots;
                 g_stride_k = nrys_roots * dli;
                 g_stride_l = nrys_roots * dli * dlk;
@@ -1402,32 +1403,32 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
 
 
         @partial(jax.jit, backend="ipu")
-        def compute_fn(input_floats, input_ints, input_ijkl): 
+        def compute_fn(input_floats, input_ints, input_ijkl):
                 sizes, counts  = np.unique(output_sizes[:, -1], return_counts=True)
                 sizes, counts = sizes.astype(np.int32), counts.astype(np.int32)
 
-                # For loop outside: 
-                # we divide each integral "type" onto different tiles, such that they take the same amount of time. 
-                # we then just loop over the integrals until done. 
-                # CON: I have to deal with tile allocation for different integrals. 
+                # For loop outside:
+                # we divide each integral "type" onto different tiles, such that they take the same amount of time.
+                # we then just loop over the integrals until done.
+                # CON: I have to deal with tile allocation for different integrals.
 
-                # For loop inside: 
-                # when we have enough work, we just loop over the integrals needed to be done for each type. 
+                # For loop inside:
+                # when we have enough work, we just loop over the integrals needed to be done for each type.
                 # CON: when there is not enough it doesn't become that fast, e.g., for smaller than benzene.
 
-                # Which one is easiest to code? probably the inside for loop  because I don't have to deal with tile allocation 
-                # also, I think if we fix the synch it should actually fix the speed issue 
+                # Which one is easiest to code? probably the inside for loop  because I don't have to deal with tile allocation
+                # also, I think if we fix the synch it should actually fix the speed issue
 
                 cpu_outputs = []
-                start_index  = 0 
-                for i, (size, count) in enumerate(zip(sizes, counts)): 
-                
+                start_index  = 0
+                for i, (size, count) in enumerate(zip(sizes, counts)):
+
                         cpu_output = jnp.zeros((count, size))
                         tiles = tuple(range(count))
-                        
+
                         tile_floats = tile_put_replicated(input_floats, tiles)
                         tile_ints   = tile_put_replicated(input_ints,   tiles)
-                        cpu_output  = tile_put_sharded(   cpu_output,   tiles)  
+                        cpu_output  = tile_put_sharded(   cpu_output,   tiles)
                         tile_ijkl   = tile_put_sharded(   input_ijkl[start_index: start_index+count],   tiles)
 
                         tile_g      = tile_put_replicated(jnp.zeros(3888+1),                      tiles)
@@ -1444,22 +1445,22 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
                 return cpu_outputs, start, stop
 
 
-        
 
-        
 
-        #@partial(jax.jit, backend="ipu", static_argnums=(4,5))  
-        #def for_loop(input_floats, input_ints, cpu_output, input_ijkl, num_calls, num_tiles):    
-                # input_ijkl may end up dominating space consumption? 
-        def wrap_cycles(func): 
+
+
+        #@partial(jax.jit, backend="ipu", static_argnums=(4,5))
+        #def for_loop(input_floats, input_ints, cpu_output, input_ijkl, num_calls, num_tiles):
+                # input_ijkl may end up dominating space consumption?
+        def wrap_cycles(func):
                 def g( int2e_sph, tile_floats, tile_ints, input_ijkl, output, tile_g, tile_idx, tile_buf ):
                         #b, cycle = ipu_hw_cycle_count(b)
                         ipu_output, tile_g, tile_idx, tile_buf = func(int2e_sph, tile_floats, tile_ints, input_ijkl, output, tile_g, tile_idx, tile_buf)
                         return ipu_output, tile_g, [0], [0] #cycle, cycle2
                 return g
 
-        @partial(jax.jit, backend="ipu", static_argnums=(3,4))  
-        def compute_integrals(input_floats, input_ints, input_ijkl, num_calls, num_tiles):    
+        @partial(jax.jit, backend="ipu", static_argnums=(3,4))
+        def compute_integrals(input_floats, input_ints, input_ijkl, num_calls, num_tiles):
                 outs, cycles_start, cycles_stop, output = [], [], [], jnp.zeros((num_tiles, n_buf))
 
 
@@ -1472,17 +1473,17 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
                 tile_idx    = tile_put_replicated(jnp.zeros(3888+1, dtype = jnp.int32) ,  tiles)
                 tile_buf    = tile_put_replicated(jnp.zeros(1080*4+1) ,                   tiles)
 
-                for i in range( num_calls // num_tiles ):  
+                for i in range( num_calls // num_tiles ):
                         start, stop = num_tiles*i, num_tiles*(i+1)
 
                         out, tile_g, cycle_start, cycle_stop = wrap_cycles(tile_map_primitive)(
-                                                int2e_sph, 
-                                                tile_floats, 
+                                                int2e_sph,
+                                                tile_floats,
                                                 tile_ints,
                                                 tile_put_sharded(input_ijkl[start:stop], tiles),
                                                 tile_put_sharded(output+i, tiles),
-                                                tile_g, 
-                                                tile_idx, 
+                                                tile_g,
+                                                tile_idx,
                                                 tile_buf
                         )
                         outs.append(out.array)
@@ -1491,13 +1492,13 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
 
                 elements_left = input_ijkl[num_tiles*(i+1):].shape[0]
                 out, tile_g, cycle_start, cycle_stop = wrap_cycles(tile_map_primitive)(
-                                int2e_sph, 
-                                tile_floats, 
-                                tile_ints, 
-                                tile_put_sharded(input_ijkl[-num_tiles:], tiles), 
-                                tile_put_sharded(output+i+1,              tiles), 
-                                tile_g, 
-                                tile_idx, 
+                                int2e_sph,
+                                tile_floats,
+                                tile_ints,
+                                tile_put_sharded(input_ijkl[-num_tiles:], tiles),
+                                tile_put_sharded(output+i+1,              tiles),
+                                tile_g,
+                                tile_idx,
                                 tile_buf
                 )
                 outs.append(out.array[-elements_left:])
@@ -1505,8 +1506,8 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
                 cycles_stop.append(cycle_stop)
 
                 return outs, tile_g.array[:10, :10], cycles_start, cycles_stop
-                
-               
+
+
         sizes, counts  = np.unique(output_sizes[:, -1], return_counts=True)
         sizes, counts = sizes.astype(np.int32), counts.astype(np.int32)
         print("[integral size ] ", sizes )
@@ -1514,18 +1515,18 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
 
         print("[matrix list] %i MB -> %i MB"%(num_calls*sizes[-1]/10**6, np.sum(sizes*counts/10**6)))
 
-        if args.cpu: 
+        if args.cpu:
                 out3 = np.zeros(out.shape)
-        else: 
+        else:
                 num_threads = int(args.threads)
                 ipu_num_tiles = 1472#jax.devices()[0].num_tiles
-                if num_calls >= ipu_num_tiles*num_threads: 
+                if num_calls >= ipu_num_tiles*num_threads:
                         # If enough calls allocate all threads and all tiles.
                         tiles = [i for i in range(1, ipu_num_tiles) for _ in range(num_threads)]
-                else: 
-                        # If too few calls deal with remainder. 
+                else:
+                        # If too few calls deal with remainder.
                         tiles = [i for i in range(num_calls//num_threads) for _ in range(num_threads)]
-                        remainder = num_calls - int(num_calls//num_threads)*num_threads  
+                        remainder = num_calls - int(num_calls//num_threads)*num_threads
                         if remainder != 0: tiles = tiles + [int(num_calls//num_threads)]*remainder
 
                 num_tiles = len(tiles)
@@ -1535,34 +1536,34 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
                                 str(cpu_output.shape),   cpu_output.nbytes/1000,
                                 str(input_ijkl.shape),   input_ijkl.nbytes/1000))
 
-                # Benchmark a single integral. 
-                # Allows us to iterate quickly on improving the C++ code on CPU/MK2. 
+                # Benchmark a single integral.
+                # Allows us to iterate quickly on improving the C++ code on CPU/MK2.
                 # This also runs the C++ variant in cpu_int2e_sph.cpp (this allows printing)
                 if args.micro != -1:
-                        # Fetch the specific integral we want to micro benchmark. 
+                        # Fetch the specific integral we want to micro benchmark.
                         args.micro = int(args.micro)
                         input_ijkl = input_ijkl[args.micro: args.micro+1]
                         cpu_output = cpu_output[args.micro: args.micro+1]
 
-                        # Run on CPU. 
+                        # Run on CPU.
                         ret = libcgto.int2e_sph(
-                                buf.ctypes.data_as(ctypes.c_void_p), 
-                                ctypes.c_int(np.prod(buf.shape)), 
+                                buf.ctypes.data_as(ctypes.c_void_p),
+                                ctypes.c_int(np.prod(buf.shape)),
                                 lib.c_null_ptr(),
                                 (ctypes.c_int*4)(*input_ijkl.tolist()[0]),
                                 atm.ctypes.data_as(ctypes.c_void_p),
-                                ctypes.c_int(n_atm), 
-                                bas.ctypes.data_as(ctypes.c_void_p), 
-                                ctypes.c_int(n_bas), 
-                                env.ctypes.data_as(ctypes.c_void_p), 
-                                ctypes.c_int(np.prod(env.shape))) 
+                                ctypes.c_int(n_atm),
+                                bas.ctypes.data_as(ctypes.c_void_p),
+                                ctypes.c_int(n_bas),
+                                env.ctypes.data_as(ctypes.c_void_p),
+                                ctypes.c_int(np.prod(env.shape)))
 
-                        # Run on IPU. 
+                        # Run on IPU.
                         num_calls = 1
                         tiles     = (1,)
 
                         out3, start_cycles, stop_cycles = compute_fn( input_floats, input_ints, input_ijkl)
-                       
+
                         stop_cycles, start_cycles, out3 = np.asarray(stop_cycles), np.asarray(start_cycles), np.asarray(out3)
                         cycles                          = (stop_cycles[:, 0] - start_cycles[:, 0]).reshape(-1)
                         print("[Cycles M]")
@@ -1574,11 +1575,11 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
                         print("> Diff")
                         print(np.max(np.abs(out3[out3!=0]-buf[buf!=0])))
                         assert np.allclose(out3[out3!=0].reshape(-1), buf[buf!=0].reshape(-1), atol=1e-5)
-                        print("PASSED!") 
+                        print("PASSED!")
 
-                # The number of integrals smaller than all tiles/threads. 
-                # One call is sufficient. 
-                elif num_calls < 1471*num_threads and False: 
+                # The number of integrals smaller than all tiles/threads.
+                # One call is sufficient.
+                elif num_calls < 1471*num_threads and False:
                         print("[For Loop] False")
 
                         indxs               = np.argsort(output_sizes[:, -1])
@@ -1591,7 +1592,7 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
                         __out3 = [np.asarray(a) for a in _out3]
 
                         outs = []
-                        for out in __out3: 
+                        for out in __out3:
                                 a = np.concatenate([out.astype(np.float32), np.zeros((out.shape[0], 625-out.shape[1]), dtype=np.float32)], axis=1)
                                 outs.append( a)
 
@@ -1604,7 +1605,7 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
 
                         out3 = ___out3[indxs_inv]
 
-                else: 
+                else:
                         print("[For Loop] True ")
 
                         indxs               = np.argsort(output_sizes[:, -1])
@@ -1613,10 +1614,10 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
 
                         sizes, counts  = np.unique(output_sizes[:, -1], return_counts=True)
                         sizes, counts = sizes.astype(np.int32), counts.astype(np.int32)
-                        start_index = 0 
+                        start_index = 0
                         inputs = []
                         shapes = []
-                        for i, (size, count) in enumerate(zip(sizes, counts)): 
+                        for i, (size, count) in enumerate(zip(sizes, counts)):
                                 a = input_ijkl[start_index: start_index+count]
                                 tuples = tuple(map(tuple, a))
                                 inputs.append(tuples)
@@ -1625,7 +1626,7 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
                         tuple_ijkl = tuple(inputs)
                         input_ijkl = inputs
 
-                        for i in range(len(sizes)): 
+                        for i in range(len(sizes)):
                                 shapes.append( get_shapes(input_ijkl[i]) )
 
                         def inverse_permutation(a):
@@ -1642,7 +1643,7 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
                         assert np.allclose(sizes, _sizes)
                         assert np.allclose(counts, _counts)
 
-                        if not args.precompute: 
+                        if not args.precompute:
 
                                 #_out3, cycles_start, cycles_stop, _, ___out3 = compute_integrals_2( _input_floats, _input_ints, _tuple_ijkl, _shapes, _sizes, _counts, tuple(indxs_inv.tolist()))
                                 ___out3, cycles_start, cycles_stop = compute_integrals_2( _input_floats, _input_ints, _tuple_ijkl, _shapes, _sizes, _counts, tuple(indxs_inv.tolist()), num_threads=int(args.threads_int), v=args.intv)
@@ -1653,34 +1654,34 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
                                 # Save so if we do -precompute we don't have to wait for compute! => 30s to 10s iteration!
                                 nps = [np.asarray(a) for a in ___out3]
                                 print([a.shape for a in nps])
-                                for _num, a in enumerate(___out3): 
+                                for _num, a in enumerate(___out3):
                                         a = np.asarray(a)
                                         #print(a)
-                                        np.savez("tmp/%i_%i.npz"%(_num, np.sum(_shapes)), a=a) # to allow saving different runs! 
+                                        np.savez("tmp/%i_%i.npz"%(_num, np.sum(_shapes)), a=a) # to allow saving different runs!
 
-                                if args.skipmult: 
+                                if args.skipmult:
                                         exit()
 
 
-                        else: 
+                        else:
                                 out3 = np.zeros(((247, 81)))
                                 cycles_start, cycles_stop = np.array(5), np.array(5)
 
                                 ___out3 = []
-                                for i in range(5): 
+                                for i in range(5):
                                         ___out3.append( np.load("tmp/%i_%i.npz"%(i, np.sum(_shapes)))["a"] )
 
                         '''__out3 = [np.asarray(np.concatenate([b for b in a])) for a in _out3]
 
                         outs = []
-                        for out in __out3: 
+                        for out in __out3:
                                 a = np.concatenate([out.astype(np.float32), np.zeros((out.shape[0], 625-out.shape[1]), dtype=np.float32)], axis=1)
                                 outs.append( a)
                         ___out3 = np.concatenate(outs, axis=0)
 
                         out3 = ___out3[indxs_inv]'''
 
-                        try: 
+                        try:
 
                                 cycles = np.concatenate(cycles)
                                 fig, ax = plt.subplots(1,3)
@@ -1698,43 +1699,43 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
                                 cycles = []
                         if not args.load: np.savez("cycles.npz", cycles=cycles)
 
-                       
+
                         print("[list of vects]", cpu_output.nbytes, np.sum([a.nbytes for a in out3]) , cpu_output.nbytes / np.sum([a.nbytes for a in out3]))
 
         tensor = np.zeros((N, N, N, N))
-        
-        from tqdm import tqdm 
+
+        from tqdm import tqdm
         outs = []
         _max = -1
-        c = 0 
+        c = 0
         skip = 0
         do = 0
 
 
         for i in tqdm(range(shls_slice[1])):
-                for j in range(shls_slice[3]): 
+                for j in range(shls_slice[3]):
                         for k in range(shls_slice[5]):
-                                for l in range(shls_slice[7]): 
-                                        if not ( i >= j and k >= l and i*j >= k * l): 
+                                for l in range(shls_slice[7]):
+                                        if not ( i >= j and k >= l and i*j >= k * l):
                                                 skip+=1
-                                                continue 
-                                        else: do += 1 
+                                                continue
+                                        else: do += 1
 
                                         ret = libcgto.int2e_sph(
-                                                buf.ctypes.data_as(ctypes.c_void_p), 
-                                                ctypes.c_int(np.prod(buf.shape)), 
+                                                buf.ctypes.data_as(ctypes.c_void_p),
+                                                ctypes.c_int(np.prod(buf.shape)),
                                                 lib.c_null_ptr(),
                                                 (ctypes.c_int*4)(*[i,j,k,l]),
-                                                atm.ctypes.data_as(ctypes.c_void_p), 
-                                                ctypes.c_int(n_atm), 
-                                                bas.ctypes.data_as(ctypes.c_void_p), 
-                                                ctypes.c_int(n_bas), 
-                                                env.ctypes.data_as(ctypes.c_void_p), 
+                                                atm.ctypes.data_as(ctypes.c_void_p),
+                                                ctypes.c_int(n_atm),
+                                                bas.ctypes.data_as(ctypes.c_void_p),
+                                                ctypes.c_int(n_bas),
+                                                env.ctypes.data_as(ctypes.c_void_p),
                                                 ctypes.c_int(np.prod(env.shape)))
 
-                                        #assert ret == 1 # if this fails we need to fix code below!  # is this just the one that says if it's empty?  yeh, it returns !empty in the end. 
-                                        # so always writing here should be okay! 
-                                        if ret: 
+                                        #assert ret == 1 # if this fails we need to fix code below!  # is this just the one that says if it's empty?  yeh, it returns !empty in the end.
+                                        # so always writing here should be okay!
+                                        if ret:
                                                 ni = ao_loc[shls_slice[1]] - ao_loc[0]
                                                 nj = ao_loc[shls_slice[3]] - ao_loc[0]
                                                 nk = ao_loc[shls_slice[5]] - ao_loc[0]
@@ -1758,35 +1759,35 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
                                                 dijk  = di * dj * dk
                                                 dijkl = di * dj * dk * dl
 
-                                                if _max > dijkl: _max = dijkl 
+                                                if _max > dijkl: _max = dijkl
 
-                                                cpu_output[c, :di*dj*dk*dl] = buf[:di*dj*dk*dl] 
-                                                c += 1  
-                                                
+                                                cpu_output[c, :di*dj*dk*dl] = buf[:di*dj*dk*dl]
+                                                c += 1
+
 
         indices = np.zeros((cpu_output.shape[0], 8))
-        def transform(eri_s8): 
+        def transform(eri_s8):
                 print(eri_s8.shape)
                 # transforms sparse_eri to dense_eri
                 # accepts sparse input as list of vectors or matrix.
-                # output:  (n, n, n, n) matrix without symmetries  
-                if type(eri_s8) != type([]): 
+                # output:  (n, n, n, n) matrix without symmetries
+                if type(eri_s8) != type([]):
                         print(eri_s8.shape)
                         if eri_s8.shape[0] == 1: eri_s8 = eri_s8[0]
                         print(eri_s8.shape)
                 out = np.zeros((N, N, N, N)) # 14
-                c = 0 
+                c = 0
 
-                for i in tqdm(range(shls_slice[1])): # 10 
-                        for j in range(shls_slice[3]): 
+                for i in tqdm(range(shls_slice[1])): # 10
+                        for j in range(shls_slice[3]):
                                 for k in range(shls_slice[5]):
-                                        for l in range(shls_slice[7]): 
-                                                if not (i >= j and k >= l and i*j >= k * l): continue 
+                                        for l in range(shls_slice[7]):
+                                                if not (i >= j and k >= l and i*j >= k * l): continue
 
                                                 # the output of integral (i,j,k,l) has shape (di, dj, dk, dl)
-                                                # where di,dj,dk,dl are in {1,2,3,4,5} because we  
-                                                #  - only use {c,h,o,n} 
-                                                #  - represent electrons as pcq dataset   
+                                                # where di,dj,dk,dl are in {1,2,3,4,5} because we
+                                                #  - only use {c,h,o,n}
+                                                #  - represent electrons as pcq dataset
                                                 di = ao_loc[i+1] - ao_loc[i]
                                                 dj = ao_loc[j+1] - ao_loc[j]
                                                 dk = ao_loc[k+1] - ao_loc[k]
@@ -1796,9 +1797,9 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
                                                 #integral = np.transpose( cpu_output[c, :di*dj*dk*dl].reshape(dl,dk,dj,di), (3,2,1,0) )
                                                 integral = np.transpose( eri_s8[c][ :di*dj*dk*dl].reshape(dl,dk,dj,di), (3,2,1,0) )
 
-                                                # we now need to compute where the current integral 'block' goes in 
-                                                # the final output matrix. 
-                                                i0 = ao_loc[i]   - ao_loc[0]  
+                                                # we now need to compute where the current integral 'block' goes in
+                                                # the final output matrix.
+                                                i0 = ao_loc[i]   - ao_loc[0]
                                                 j0 = ao_loc[j]   - ao_loc[0]
                                                 k0 = ao_loc[k]   - ao_loc[0]
                                                 l0 = ao_loc[l]   - ao_loc[0]
@@ -1806,7 +1807,7 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
                                                 indices[c] = np.array([di, dj, dk, dl, i0, j0, k0, l0])
                                                 c += 1
 
-                                                # we then store the block of integrals in whatever places. 
+                                                # we then store the block of integrals in whatever places.
                                                 out[ i0:i0+di, j0:j0+dj, k0:k0+dk, l0:l0+dl ] = integral #ijkl
                                                 out[ i0:i0+di, j0:j0+dj, l0:l0+dl, k0:k0+dk ] = np.transpose(integral, (0,1,3,2)) #ijlk
                                                 out[ j0:j0+dj, i0:i0+di, k0:k0+dk, l0:l0+dl ] = np.transpose(integral, (1,0,2,3)) #jikl
@@ -1821,12 +1822,12 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
         if cpu_output.shape == out3.shape: print("[error cpu/ipu s1]", np.max(np.abs(cpu_output-out3)))
         else: print("[error cpu/ipu s1] SHAPES NOT EQUAL")
 
-        print("[error cpu_output s8] ", np.max(np.abs(transform(cpu_output).reshape(-1) - eri_them.reshape(-1)))) 
+        print("[error cpu_output s8] ", np.max(np.abs(transform(cpu_output).reshape(-1) - eri_them.reshape(-1))))
 
-        def direct_mult(sparse_s8, dm): 
+        def direct_mult(sparse_s8, dm):
                 print(sparse_s8.shape)
                 n = shls_slice[1]
-                c = 0 
+                c = 0
                 _vj, _vk = np.zeros(dm.shape), np.zeros(dm.shape)
                 vj, vk   = np.zeros((sparse_s8.shape[0],)+dm.shape), np.zeros((sparse_s8.shape[0],)+dm.shape)
                 dct = {}
@@ -1834,17 +1835,17 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
 
                 do_lists = np.zeros((sparse_s8.shape[0], 8), dtype=np.int32)
 
-                for i in tqdm(range(n)): 
-                        for j in range(n): 
+                for i in tqdm(range(n)):
+                        for j in range(n):
                                 for k in range(n):
-                                        for l in range(n): 
+                                        for l in range(n):
 
-                                                if not (i >= j and k >= l and i*j >= k * l): continue 
+                                                if not (i >= j and k >= l and i*j >= k * l): continue
 
 
                                                 # the output of integral (i,j,k,l) has shape (di, dj, dk, dl)
-                                                # where di,dj,dk,dl are in {1,2,3,4,5} because we  
-                                                #  - only use {c,h,o,n} 
+                                                # where di,dj,dk,dl are in {1,2,3,4,5} because we
+                                                #  - only use {c,h,o,n}
                                                 #  - represent electrons as pcq dataset 6-31G*
                                                 di = ao_loc[i+1] - ao_loc[i]
                                                 dj = ao_loc[j+1] - ao_loc[j]
@@ -1854,18 +1855,18 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
                                                 # knowing the shape of integral (i,j,k,l) we can fetch it.
                                                 integral = np.transpose( sparse_s8[c][ :di*dj*dk*dl].reshape(dl,dk,dj,di), (3,2,1,0) )
 
-                                                # we now need to compute where the current integral 'block' goes in 
-                                                # the final output matrix. 
-                                                i0 = ao_loc[i] - ao_loc[0]  
+                                                # we now need to compute where the current integral 'block' goes in
+                                                # the final output matrix.
+                                                i0 = ao_loc[i] - ao_loc[0]
                                                 j0 = ao_loc[j] - ao_loc[0]
                                                 k0 = ao_loc[k] - ao_loc[0]
                                                 l0 = ao_loc[l] - ao_loc[0]
-                                                #print(i0,j0,k0,l0) # this is different! 
+                                                #print(i0,j0,k0,l0) # this is different!
 
                                                 indices[c] = np.array([ di, dj, dk, dl, i0, j0, k0, l0 ])
 
                                                 do_list = [False]*8
-                                        
+
                                                 if not ( i0,j0,k0,l0 ) in dct:
                                                         dct [ i0, j0, k0, l0 ] = 8
                                                         do_list[0] = True
@@ -1890,13 +1891,13 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
                                                         dct[ k0, l0, j0, i0 ]  = 13
                                                         do_list[5] = True
 
-                                                if not ( l0, k0, i0, j0  ) in dct: 
+                                                if not ( l0, k0, i0, j0  ) in dct:
                                                         dct[ l0, k0, i0, j0 ]  = 14
                                                         do_list[6] = True
                                                 if not ( l0, k0, j0, i0 ) in dct:
                                                         dct [ l0, k0, j0, i0 ]  = 15
                                                         do_list[7] = True
-                                                
+
                                                 do_lists[c] = np.array(do_list)
                                                 c += 1
 
@@ -1906,33 +1907,33 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
                 _debug = np.zeros((sparse_s8.shape[0], 8))
 
                 for i in tqdm(range(n)):
-                        if args.fast: break 
+                        if args.fast: break
                         for j in range(n):
                                 for k in range(n):
                                         for l in range(n):
 
-                                                if not (i >= j and k >= l and i*j >= k * l): continue 
-                                                # could we change this to for c in range num_calls? 
+                                                if not (i >= j and k >= l and i*j >= k * l): continue
+                                                # could we change this to for c in range num_calls?
 
-                                                # every tile can get exactly this and just deal with the c'th part of eri_s8! 
+                                                # every tile can get exactly this and just deal with the c'th part of eri_s8!
 
                                                 di, dj, dk, dl, i0, j0, k0, l0  = [int(a) for a in indices[c]]
                                                 #integral        = np.transpose( eri_s1[c][ :di*dj*dk*dl].copy().reshape(dl,dk,dj,di), (3,2,1,0) )
                                                 integral        =  sparse_s8[c][ :di*dj*dk*dl].copy().reshape(dl,dk,dj,di)
                                                 #integral        =  eri_s1[c][ :di*dj*dk*dl]#.copy().reshape(dl,dk,dj,di)
-                                                #eri_s1[c] = 0 
+                                                #eri_s1[c] = 0
                                                 #eri_s1[c, :di*dj*dk*dl] = integral.reshape(-1)
 
-                                                do_list = do_lists[c] 
+                                                do_list = do_lists[c]
 
                                                 for ci, _i in enumerate(range(i0, i0+di)):
                                                         for cj, _j in enumerate(range(j0, j0+dj)):
                                                                 for ck, _k in enumerate(range(k0, k0+dk)):
                                                                         for cl, _l in enumerate(range(l0, l0+dl)):
-                                                                                val = integral.reshape(-1)[ci+cj*di+ck*dj*di+cl*dj*dk*di] 
-                                                                                
-                                                                                if do_list[0]: 
-                                                                                        #_vj[_k, _l] += dm[_j,_i] * integral[ci, cj, ck, cl] 
+                                                                                val = integral.reshape(-1)[ci+cj*di+ck*dj*di+cl*dj*dk*di]
+
+                                                                                if do_list[0]:
+                                                                                        #_vj[_k, _l] += dm[_j,_i] * integral[ci, cj, ck, cl]
                                                                                         #_vk[_i, _l] += dm[_j,_k] * integral[ci, cj, ck, cl]
                                                                                         _vj.reshape(-1)[_k*N+ _l] += dm.reshape(-1)[_j*N+_i] * val
                                                                                         _vk.reshape(-1)[_i*N+ _l] += dm.reshape(-1)[_j*N+_k] * val
@@ -1940,16 +1941,16 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
                                                                                         vj[c].reshape(-1)[_k*N+ _l] += dm.reshape(-1)[_j*N+_i] * val
                                                                                         vk[c].reshape(-1)[_i*N+ _l] += dm.reshape(-1)[_j*N+_k] * val
                                                                                         sums[c] += val
-                                                                                        
+
                                                                                         _sums[c, 0] += dm.reshape(-1)[_j*N+_i] #* val
                                                                                         _sums[c, 1] += dm.reshape(-1)[_j*N+_k] #* val
 
                                                                                         _debug[c, 4] += val
-                                                                                        _debug[c, 5] += dm.reshape(-1)[_j*N+_i] 
-                                                                                        _debug[c, 6] += dm.reshape(-1)[_j*N+_k] *val 
+                                                                                        _debug[c, 5] += dm.reshape(-1)[_j*N+_i]
+                                                                                        _debug[c, 6] += dm.reshape(-1)[_j*N+_k] *val
 
                                                                                 if do_list[1]:
-                                                                                        #_vj[_l, _k] += dm[_j,_i] * integral[ci, cj, ck, cl] 
+                                                                                        #_vj[_l, _k] += dm[_j,_i] * integral[ci, cj, ck, cl]
                                                                                         #_vk[_i, _k] += dm[_j,_l] * integral[ci, cj, ck, cl]
 
                                                                                         _vj.reshape(-1)[_l*N+ _k] += dm.reshape(-1)[_j*N+_i] * val
@@ -1959,86 +1960,86 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
                                                                                         vk[c].reshape(-1)[_i*N+ _k] += dm.reshape(-1)[_j*N+_l] * val
                                                                                         sums[c] += val
                                                                                 if do_list[2]:
-                                                                                        #_vj[_k, _l] += dm[_i,_j] * integral[ci, cj, ck, cl] 
+                                                                                        #_vj[_k, _l] += dm[_i,_j] * integral[ci, cj, ck, cl]
                                                                                         #_vk[_j, _l] += dm[_i,_k] * integral[ci, cj, ck, cl]
-                                                                                        _vj.reshape(-1)[_k*N+ _l] += dm.reshape(-1)[_i*N+_j] * val 
+                                                                                        _vj.reshape(-1)[_k*N+ _l] += dm.reshape(-1)[_i*N+_j] * val
                                                                                         _vk.reshape(-1)[_j*N+ _l] += dm.reshape(-1)[_i*N+_k] * val
 
-                                                                                        vj[c].reshape(-1)[_k*N+ _l] += dm.reshape(-1)[_i*N+_j] * val 
+                                                                                        vj[c].reshape(-1)[_k*N+ _l] += dm.reshape(-1)[_i*N+_j] * val
                                                                                         vk[c].reshape(-1)[_j*N+ _l] += dm.reshape(-1)[_i*N+_k] * val
                                                                                         sums[c] += val
                                                                                 if do_list[3]:
-                                                                                        #_vj[_l, _k] += dm[_i,_j] * integral[ci, cj, ck, cl] 
+                                                                                        #_vj[_l, _k] += dm[_i,_j] * integral[ci, cj, ck, cl]
                                                                                         #_vk[_j, _k] += dm[_i,_l] * integral[ci, cj, ck, cl]
 
-                                                                                        _vj.reshape(-1)[_l*N+ _k] += dm.reshape(-1)[_i*N+_j] * val 
+                                                                                        _vj.reshape(-1)[_l*N+ _k] += dm.reshape(-1)[_i*N+_j] * val
                                                                                         _vk.reshape(-1)[_j*N+ _k] += dm.reshape(-1)[_i*N+_l] * val
 
-                                                                                        vj[c].reshape(-1)[_l*N+ _k] += dm.reshape(-1)[_i*N+_j] * val 
+                                                                                        vj[c].reshape(-1)[_l*N+ _k] += dm.reshape(-1)[_i*N+_j] * val
                                                                                         vk[c].reshape(-1)[_j*N+ _k] += dm.reshape(-1)[_i*N+_l] * val
                                                                                         sums[c] += val
                                                                                 if do_list[4]:
-                                                                                        #_vj[_i, _j] += dm[_l,_k] * integral[ci, cj, ck, cl] 
+                                                                                        #_vj[_i, _j] += dm[_l,_k] * integral[ci, cj, ck, cl]
                                                                                         #_vk[_k, _j] += dm[_l,_i] * integral[ci, cj, ck, cl]
 
-                                                                                        _vj.reshape(-1)[_i*N+ _j] += dm.reshape(-1)[_l*N+_k] * val 
+                                                                                        _vj.reshape(-1)[_i*N+ _j] += dm.reshape(-1)[_l*N+_k] * val
                                                                                         _vk.reshape(-1)[_k*N+ _j] += dm.reshape(-1)[_l*N+_i] * val
 
-                                                                                        vj[c].reshape(-1)[_i*N+ _j] += dm.reshape(-1)[_l*N+_k] * val 
+                                                                                        vj[c].reshape(-1)[_i*N+ _j] += dm.reshape(-1)[_l*N+_k] * val
                                                                                         vk[c].reshape(-1)[_k*N+ _j] += dm.reshape(-1)[_l*N+_i] * val
                                                                                         sums[c] += val
                                                                                 if do_list[5]:
-                                                                                        #_vj[_j, _i] += dm[_l,_k] * integral[ci, cj, ck, cl] 
+                                                                                        #_vj[_j, _i] += dm[_l,_k] * integral[ci, cj, ck, cl]
                                                                                         #_vk[_k, _i] += dm[_l,_j] * integral[ci, cj, ck, cl]
 
-                                                                                        _vj.reshape(-1)[_j*N+ _i] += dm.reshape(-1)[_l*N+_k] * val 
+                                                                                        _vj.reshape(-1)[_j*N+ _i] += dm.reshape(-1)[_l*N+_k] * val
                                                                                         _vk.reshape(-1)[_k*N+ _i] += dm.reshape(-1)[_l*N+_j] * val
 
-                                                                                        vj[c].reshape(-1)[_j*N+ _i] += dm.reshape(-1)[_l*N+_k] * val 
+                                                                                        vj[c].reshape(-1)[_j*N+ _i] += dm.reshape(-1)[_l*N+_k] * val
                                                                                         sums[c] += val
                                                                                         vk[c].reshape(-1)[_k*N+ _i] += dm.reshape(-1)[_l*N+_j] * val
                                                                                 if do_list[6]:
-                                                                                        #_vj[_i, _j] += dm[_k,_l] * integral[ci, cj, ck, cl] 
+                                                                                        #_vj[_i, _j] += dm[_k,_l] * integral[ci, cj, ck, cl]
                                                                                         #_vk[_l, _j] += dm[_k,_i] * integral[ci, cj, ck, cl]
 
-                                                                                        _vj.reshape(-1)[_i*N+ _j] += dm.reshape(-1)[_k*N+_l] * val 
+                                                                                        _vj.reshape(-1)[_i*N+ _j] += dm.reshape(-1)[_k*N+_l] * val
                                                                                         _vk.reshape(-1)[_l*N+ _j] += dm.reshape(-1)[_k*N+_i] * val
 
-                                                                                        vj[c].reshape(-1)[_i*N+ _j] += dm.reshape(-1)[_k*N+_l] * val 
+                                                                                        vj[c].reshape(-1)[_i*N+ _j] += dm.reshape(-1)[_k*N+_l] * val
                                                                                         vk[c].reshape(-1)[_l*N+ _j] += dm.reshape(-1)[_k*N+_i] * val
                                                                                         sums[c] += val
                                                                                 if do_list[7]:
-                                                                                        #_vj[_j, _i] += dm[_k,_l] * integral[ci, cj, ck, cl] 
+                                                                                        #_vj[_j, _i] += dm[_k,_l] * integral[ci, cj, ck, cl]
                                                                                         #_vk[_l, _i] += dm[_k,_j] * integral[ci, cj, ck, cl]
 
-                                                                                        _vj.reshape(-1)[_j*N+ _i] += dm.reshape(-1)[_k*N+_l] * val 
+                                                                                        _vj.reshape(-1)[_j*N+ _i] += dm.reshape(-1)[_k*N+_l] * val
                                                                                         _vk.reshape(-1)[_l*N+ _i] += dm.reshape(-1)[_k*N+_j] * val
 
-                                                                                        vj[c].reshape(-1)[_j*N+ _i] += dm.reshape(-1)[_k*N+_l] * val 
+                                                                                        vj[c].reshape(-1)[_j*N+ _i] += dm.reshape(-1)[_k*N+_l] * val
                                                                                         vk[c].reshape(-1)[_l*N+ _i] += dm.reshape(-1)[_k*N+_j] * val
                                                                                         sums[c] += val
 
 
-                                                
+
 
                                                 c+= 1
 
-                
+
 
                 return _vj, _vk, do_lists
 
         N = mol.nao
         np.random.seed(42)
-        dm  = np.random.normal(0,1, (N, N)) 
-        dm  = dm + dm.T 
-        dm  = np.linalg.qr(dm )[0] # this reduces errors quite a bit 
+        dm  = np.random.normal(0,1, (N, N))
+        dm  = dm + dm.T
+        dm  = np.linalg.qr(dm )[0] # this reduces errors quite a bit
 
         vj, vk, do_lists = direct_mult(cpu_output, dm)
         vj, vk = np.asarray(vj), np.asarray(vk)
 
-        if args.fast: 
+        if args.fast:
                 vj = np.einsum('ijkl,ji->kl', eri_them, dm)
-                vk = np.einsum('ijkl,jk->il', eri_them, dm) 
+                vk = np.einsum('ijkl,jk->il', eri_them, dm)
 
 
 
@@ -2046,21 +2047,21 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
         #vertex_filename = osp.join(osp.dirname(__file__), "outfile.gp")
         poplar_direct_s1 = create_ipu_tile_primitive(
                 "poplar_direct_s1",
-                "poplar_direct_s1", 
+                "poplar_direct_s1",
                 inputs=["integral", "indices", "do_list", "dm"],
                 outputs={ "vj": 3, "vk": 3},
                 gp_filename=vertex_filename,
-                perf_estimate=100,  
-        )        
+                perf_estimate=100,
+        )
 
         eri_s1 = cpu_output
         num_tiles = eri_s1.shape[0]
         ipu_num_tiles = jax.devices()[0].num_tiles
         tiles = tuple(np.array(np.arange(num_tiles)%ipu_num_tiles).tolist())
-        
+
         tuple_indices  = tuple(map(tuple, indices.astype(np.int32).tolist()))
         tuple_do_lists = tuple(map(tuple, do_lists.astype(np.int32).tolist()))
-        
+
         _tuple_indices, _tuple_do_lists, _N = prepare_ipu_direct_mult_inputs(eri_s1.shape[0], mol)
 
         assert np.allclose(_tuple_indices, tuple_indices)
@@ -2070,8 +2071,8 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
         print(indxs_inv)
 
         ipu_vj, ipu_vk = jax.jit(ipu_direct_mult, backend="ipu", static_argnums=(2,3,4,5,6,7,8))(
-                                                ___out3,#eri_s1.astype(np.float32), 
-                                                dm.astype(np.float32), 
+                                                ___out3,#eri_s1.astype(np.float32),
+                                                dm.astype(np.float32),
                                                 tuple_indices,
                                                 tuple_do_lists, N, eri_s1.shape[0],
                                                 tuple(indxs_inv.tolist()),
@@ -2080,15 +2081,15 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
                                                 )
         ipu_vj, ipu_vk = np.asarray(ipu_vj),np.asarray(ipu_vk )
 
-        eri = eri_them 
+        eri = eri_them
         vj0 = np.einsum('ijkl,ji->kl', eri, dm)
-        vk0 = np.einsum('ijkl,jk->il', eri, dm) 
+        vk0 = np.einsum('ijkl,jk->il', eri, dm)
 
         print("[full v dot] np.max(np.abs( diff ))", np.max(np.abs(vj0-vj)), np.max(np.abs(vk0 - vk)))
         print("[full v dot] np.max(np.abs( diff ))", np.max(np.abs(vj0-ipu_vj)), np.max(np.abs(vk0 - ipu_vk)), "[ipu]")
 
         vj, vk = ipu_vj, ipu_vk
-        
+
         fig ,ax = plt.subplots(1,4, figsize=(12, 4))
         ax[0].plot(np.abs(vj0.reshape(-1)), "bo", ms=5, label="reference")
         ax[0].plot(np.abs(vj.reshape(-1)), "wx", ms=2, label="us/ipu")
@@ -2103,7 +2104,7 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
         ax[1].legend()
 
 
-        # might catch cases where we just mess up indices 
+        # might catch cases where we just mess up indices
         vj0 = np.sort(vj0)
         vj = np.sort(vj)
         vk = np.sort(vk)
@@ -2130,14 +2131,14 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
         plt.savefig("direct2.jpg")
 
         exit()
-        
+
 #vj1, vk1 = runjk(dm,  mol, N,   1,    'int2e_sph', 'CVHFdot_nrs8', 'CVHFnrs8_ji_s1kl', 'CVHFnrs8_jk_s1il')
 def runjk(dm1, mol, nao, *namejk):
     type = open("cpu_int2e_sph.cpp", "r").read().split("#define ddtype")[1].split("\n")[0]
 
-    if "double" in type: 
+    if "double" in type:
         dtype = np.float64
-    else: 
+    else:
         dtype = np.float32
 
     print(dtype)
@@ -2149,33 +2150,33 @@ def runjk(dm1, mol, nao, *namejk):
     ao_loc = numpy.asarray(mol.ao_loc_nr(), dtype=numpy.int32)
     vjk = numpy.zeros((2, nao, nao)).astype(dtype) # 2 = vj and vk ;;; this is initialzied from numpy
 
-    # I think this pointer stuff is the one breaking in float32? 
+    # I think this pointer stuff is the one breaking in float32?
     fjk    = (ctypes.c_void_p*(2))()
     vjkptr = (ctypes.c_void_p*(2))()
 
     vjkptr[0] = vjk[0].ctypes.data_as(ctypes.c_void_p)
-    fjk[0]    = ctypes.c_void_p(_ctypes.dlsym(libcgto._handle, "CVHFnrs8_ji_s1kl")) 
+    fjk[0]    = ctypes.c_void_p(_ctypes.dlsym(libcgto._handle, "CVHFnrs8_ji_s1kl"))
 
     vjkptr[1] = vjk[1].ctypes.data_as(ctypes.c_void_p)
     #vjkptr = vjk.ctypes.data_as(ctypes.c_void_p)
-    fjk[1]    = ctypes.c_void_p(_ctypes.dlsym(libcgto._handle, "CVHFnrs8_jk_s1il")) 
+    fjk[1]    = ctypes.c_void_p(_ctypes.dlsym(libcgto._handle, "CVHFnrs8_jk_s1il"))
 
     libcgto.CVHFnr_direct_drv(
-         fjk, 
-         dm1.ctypes.data_as(ctypes.c_void_p) , 
+         fjk,
+         dm1.ctypes.data_as(ctypes.c_void_p) ,
          vjkptr,
-         ctypes.c_int(2), 
+         ctypes.c_int(2),
          ctypes.c_int(1),
          (ctypes.c_int*8)(*([0, mol.n_bas]*4)) ,
          ao_loc.ctypes.data_as(ctypes.c_void_p),
          c_atm.ctypes.data_as(ctypes.c_void_p), ctypes.c_int(c_atm.shape[0]) ,
          c_bas.ctypes.data_as(ctypes.c_void_p), ctypes.c_int(c_bas.shape[0]),
          c_env.ctypes.data_as(ctypes.c_void_p), ctypes.c_int(np.prod(c_env.shape))
-    ) 
+    )
 
     return vjk.reshape(2,nao,nao)
 
-from pyscf import lib 
+from pyscf import lib
 libcvhf2 = lib.load_library('libcvhf')
 
 def test(str):
@@ -2185,10 +2186,10 @@ def test(str):
         mol = pyscf.gto.mole.Mole()
         print("")
 
-        try: 
+        try:
                 mol.build(atom=str, unit="Bohr", basis=args.basis, spin=0, verbose=0)
         except:
-                return 
+                return
 
 
         them, us = [], []
@@ -2207,11 +2208,11 @@ def test(str):
         N = mol.nao
         np.random.seed(42)
         dm  = np.random.normal(0,1, (N, N))
-        dm  = dm + dm.T 
+        dm  = dm + dm.T
         vj0 = np.einsum('ijkl,ji->kl', eri_them, dm)
-        vk0 = np.einsum('ijkl,jk->il', eri_them, dm) 
+        vk0 = np.einsum('ijkl,jk->il', eri_them, dm)
 
-        print("[PySCF s8  ] ", end="") 
+        print("[PySCF s8  ] ", end="")
         for _ in range(5):
                 t0 = time.time()
                 eri_them_s8 = mol.intor("int2e_sph", aosym="s8")
@@ -2239,9 +2240,9 @@ if __name__ == "__main__":
 
         import numpy as np
         import pyscf
-        import time 
+        import time
         import ctypes
-        from pyscf import lib 
+        from pyscf import lib
 
         import argparse
         parser = argparse.ArgumentParser(description='Arguments for Density Functional Theory. ')
@@ -2275,7 +2276,7 @@ if __name__ == "__main__":
         parser.add_argument('-cpu',       action="store_true", help="Only run C++ code on cpu. ")
 
         # md17
-        parser.add_argument('-benzene',   action="store_true", help='Benchmark time on benzene, see https://pyscf.org/benchmark.html. ') 
+        parser.add_argument('-benzene',   action="store_true", help='Benchmark time on benzene, see https://pyscf.org/benchmark.html. ')
         parser.add_argument('-ethanol',       action="store_true", help="Compute ethanol . ")
         parser.add_argument('-maldehyde',       action="store_true", help="Compute ethanol . ")
         parser.add_argument('-uracil',       action="store_true", help="Compute ethanol . ")
@@ -2284,7 +2285,7 @@ if __name__ == "__main__":
 
         args = parser.parse_args()
 
-        import sys 
+        import sys
         sys.argv = sys.argv[:1]
 
         if args.str != "": test(args.str)
@@ -2295,7 +2296,7 @@ if __name__ == "__main__":
 
         elif args.O:       test(str="F 0 0 0; F 0 0 1; ")
 
-        elif args.maldehyde: 
+        elif args.maldehyde:
                 test("O 5.4641   -0.5600    0.0000; \
                       O 2.0000   -0.5600    0.0000; \
                       C 3.7320   -0.5600    0.0000; \
@@ -2306,7 +2307,7 @@ if __name__ == "__main__":
                       H 4.5981    0.5600    0.0000; \
                       H 2.8660    0.5600    0.0000;")
 
-        elif args.gdb > 0: 
+        elif args.gdb > 0:
                 #if args.gdb == 10: args.smiles = [a.split("\t")[0] for a in open("gdb/gdb11_size10.smi", "r").read().split("\n")]
 
             if args.gdb == 11: args.smiles = [a for a in open("../gdb/gdb11_size11_sorted.csv", "r").read().split("\n")][:-1]
@@ -2316,11 +2317,11 @@ if __name__ == "__main__":
             if args.gdb == 7:  args.smiles = [a for a in open("../gdb/gdb11_size07_sorted.csv", "r").read().split("\n")][:-1]
             if args.gdb == 8:  args.smiles = [a for a in open("../gdb/gdb11_size08_sorted.csv", "r").read().split("\n")][:-1]
             if args.gdb == 5:  args.smiles = [a  for a in open("../gdb/gdb11_size05_sorted.csv", "r").read().split("\n")][:-1]
-            if args.gdb == 6:  args.smiles = ["c1ccccc1"]*1000 # do benzene for timing experiment. 
+            if args.gdb == 6:  args.smiles = ["c1ccccc1"]*1000 # do benzene for timing experiment.
 
             print("Length GDB: ", len(args.smiles))
-            
-            smile = args.smiles[int(args.id)] 
+
+            smile = args.smiles[int(args.id)]
 
             print(smile)
             angstrom_to_bohr = 1.88973
@@ -2329,11 +2330,11 @@ if __name__ == "__main__":
             from rdkit import Chem  # To extract information of the molecules
             from rdkit.Chem import AllChem
             b = Chem.MolFromSmiles(smile)
-            b = Chem.AddHs(b)  
+            b = Chem.AddHs(b)
             atoms = [atom.GetSymbol() for atom in b.GetAtoms()]
 
-            AllChem.EmbedMolecule(b) # hypothesis: adding Hs on average increase energy => increase numerror, but, removes extreme cases? 
-            # does look like that!  main problem of more Hs is increased memory consumption, so if we fix that it looks pretty good! 
+            AllChem.EmbedMolecule(b) # hypothesis: adding Hs on average increase energy => increase numerror, but, removes extreme cases?
+            # does look like that!  main problem of more Hs is increased memory consumption, so if we fix that it looks pretty good!
 
             #locs = np.concatenate( (b.GetConformer().GetPositions(), np.ones((1,3))*4), axis=0)
             locs = b.GetConformer().GetPositions() * angstrom_to_bohr
@@ -2342,7 +2343,7 @@ if __name__ == "__main__":
             print(string)
             test(string)
 
-        elif args.C > 0:       
+        elif args.C > 0:
 
                 _str = ";".join("C     1.56910  -0.65660  -0.93640;\
         C     1.76690   0.64310  -0.47200;\
@@ -2368,65 +2369,65 @@ if __name__ == "__main__":
                 test(str=_str)
 
         elif args.Be:      test(str="Be 0 0 0;")
-        elif args.graphene: 
+        elif args.graphene:
                 str = "C	-4.928	-4.26777318984971	0; C	-3.696	-4.97906872149133	0; C	-2.464	-4.26777318984971	0; C	-4.928	-2.84518212656648	0; C	-3.696	-2.13388659492486	0; C	-4.928	0	0;"
                 test(str)
-        elif args.benzene: 
-                benzene  = open("../../tmp/benzene.xyz", "r").read().split("\n")[2:] 
+        elif args.benzene:
+                benzene  = open("../../tmp/benzene.xyz", "r").read().split("\n")[2:]
                 #benzene = [benzene[i] for i in [1,2,4,6,8,10][:4] + [0,3,5,7,9,11][:4]]
                 benzene = [benzene[i] for i in [1,2,4,6,8,10][:6] + [0,3,5,7,9,11][:6]]
 
                 def center(loaded_lst):
-                        # Center atom positions. TODO refactor this. 
+                        # Center atom positions. TODO refactor this.
                         atoms = "".join([a.split(" ")[0] for a in loaded_lst])
                         print(atoms)
                         pos   = np.concatenate([np.array([float(a) for a in g.split()[1:]]).reshape(1,3) for g in loaded_lst])
                         mean  = np.mean(pos, axis=0)
-                        pos   = pos - mean 
+                        pos   = pos - mean
 
                         np.random.seed(42)
                         pos = pos + np.random.normal(0, 1, pos.shape)
 
-                        # Get PySCF representation. 
+                        # Get PySCF representation.
                         return get_atom_string(atoms, pos)[1]
 
-                benzene  = center(benzene) 
+                benzene  = center(benzene)
                 test(benzene)
                 assert False
 
-        elif args.co2: 
+        elif args.co2:
                 test("C 0 0 0; O 0 0 1; O 1 0 0;")
 
-        elif args.water != -1: 
+        elif args.water != -1:
                 if 10 in args.water and False:
                         atom_positions = np.load("1h2o.npz")["arr_0"]
                         atom_positions = atom_positions - np.mean(atom_positions, axis=0).reshape(1, 3) # translate so mean is (0,0,0)
 
                         water = ""
-                        for i in range(0, 10): 
+                        for i in range(0, 10):
                                 atom_O  = atom_positions[i*3]
                                 atom_H1 = atom_positions[i*3+1]
                                 atom_H2 = atom_positions[i*3+2]
                                 water += "O %f %f %f; H %f %f %f; H %f %f %f;"%(*atom_O.tolist(), *atom_H1.tolist(), *atom_H2.tolist())
 
                         test(args, None, 0, 0, our_fun=jax_dft, str=water)
-                        assert False 
+                        assert False
 
-                for num in args.water: 
+                for num in args.water:
                         water = ""
                         np.random.seed(42)
-                        for i in range(num): 
+                        for i in range(num):
                                 # O 1.779297 0.082581 -0.129883; H 3.607422 0.030426 -0.206665; H 1.257812 -0.904297 -1.580078;
-                                # no, make a cube 
-                                position = np.array([1.779297, 0.082581, -0.129883, 3.607422, 0.030426, -0.206665, 1.257812, -0.904297, -1.580078])  
-                                position[i%3::3] += 1 + i//3 # kid of makes a cube I think? 
+                                # no, make a cube
+                                position = np.array([1.779297, 0.082581, -0.129883, 3.607422, 0.030426, -0.206665, 1.257812, -0.904297, -1.580078])
+                                position[i%3::3] += 1 + i//3 # kid of makes a cube I think?
 
-                                pos = tuple([position[j] for j in range(9)]) 
-                                water += "H %f %f %f; H %f %f %f; O %f %f %f;"%pos 
+                                pos = tuple([position[j] for j in range(9)])
+                                water += "H %f %f %f; H %f %f %f; O %f %f %f;"%pos
 
                         #print(water)
 
                         test(str=water)
 
-        else: 
+        else:
                 test("H 0 0 0; B 1 0 0;")
