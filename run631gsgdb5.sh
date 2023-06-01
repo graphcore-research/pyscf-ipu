@@ -1,1 +1,0 @@
-XLA_IPU_PLATFORM_DEVICE_COUNT=2 TF_POPLAR_FLAGS=--executable_cache_path="_cache/"  python density_functional_theory.py -gdb ^C -fname run16 -split 0 2 -basis 631gs  -threads 1 -generate -save -backend ipu -float32 -level 0 -plevel 0 -its 50 -seperate -pyscf
