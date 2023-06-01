@@ -1,0 +1,1 @@
+watch tmux list-session
