@@ -22,8 +22,14 @@ pip install git+https://github.com/graphcore-research/jax-ipu-experimental-addon
 
 ## GDB 11 database preparation
 
-The GDB 11 database required for running PySCF on IPU can be downloaded here: https://zenodo.org/record/5172018
-Please download the `gdb11.tgz` file and extract its content in `gdb/` directory.
+The GDB 11 database required for running PySCF on IPU can be found here: https://zenodo.org/record/5172018.
+Please download the `gdb11.tgz` file and extract its content in `gdb/` directory:
+```bash
+wget -p -O ./gdb/gdb11.tgz https://zenodo.org/record/5172018/files/gdb11.tgz\?download\=1
+tar -xvf ./gdb/gdb11.tgz --directory ./gdb/
+```
+
+
 
 ## Running
 
