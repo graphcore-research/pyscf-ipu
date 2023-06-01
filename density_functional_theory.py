@@ -1487,7 +1487,6 @@ if __name__ == "__main__":  # need to do a bit of work not to OOM.
     parser.add_argument('-step',      default=1,           type=int,   help='If running 1000s of test cases, do 1, 1+step, 1+2*step, ... ')
     parser.add_argument('-spin',      default=0,           type=int,   help='Even or odd number of electrons? Only tested for spin=0')
     parser.add_argument('-str',       default="",          help='Molecule string, e.g., "H 0 0 0; H 0 0 1; O 1 0 0; "')
-    # parser.add_argument('-init',      default="minao",     help='How to initialize density matrix. ')
 
     parser.add_argument('-numerror', action="store_true",     help='Save all tensors to wandb. ')
 
@@ -1501,8 +1500,6 @@ if __name__ == "__main__":  # need to do a bit of work not to OOM.
     parser.add_argument('-float16',   action="store_true", help='Whether to use float16 (default is float64). ')
     parser.add_argument('-basis',     default="STO-3G",    help='Developed for STO-3G (and a little for 6-31G*), but others may work. ')
     parser.add_argument('-xc',        default="b3lyp",     help='Only implemented b3lyp (and it\'s components); known bug exists for lda. ')
-    # parser.add_argument('-loadpyscf', action="store_true", help='Load precomputed PySCF values, a little faster. ')
-    # parser.add_argument('-benzene',   action="store_true", help='Benchmark time on benzene, see https://pyscf.org/benchmark.html. ')
     parser.add_argument('-skip',      default=0,           help='Skip the first "skip" testcases. ', type=int)
     parser.add_argument('-backend',   default="cpu",       help='Which backend to use, accepts {cpu, ipu, gpu} dependent on hardware. ')
     parser.add_argument('-wandb',     action="store_true", help='Whether to store results in wandb.')
@@ -1524,9 +1521,7 @@ if __name__ == "__main__":  # need to do a bit of work not to OOM.
     parser.add_argument('-plevel',   default=2, help="Level of the grids used by pyscf (default=2). ", type=int)
 
     parser.add_argument('-C',         default=-1, type=int,  help='Number of carbons from C20 . ')
-    # parser.add_argument('-biochem',        default=-1, type=int,  help='Number of atoms from the important biochemistry ones {C,H,N,O,F,S}. ')
     parser.add_argument('-gdb',        default=-1, type=int,  help='Which version of GDP to load {10, 11, 13, 17}. ')
-    # parser.add_argument('-gdb13',        default=-1, type=int,  help='Which split of GDB 13 to do (we split gdb13 into 100 versions). ')
 
     parser.add_argument('-skiperi',         action="store_true", help='estimate time if eri wasn"t in computation. done by using (N, N) matrix instead. ')
     parser.add_argument('-randeri',         action="store_true", help='Initialize electron_repulsion=np.random.normal(0,1,(N,N,N,N))')
