@@ -1,0 +1,7 @@
+-r requirements.txt
+
+# Experimental JAX for IPU
+-f https://graphcore-research.github.io/jax-experimental/wheels.html
+jax==0.3.16+ipu
+jaxlib==0.3.15+ipu.sdk320
+jax-ipu-experimental-addons@git+https://github.com/graphcore-research/jax-ipu-experimental-addons.git@main

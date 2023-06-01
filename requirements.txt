@@ -1,0 +1,18 @@
+numpy
+matplotlib
+pandas
+scipy
+pyscf
+icecream
+seaborn
+tqdm
+pytest
+natsort
+rdkit
+jsonargparse[all]
+
+# silence warnings about setuptools + numpy
+setuptools < 60.0
+
+jax==0.3.16
+jaxlib==0.3.15
