@@ -18,9 +18,10 @@ from icecream import ic
 from ctypes import *
 import os
 import os.path as osp
-try:
-        libcgto = cdll.LoadLibrary( os.getcwd() + "/gen.so" )
-        from jax_ipu_research.tile import create_ipu_tile_primitive, ipu_hw_cycle_count, tile_map_primitive, tile_put_sharded, tile_put_replicated
+# lazy load to allow using with CPU without jax_ipu_research 
+try: from jax_ipu_research.tile import create_ipu_tile_primitive, ipu_hw_cycle_count, tile_map_primitive, tile_put_sharded, tile_put_replicated
+except: pass 
+try: libcgto = cdll.LoadLibrary( os.getcwd() + "/gen.so" )
 except: pass
 from pyscf import lib
 
@@ -916,14 +917,7 @@ def prepare_integrals_2_inputs(mol):
         eri     = np.zeros(shape).reshape(-1)
         ipu_eri = np.zeros(shape).reshape(-1)
 
-        # Fetch dtype from cpp file and cast tensors correspondingly.
-        try:
-                _type = open("cpu_int2e_sph.cpp", "r").read().split("#define input_type")[1].split("\n")[0]
-        except:
-                _type = open("electron_repulsion/cpu_int2e_sph.cpp", "r").read().split("#define input_type")[1].split("\n")[0]
-        if "double" in _type: dtype = np.float64
-        else:                 dtype = np.float32
-        #print("[dtype] %s"%(str(dtype)))
+        dtype = np.float32 #hardcoded 
         buf, out, eri, ipu_eri, env = buf.astype(dtype), out.astype(dtype), eri.astype(dtype), ipu_eri.astype(dtype), env.astype(dtype)
 
         # The padded shape used to store output from all tiles.
@@ -1134,14 +1128,12 @@ def prepare_ipu_direct_mult_inputs(num_calls, mol):
                 for j in range(n):
                         for k in range(n):
                                 for l in range(n):
-
                                         if not (i >= j and k >= l and i*j >= k * l): continue
-
 
                                         # the output of integral (i,j,k,l) has shape (di, dj, dk, dl)
                                         # where di,dj,dk,dl are in {1,2,3,4,5} because we
                                         #  - only use {c,h,o,n}
-                                        #  - represent electrons as pcq dataset 6-31G*
+                                        #  - represent electrons as pcq dataset 6-31G* (or sto3g/6-31g)
                                         di = ao_loc[i+1] - ao_loc[i]
                                         dj = ao_loc[j+1] - ao_loc[j]
                                         dk = ao_loc[k+1] - ao_loc[k]
