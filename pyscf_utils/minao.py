@@ -1,11 +1,6 @@
 from pyscf import gto 
 import numpy as np 
 
-#'minao' (default)
-
-#Superposition of atomic densities projected in a minimal basis obtained from the first contracted functions in the cc-pVTZ 
-# or cc-pVTZ-PP basis set. The guess orbitals are obtained by diagonalizing the Fock matrix that arises from the spin-restricted guess density.
-
 def minao(mol):
     from pyscf.scf import atom_hf
     from pyscf.scf import addons
@@ -95,13 +90,11 @@ def minao(mol):
     basis = {}
     occdic = {}
     for symb, nelec_ecp in nelec_ecp_dic.items():
-        #print(symb, nelec_ecp) # is this every different atom? 
         occ_add, basis_add = minao_basis(symb, nelec_ecp)
         occdic[symb] = occ_add
         basis[symb] = basis_add
 
     times.append(time.time())
-    #print("---")
 
     occ = []
     new_atom = []
@@ -114,15 +107,13 @@ def minao(mol):
     occ = np.hstack(occ)
 
     times.append(time.time())
-    #print("---")
-
 
     pmol = gto.Mole()
     times.append(time.time())
     pmol._atm, pmol._bas, pmol._env = pmol.make_env(new_atom, basis, [])
     times.append(time.time())
     pmol._built = True
-    dm = addons.project_dm_nr2nr(pmol, np.diag(occ), mol) # this is the one that takes all the time 
+    dm = addons.project_dm_nr2nr(pmol, np.diag(occ), mol) 
 
     times.append(time.time())
 

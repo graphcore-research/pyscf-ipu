@@ -111,14 +111,12 @@ def build_grid(self):
   mol = self.mol
 
   atom_grids_tab            = self.gen_atomic_grids( mol, self.atom_grid, self.radi_method, self.level, self.prune)
-
   self.coords, self.weights = get_partition(self, mol, atom_grids_tab, self.radii_adjust, self.atomic_radii, self.becke_scheme) 
-
   idx = arg_group_grids(mol, self.coords)
   self.coords  = self.coords[idx]
   self.weights = self.weights[idx]
 
-  '''if self.alignment > 1:
+  if self.alignment > 1:
       def _padding_size(ngrids, alignment):
           if alignment <= 1:
               return 0
@@ -130,7 +128,6 @@ def build_grid(self):
           self.coords = numpy.vstack(
               [self.coords, numpy.repeat([[1e4]*3], padding, axis=0)])
           self.weights = numpy.hstack([self.weights, numpy.zeros(padding)])
-  '''
 
   self.screen_index = self.non0tab = None
 

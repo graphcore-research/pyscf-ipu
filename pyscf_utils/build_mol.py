@@ -6,14 +6,13 @@ def build_mol(self, dump_input=True, parse_arg=True,
               verbose=None, output=None, max_memory=None,
               atom=None, basis=None, unit=None, nucmod=None, ecp=None,
               charge=None, spin=0, symmetry=None, symmetry_subgroup=None,
-              cart=None, magmom=None): # reduced time to generate from 150 ms to 1ms by removing gc.collect. could call it each 1000 molecules or so. 
+              cart=None, magmom=None): 
 
         if sys.version_info >= (3,):
             unicode = str
             #print(unicode)
             #print("ASD")
             #exit()
-        #exit()
         from pyscf import __config__ 
         DISABLE_GC = getattr(__config__, 'DISABLE_GC', False)
 
@@ -60,8 +59,6 @@ def build_mol(self, dump_input=True, parse_arg=True,
                 if opts.output:
                     mol.output = opts.output
 
-        #if self.verbose >= logger.WARN:
-        #    self.check_sanity()
 
         self._atom = self.format_atom(self.atom, unit=self.unit)
         uniq_atoms = set([a[0] for a in self._atom])
