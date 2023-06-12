@@ -1,6 +1,12 @@
 # PySCF on IPU
+Port of PySCF to Graphcore IPU. 
 
-Port of PySCF to Graphcore IPU.
+Limitations
+- Restricted Kohn Sham DFT ([RKS](https://github.com/pyscf/pyscf/blob/6c815a62bc2e5eae1488a1d0dbe84556dd54b922/pyscf/dft/rks.py#L531), [KohnShamDFT](https://github.com/pyscf/pyscf/blob/6c815a62bc2e5eae1488a1d0dbe84556dd54b922/pyscf/dft/rks.py#L280) and [hf.RHF](https://github.com/pyscf/pyscf/blob/6c815a62bc2e5eae1488a1d0dbe84556dd54b922/pyscf/scf/hf.py#L2044)).
+- Number of atomic orbitals less than 70 `mol.nao_nr() <= 70`. 
+- Larger numerical errors due to `np.float32` instead of `np.float64`.
+- Limited support for `jax.grad(.)`
+
 
 ## Installation
 
