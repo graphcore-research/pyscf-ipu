@@ -28,7 +28,7 @@ pip install jax==0.3.16+ipu jaxlib==0.3.15+ipu.sdk320 -f https://graphcore-resea
 pip install git+https://github.com/graphcore-research/jax-ipu-experimental-addons.git@main
 ```
 
-The following commands may be useful to check the installation across numerical precision and backend.  
+The following commands may be useful to check the installation.  
 ```
 python density_functional_theory.py -methane -backend cpu # defaults to float64 as used in PySCF
 python density_functional_theory.py -methane -backend cpu -float32
