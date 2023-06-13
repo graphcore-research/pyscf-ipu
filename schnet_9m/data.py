@@ -19,8 +19,7 @@ class DataConfig:
     num_train: int = 100000
     num_test: int = 20000
     max_num_examples: int = int(1e9)
-    test_file: Optional[str] = None
-    train_folder: Optional[str] = None
+    root_folder: Optional[str] = None
     shuffle: bool = True
 
 

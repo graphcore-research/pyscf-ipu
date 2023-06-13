@@ -1,0 +1,7 @@
+dataset: qm1b
+num_workers: 0
+num_train: 100000000
+num_test: 10000000
+max_num_examples: 1000000000
+root_folder: /net/group/research/datasets/qm1b
+shuffle: true

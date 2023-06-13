@@ -11,6 +11,7 @@ import numpy as np
 from natsort import natsorted
 from torch.utils.data import IterableDataset
 from tqdm import tqdm
+from download import download
 
 INT_MAX = np.iinfo(np.int32).max
 
@@ -199,43 +200,24 @@ def combined_batch(options, num_graphs_per_batch):
     return combined_batch_size
 
 
-def create_qm1b_iter_dataset(
-    folder: str,
-    shuffle: bool = False,
-    split: bool = True,
-    num_test: Optional[int] = None,
-    num_train: Optional[int] = None,
-):
-    files = glob(osp.join(folder, "*.parquet"))
-    files = natsorted(files)
-
-    if shuffle:
-        np.random.shuffle(files)
-
-    if not split:
-        return QM1B(files)
-
-    # apply test-train split by file (assumes no smiles overlap multiple files)
-    n = np.array([pq.read_metadata(f).num_rows for f in files])
-    index = (np.cumsum(n) > 1e9).argmax() + 1
-    test = QM1B(files[index:], num_subset=num_test, shuffle=shuffle)
-    train = QM1B(files[:index], num_subset=num_train, shuffle=shuffle)
-    return test, train
-
-
 def create_qm1b_split_dataset(
-    train_folder: str,
-    val_file: str,
+    root_folder: str,
     shuffle: bool = False,
     num_test: Optional[int] = None,
     num_train: Optional[int] = None,
 ):
+    train_folder = osp.join(root_folder, "shuffled_training")
+
+    if not osp.exists(train_folder):
+        download(root_folder)
+
     files = glob(osp.join(train_folder, "*.parquet"))
     files = natsorted(files)
 
     if shuffle:
         np.random.shuffle(files)
 
+    val_file = osp.join(root_folder, "validation", "qm1b_validation.parquet")
     test = QM1B([val_file], num_subset=num_test, shuffle=shuffle)
     train = QM1B(files, num_subset=num_train, shuffle=shuffle)
     return test, train
@@ -260,8 +242,7 @@ def create_qm1b_loader(data_config, model_config, options):
     }
 
     test, train = create_qm1b_split_dataset(
-        data_config.train_folder,
-        data_config.test_file,
+        data_config.root_folder,
         shuffle=data_config.shuffle,
         num_train=data_config.num_train,
         num_test=data_config.num_test,
