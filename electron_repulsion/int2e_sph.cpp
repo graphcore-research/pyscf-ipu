@@ -1,4 +1,6 @@
-// Copyright (c) 2018 Graphcore Ltd. All rights reserved.
+/*
+        This code implements the integral computation on IPU. 
+*/
 #include <poplar/Vertex.hpp>
 #include <algorithm>
 #include <cassert>
@@ -72,7 +74,7 @@ static float ROOTS_FOR_X0[]   = {0.5, 0.13069360623708471, 2.86930639376291528, 
 static float WEIGHTS_FOR_X0[] = {1.0, 0.65214515486254614, 0.34785484513745385, 0.46791393457269104, 0.36076157304813860, 0.17132449237917034, 0.36268378337836198, 0.31370664587788728, 0.22238103445337447, 0.10122853629037625, 0.29552422471475287, 0.26926671930999635, 0.21908636251598204, 0.14945134915058059, 0.06667134430868813, 0.24914704581340278, 0.23349253653835480, 0.20316742672306592, 0.16007832854334622, 0.10693932599531843, 0.04717533638651182, 0.21526385346315779, 0.20519846372129560, 0.18553839747793781, 0.15720316715819353, 0.12151857068790318, 0.08015808715976020, 0.03511946033175186, 0.18945061045506849, 0.18260341504492358, 0.16915651939500253, 0.14959598881657673, 0.12462897125553387, 0.09515851168249278, 0.06225352393864789, 0.02715245941175409, 0.16914238296314359, 0.16427648374583272, 0.15468467512626524, 0.14064291467065065, 0.12255520671147846, 0.10094204410628716, 0.07642573025488905, 0.04971454889496979, 0.02161601352648331, 0.15275338713072585, 0.14917298647260374, 0.14209610931838205, 0.13168863844917662, 0.11819453196151841, 0.10193011981724043, 0.08327674157670474, 0.06267204833410906, 0.04060142980038694, 0.01761400713915211, 0.13925187285563199, 0.13654149834601517, 0.13117350478706237, 0.12325237681051242, 0.11293229608053921, 0.10041414444288096, 0.08594160621706772, 0.06979646842452048, 0.05229333515268328, 0.03377490158481415, 0.01462799529827220, 0.12793819534675215, 0.12583745634682829, 0.12167047292780339, 0.11550566805372560, 0.10744427011596563, 0.09761865210411388, 0.08619016153195327, 0.07334648141108030, 0.05929858491543678, 0.04427743881741980, 0.02853138862893366, 0.01234122979998719, 0.11832141527926227, 0.11666044348529658, 0.11336181654631966, 0.10847184052857659, 0.10205916109442542, 0.09421380035591414, 0.08504589431348523, 0.07468414976565974, 0.06327404632957483, 0.05097582529714781, 0.03796238329436276, 0.02441785109263190, 0.01055137261734300, 0.11004701301647519, 0.10871119225829413, 0.10605576592284641, 0.10211296757806076, 0.09693065799792991, 0.09057174439303284, 0.08311341722890121, 0.07464621423456877, 0.06527292396699959, 0.05510734567571674, 0.04427293475900422, 0.03290142778230437, 0.02113211259277125, 0.00912428259309451, 0.10285265289355884, 0.10176238974840550, 0.09959342058679526, 0.09636873717464425, 0.09212252223778612, 0.08689978720108297, 0.08075589522942021, 0.07375597473770520, 0.06597422988218049, 0.05749315621761906, 0.04840267283059405, 0.03879919256962704, 0.02878470788332336, 0.01846646831109095, 0.00796819249616660, 0.09654008851472780, 0.09563872007927485, 0.09384439908080456, 0.09117387869576388, 0.08765209300440381, 0.08331192422694675, 0.07819389578707030, 0.07234579410884850, 0.06582222277636184, 0.05868409347853554, 0.05099805926237617, 0.04283589802222668, 0.03427386291302143, 0.02539206530926205, 0.01627439473090567, 0.00701861000947009, 0.09095674033025987, 0.09020304437064072, 0.08870189783569386, 0.08646573974703574, 0.08351309969984565, 0.07986844433977184, 0.07556197466003193, 0.07062937581425572, 0.06511152155407641, 0.05905413582752449, 0.05250741457267810, 0.04552561152335327, 0.03816659379638751, 0.03049138063844613, 0.02256372198549497, 0.01445016274859503, 0.00622914055590868, 0.08598327567039474, 0.08534668573933862, 0.08407821897966193, 0.08218726670433970, 0.07968782891207160, 0.07659841064587067, 0.07294188500565306, 0.06874532383573644, 0.06403979735501548, 0.05886014424532481, 0.05324471397775991, 0.04723508349026597, 0.04087575092364489, 0.03421381077030722, 0.02729862149856877, 0.02018151529773547, 0.01291594728406557, 0.00556571966424504, 0.08152502928038578, 0.08098249377059710, 0.07990103324352782, 0.07828784465821094, 0.07615366354844639, 0.07351269258474345, 0.07038250706689895, 0.06678393797914041, 0.06274093339213305, 0.05828039914699720, 0.05343201991033231, 0.04822806186075868, 0.04270315850467443, 0.03689408159402473, 0.03083950054517505, 0.02457973973823237, 0.01815657770961323, 0.01161344471646867, 0.00500288074963934, 0.07750594797842481, 0.07703981816424796, 0.07611036190062624, 0.07472316905796826, 0.07288658239580405, 0.07061164739128677, 0.06791204581523390, 0.06480401345660103, 0.06130624249292893, 0.05743976909939155, 0.05322784698393682, 0.04869580763507223, 0.04387090818567327, 0.03878216797447201, 0.03346019528254784, 0.02793700698002340, 0.02224584919416695, 0.01642105838190788, 0.01049828453115281, 0.00452127709853319, 0.07386423423217287, 0.07346081345346752, 0.07265617524380410, 0.07145471426517098, 0.06986299249259415, 0.06788970337652194, 0.06554562436490897, 0.06284355804500257, 0.05979826222758665, 0.05642636935801838, 0.05274629569917407, 0.04877814079280324, 0.04454357777196587, 0.04006573518069226, 0.03536907109759211, 0.03047924069960346, 0.02542295952611304, 0.02022786956905264, 0.01492244369735749, 0.00953622030174850, 0.00410599860464908, 0.07054915778935406, 0.07019768547355821, 0.06949649186157257, 0.06844907026936666, 0.06706063890629365, 0.06533811487918143, 0.06329007973320385, 0.06092673670156196, 0.05825985987759549, 0.05530273556372805, 0.05207009609170446, 0.04857804644835203, 0.04484398408197003, 0.04088651231034621, 0.03672534781380887, 0.03238122281206982, 0.02787578282128101, 0.02323148190201921, 0.01847148173681474, 0.01361958675557998, 0.00870048136752484, 0.00374540480311277, 0.06751868584903645, 0.06721061360067817, 0.06659587476845488, 0.06567727426778120, 0.06445900346713906, 0.06294662106439450, 0.06114702772465048, 0.05906843459554631, 0.05672032584399123, 0.05411341538585675, 0.05125959800714302, 0.04817189510171220, 0.04486439527731812, 0.04135219010967872, 0.03765130535738607, 0.03377862799910689, 0.02975182955220275, 0.02558928639713001, 0.02130999875413650, 0.01693351400783623, 0.01247988377098868, 0.00796989822972462, 0.00343030086810704, 0.06473769681268392, 0.06446616443595008, 0.06392423858464818, 0.06311419228625402, 0.06203942315989266, 0.06070443916589388, 0.05911483969839563, 0.05727729210040321, 0.05519950369998416, 0.05289018948519366, 0.05035903555385447, 0.04761665849249047, 0.04467456085669428, 0.04154508294346474, 0.03824135106583070, 0.03477722256477043, 0.03116722783279808, 0.02742650970835694, 0.02357076083932437, 0.01961616045735552, 0.01557931572294384, 0.01147723457923453, 0.00732755390127626, 0.00315334605230583, 0.06217661665534726, 0.06193606742068324, 0.06145589959031666, 0.06073797084177021, 0.05978505870426545, 0.05860084981322244, 0.05718992564772838, 0.05555774480621251, 0.05371062188899624, 0.05165570306958113, 0.04940093844946631, 0.04695505130394843, 0.04432750433880327, 0.04152846309014769, 0.03856875661258767, 0.03545983561514615, 0.03221372822357801, 0.02884299358053519, 0.02536067357001239, 0.02178024317012479, 0.01811556071348939, 0.01438082276148557, 0.01059054838365096, 0.00675979919574540, 0.00290862255315514, 0.05981036574529186, 0.05959626017124815, 0.05916881546604297, 0.05852956177181386, 0.05768078745252682, 0.05662553090236859, 0.05536756966930265, 0.05391140693275726, 0.05226225538390699, 0.05042601856634237, 0.04840926974407489, 0.04621922837278479, 0.04386373425900040, 0.04135121950056027, 0.03869067831042397, 0.03589163483509723, 0.03296410908971879, 0.02991858114714394, 0.02676595374650401, 0.02351751355398446, 0.02018489150798079, 0.01678002339630073, 0.01331511498234096, 0.00980263457946275, 0.00625552396297327, 0.00269131695004711, 0.05761753670714702, 0.05742613705411211, 0.05704397355879459, 0.05647231573062596, 0.05571306256058998, 0.05476873621305798, 0.05364247364755361, 0.05233801619829874, 0.05085969714618814, 0.04921242732452888, 0.04740167880644499, 0.04543346672827671, 0.04331432930959701, 0.04105130613664497, 0.03865191478210251, 0.03612412584038355, 0.03347633646437264, 0.03071734249787067, 0.02785630931059587, 0.02490274146720877, 0.02186645142285308, 0.01875752762146937, 0.01558630303592413, 0.01236332812884764, 0.00909936945550939, 0.00580561101523998, 0.00249748183576158, 0.05557974630651439, 0.05540795250324512, 0.05506489590176242, 0.05455163687088942, 0.05386976186571448, 0.05302137852401076, 0.05200910915174139, 0.05083608261779848, 0.04950592468304757, 0.04802274679360025, 0.04639113337300189, 0.04461612765269228, 0.04270321608466708, 0.04065831138474451, 0.03848773425924766, 0.03619819387231518, 0.03379676711561176, 0.03129087674731044, 0.02868826847382274, 0.02599698705839195, 0.02322535156256531, 0.02038192988240257, 0.01747551291140094, 0.01451508927802147, 0.01150982434038338, 0.00846906316330788, 0.00540252224601533, 0.00232385537577321, 0.05368111986333484, 0.05352634330405825, 0.05321723644657901, 0.05275469052637083, 0.05214003918366981, 0.05137505461828572, 0.05046194247995312, 0.04940333550896239, 0.04820228594541774, 0.04686225672902634, 0.04538711151481980, 0.04378110353364025, 0.04204886332958212, 0.04019538540986779, 0.03822601384585843, 0.03614642686708727, 0.03396262049341601, 0.03168089125380932, 0.02930781804416049, 0.02685024318198186, 0.02431525272496395, 0.02171015614014623, 0.01904246546189340, 0.01631987423497096, 0.01355023711298881, 0.01074155353287877, 0.00790197384999867, 0.00503998161265024, 0.00216772324962744, 0.05190787763122063, 0.05176794317491017, 0.05148845150098092, 0.05107015606985562, 0.05051418453250936, 0.04982203569055017, 0.04899557545575683, 0.04803703181997117, 0.04694898884891220, 0.04573437971611448, 0.04439647879578711, 0.04293889283593564, 0.04136555123558475, 0.03968069545238080, 0.03788886756924344, 0.03599489805108450, 0.03400389272494642, 0.03192121901929633, 0.02975249150078894, 0.02750355674992479, 0.02518047762152125, 0.02278951694399782, 0.02033712072945729, 0.01782990101420772, 0.01527461859678480, 0.01267816647681596, 0.01004755718228798, 0.00738993116334545, 0.00471272992695356, 0.00202681196887375, 0.05024800037525557, 0.05012106956904260, 0.04986752859495174, 0.04948801791969869, 0.04898349622051730, 0.04835523796347721, 0.04760483018410085, 0.04673416847841523, 0.04574545221456998, 0.04464117897712430, 0.04342413825804739, 0.04209740441038514, 0.04066432888241756, 0.03912853175196327, 0.03749389258228027, 0.03576454062276843, 0.03394484437941086, 0.03203940058162502, 0.03005302257399023, 0.02799072816331500, 0.02585772695402506, 0.02365940720868315, 0.02140132227767030, 0.01908917665857351, 0.01672881179017760, 0.01432619182380677, 0.01188739011701071, 0.00941857942842056, 0.00692604190183109, 0.00441633345693098, 0.00189920567951372, };
 
 
-dtype CINTcommon_fac_sp(int l) // @alex: changing duble to float improved test case max(abs( num_precision )) 
+dtype CINTcommon_fac_sp(int l) 
 {
         switch (l) {
                 case 0: return 0.282094791773878143;
@@ -82,19 +84,18 @@ dtype CINTcommon_fac_sp(int l) // @alex: changing duble to float improved test c
 }
 
 
-//dtype _sqrt(dtype num) {return num;} // try to remove sqrt?
-//dtype _sqrt(dtype num) {return sqrt(num);} // try to remove sqrt?
-dtype _sqrt(dtype num) { return exp(log(num)*1/2);} // try to remove sqrt?
-//dtype _sqrt(dtype num) { return num;} // try to remove sqrt?
+//dtype _sqrt(dtype num) {return num;} 
+//dtype _sqrt(dtype num) {return sqrt(num);} 
+dtype _sqrt(dtype num) { return exp(log(num)*1/2);} 
+//dtype _sqrt(dtype num) { return num;} 
 
 //static void rys_root1(dtype X, dtype *roots,  Output<Vector<float>> weights, int g_size) {
 static void rys_root1(dtype X, dtype *roots,  float* weights, int g_size) {
         dtype Y, F1;
 
-        // perhaps kill values smaller than 1e-10? 
 
         if (X > (float)33.) { 
-                weights[0+g_size*2] = _sqrt(PIE4/X);  // this may be taking very long; maybe compute with log instead? 
+                weights[0+g_size*2] = _sqrt(PIE4/X);  
                 roots  [0         ] = (float)0.5E+00 / ( X - (float)0.5E+00 ); 
                 return; 
         }
@@ -106,22 +107,16 @@ static void rys_root1(dtype X, dtype *roots,  float* weights, int g_size) {
 
         dtype E = exp(-X); 
 
-        // 2.307408 removing all for loops 
-        // 2.284576 adding the one below. 
-        // removing ll all 
 
         if (X > (float)15.) {
-                //Y  = (float)1. / X;
                 F1 = ((( ( (float)1.9623264149430E-01) / X - (float)4.9695241464490E-01) / X -
                            (float)6.0156581186481E-05)* E + _sqrt(PIE4/X) - E) / X * (float)0.5;
-                //F1 *= .5;
         } 
         else if (X > (float)10.) {
                 Y = (float)1./X;
                 F1 = ((((-(float)1.8784686463512E-01*Y+(float)2.2991849164985E-01)*Y -
                           (float)4.9893752514047E-01)*Y-(float)2.1916512131607E-05)* E
                         + _sqrt(PIE4/X) - E)*Y*(float)0.5;
-                //F1 *= .5;
         } 
         else if (X > (float)5.) {
                 Y = (float)1./X;
@@ -129,7 +124,6 @@ static void rys_root1(dtype X, dtype *roots,  float* weights, int g_size) {
                              (float)5.3689283271887E-01)*Y-(float)3.2883030418398E-01)*Y +
                              (float)2.4645596956002E-01)*Y-(float)4.9984072848436E-01)*Y -
                              (float)3.1501078774085E-06)* E + _sqrt(PIE4/X) - E)*Y*(float)0.5;
-                //F1 *= .5;
         } 
         else if (X > (float)3.){
                 Y = X-(float)4.0E+00;
@@ -157,24 +151,13 @@ static void rys_root1(dtype X, dtype *roots,  float* weights, int g_size) {
                               (float)1.99999999997023E-01)*X + (float)3.33333333333318E-01;
         }
 
-         /*F1 = (((((//((  //(   -(float)8.36313918003957E-08 *X + (float)1.21222603512827E-06)*X-
-                              //(float)1.15662609053481E-05)*X + (float)9.25197374512647E-05)*X-
-                              (float)6.40994113129432E-04)*X + (float)3.78787044215009E-03)*X-
-                              (float)1.85185172458485E-02)*X + (float)7.14285713298222E-02)*X-
-                              (float)1.99999999997023E-01)*X + (float)3.33333333333318E-01;*/
-
-        //F1 = 0; // F1 / F1  - 1; // so the value of this, impacts weights and roots, which makes other part of prorgram slower. 
-
-        //dtype WW1 = 2. * X * F1 + E; 5.58 M cycles 
-        dtype WW1 = (float)2. * X * F1 + E; // 2 M cycles 
+        dtype WW1 = (float)2. * X * F1 + E; 
         weights[0+g_size*2] = WW1; 
         roots[0] = F1 / (WW1 - F1);
 }
 
 static void rys_root2(dtype X, dtype *roots, float* weights, int g_size) { 
         // added (float) to all 2.12312E-01 numbers; 
-        // this reduced cycle count from 7M to 1M! 
-        // looks like it confused compiler.. 
         dtype R12, R22, W22;
 
         dtype RT1, RT2, WW1, WW2;
@@ -216,7 +199,7 @@ static void rys_root2(dtype X, dtype *roots, float* weights, int g_size) {
                 WW1 = WW1-WW2;
 
         } 
-        else if (X < (float)3.) { // how many times is this run?  can we compute Y coefficients once? 
+        else if (X < (float)3.) { 
 
                 Y = X-(float)2.0E+00;
                 F1 = ((((((((((-(float)1.61702782425558E-10*Y+(float)1.96215250865776E-09 )*Y-
@@ -945,7 +928,7 @@ float* weights, int g_size)
                        (float)6.0156581186481E-05)*E + WW1-WW2-WW3-WW4;
         } else if (X <= (float)53) {
                 WW1 = _sqrt(PIE4/X);
-                E = exp(-X)*pow(X,4); // alex: pow previous made program 10x slower 
+                E = exp(-X)*pow(X,4); 
                 RT4 = ((-(float)2.19135070169653E-03*X-(float)1.19108256987623E-01)*X -
                        (float)7.50238795695573E-01)*E + R44/(X-R44);
                 RT3 = ((-(float)9.65842534508637E-04*X-(float)4.49822013469279E-02)*X +
@@ -982,8 +965,8 @@ float* weights, int g_size)
         weights[3+g_size*2] = WW4;
 }
 
-// this is called for 6-31G*, so we'd need to fix it up! 
-static void rys_root5(dtype X, dtype *roots,  // floating it 
+// this is called for 6-31G*
+static void rys_root5(dtype X, dtype *roots,  
 //Output<Vector<float>> weights, int g_size) 
 float* weights, int g_size) 
 {
@@ -1491,11 +1474,9 @@ float* weights, int g_size)
 void CINTg0_2e_2d(float* g, int g_len, 
         int nroots, int nmax, int mmax, int dm, int dn, int g_size
         ,const dtype *__bcc00, const dtype *__bcc0p, int bcc0_len,
-        //,const dtype *bcc00, const dtype *bcc0p, int bcc0_len,
         const dtype *b01, const dtype *b00, const dtype *b10 , int b_len
         ) {
 
-                // this one takes 800k cycles for -water 1 -micro 624
 
 
         //int i, j, m, n, off;
@@ -1516,7 +1497,6 @@ void CINTg0_2e_2d(float* g, int g_len,
                 //gz[i] = w[i];
         }
 
-        // maybe this is the loop thing? poplar doesn't realize it can repeat? 
 
         // 200k 
         if (nmax > 0) {
@@ -1566,7 +1546,7 @@ void CINTg0_2e_2d(float* g, int g_len,
                 }
         }
 
-        // 400k in this one 
+        // 400k 
         if (nmax > 0 && mmax > 0) {
                 // gx(irys,1,1) = c0p(irys)*gx(irys,0,1)
                 // + b00(irys)*gx(irys,0,0)
@@ -1592,9 +1572,6 @@ void CINTg0_2e_2d(float* g, int g_len,
                 // + n*b10(irys)*gx(irys,m,n-1)
                 // + m*b00(irys)*gx(irys,m-1,n)
 
-                // looks like the thing taking time is unrolling the for loop? 
-                // commenting out one of the g's doens't remove 30% of the time
-                // removing all of them removes a lot of time! 
                 for (m = 1; m <= mmax; m++) {
                         for (n = 1; n < nmax; n++) {
                                 off = m * dm + n * dn;
@@ -1710,7 +1687,6 @@ void CINTg0_il2d_4d(float* g, int g_len,
         int nmax, int mmax, int lk, int ll, int lj, int nroots,
         int di, int dk, int dl, int dj, const dtype *rirj, const dtype *rkrl, int g_size) {
 
-        // copy 
 
         dtype rx, ry, rz, _rx, _ry, _rz;
         //unsigned short i, j, k, l, ptr, n;
@@ -1804,8 +1780,7 @@ void CINTg0_ik2d_4d(float* g, int g_len,
 }
 
 
-// this takes 50.2 kb 
-// perhaps that is the code size? 
+// code size takes 50.2 kb 
 int CINTg0_2e( float* g, int g_len,
 int kbase, int ibase, int di, int dk, int dl, int dj, int dm, int dn
 ,int nroots, dtype aij, dtype akl, int g_size, dtype fac0, int nmax, int mmax, 
@@ -1824,7 +1799,6 @@ dtype rijrkl[], dtype rijrx[], dtype rklrx[]) {
         if (x < (float)1E-15) { 
                 int off = nroots * (nroots - 1) / 2;
                 int i; 
-                // unsigned short i;
                 for (i = 0; i < nroots; i++)  {
                         u[i]          = ROOTS_FOR_X0[off + i]; 
                         g[i+g_size*2] = WEIGHTS_FOR_X0[off + i];
@@ -1844,7 +1818,6 @@ dtype rijrkl[], dtype rijrx[], dtype rklrx[]) {
                 if (nroots == 4) { rys_root4(x, u, g, g_size);}  
                 if (nroots == 5) { rys_root5(x, u, g, g_size);}  // adding float: -12.3 KiB (from 49.3 KiB to 37.0 KiB) 
                 
-                // 5 11 5 5 5
         }
 
         if (g_size == 1) {
@@ -1879,7 +1852,7 @@ dtype rijrkl[], dtype rijrx[], dtype rklrx[]) {
         //for (unsigned short irys = 0; irys < nroots; irys++, c00+=3, c0p+=3) {
         for (int irys = 0; irys < nroots; irys++, c00+=3, c0p+=3) {
                 u2 = a0 * u[irys];
-                tmp4 = (float).5 / (u2 * (aij + akl) + a1); // casting to float reduced from 2.6M to ?
+                tmp4 = (float).5 / (u2 * (aij + akl) + a1); 
                 tmp5 = u2 * tmp4;
                 tmp1 = (float)2. * tmp5;
                 tmp2 = tmp1 * akl;
@@ -1929,7 +1902,6 @@ typedef struct {
 
 
 void CINTOpt_log_max_pgto_coeff(dtype *log_maxc, const dtype *coeff, int nprim, int nctr) {
-        //int i, ip;
         short i, ip; // max is 32k 
         dtype maxc;
         for (ip = 0; ip < nprim; ip++) {
@@ -1968,7 +1940,6 @@ void CINTcart_comp(int *nx, int *ny, int *nz, const int lmax)
 
 // other boundaries
 #define CART_MAX        136 // > (ANG_MAX*(ANG_MAX+1)/2)
-// writing it in to be sure 
 void CINTg2e_index_xyz(int *idx, int i_l, int j_l, int k_l, int l_l,
                                                            int nfi, int nfj, int nfk, int nfl, 
                                                            int di,  int dk,  int dl,  int dj, int g_size) {
@@ -1976,8 +1947,6 @@ void CINTg2e_index_xyz(int *idx, int i_l, int j_l, int k_l, int l_l,
         int ofx, ofkx, oflx;
         int ofy, ofky, ofly;
         int ofz, ofkz, oflz;
-        // TODO:allocate ;; see inspect.jpg;; this size is the same everywhere! 
-        // might want to try power off two; may allocate faster? 
         int i_nx[136], i_ny[136], i_nz[136];
         int j_nx[136], j_ny[136], j_nz[136];
         int k_nx[136], k_ny[136], k_nz[136];
@@ -2440,6 +2409,7 @@ int CINTset_pairdata(PairData *pairdata, const dtype *ai, const dtype *aj, const
                      dtype rr_ij, dtype expcutoff, dtype*eri) {
         int ip, jp, n;
         dtype aij, eij, cceij;
+        // the comment below was commented from libcint. 
         // This estimation is based on the assumption that the two gaussian charge
         // distributions are separated in space. If two gaussians are too close (the
         // distance between gaussian product ij and gaussian product kl < 1), rr
@@ -2503,23 +2473,22 @@ int CINT2e_loop_nopt(
   int k_sh    = shls[2];
   int l_sh    = shls[3];
 
-  int i_prim  = bas[BAS_SLOTS*i_sh + NPRIM_OF];  // all 3 (CPU agree)  [H2]
+  int i_prim  = bas[BAS_SLOTS*i_sh + NPRIM_OF];  
   int j_prim  = bas[BAS_SLOTS*j_sh + NPRIM_OF]; 
   int k_prim  = bas[BAS_SLOTS*k_sh + NPRIM_OF];
   int l_prim  = bas[BAS_SLOTS*l_sh + NPRIM_OF];
 
-  const dtype *ai = env + bas[BAS_SLOTS*i_sh+PTR_EXP]; // all 3.425251 (CPU agree) [H2]
+  const dtype *ai = env + bas[BAS_SLOTS*i_sh+PTR_EXP]; 
   const dtype *aj = env + bas[BAS_SLOTS*j_sh+PTR_EXP];
   const dtype *ak = env + bas[BAS_SLOTS*k_sh+PTR_EXP];
   const dtype *al = env + bas[BAS_SLOTS*l_sh+PTR_EXP];
 
-  const dtype *ci = env + bas[BAS_SLOTS*i_sh+PTR_COEFF]; // all 0.981707 (CPU agree) [H2]
+  const dtype *ci = env + bas[BAS_SLOTS*i_sh+PTR_COEFF]; 
   const dtype *cj = env + bas[BAS_SLOTS*j_sh+PTR_COEFF];
   const dtype *ck = env + bas[BAS_SLOTS*k_sh+PTR_COEFF];
   const dtype *cl = env + bas[BAS_SLOTS*l_sh+PTR_COEFF];
 
 
-  // TODO:allocate ;; see inspect.jpg
   dtype log_maxci[32], *log_maxcj, *log_maxck, *log_maxcl;// 6-31G=25, 6-31G*=25
 
 
@@ -2543,7 +2512,7 @@ int CINT2e_loop_nopt(
   CINTOpt_log_max_pgto_coeff(log_maxck, ck, k_prim, k_ctr);
   CINTOpt_log_max_pgto_coeff(log_maxcl, cl, l_prim, l_ctr);
 
-  dtype fac1i, fac1j, fac1k, fac1l; // TODO: this dooubled error to 3.318841e-07;; 
+  dtype fac1i, fac1j, fac1k, fac1l; 
   int _empty[5] = {1, 1, 1, 1, 1};
   int *iempty = _empty + 0;
   int *jempty = _empty + 1;
@@ -2555,13 +2524,12 @@ int CINT2e_loop_nopt(
   dtype *rij; // 
   // TODO:allocate 
   //int idx[256];  // 6-31G = 240?
-  int * idx = tile_idx; // oohh didn't know this was an integer. 
+  int * idx = tile_idx; 
   //int idx[3888]; 
   
   // This allocated ~ [3,4] kB but doesn't really spend many cycles. 
   CINTg2e_index_xyz(idx, i_l, j_l, k_l, l_l, nfi, nfj, nfk, nfl, g_stride_i , g_stride_k , g_stride_l , g_stride_j, g_size);
 
-  // TODO::allocate 
   int non0ctri[64], *non0ctrj, *non0ctrk, *non0ctrl; 
   int *non0idxi, *non0idxj, *non0idxk, *non0idxl;
   non0ctrj = non0ctri + i_prim;
@@ -2585,7 +2553,6 @@ int CINT2e_loop_nopt(
   size_t len0 = nf * n_comp; // gout
   size_t len = leng + lenl + lenk + lenj + leni + len0;
 
-  //TODO:allocate
   //dtype g[16384]; // this becomes 1053 at some point? 
   //dtype g[1053]; // this becomes 1053 at some point? 
   dtype *g = tile_g;
@@ -2685,9 +2652,6 @@ int CINT2e_loop_nopt(
 
 
                                         // 3.08M to 700k ; so this is 2.2M 
-                                        // 1.6M is "last two calls" with 0.6M for rys_roots? 
-                                        // looks like most of time goes to convert between e.g. double/float or float/int 
-                                        // need to make sure all the datatypes don't lead to implicit casting. 
                                        int ret = CINTg0_2e(g, len, 
                                                 kbase, ibase, 
                                                 g_stride_i, g_stride_k, g_stride_l, g_stride_j, 
@@ -2702,7 +2666,7 @@ int CINT2e_loop_nopt(
 
                                         // this takes ~ 700k? 
                                         if (ret) {
-                                                CINTgout2e(gout, g, idx, *gempty, nf, nrys_roots);// this is the one where default case is a bit slower I think? 
+                                                CINTgout2e(gout, g, idx, *gempty, nf, nrys_roots);// this may be the one where default case is a bit slower 
 
                                                 //#define PRIM2CTR(ctrsymb, gp, ngp) 
                                                 if (i_ctr > 1) {
@@ -3466,7 +3430,7 @@ static dtype g_trans_cart2sph[] = {
  * / xyz_alpha \
  * \ xyz_beta  /
  */
- // this takes up 135 KiB
+ // this takes up 135 KiB code 
 static dtype g_trans_cart2jR[] = {
         0,
         1,
@@ -6207,15 +6171,11 @@ struct cart2sp_t {
 // [*] = n(n+1)(n+2)(n+3)/4+(n+1)(n+2)(n+3)/6
 
 
-// just doing this gets compiler to remove the 300KB of code! 
 //static struct cart2sp_t g_c2s[] = {};
 
-// TODO: try to just change I to R; I don't think the imaginary part is used anyway! 
-// Chek whether it makes sense the thing is 135 KiB. 
 
-// Does g_c2s point to g_trans_cart2sph or copy it 100x times? 
-
-/*static struct cart2sp_t g_c2s[] = { // so the different ones just add different stuff? 
+// removed the ones not used to reduce code size, see below. 
+/*static struct cart2sp_t g_c2s[] = { 
         {g_trans_cart2sph     ,g_trans_cart2jR      , g_trans_cart2jI      , g_trans_cart2jR      , g_trans_cart2jI      }, // 1 
         {g_trans_cart2sph+1   ,g_trans_cart2jR+4    , g_trans_cart2jI+4    , g_trans_cart2jR+16   , g_trans_cart2jI+16   }, // 2 
         {g_trans_cart2sph+10  ,g_trans_cart2jR+40   , g_trans_cart2jI+40   , g_trans_cart2jR+88   , g_trans_cart2jI+88   }, //3 
@@ -6231,11 +6191,11 @@ struct cart2sp_t {
         {g_trans_cart2sph+6370,g_trans_cart2jR+25480, g_trans_cart2jI+25480, g_trans_cart2jR+29848, g_trans_cart2jI+29848},
         {g_trans_cart2sph+8645,  NULL, NULL, NULL, NULL},
         {g_trans_cart2sph+11480, NULL, NULL, NULL, NULL},
-        {g_trans_cart2sph+14960, NULL, NULL, NULL, NULL}, // looks like we only use cart2sph 
+        {g_trans_cart2sph+14960, NULL, NULL, NULL, NULL}, 
 };*/
 
 
-static struct cart2sp_t g_c2s[] = { // so the different ones just add different stuff? 
+static struct cart2sp_t g_c2s[] = { 
         {g_trans_cart2sph     }, // 1 
         {g_trans_cart2sph+1   }, // 2 
         {g_trans_cart2sph+10  }, //3 
@@ -6934,18 +6894,16 @@ int int2e_sph(dtype *out, int n_out, int *dims, const int *shls, const int *atm,
           int l_prim = bas(NPRIM_OF, shls[3]); 
           size_t pdata_size = ((i_prim*j_prim + k_prim*l_prim) * 5 + i_prim * x_ctr[0]  + j_prim * x_ctr[1] + k_prim * x_ctr[2] + l_prim * x_ctr[3] +(i_prim+j_prim+k_prim+l_prim)*2 + nf*3);
           size_t len0       = nf*n_comp;
-          size_t cache_size = (size_t)std::fmax((float)(leng+len0+nc*n_comp*3 + pdata_size), (float)(nc*n_comp+nf*4)); // @alex: using fmax which takes only float, so have to cast. For very large integers this is obviously wrong! 
+          size_t cache_size = (size_t)std::fmax((float)(leng+len0+nc*n_comp*3 + pdata_size), (float)(nc*n_comp+nf*4)); // @alex: using fmax which takes only float, so have to cast. 
           return cache_size;
   }
   
   //dtype gctr[nc*n_comp]; 
-  dtype gctr[1296+1];  // TODO:allocate // perhaps this isn't big enough? 
+  dtype gctr[1296+1];  // hardcoded, may not be big enough for some cases. 
 
   int n;
   int empty = 1;
 
-
-        // removing this goes to 200k ops! 
   CINT2e_loop_nopt(gctr, env, rk, ri, rj, rl, expcutoff, rkrl, rirj, 
                          ai, aj, ak, al, fac, rij, rkl, rx_in_rijrx, rx_in_rklrx, 
                          common_factor, (lk_ceil+ll_ceil+1), nc*n_comp, &empty, shls, bas, // ints after this 
@@ -6966,10 +6924,6 @@ int int2e_sph(dtype *out, int n_out, int *dims, const int *shls, const int *atm,
         
   if (!empty) {
           for (n = 0; n < n_comp; n++) {
-                  // @alex; 
-                  // this one is a bit annoying, has a lot of dependencies...
-                  // just coped in function for simplicity.. 
-                  //c2s_sph_2e1(out+nout*n, gctr+nc*n, dims, &envs, cache);  
                   int di = i_l * 2 + 1;
                   int dj = j_l * 2 + 1;
                   int dk = k_l * 2 + 1;
@@ -6988,14 +6942,11 @@ int int2e_sph(dtype *out, int n_out, int *dims, const int *shls, const int *atm,
                   int ic, jc, kc, lc;
                   int buflen = nfikl*dj;
 
-                  // TODO:allocate
-                  // This also increases from 80 to 1200 in 631g to 6-31g*
-                  // might perhaps reduce this to one? 
+                  // This increase from 80 to 1200 in 631g to 6-31g*
                   /*dtype buf1[81]; 
                   dtype buf2[81];
                   dtype buf3[81];
                   dtype buf4[81];*/
-                  // rewrite to use use tile_buf;;  start by rewrite from using buf{1,2,3,4} to a single buf. 
                   
                   dtype * buf1 = tile_buf;
                   dtype * buf2 = tile_buf+buflen;
@@ -7006,7 +6957,7 @@ int int2e_sph(dtype *out, int n_out, int *dims, const int *shls, const int *atm,
                   //tile_g[3] = 3*buflen; 
 
 
-                  /*dtype buf1[1080]; // (this was 1 on the CPU)
+                  /*dtype buf1[1080]; 
                   dtype buf2[1080];
                   dtype buf3[1080];
                   dtype buf4[1080];*/
@@ -7028,11 +6979,10 @@ int int2e_sph(dtype *out, int n_out, int *dims, const int *shls, const int *atm,
                                                   //tmp1 = c2s_bra_sph[i_l](buf4, dk*dlj, tmp1, i_l); 
                                                   for (int v = 0; v < nc*n_comp; v++) gctr[v] = tmp1[v];
                                                   _tmp = c2s_bra_sph[i_l](buf1, dk*dlj, gctr, i_l); 
-                                                  // got the last function to be float! 
                                                   
                                                   pout = out + ofl * lc + ofk * kc + ofj * jc + di * ic;
                                                   dcopy_iklj(pout, _tmp, ni, nj, nk, nl, di, dj, dk, dl);
-                                                  //gctr += nf; // WARNING: removed this. It didn't break 6-31G* test case when compiling with CC. 
+                                                  //gctr += nf; // WARNING: 
                                           } 
                                   } 
                           } 
@@ -7077,9 +7027,9 @@ void GTOnr2e_fill_s1( dtype *eri, int n_eri, dtype *buf, int n_buf, int comp, in
 
   dtype *_eri = eri;  // before moving pointer make a copy of old pointer. 
 
-  //eri += nkl * (i0 * nj + j0);  // this switches around depending on i and j? 
+  //eri += nkl * (i0 * nj + j0);  
   // this still gives all the right entries, we just have to put them the right place in ERI
-  // also, when readjusting the size of eri, we have to be careful because different tiles can have differently sized stuff. 
+  // when readjusting the size of eri, we have to be careful because different tiles can have differently sized stuff. 
 
   int di = ao_loc[ish+1] - ao_loc[ish];
   int dj = ao_loc[jsh+1] - ao_loc[jsh];
@@ -7107,13 +7057,8 @@ void GTOnr2e_fill_s1( dtype *eri, int n_eri, dtype *buf, int n_buf, int comp, in
                   dl = ao_loc[lsh+1] - ao_loc[lsh];
                   dijk = dij * dk;
                   dijkl = dijk * dl;
-                  //cache = buf + dijkl * comp; // this points to a different place in buf which is the "real" cache?
+                  //cache = buf + dijkl * comp; 
 
-                  // try to tilemap int2e_sph may be sufficient? 
-                  
-                  // TODO ALEX: 2/21/2023; this was not used anymore!
-                  // added parameters to int2e_sph to allow allocating larger stuff and do 6-31G*
-                  // adding null poitners for the additional arguments to make it compile without having to remove function! ! 
                   if (int2e_sph(buf, n_buf, NULL, shls, atm, natm, bas, nbas, env, n_env, _eri, NULL, NULL, NULL) ) { 
 
                           // move from buf to eri. 
@@ -7205,13 +7150,9 @@ public:
                 const float * env = floats;
                 float * eri = ipu_output.data();
 
-                // this is smth like 80 cycles?
-                // todo: change to unsigned char i
 
                 for (int i = 0; i < ipu_output.size(); i++){ eri[i] = 0; }  
 
-                // zero this out is importnat for bug? 
-                // probably just because it casts integer to float all the time. 
                 //for (unsigned short i = 0; i < tile_g.size(); i++) tile_g[i] = 0;
                 //for (unsigned short i = 0; i < tile_idx.size(); i++) tile_idx[i] = 0;
                 //for (unsigned short i = 0; i < tile_buf.size(); i++) tile_buf[i] = 0;
@@ -7275,17 +7216,15 @@ public:
                 //float * eri = ipu_output.data();
 
 
-                for (int j = 0; j < chunks.size(); j++ ){ // i thought in this case chunks would == 1? 
+                for (int j = 0; j < chunks.size(); j++ ){ 
                 //for (int j = 0; j < 1; j++ ){
 
-                        //float array[integral_size.size()] = {0.}; // not allowed to do this? 
+                        //float array[integral_size.size()] = {0.}; 
                         //for (int i = 0; i < 81; i++){ eri[i] = 0; }  
                         //float array[81] = {0.}; 
                         float array[625] = {0.}; 
                         float * eri = array; 
 
-                        // zero this out is importnat for bug? 
-                        // probably just because it casts integer to float all the time. 
                         //for (unsigned short i = 0; i < tile_g.size(); i++) tile_g[i] = 0;
                         //for (unsigned short i = 0; i < tile_idx.size(); i++) tile_idx[i] = 0;
                         //for (unsigned short i = 0; i < tile_buf.size(); i++) tile_buf[i] = 0;
@@ -7335,9 +7274,9 @@ public:
         bool compute() {
 
                 float * eri = ipu_output.data();
-                for (int i = 0; i < ipu_output.size(); i++){ eri[i] = 0; }   // perhaps only clear out the one used? 
+                for (int i = 0; i < ipu_output.size(); i++){ eri[i] = 0; }   
 
-                int integral_output_size = integral_size.size(); //di*dj*dk*dl; // is this n_eri? 
+                int integral_output_size = integral_size.size(); //di*dj*dk*dl; 
                 const float * floats = ipu_floats.data(); 
                 const int   * ints   = ipu_ints  .data(); 
                 int n_eri    = ipu_ints[0];
@@ -7361,8 +7300,6 @@ public:
 
                         eri += integral_output_size; 
 
-                        // zero this out is importnat for bug? 
-                        // probably just because it casts integer to float all the time. 
                         //for (unsigned short i = 0; i < tile_g.size(); i++) tile_g[i] = 0;
                         //for (unsigned short i = 0; i < tile_idx.size(); i++) tile_idx[i] = 0;
                         //for (unsigned short i = 0; i < tile_buf.size(); i++) tile_buf[i] = 0;
@@ -7411,7 +7348,7 @@ public:
                 float * indices = ipu_ij.data();
                 int c = 0;
 
-                int N = ints[0];//4;//ao_loc[1]; // this should be 4? 
+                int N = ints[0];//4;//ao_loc[1]; 
                 int di,dj,dk,dl,i0,j0,k0,l0;
 
                 /*ni = ao_loc[shls_slice[1]] - ao_loc[0];
@@ -7511,7 +7448,7 @@ public:
 void set(dtype * _eri, int index, dtype val, int min, int max, int size){
         if (min <= index && index < max)  { 
                 //_eri[index % size] = val; 
-                _eri[index - min] = val;  // reduced from 200k to 40k cycles! 
+                _eri[index - min] = val;  // reduced from 200k to 40k cycles
         }
 }
 
@@ -7681,7 +7618,7 @@ public:
                 For -C 6 the copy input to output costs the following amount of cycles.
                         FROM:  2K,  5.4K, 14.9K, 39.4K,  84  K 
                         TO:   26K, 30  K, 39  k, 64  K, 108.7K
-                */for (unsigned short i = 0; i < vj.size(); i++){  // this costs 20k cycles. so basically reduce 1/4?
+                */for (unsigned short i = 0; i < vj.size(); i++){  // this costs 20k cycles. so around 25$ 
                         vj[i] = in_vj[i];
                         vk[i] = in_vk[i];
                 }
@@ -7702,7 +7639,6 @@ public:
 
                 float val = 0;
 
-                // how much does this do? 
                 // we have do_list = {True,...,False} of length 8. 
                 for (unsigned short _i = i0, ci = 0; _i < i0+di; _i++, ci++){
                         for (unsigned short _j = j0, cj = 0; _j < j0+dj; _j++, cj++){
@@ -7758,13 +7694,6 @@ public:
 class poplar_direct_s1_forloop  : public Vertex {  
 public:
         // same as above, but moved for loop from python to C++ code; 
-        // because
-        // problem: in/out doesn't work 
-        // solution: copy vj input into vj output
-        // this takes N^2 work
-        // problem: we need to do this for each hydrogen integral 
-        // => 20k cycles * numb_hydrogen_integrals
-        // solution: move python forloop inside 
         Input<Vector<float>>    integral;
         Input<Vector<int>>      indices;
         Input<Vector<int>>      do_list;
@@ -7789,12 +7718,11 @@ public:
                         FROM:  2K,  5.4K, 14.9K, 39.4K,  84  K 
                         TO:   26K, 30  K, 39  k, 64  K, 108.7K
                 */
-                for (unsigned short i = 0; i < vj.size(); i++){  // this costs 20k cycles. so basically reduce 1/4?
+                for (unsigned short i = 0; i < vj.size(); i++){  // this costs 20k cycles ~ 25%
                         vj[i] = in_vj[i];
                         vk[i] = in_vk[i];
                 }
                 
-                /// change to multivertex and get a thread_id\in{0,1,2,3,4,5}
                 int chunks = chunk_size.size();
 
 
@@ -7816,7 +7744,6 @@ public:
 
                         float val = 0;
 
-                        // how much does this do? 
                         // we have do_list = {True,...,False} of length 8. 
                         for (unsigned short _i = i0, ci = 0; _i < i0+di; _i++, ci++){
                                 for (unsigned short _j = j0, cj = 0; _j < j0+dj; _j++, cj++){
@@ -7901,11 +7828,10 @@ public:
                         FROM:  2K,  5.4K, 14.9K, 39.4K,  84  K 
                         TO:   26K, 30  K, 39  k, 64  K, 108.7K
                 */
-                for (unsigned short i = 0; i < vj.size(); i++){  // this costs 20k cycles. so basically reduce 1/4?
+                for (unsigned short i = 0; i < vj.size(); i++){  
                         vj[i] = in_vj[i];
                 }
                 
-                /// change to multivertex and get a thread_id\in{0,1,2,3,4,5}
                 int chunks = chunk_size.size();
 
 
@@ -7927,7 +7853,6 @@ public:
 
                         float val = 0;
 
-                        // how much does this do? 
                         // we have do_list = {True,...,False} of length 8. 
                         for (unsigned short _i = i0, ci = 0; _i < i0+di; _i++, ci++){
                                 for (unsigned short _j = j0, cj = 0; _j < j0+dj; _j++, cj++){
@@ -7967,7 +7892,6 @@ public:
                                 }
                         }
 
-                        //return true;
                 }
               
                 return true;
@@ -8002,11 +7926,10 @@ public:
                         FROM:  2K,  5.4K, 14.9K, 39.4K,  84  K 
                         TO:   26K, 30  K, 39  k, 64  K, 108.7K
                 */
-                for (unsigned short i = 0; i < vk.size(); i++){  // this costs 20k cycles. so basically reduce 1/4?
+                for (unsigned short i = 0; i < vk.size(); i++){  
                         vk[i] = in_vk[i];
                 }
                 
-                /// change to multivertex and get a thread_id\in{0,1,2,3,4,5}
                 int chunks = chunk_size.size();
 
 
@@ -8028,7 +7951,6 @@ public:
 
                         float val = 0;
 
-                        // how much does this do? 
                         // we have do_list = {True,...,False} of length 8. 
                         for (unsigned short _i = i0, ci = 0; _i < i0+di; _i++, ci++){
                                 for (unsigned short _j = j0, cj = 0; _j < j0+dj; _j++, cj++){
@@ -8068,7 +7990,6 @@ public:
                                 }
                         }
 
-                        //return true;
                 }
               
                 return true;
@@ -8101,11 +8022,10 @@ public:
                 For -C 6 the copy input to output costs the following amount of cycles.
                         FROM:  2K,  5.4K, 14.9K, 39.4K,  84  K 
                         TO:   26K, 30  K, 39  k, 64  K, 108.7K
-                */for (unsigned short i = 0; i < vj.size(); i++){  // this costs 20k cycles. so basically reduce 1/4?
+                */for (unsigned short i = 0; i < vj.size(); i++){  // this costs 20k cycles. 
                         vj[i] = in_vj[i];
                 }
                 
-                /// change to multivertex and get a thread_id\in{0,1,2,3,4,5}
 
                 int di = indices[0];
                 int dj = indices[1];
@@ -8121,7 +8041,6 @@ public:
 
                 float val = 0;
 
-                // how much does this do? 
                 // we have do_list = {True,...,False} of length 8. 
                 for (unsigned short _i = i0, ci = 0; _i < i0+di; _i++, ci++){
                         for (unsigned short _j = j0, cj = 0; _j < j0+dj; _j++, cj++){
@@ -8190,11 +8109,10 @@ public:
                 For -C 6 the copy input to output costs the following amount of cycles.
                         FROM:  2K,  5.4K, 14.9K, 39.4K,  84  K 
                         TO:   26K, 30  K, 39  k, 64  K, 108.7K
-                */for (unsigned short i = 0; i < vk.size(); i++){  // this costs 20k cycles. so basically reduce 1/4?
+                */for (unsigned short i = 0; i < vk.size(); i++){  
                         vk[i] = in_vk[i];
                 }
                 
-                /// change to multivertex and get a thread_id\in{0,1,2,3,4,5}
 
                 int di = indices[0];
                 int dj = indices[1];
@@ -8210,7 +8128,6 @@ public:
 
                 float val = 0;
 
-                // how much does this do? 
                 // we have do_list = {True,...,False} of length 8. 
                 for (unsigned short _i = i0, ci = 0; _i < i0+di; _i++, ci++){
                         for (unsigned short _j = j0, cj = 0; _j < j0+dj; _j++, cj++){
@@ -8277,7 +8194,7 @@ public:
                 int iteration                  = i[0]; 
                 int num_integrals_on_each_tile = i[1];
 
-                int n_ao_loc = ipu_ints[5]; // this is the same in all "rows" so we can just take th efirst one. 
+                int n_ao_loc = ipu_ints[5]; // this is the same in all "rows" so we can just take the first one. 
                 int size_ints = n_ao_loc + 10 ;
 
                 int n = ints[0];
@@ -8429,10 +8346,6 @@ public:
 
                 //int2e_sph(eri, n_buf, NULL, ipu_ij.data(), atm, n_atm, bas, n_bas, env, n_env, _eri) ;
 
-                // ALEX 2/21/2023; adding variables to allcoate large stuff upfront. 
-                // as a result,  didn't compile unless i specified arguments here, but we don't have them, so passing NULLs! 
-                // could be made to work by looking at how they previously where allocated inside C++ and then just allocating here and passing on! 
-
                 int2e_sph(eri, n_buf, NULL, ipu_ij.data(), atm, n_atm, bas, n_bas, env, n_env, _eri, NULL, NULL, NULL) ;
                 //for (int i = 0; i < 5; i++) eri[i] = 3.;
 
@@ -8488,7 +8401,7 @@ typedef struct CVHFOpt_struct {
     //int (*r_vkscreen)(int *shls, struct CVHFOpt_struct *opt,
     //                  ddtype **dms_cond, int n_dm, ddtype *dm_atleast,
     //                  int *atm, int *bas, ddtype *env);
-} CVHFOpt; // this is optimizer stuff; should be able to just remove all of htis! 
+} CVHFOpt; 
 
 typedef struct {
         int ibra_shl0;  // = 0, 2, 4, 6. The index in shls_slice
@@ -8557,7 +8470,6 @@ int CVHFnoscreen(int *shls, CVHFOpt *opt, int *atm, int *bas, ddtype *env)
         } \
         int ish, jsh, ksh, lsh, i0, j0, k0, l0, i1, j1, k1, l1, idm;
 
-// 2/21/2023 adding null pointers ot this, will break functionality. 
 #define INTOR_AND_CONTRACT \
         shls[0] = ish; \
         shls[1] = jsh; \
@@ -8733,7 +8645,6 @@ void CVHFdot_nrs8( JKOperator **jkop, JKArray **vjk,
                                         shls[1] = jsh; 
                                         shls[2] = ksh; 
                                         shls[3] = lsh; 
-                                        //2/21/2023 adding NULL pointers here, will break 
                                         notempty = int2e_sph(buf, n_buf, NULL, shls, atm, natm, bas, nbas, env, n_env, NULL, NULL, NULL, NULL); 
                                         if (notempty) { 
                                                 i0 = ao_loc[ish] - ioff; 
@@ -8962,8 +8873,8 @@ static int _shls_block_partition_lim(int *block_loc, int *shls_slice,
 extern "C" void CVHFnr_direct_drv(//int (*intor)(), void (*fdot)(), 
                        JKOperator **jkop, 
 
-                       //input_type **dms, input_type **vjk,  // this is input and output, both of size (NAO, NAO), very small! 
-                       ddtype **dms, ddtype **vjk,  // this is input and output, both of size (NAO, NAO), very small! 
+                       //input_type **dms, input_type **vjk,  // this is input and output, both of size (NAO, NAO)
+                       ddtype **dms, ddtype **vjk,  // this is input and output, both of size (NAO, NAO)
 
                        int n_dm, int ncomp,
                        int *shls_slice, int *ao_loc,
@@ -8984,7 +8895,7 @@ extern "C" void CVHFnr_direct_drv(//int (*intor)(), void (*fdot)(),
         IntorEnvs envs = {natm, nbas, atm, bas, env, shls_slice, ao_loc, NULL, cintopt, ncomp};
         int idm ;
         ddtype *tile_dms[2];
-        //CVHFzero_out_vjk(vjk[idm], jkop[idm], shls_slice, ao_loc, ncomp); // does this just initialize output to zero? looks like it, and it's already initialized as zero in numpy. 
+        //CVHFzero_out_vjk(vjk[idm], jkop[idm], shls_slice, ao_loc, ncomp); 
         tile_dms[0] = CVHFallocate_and_reorder_dm(jkop[0], dms[0], shls_slice, ao_loc);
         tile_dms[1] = CVHFallocate_and_reorder_dm(jkop[1], dms[1], shls_slice, ao_loc);
         //printf("idm=%i\n", idm);
@@ -9047,18 +8958,16 @@ extern "C" void CVHFnr_direct_drv(//int (*intor)(), void (*fdot)(),
 
                         //printf("[%i %i %i]\n", blk_id, i, nblock_i); // it only ends up calling once? 
                         //fflush(stdout);
-                        // perhaps move everything except this to python, and then this is what we do on each tile? 
                         CVHFdot_nrs8(jkop, v_priv, tile_dms, buf, n_buf, cache, n_dm, block_iloc+i, block_jloc+j, block_kloc+k, block_lloc+l, vhfopt, &envs, n_env);
                 }
                 
         }
 
 
-        // this moves everything into output! 
                 
-        for (i = 0; i < n_dm; i++) { // this one dies for some reason. 
+        for (i = 0; i < n_dm; i++) { 
                 CVHFassemble_v(vjk[i], jkop[i], v_priv[i], shls_slice, ao_loc);
-                CVHFdeallocate_JKArray(v_priv[i]); // todo?? perhaps wrong? 
+                CVHFdeallocate_JKArray(v_priv[i]); 
         }
 
         /*free(buf);
@@ -9073,9 +8982,6 @@ extern "C" void CVHFnr_direct_drv(//int (*intor)(), void (*fdot)(),
 // FILE nr_direct_Dot.c file 
 
 
-
-
-// don't do anything. 
 #define ASSERT(expr, msg) \
         {}//if (!(expr)) { fprintf(stderr, "Fail at %s\n", msg); exit(1); }
 

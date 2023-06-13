@@ -19,60 +19,30 @@ except:
 
 import time
 
-# ideas
-# 1. pyscf has a "transform b3lyp" function thay may give us gradients without having to backprop?
-#    this may be faster to compile and give different memory-layouts ?
-# 2. get a big test case like 5 water molecules by default; this will make sure we optimize time for a case we actually care about!
-
-
-# compare memory consumption with across different grid sizes.
-# perhaps add gradient checkpointing to grad?
-
-
-#@jax.jit # does removing inner jax.jit change stuff?
-
 def b3lyp(rho, EPSILON_B3LYP=0):
     print(rho.shape, rho.dtype)
 
     rho0  = rho.T[:, 0]
     norms = jnp.linalg.norm(rho[1:], axis=0).T**2+EPSILON_B3LYP
 
-    # change to jax.checkpoint(__b88)
     def lda(rho0):        return jax.vmap(jax.value_and_grad(lambda x: __lda(x)*0.08)) (rho0)
     def vwn(rho0):        return jax.vmap(jax.value_and_grad(lambda x: __vwn(x)*0.19)) (rho0)
 
-    # TODO; check if this really does increase numerical error (Checkpoint increased numerical error from 32 to ~1 for -gdb 11 -float32 ! )
+    # disabled gradient checkpointing 
     #def b88(rho0, norms): return jax.vmap(jax.value_and_grad(lambda rho0, norm: jax.checkpoint(__b88)(rho0, norm)*0.72, (0, 1))) (rho0, norms)
     #def lyp(rho0, norms): return jax.vmap(jax.value_and_grad(lambda rho0, norm: jax.checkpoint(__lyp)(rho0, norm)*0.810, (0, 1))) (rho0, norms)
 
     def b88(rho0, norms): return jax.vmap(jax.value_and_grad(lambda rho0, norm: __b88(rho0, norm)*0.72, (0,1))) (rho0, norms)
     def lyp(rho0, norms): return jax.vmap(jax.value_and_grad(lambda rho0, norm: __lyp(rho0, norm)*0.810, (0,1)))  (rho0, norms)
 
-    # adding the jax.jit so it
     e_xc_lda, v_rho_lda               = jax.jit(lda)(rho0)
     e_xc_vwn, v_rho_vwn               = jax.jit(vwn)(rho0)
-
-    #./profile.sh  -id 3  -backend ipu -float32
-    # [##################################################] 100% Compilation Finished [Elapsed: 00:01:12.6]
-
-    # removing these two reduces from 2min to [1min]?
     e_xc_b88, (v_rho_b88, v_norm_b88) = jax.jit(b88)(rho0, norms)
     e_xc_lyp, (v_rho_lyp, v_norm_lyp) = jax.jit(lyp)(rho0, norms)
 
-    #e_xc_b88, (v_rho_b88, v_norm_b88) = 0, (0, 0)
-    #e_xc_lyp, (v_rho_lyp, v_norm_lyp) = 0, (0, 0)
-
-
     e_xc       = e_xc_lda + (e_xc_vwn + e_xc_b88 + e_xc_lyp) / rho[0]
-
-
     v_xc_rho   = v_rho_lda*4*rho[0] + v_rho_vwn + v_rho_b88 + v_rho_lyp
     v_xc_norms = v_norm_b88 + v_norm_lyp
-    #v_xc_norms = jnp.zeros(rho[0].shape)
-    #print(v_xc_norms.shape, rho.shape)
-
-    print(e_xc.dtype, v_xc_rho.dtype, v_xc_norms.dtype)
-
 
     return e_xc, v_xc_rho, v_xc_norms
 

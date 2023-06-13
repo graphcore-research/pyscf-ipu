@@ -3,7 +3,7 @@ import jax
 import numpy as np
 
 def __vwn(n):
-        # All of this is okay, we compute it in numpy in float64.
+        # Precompute stuff in np.float64 
         p     = np.array( [-0.10498, 0.0621813817393097900698817274255, 3.72744, 12.9352])
         f     = p[0] * p[2] / (p[0] * p[0] + p[0] * p[2] + p[3]) - 1.0
         f_inv_p1 = 1/f+1
@@ -19,7 +19,7 @@ def __vwn(n):
         )
         log_s_c =  np.log( 3.0 /(4*np.pi) ) / 6
 
-        # Below e use in the same dtype as n
+        # Below cast to same dtype as input (allow easier comparison between f32/f64). 
         dtype = n.dtype
         p = p.astype(dtype)
         f = f.astype(dtype)
@@ -35,8 +35,6 @@ def __vwn(n):
         s     = jnp.exp( log_s )
         z     = sqrt / (2.0 * s + p[2])
 
-
-
         result = n * p[1] * (
                 log_s
                 #+ f *  jnp.log( jnp.sqrt( s_2 + p[2] * s + p[3] ) / (s-p[0])**(1/f+1) ) # problem with float, 1/f+1 was done in np which automatically sticks to float64
@@ -44,6 +42,5 @@ def __vwn(n):
                 + precompute * jnp.arctan(z)
 
         )
-
 
         return result

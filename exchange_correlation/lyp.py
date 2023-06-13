@@ -2,10 +2,6 @@ import jax
 import jax.numpy as jnp
 import numpy
 
-# we'll have to cut off some of the smaller ones
-# previously, we got NaN from this guy in float32
-# in dft.py we called jnp.nan_to_num( .. , nan=0 )
-# this now actually produces numbers; we'll have to fix that.
 def __lyp(n, gnn):
 
         # precompute

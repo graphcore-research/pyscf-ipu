@@ -1,6 +1,10 @@
-// Copyright (c) 2018 Graphcore Ltd. All rights reserved.
+/*
+        This is a modification of libcint for CPU. 
+        It is used mainly for debugging, comparing CPU/IPU implementation. 
+        Example: Compute a single integral (out of the N^4 integrals) to compare against IPU computation. 
 
-//#ifdef __cplusplus
+        Most of the comments are left-overs from libcint.
+*/
 #include <poplar/DeviceManager.hpp>
 #include <poplar/Engine.hpp>
 #include <algorithm>
@@ -8,7 +12,6 @@
 #include <vector>
 using namespace poplar;
 using namespace poplar::program; 
-//#endif 
 
 #define dtype double
 #define input_type double
@@ -21,14 +24,6 @@ bool test_GTOnr2e_fill_s1 = false;
 #define debug_print false
 #define print_shapes false 
 
-// link this file so we can run test cases with it; 
-// define an IPU version of everything and start moving stuff. 
-//#include "generated.c"
-/*
- * Copyright (C) 2013-  Qiming Sun <osirpt.sun@gmail.com>
- *
- * basic cGTO integrals
- */
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -37,11 +32,9 @@ bool test_GTOnr2e_fill_s1 = false;
 #include <float.h>
 #include <math.h>
 #include <stdint.h>
-//#include <cstdint>    
 #include <quadmath.h>
 
 
-// for saving stuff for test cases. 
 #if __cplusplus
 #include <iostream>
 #include <string>
@@ -50,10 +43,8 @@ using namespace std;
 #endif
 
 
-//#define int int
 #define CACHE_SIZE_T int
 
-// global parameters in env
 // Overall cutoff for integral prescreening, value needs to be ~ln(threshold)
 #define PTR_EXPCUTOFF           0
 // R_C of (r-R_C) in dipole, GIAO operators
@@ -197,7 +188,6 @@ static dtype WEIGHTS_FOR_X0[] = { 1.0, 0.65214515486254614, 0.34785484513745385,
 
 
 
-// header thingy stuff.. defined here so c
 
 extern "C" CACHE_SIZE_T int2e_sph(dtype *out, int n_out, int *dims, int *shls, int *atm, int natm, int *bas, int nbas, dtype *env, int n_env); 
 int CINTcgto_spinor(const int bas_id, const int *bas); 
@@ -238,7 +228,6 @@ void CINTg0_ik2d_4d(dtype *g, int g_len,
         int dk, int dl, int dj, const dtype *rirj, const dtype *rkrl, int g_size
 );
 
-// this will not work in cpp; initial code had ifcplusplus for it. just steal that!
 
 
 static void dcopy_iklj(dtype *fijkl, const dtype *gctr, const int ni, const int nj, const int nk, const int nl, const int mi, const int mj, const int mk, const int ml);
@@ -265,7 +254,6 @@ static void dcopy_iklj(dtype *fijkl, const dtype *gctr, const int ni, const int 
 #define G2E_R_L(f, g, li, lj, lk, ll)   f = g + envs->g_stride_l
 #define G2E_R_J(f, g, li, lj, lk, ll)   f = g + envs->g_stride_j
 
-//#define NOVALUE                 ((void *)0xffffffffffffffffuL)
 #define MAX_PGTO_FOR_PAIRDATA   2048
 
 void CINTOpt_log_max_pgto_coeff(dtype *log_maxc, dtype *coeff, int nprim, int nctr);
@@ -273,8 +261,6 @@ void CINTOpt_non0coeff_byshell(int *sortedidx, int *non0ctr, dtype *ci, int ipri
 int CINTset_pairdata(PairData *pairdata, dtype *ai, dtype *aj, dtype *ri, dtype *rj, dtype *log_maxci, dtype *log_maxcj, 
                                 int li_ceil, int lj_ceil, int iprim, int jprim, dtype rr_ij, dtype expcutoff);
 
-//int nf = envs->nf;
-//        switch (envs->nrys_roots) {
 void CINTgout2e(dtype *g, dtype *gout, int *idx, int gout_empty, int envs_nf, int envs_nrys_roots);
 
 
@@ -339,7 +325,6 @@ int CINT2e_loop_nopt(
         int k_prim  = bas[BAS_SLOTS*k_sh + NPRIM_OF];
         int l_prim  = bas[BAS_SLOTS*l_sh + NPRIM_OF];
 
-        // this relies on env, so we need to make env in float!
         dtype *ai = env + bas[BAS_SLOTS*i_sh+PTR_EXP];
         dtype *aj = env + bas[BAS_SLOTS*j_sh+PTR_EXP];
         dtype *ak = env + bas[BAS_SLOTS*k_sh+PTR_EXP];
@@ -381,7 +366,7 @@ int CINT2e_loop_nopt(
         CINTOpt_log_max_pgto_coeff(log_maxck, ck, k_prim, k_ctr);
         CINTOpt_log_max_pgto_coeff(log_maxcl, cl, l_prim, l_ctr);
 
-        dtype fac1i, fac1j, fac1k, fac1l; // TODO: this dooubled error to 3.318841e-07;; 
+        dtype fac1i, fac1j, fac1k, fac1l; 
         int ip, jp, kp, lp;
         int _empty[5] = {1, 1, 1, 1, 1};
         int *iempty = _empty + 0;
@@ -473,11 +458,9 @@ int CINT2e_loop_nopt(
         #endif
 
 
-        //printf("\n%i %i %i %i\n", i_prim, j_prim, k_prim, l_prim);
 
         for (lp = 0; lp < l_prim; lp++) {
 
-                //envs_al[0] = al[lp];  just explicitly use al[lp] instead. 
 
                 if (l_ctr == 1) {
                         fac1l = common_factor * cl[lp]; 
@@ -519,7 +502,7 @@ int CINT2e_loop_nopt(
                                 else { fac1j = fac1k; *iempty = 1; }
 
                                 for (ip = 0; ip < i_prim; ip++, pdata_ij++) {
-                                        //printf("\t%i %i %i %i\n", lp, kp, jp, ip);
+                                        
                                         
                                         envs_ai[0] = ai[ip]; 
                                         rij = pdata_ij->rij;
@@ -723,8 +706,6 @@ int CINT2e_loop_nopt(
  * <ki|jl> = (ij|kl); i,j\in electron 1; k,l\in electron 2
 
 
-//int nf = envs->nf;
-//        switch (envs->nrys_roots) {
  */
 void CINTgout2e(dtype *gout, dtype *g, int *idx,
                 int gout_empty, int envs_nf, int envs_nrys_roots)
@@ -985,11 +966,6 @@ int GTOmax_cache_size(int *shls_slice, int ncenter,
                 shls[1] = i;
                 shls[2] = i;
                 shls[3] = i;
-                //n = (*intor)(NULL, NULL, shls, atm, natm, bas, nbas, env, NULL, NULL); // TODO: hardcoding dependency on intor2e_sph here
-                // previously this could be controlled from python. 
-                //n = int2e_sph(NULL, NULL, shls, atm, natm, bas, nbas, env, NULL, NULL);
-
-                // compute this at compile time! 
 
                 n = int2e_sph(NULL, 0, NULL, shls, atm, natm, bas, nbas, env, n_env);
                 cache_size = MAX(cache_size, n);
@@ -1060,9 +1036,7 @@ void GTOnr2e_fill_s1( input_type *eri, int n_eri, dtype *buf, int n_buf, int com
                         dl = ao_loc[lsh+1] - ao_loc[lsh];
                         dijk = dij * dk;
                         dijkl = dijk * dl;
-                        //cache = buf + dijkl * comp; // this points to a different place in buf which is the "real" cache?
 
-                        // try to tilemap int2e_sph may be sufficient? 
                         
                         if (int2e_sph(buf, n_buf, NULL, shls, atm, natm, bas, nbas, env, n_env) ) { 
 
@@ -1103,7 +1077,6 @@ void GTOnr2e_fill_s1( input_type *eri, int n_eri, dtype *buf, int n_buf, int com
                 } 
         }
 
-        //printf("[%i]",c);
 
 
 }
@@ -1120,7 +1093,7 @@ extern "C" {
 
 // topfunction
 void GTOnr2e_fill_drv(          // SIZES BELOW ARE FOR THE AMINO ACID TEST CASE 
-        input_type *eri,        // (1, 37, 37, 37, 37) // can't template this, the dtype is choosen in python. 
+        input_type *eri,        // (1, 37, 37, 37, 37) 
         int n_eri, 
         int comp,               // 1
         int *shls_slice,        // (0, 25, 0, 25, 0, 25, 0, 25)         25 = nbas
@@ -1170,8 +1143,6 @@ void GTOnr2e_fill_drv(          // SIZES BELOW ARE FOR THE AMINO ACID TEST CASE
                 i = ij / njsh;
                 j = ij % njsh;
 
-                //printf("\r[%i / %i] %i %i", ij+1, nish*njsh, i, j); 
-                //fflush(stdout);
 
                 /*
                         run.py                
@@ -1181,13 +1152,10 @@ void GTOnr2e_fill_drv(          // SIZES BELOW ARE FOR THE AMINO ACID TEST CASE
                         => switching between CPU/IPU can now be done in python. 
                         => the fill_s1 code for IPU/CPU can be the same.
 
-
                         impacts for numerical precision experiments. 
 
                         - can still do everything dtype CPU. 
                         - input=float compute=dtype. 
-
-
                 
                 */
 
@@ -1276,16 +1244,13 @@ void GTOnr2e_fill_drv(          // SIZES BELOW ARE FOR THE AMINO ACID TEST CASE
                         engine.connectStream("ipu_output",  cpu_output.data());
 
                         // Execute the program
-                        //printf("Running kernel..\n");
                         fflush(stdout);
                         
                         engine.run();
-                        //printf("done..\n");
                         fflush(stdout);
                         #endif
                 }
 
-                // in theory we should be able to move GTOnr2e_fill_s1! 
                 GTOnr2e_fill_s1(eri, n_eri, buf, n_buf, comp, i, j, shls_slice, ao_loc, atm, n_atm, bas, n_bas, env, n_env);
 
                 if (test_GTOnr2e_fill_s1){
@@ -1316,7 +1281,7 @@ void GTOnr2e_fill_drv(          // SIZES BELOW ARE FOR THE AMINO ACID TEST CASE
 
         if (test_GTOnr2e_fill_s1){
                 #ifdef __cplusplus
-                for (int t = 1; t < n_eri; t++) eri[t] = cpu_output[t]; // overwrite so we can use python test case! 
+                for (int t = 1; t < n_eri; t++) eri[t] = cpu_output[t]; 
                 #endif
         }
 
@@ -1474,7 +1439,7 @@ void CINTprim_to_ctr_1(dtype *gc, dtype *gp, dtype *coeff, size_t nf,
  * to optimize memory copy in cart2sph.c, remove the common factor for s
  * and p function in cart2sph
  */
-dtype CINTcommon_fac_sp(int l) // @alex: changing duble to float improved test case max(abs( num_precision )) 
+dtype CINTcommon_fac_sp(int l) 
 {
         switch (l) {
                 case 0: return 0.282094791773878143;
@@ -1801,7 +1766,6 @@ void CINTg0_il2d_4d(dtype *g, int g_len,
         int nmax, int mmax, int lk, int ll, int lj, int nroots,
         int di, int dk, int dl, int dj, const dtype *rirj, const dtype *rkrl, int g_size) {
 
-        // copy 
 
         dtype rx, ry, rz, _rx, _ry, _rz;
         int i, j, k, l, ptr, n;
@@ -1908,7 +1872,6 @@ void CINTg0_ik2d_4d(dtype *g, int g_len,
         }*/
 
 
-        //abort() ;
 
 }
 
@@ -1935,32 +1898,22 @@ int CINTg0_2e(dtype *g, int g_len,
         dtype x = a0 *(rijrkl[0] * rijrkl[0] + rijrkl[1] * rijrkl[1] + rijrkl[2] * rijrkl[2]);
 
         // https://pubs.acs.org/doi/10.1021/acs.jpca.6b10004
-        // the definition has 1e-15 things which become zero in float32. 
-        // this may be reason we end up with 0 in that case ?
-        //CINTrys_roots(nroots, x, u, w); // this does some kind of integral and stores result in u[MXRYSROOTS] and w
-        if (x < THRESHOLD_ZERO) { // so if smaller than 1e-15 we use values in this array! 
-        //printf("[small]");
+        if (x < THRESHOLD_ZERO) { 
                 int off = nroots * (nroots - 1) / 2;
                 int i;
                 for (i = 0; i < nroots; i++)  {
-                        u[i] = ROOTS_FOR_X0[off + i]; // just defined? is this just hardcode computed? 
+                        u[i] = ROOTS_FOR_X0[off + i]; 
                         w[i] = WEIGHTS_FOR_X0[off + i];
                 }
         }
         else{
-                //dtype weights[g_len-2*g_size]; 
 
-                //for (int i = 0; i < g_len-2*g_size; i++){ weights[i] = w[i]; }
-
-                //if (nroots > 3) printf("%i",nroots);
-                //fflush(stdout);
-
-
-                if (nroots == 1) { rys_root1(x, u, w);}  // the slow one just calls this 1k times. they take maybe 6M cycles so ~ 6000 cycles each 
+                if (nroots == 1) { rys_root1(x, u, w);}  
                 if (nroots == 2) { rys_root2(x, u, w);}
                 if (nroots == 3) { rys_root3(x, u, w);}
                 if (nroots == 4) { rys_root4(x, u, w);}
                 if (nroots == 5) { rys_root5(x, u, w);}
+                // not implemented for larger than nroots=5; if you need this please raise github issue
 
                 //for (int i = 0; i < g_len-2*g_size; i++){ w[i] = weights[i]; }
                 //for (int i = 0; i < g_len-2*g_size; i++){ g[i+g_size*2] = weights[i]; }
@@ -2082,8 +2035,6 @@ int CINTset_pairdata(PairData *pairdata, dtype *ai, dtype *aj, dtype *ri, dtype 
         n = 0;
         for (jp = 0; jp < jprim; jp++) {
                 for (ip = 0; ip < iprim; ip++) {
-
-                        //printf("%i %i %i\n", n, jp, ip);
                         
                         aij = 1/(ai[ip] + aj[jp]);
                         eij = rr_ij * ai[ip] * aj[jp] * aij;
@@ -5813,7 +5764,7 @@ struct cart2sp_t {
 
 // [*] = n(n+1)(n+2)(n+3)/4+(n+1)(n+2)(n+3)/6
 // TODO: OBS!!! 
-//static struct cart2sp_t g_c2s[] = {}; // the one below is only used for 6-31G*; in sto-3g we can just comment out! 
+//static struct cart2sp_t g_c2s[] = {}; 
 static struct cart2sp_t g_c2s[] = {
         {g_trans_cart2sph     ,g_trans_cart2jR      , g_trans_cart2jI      , g_trans_cart2jR      , g_trans_cart2jI      },
         {g_trans_cart2sph+1   ,g_trans_cart2jR+4    , g_trans_cart2jI+4    , g_trans_cart2jR+16   , g_trans_cart2jI+16   },
@@ -7751,7 +7702,7 @@ CACHE_SIZE_T _int2e_sph(ddtype *out, int n_out, int *dims, int *shls, int *atm, 
 }
 
 
-// only *out/*buf left. it's a bit tricky this one. 
+// only *out/*buf left. 
 CACHE_SIZE_T int2e_sph(dtype *out, int n_out, int *dims, int *shls, int *atm, int natm, int *bas, int nbas, dtype *env, int n_env) {
         
         int ng[] = {0, 0, 0, 0, 0, 1, 1, 1};
@@ -7773,7 +7724,6 @@ CACHE_SIZE_T int2e_sph(dtype *out, int n_out, int *dims, int *shls, int *atm, in
         _x_ctr[3] = bas[BAS_SLOTS * l_sh + NCTR_OF];
 
 
-        // todo; refactor this all the way to the top! 
         int nfi  = (i_l+1)*(i_l+2)/2;
         int nfj  = (j_l+1)*(j_l+2)/2;
         int nfk  = (k_l+1)*(k_l+2)/2;
@@ -7790,7 +7740,6 @@ CACHE_SIZE_T int2e_sph(dtype *out, int n_out, int *dims, int *shls, int *atm, in
         //printf("\n\n@@%li\n\n", nf * _x_ctr[0] * _x_ctr[1] * _x_ctr[2] * _x_ctr[3] * ncomp_e1 * ncomp_e2 * ncomp_tensor);
 
 
-        // these are tricky. 
         // #define atm(SLOT,I)     atm[ATM_SLOTS * (I) + (SLOT)]
         dtype * ri = env + atm[ATM_SLOTS * bas[BAS_SLOTS*i_sh + ATOM_OF] + PTR_COORD];
         dtype * rj = env + atm[ATM_SLOTS * bas[BAS_SLOTS*j_sh + ATOM_OF] + PTR_COORD];
@@ -7970,34 +7919,6 @@ CACHE_SIZE_T int2e_sph(dtype *out, int n_out, int *dims, int *shls, int *atm, in
                 Engine engine(graph, prog);
                 engine.load(device);
 
-
-                /*float params[20+15] = {(float)len, (float)kbase, (float)ibase, (float)g_stride_i, (float)g_stride_k, (float)g_stride_l, (float)g_stride_j, 
-                                (float)g2d_klmax, (float)g2d_ijmax, (float)nrys_roots, (float)(envs_ai[0]+envs_aj[0]), 
-                                (float)(envs_ak[0]+envs_al[0]), 
-                                (float)g_size, (float)envs_fac[0],
-                                (float)(li_ceil + lj_ceil), (float)(lk_ceil + ll_ceil), 
-                                (float)(li_ceil), (float)lj_ceil, (float)lk_ceil, (float)ll_ceil,
-                                        rkrl[0], rkrl[1], rkrl[2],
-                                        rirj[0], rirj[1], rirj[2],
-                                        rijrkl[0], rijrkl[1], rijrkl[2], 
-                                        rijrx[0], rijrx[1], rijrx[2], 
-                                        rklrx[0], rklrx[1], rklrx[2] }; 
-                auto input1 = g;
-                auto input2 = params;
-                
-                engine.connectStream("ipu_input1",    input1);
-                engine.connectStream("ipu_input2",    input2);
-                engine.connectStream("ipu_output",    cpu_output.data());
-
-                // Execute the program
-                printf("Running kernel..\n");
-                fflush(stdout);
-                
-                engine.run();
-                printf("done..\n");
-                fflush(stdout);*/
-
-
                 //n_gctr + n_env, 
                 #endif
 
@@ -8026,7 +7947,6 @@ CACHE_SIZE_T int2e_sph(dtype *out, int n_out, int *dims, int *shls, int *atm, in
 
         }
 
-        //for (int i = 0; i < nc*n_comp; i++) _gctr[i] = gctr[i];
 
         if (dims == NULL) { dims = counts; }
         int nout = dims[0] * dims[1] * dims[2] * dims[3];
@@ -8061,7 +7981,6 @@ CACHE_SIZE_T int2e_sph(dtype *out, int n_out, int *dims, int *shls, int *atm, in
 
                         }
 
-                        //buflen--;  // this breaks it, really uses all of buflen?! :O
 
                         dtype buf[3*buflen];
                         dtype * buf1 = buf; 
@@ -8091,7 +8010,7 @@ CACHE_SIZE_T int2e_sph(dtype *out, int n_out, int *dims, int *shls, int *atm, in
                                                         pout = out + ofl * lc + ofk * kc + ofj * jc + di * ic;
                                                         dcopy_iklj(pout, _tmp, ni, nj, nk, nl, di, dj, dk, dl);
 
-                                                        //gctr += nf; // WARNING: removed this. It didn't break 6-31G* test case when compiling with CC. 
+                                                        //gctr += nf; // WARNING: 
                                                 } 
                                         } 
                                 } 
@@ -8111,11 +8030,6 @@ CACHE_SIZE_T int2e_sph(dtype *out, int n_out, int *dims, int *shls, int *atm, in
         }
         return !empty;
 }
-
-
-// todo fix 
-//int n_out = 123;
-//int n_env = 123;
 
 
 
@@ -8163,7 +8077,7 @@ typedef struct CVHFOpt_struct {
     //int (*r_vkscreen)(int *shls, struct CVHFOpt_struct *opt,
     //                  ddtype **dms_cond, int n_dm, ddtype *dm_atleast,
     //                  int *atm, int *bas, ddtype *env);
-} CVHFOpt; // this is optimizer stuff; should be able to just remove all of htis! 
+} CVHFOpt; 
 
 typedef struct {
         int ibra_shl0;  // = 0, 2, 4, 6. The index in shls_slice
@@ -8387,7 +8301,6 @@ void CVHFdot_nrs8( JKOperator **jkop, JKArray **vjk,
         // else i == k && i >= j && k >= l
         assert(ishls[1] == kshls[1]);
 
-        //printf("ELSE!\n");
 
         DECLARE_ALL;
 
@@ -8395,6 +8308,7 @@ void CVHFdot_nrs8( JKOperator **jkop, JKArray **vjk,
                 for (jsh = jsh0; jsh < MIN(jsh1, ish+1); jsh++) {
                         for (ksh = ksh0; ksh <= ish; ksh++) {
                                 for (lsh = lsh0; lsh < MIN(lsh1, ksh+1); lsh++) {
+                                        // comment below is from libcint 
                         // when ksh==ish, (lsh<jsh) misses some integrals (eg k<i&&l>j).
                         // These integrals are calculated in the next (ish,jsh) pair. To show
                         // that, we just need to prove that every elements in shell^4 appeared
@@ -8430,14 +8344,11 @@ void CVHFdot_nrs8( JKOperator **jkop, JKArray **vjk,
 
                                         }
 
-                                        //printf("%i %i %i %i\n", ish, jsh, ksh, lsh);
-                                        //fflush(stdout);
                                 } 
                         } 
                 } 
         }
 
-        //printf("DONE!\n");
 }
 
 JKArray *CVHFallocate_JKArray(JKOperator *op, int *shls_slice, int *ao_loc, int ncomp)
@@ -8630,9 +8541,9 @@ static int _shls_block_partition_lim(int *block_loc, int *shls_slice,
 extern "C" void CVHFnr_direct_drv(//int (*intor)(), void (*fdot)(), 
                        JKOperator **jkop, 
 
-                       //input_type **dms, input_type **vjk,  // this is input and output, both of size (NAO, NAO), very small! 
+                       //input_type **dms, input_type **vjk,  // this is input and output, both of size (NAO, NAO)
                         dtype *dm, 
-                        ddtype **vjk,  // this is input and output, both of size (NAO, NAO), very small! 
+                        ddtype **vjk,  // this is input and output, both of size (NAO, NAO)
                         //ddtype vjk, 
 
                        int n_dm, int ncomp,
@@ -8700,20 +8611,19 @@ extern "C" void CVHFnr_direct_drv(//int (*intor)(), void (*fdot)(),
 
                 for (i = 0; i < nblock_i; i++) {
 
-                        //printf("[%i %i %i]\n", blk_id, i, nblock_i); // it only ends up calling once? 
+                        //printf("[%i %i %i]\n", blk_id, i, nblock_i); 
                         //fflush(stdout);
-                        // perhaps move everything except this to python, and then this is what we do on each tile? 
                         CVHFdot_nrs8(jkop, v_priv, tile_dms, buf, n_buf, cache, n_dm, block_iloc+i, block_jloc+j, block_kloc+k, block_lloc+l, vhfopt, &envs, n_env);
                 }
                 
         }
 
 
-        // this moves everything into output! 
+        // move everything into output
                 
-        for (i = 0; i < n_dm; i++) { // this one dies for some reason. 
+        for (i = 0; i < n_dm; i++) { 
                 CVHFassemble_v(vjk[i], jkop[i], v_priv[i], shls_slice, ao_loc);
-                CVHFdeallocate_JKArray(v_priv[i]); // todo?? perhaps wrong? 
+                CVHFdeallocate_JKArray(v_priv[i]); 
         }
 
         free(buf);
