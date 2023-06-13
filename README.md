@@ -45,7 +45,7 @@ tar -xvf ./gdb/gdb11.tgz --directory ./gdb/
 ```
 To utilize caching you need to sort the SMILES strings by the number of hydrogens RDKit adds to them. This means molecule `i` and `i+1` in most cases have the same number of hydrogens which allows our code reuse/cache the computational graph for DFT. This can be done by running the cells in 
 ```
-gdb/sortgdb9.ipynb. 
+gdb/sortgdb9.ipynb
 ```
 You can then start generating a dataset using the following command:
 ```bash
