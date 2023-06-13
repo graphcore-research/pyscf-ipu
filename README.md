@@ -37,7 +37,7 @@ python density_functional_theory.py -methane -backend ipu -float32
 This will automatically compare our DFT against PySCF for methane `CH4` and report numerical errors. 
 
 ## Generating New Datasets
-This shows an example on how to generate a DFT dataset based of GDB. This is not needed if you just want to train on QM1B.  
+This section contains an example on how to generate a DFT dataset based of GDB. This is not needed if you just want to train on QM1B.  
 
 Download the `gdb11.tgz` file from https://zenodo.org/record/5172018 and extract its content in `gdb/` directory:
 ```bash
