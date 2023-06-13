@@ -229,6 +229,9 @@ def create_qm1b_loader(data_config, model_config, options):
     if model_config.use_half:
         raise NotImplementedError()
 
+    if data_config.root_folder is None:
+        raise ValueError("Must provide a data_config.root_folder for the QM1B dataset")
+
     num_graphs_per_batch = model_config.batch_size - 1
     val_batch_size, train_batch_size = [
         combined_batch(opt, num_graphs_per_batch) for opt in options
