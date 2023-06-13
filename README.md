@@ -27,7 +27,7 @@ pip install jax==0.3.16+ipu jaxlib==0.3.15+ipu.sdk320 -f https://graphcore-resea
 pip install git+https://github.com/graphcore-research/jax-ipu-experimental-addons.git@main
 ```
 
-# Example DFT Computations
+## Example DFT Computations
 The following commands may be useful to check the installation. Each command runs a test-case which compares PySCF against our DFT computation using different options. 
 ```
 python density_functional_theory.py -methane -backend cpu # defaults to float64 as used in PySCF
