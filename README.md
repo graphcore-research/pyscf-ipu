@@ -28,7 +28,7 @@ pip install git+https://github.com/graphcore-research/jax-ipu-experimental-addon
 ```
 
 # Example DFT Computations
-The following commands may be useful to check the installation. Each command runs test-case, compariing PySCF against our DFT computation with different options. 
+The following commands may be useful to check the installation. Each command runs test-case, comparing PySCF against our DFT computation with different options. 
 ```
 python density_functional_theory.py -methane -backend cpu # defaults to float64 as used in PySCF
 python density_functional_theory.py -methane -backend cpu -float32
