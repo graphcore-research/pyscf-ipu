@@ -230,7 +230,10 @@ def create_qm1b_loader(data_config, model_config, options):
         raise NotImplementedError()
 
     if data_config.root_folder is None:
-        raise ValueError("Must provide a data_config.root_folder for the QM1B dataset")
+        raise ValueError(
+            "Must provide a data_config.root_folder for the QM1B dataset. "
+            "This requires approximately 240GB of storage"
+        )
 
     num_graphs_per_batch = model_config.batch_size - 1
     val_batch_size, train_batch_size = [

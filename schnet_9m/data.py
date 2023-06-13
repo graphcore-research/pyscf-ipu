@@ -50,7 +50,8 @@ def split(dataset: Dataset, data_config: DataConfig):
 def create_pyg_dataset(config: DataConfig, use_half: bool = False):
     transform = partial(prep_qm9, use_half=use_half)
     if config.dataset == "qm9":
-        dataset = QM9(root="../datasets/qm9", transform=transform)
+        root = "datasets/qm9" if config.root_folder is None else config.root_folder
+        dataset = QM9(root=root, transform=transform)
     else:
         raise ValueError(f"Invalid dataset: {config.dataset}")
 
