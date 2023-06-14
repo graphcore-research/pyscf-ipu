@@ -1,14 +1,36 @@
-## Minimal SchNet training and validation
+# Training SchNet on QM1B
 
-The minimum possible scripts for training and validation of SchNet GNN to
-support scaling laws experimentation.
+This repository contains the implementation of the SchNet 9M trained on the QM1B
+dataset. We show that training a SchNet 9M model to predict HL gap shows improvement as
+the number of training samples approaches 500M.
 
-### Quickstart
+![scaling_qm1b](./scaling_qm1b.png)
+
+## Requirements
+This project requires requires Python 3.8, and Graphcore SDK 3.2.  Additional
+dependencies can be installed into your environment with
 ```bash
 pip install -r requirements.txt
+```
+
+## Training SchNet
+
+```bash
 python train.py
 ```
 
+## Downloading QM1B
+The QM1B dataset is stored in multiple Apache Parquet files and can be downloaded
+locally using:
+```bash
+python download.py /path/for/qm1b
+```
+This is required for running the training script.
+> **Note** 
+> this will require at least 240GB of storage.
+
+
+## Complete Training Usage
 Complete usage is documented below.
 
 ```bash
