@@ -6,7 +6,6 @@ cache/
 *.pkl
 *.jpg
 *.npz
-*.txt
 *.smi
 _cache/
 tmp/
