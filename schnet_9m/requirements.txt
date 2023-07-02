@@ -1,0 +1,13 @@
+awscli
+jsonargparse[all]
+jupyter
+natsort
+pandas
+periodictable
+py3Dmol
+pyarrow
+rdkit
+seaborn
+torchinfo
+torchmetrics
+wandb

@@ -34,7 +34,7 @@ from pyscf_utils.build_grid import build_grid
 from pyscf_utils.build_mol  import build_mol
 from exchange_correlation.b3lyp import b3lyp
 from exchange_correlation.b3lyp import do_lda as lda
-from rdkit import Chem 
+from rdkit import Chem
 from rdkit.Chem import AllChem
 from rdkit import RDLogger
 from electron_repulsion.direct import prepare_int_floats, prepare_integrals_2_inputs
@@ -53,7 +53,7 @@ def get_atom_string(atoms, locs):
       str += "%s %4f %4f %4f; "%((atom,) + tuple(loc) )
     return atom_string, str
 
-def _do_compute(density_matrix, kinetic, nuclear, overlap, ao, 
+def _do_compute(density_matrix, kinetic, nuclear, overlap, ao,
                 electron_repulsion, weights, coords, nuclear_energy, disable_cache, mf_diis_space, N, hyb, mask, _input_floats, _input_ints, L_inv=None):
         # --- INITIALIZE MATRICES USED FOR DIIS --- #
         mf_diis_H       = np.zeros((mf_diis_space+1, mf_diis_space+1))
@@ -93,7 +93,7 @@ def _do_compute(density_matrix, kinetic, nuclear, overlap, ao,
             if not args.seperate:
                 electron_repulsion = compute_integrals_2( _input_floats, _input_ints, _tuple_ijkl, _shapes, _sizes, _counts, tuple(indxs_inv), num_threads=args.threads_int, v=args.intv)[0]
                 electron_repulsion = [a  for a in electron_repulsion]
-            print("bytes: ", np.sum([a.nbytes for a in electron_repulsion])/ 10**6) 
+            print("bytes: ", np.sum([a.nbytes for a in electron_repulsion])/ 10**6)
         elif not args.seperate:
             num_calls = electron_repulsion.shape[0]
 
@@ -111,7 +111,7 @@ def _do_compute(density_matrix, kinetic, nuclear, overlap, ao,
         errvec = jnp.zeros(overlap.shape)
 
         _num_calls = np.zeros(num_calls)
-        cycle = 0 
+        cycle = 0
         if type(electron_repulsion) == type([]):
             if args.float32: E_xc, V_xc, E_coulomb, vj, vk = xc( density_matrix.astype(np.float32), dms.astype(np.float32), cycle, ao.astype(np.float32), electron_repulsion, weights.astype(np.float32), vj.astype(np.float32), vk.astype(np.float32), hyb, _num_calls)
         else:
@@ -153,18 +153,18 @@ def _do_compute(density_matrix, kinetic, nuclear, overlap, ao,
         dms           = vals[28]
         part_energies = vals[29]
 
-        return energies, energy, eigenvalues, eigenvectors, dms, fixed_hamiltonian, part_energies, L_inv 
+        return energies, energy, eigenvalues, eigenvectors, dms, fixed_hamiltonian, part_energies, L_inv
 
-def density_functional_theory(atom_positions, mf_diis_space=9):                              
-    if args.backend == "ipu": mf_diis_space = 9                                              
+def density_functional_theory(atom_positions, mf_diis_space=9):
+    if args.backend == "ipu": mf_diis_space = 9
 
     if args.generate: global mol
-    
-    nuclear_energy    = mol.energy_nuc()                                                      
-    n_electrons       = mol.nelectron                                                         
-    n_electrons_half  = n_electrons//2                                                        
-    hyb               = pyscf.dft.libxc.hybrid_coeff(args.xc, mol.spin)                       
-    N                 = mol.nao_nr()                                                          
+
+    nuclear_energy    = mol.energy_nuc()
+    n_electrons       = mol.nelectron
+    n_electrons_half  = n_electrons//2
+    hyb               = pyscf.dft.libxc.hybrid_coeff(args.xc, mol.spin)
+    N                 = mol.nao_nr()
 
     mask = np.ones(N)
     mask[n_electrons_half:] = 0
@@ -173,17 +173,17 @@ def density_functional_theory(atom_positions, mf_diis_space=9):
 
     # Initialize grid.
     grids            = pyscf.dft.gen_grid.Grids(mol)
-    grids.level      = args.level 
+    grids.level      = args.level
     grids.build()
-    coords           = grids.coords                                                          
-    weights          = grids.weights                                                         
+    coords           = grids.coords
+    weights          = grids.weights
     weights          = weights
     ao              = mol.eval_gto('GTOval_cart_deriv1' if mol.cart else 'GTOval_sph_deriv1', coords, 4)
 
     # Initialize all (N, N) sized matrices (using PySCF or Jax depending on args).
-    density_matrix  = np.array(minao(mol)).reshape(N, N)  
+    density_matrix  = np.array(minao(mol)).reshape(N, N)
 
-    kinetic         = mol.intor_symmetric('int1e_kin'). reshape(N, N)  
+    kinetic         = mol.intor_symmetric('int1e_kin'). reshape(N, N)
     nuclear         = mol.intor_symmetric('int1e_nuc'). reshape(N, N)
     overlap         = mol.intor_symmetric('int1e_ovlp').reshape(N, N)
 
@@ -197,7 +197,7 @@ def density_functional_theory(atom_positions, mf_diis_space=9):
     if args.generate:
         __config__.dft_rks_RKS_grids_level = args.plevel
 
-        rng = range(len(args.smiles)) 
+        rng = range(len(args.smiles))
         if args.gdb > 0:
             id, num = args.split
             num_mols = len(args.smiles) // num
@@ -241,7 +241,7 @@ def density_functional_theory(atom_positions, mf_diis_space=9):
 
                   print("Left: ", len(args.smiles))
 
-                  rng = range(len(args.smiles)) 
+                  rng = range(len(args.smiles))
 
 
                 name = "%i_GDB%i_f32%s_grid%i_backend%s"%(len(os.listdir("data/generated/%s/"%args.fname)), int(args.gdb), args.float32, args.level, args.backend)
@@ -272,13 +272,13 @@ def density_functional_theory(atom_positions, mf_diis_space=9):
         # figure out largest grid size by looking at last molecule.
         if True:
             for j in range(1, len(args.smiles)):
-                i = rng[-j] 
+                i = rng[-j]
 
                 smile = args.smiles[i]
                 atoms = [a for a in list(smile.upper()) if a == "C" or a == "N" or a == "O" or a == "F"]
 
                 b = Chem.MolFromSmiles(smile)
-                if not args.nohs: b = Chem.AddHs(b, explicitOnly=False)   
+                if not args.nohs: b = Chem.AddHs(b, explicitOnly=False)
 
                 AllChem.EmbedMolecule(b)
 
@@ -295,9 +295,9 @@ def density_functional_theory(atom_positions, mf_diis_space=9):
                 mol = build_mol(mol, atom=string, unit="Bohr", basis=args.basis, spin=args.spin, verbose=0)
 
                 # Initialize grid. Depends on molecule!
-                grids            = pyscf.dft.gen_grid.Grids(mol)  
+                grids            = pyscf.dft.gen_grid.Grids(mol)
                 grids.level      = args.level
-                grids            = build_grid(grids) 
+                grids            = build_grid(grids)
                 coords           = grids.coords
                 weights          = grids.weights
                 pad = int(weights.shape[0]*1.1) # assuming 10% larger than last molecule is ok.
@@ -318,19 +318,19 @@ def density_functional_theory(atom_positions, mf_diis_space=9):
             if True:
 
                 if args.gdb == 1337:
-                    conformers = [args.qm9["pos"].values[i][0]]*3 
+                    conformers = [args.qm9["pos"].values[i][0]]*3
                     atoms = [ptable.GetElementSymbol( n) for n in args.qm9["z"].values[i][0].tolist() ]
                     num_hs = len([a for a in atoms if a == "H"])
 
                 else:
-                    times.append(time.perf_counter())   
+                    times.append(time.perf_counter())
                     smile = args.smiles[i]
                     print("[%s]"%smile)
                     atoms = [a for a in list(smile.upper()) if a == "C" or a == "N" or a == "O" or a == "F"]
 
                     b = Chem.MolFromSmiles(smile)
 
-                    if not args.nohs: b = Chem.AddHs(b, explicitOnly=False)   
+                    if not args.nohs: b = Chem.AddHs(b, explicitOnly=False)
 
                     embed_result = AllChem.EmbedMultipleConfs(b, numConfs=args.num_conformers, randomSeed=43)
                     if embed_result == -1:
@@ -346,7 +346,7 @@ def density_functional_theory(atom_positions, mf_diis_space=9):
                     num_hs = len([a for a in atoms if a == "H"])
 
             finished_first_iteration  = False
-            vals = [] 
+            vals = []
 
             for conformer_num, conformer in enumerate(conformers):
 
@@ -358,14 +358,14 @@ def density_functional_theory(atom_positions, mf_diis_space=9):
                     prev_locs = locs
                     prev_atoms = atoms
 
-                times.append(time.perf_counter()) 
+                times.append(time.perf_counter())
                 locs = conformer * angstrom_to_bohr
                 if args.rattled_std != 0:
                     print(locs)
                     locs += np.random.normal(0, args.rattled_std, locs.shape)
                     print(locs)
 
-                times.append(time.perf_counter()) 
+                times.append(time.perf_counter())
                 atom_string, string = get_atom_string(" ".join(atoms), locs)
                 times.append(time.perf_counter())
 
@@ -386,29 +386,29 @@ def density_functional_theory(atom_positions, mf_diis_space=9):
                 mask = np.ones(N)
                 mask[n_electrons_half:] = 0
 
-                times.append(time.perf_counter()) 
+                times.append(time.perf_counter())
 
                 if (args.backend == "cpu" or args.ipumult) and not args.seperate: electron_repulsion = mol.intor('int2e_sph').reshape(N, N, N, N)
                 else:                     electron_repulsion = 0
 
                 # Initialize grid.
                 if conformer_num == 0 or True:
-                    times.append(time.perf_counter()) 
-                    grids            = pyscf.dft.gen_grid.Grids(mol)  
+                    times.append(time.perf_counter())
+                    grids            = pyscf.dft.gen_grid.Grids(mol)
                     grids.level      = args.level
-                    times.append(time.perf_counter()) 
-                    grids            = build_grid(grids) 
+                    times.append(time.perf_counter())
+                    grids            = build_grid(grids)
                 times.append(time.perf_counter())
                 coords          = grids.coords
                 weights         = grids.weights
                 ao              = mol.eval_gto('GTOval_cart_deriv1' if mol.cart else 'GTOval_sph_deriv1', coords, 4)
-                times.append(time.perf_counter()) 
+                times.append(time.perf_counter())
                 kinetic         = mol.intor_symmetric('int1e_kin'). reshape(N, N)
-                times.append(time.perf_counter()) 
+                times.append(time.perf_counter())
                 nuclear         = mol.intor_symmetric('int1e_nuc'). reshape(N, N)
-                times.append(time.perf_counter()) 
+                times.append(time.perf_counter())
                 overlap         = mol.intor_symmetric('int1e_ovlp').reshape(N, N)
-                times.append(time.perf_counter()) 
+                times.append(time.perf_counter())
                 fixed_hamiltonian   = kinetic + nuclear
                 if vals != []:
                     L_inv_prev = L_inv
@@ -425,48 +425,48 @@ def density_functional_theory(atom_positions, mf_diis_space=9):
                 except:
                     print("MATRIX NOT POSITIVE DEFINITE, SKIPPING MOLECULE: ", smile)
                     continue
-                times.append(time.perf_counter()) 
+                times.append(time.perf_counter())
 
-                # Reuse minao across conformers. 
+                # Reuse minao across conformers.
                 if conformer_num == 0: init_density_matrix = hf.init_guess_by_minao(mol)
                 if np.sum(np.isnan(density_matrix)) > 0 or density_matrix.shape != kinetic.shape: density_matrix = hf.init_guess_by_minao(mol)
                 density_matrix = init_density_matrix
-                times.append(time.perf_counter()) 
+                times.append(time.perf_counter())
 
                 weights = np.pad(weights, (0, pad-weights.shape[0]))
                 coords  = np.pad(coords, ((0, pad-weights.shape[0]), (0, 0)))
                 ao      = np.pad(ao, ((0, 0), (0, pad-ao.shape[1]), (0, 0)))
 
-                times.append(time.perf_counter()) 
+                times.append(time.perf_counter())
                 _input_floats, _input_ints = prepare_int_floats(mol)
-                times.append(time.perf_counter()) 
+                times.append(time.perf_counter())
 
-                if args.backend != "cpu": 
+                if args.backend != "cpu":
                     if _input_floats.shape[0] != 400:
                         _input_floats = np.concatenate((_input_floats, np.zeros((1, 400-_input_floats.shape[1]))), axis=1)
 
                 if args.seperate:
                     if init_int: _input_floats, _input_ints, _tuple_ijkl, _shapes, _sizes, _counts, indxs, indxs_inv, num_calls = prepare_integrals_2_inputs(mol)
-                    init_int = False  
+                    init_int = False
                     if _input_floats.shape[0] != 400:
                         _input_floats = np.concatenate((_input_floats, np.zeros((1, 400-_input_floats.shape[1]))), axis=1)
                     times.append(time.perf_counter())
                     electron_repulsion, cycles_start, cycles_stop = compute_integrals( _input_floats, _input_ints, _tuple_ijkl, _shapes, _sizes, _counts, tuple(indxs_inv), args.threads_int)
                     times.append(time.perf_counter())
 
-                times.append(time.perf_counter())  
+                times.append(time.perf_counter())
 
-                if args.save and vals != []:   
-                    times.append(time.perf_counter())  
+                if args.save and vals != []:
+                    times.append(time.perf_counter())
                     energies_, energy, eigenvalues, eigenvectors, dms, _fixed_hamiltonian, part_energies, _L_inv_prev  = [np.asarray(a).astype(np.float64) for a in vals[-1]]
-                    times.append(time.perf_counter()) 
+                    times.append(time.perf_counter())
 
                     if not args.choleskycpu: L_inv_prev = _L_inv_prev #
 
                     e = np.zeros(energies_.shape)
                     for i in range(energies_.shape[0]):
-                        density_matrix = dms[i,0].reshape(-1) 
-                        vj             = dms[i,1].reshape(-1) 
+                        density_matrix = dms[i,0].reshape(-1)
+                        vj             = dms[i,1].reshape(-1)
                         E_coulomb      = np.sum( (density_matrix) * vj) * .5
                         e[i]           = part_energies[i] + np.dot(_fixed_hamiltonian.reshape(-1) , dms[i, 0].reshape(-1)) + E_coulomb + old_nuclear_energy
 
@@ -474,7 +474,7 @@ def density_functional_theory(atom_positions, mf_diis_space=9):
                     density_matrix = density_matrix.reshape(_N, _N)
                     energy = np.mean(e[-5:])
 
-                    times.append(time.perf_counter())  
+                    times.append(time.perf_counter())
 
                     try:
                         mo_energy_us = np.linalg.eigvalsh(L_inv_prev @ dms[-1, 2].reshape(_N,_N) @ L_inv_prev.T)
@@ -615,29 +615,29 @@ def density_functional_theory(atom_positions, mf_diis_space=9):
                             dct["pyscf_lumo"]   = pyscf_lumo
                             dct["pyscf_hlgap"]  = pyscf_hlgap
 
-                        times.append(time.perf_counter()) 
+                        times.append(time.perf_counter())
                         if not os.path.isfile(filename):  pd.DataFrame(dct).to_csv(filename, mode='a', header=True, compression="gzip")
                         else:  pd.DataFrame(dct).to_csv(filename, mode='a', header=False, compression="gzip")
 
                 if vals != []:
-                    times.append(time.perf_counter()) 
+                    times.append(time.perf_counter())
                     times = np.array(times)
                     times = np.around((times[1:] - times[:-1])*1000, 1)
                     pbar.set_description("[%i / %i] Hs=%5i "%(conformer_num, len(conformers), num_hs) +  "%10f "%energy + " ".join([str(a) for a in times.tolist() + [np.around(np.sum(times), 1)]])  + " [%i ; %i]"%(embedded, not_embedded))
 
                 vals  = []
-                times = [time.perf_counter()]  
+                times = [time.perf_counter()]
                 if np.sum(np.isnan(density_matrix)) > 0 or density_matrix.shape != kinetic.shape:
                     density_matrix  = np.array(minao(mol))
                 if not args.forloop:
-                    if not args.skip_minao: density_matrix  = np.array(minao(mol)) 
+                    if not args.skip_minao: density_matrix  = np.array(minao(mol))
                     vals.append( function( density_matrix, kinetic, nuclear, overlap, ao, electron_repulsion, weights, coords, nuclear_energy, 0, mf_diis_space, N, hyb , mask, _input_floats, _input_ints, L_inv)  )
                 else:
                     # make this into a flag.
                     if not args.skip_minao: density_matrix  = np.array(minao(mol))
                     vals.append(_do_compute( density_matrix, kinetic, nuclear, overlap, ao, electron_repulsion, weights, coords, nuclear_energy, 0, mf_diis_space, N, hyb , mask, _input_floats, _input_ints, L_inv) )
 
-                times.append(time.perf_counter())  
+                times.append(time.perf_counter())
 
 
                 if args.profile:
@@ -671,8 +671,8 @@ def density_functional_theory(atom_positions, mf_diis_space=9):
         print(density_matrix.dtype)
         e = np.zeros(energies_.shape)
         for i in range(energies_.shape[0]):
-            density_matrix = dms[i,0] 
-            vj = dms[i,1]  
+            density_matrix = dms[i,0]
+            vj = dms[i,1]
             E_coulomb = np.sum( (density_matrix/c) * vj) * .5
             e[i] = part_energies[i] + np.dot(fixed_hamiltonian.reshape(-1) , dms[i, 0].reshape(-1))  + E_coulomb + nuclear_energy
 
@@ -693,8 +693,8 @@ def density_functional_theory(atom_positions, mf_diis_space=9):
         energies_, energy, eigenvalues, eigenvectors, dms, fixed_hamiltonian, part_energies  = [np.asarray(a).astype(np.float64) for a in vals]
         e = np.zeros(energies_.shape)
         for i in range(energies_.shape[0]):
-            density_matrix = dms[i,0] 
-            vj = dms[i,1]  
+            density_matrix = dms[i,0]
+            vj = dms[i,1]
             E_coulomb = np.sum( (density_matrix.astype(np.float64)/c) * vj) * .5
             e[i] = part_energies[i] + np.dot(fixed_hamiltonian.reshape(-1) , dms[i, 0].reshape(-1))  + E_coulomb + nuclear_energy
 
@@ -725,7 +725,7 @@ def f(x, float32):
     elif type(x) == type(jnp.zeros(1)): return jnp.asarray(x).astype(jnp.float64)
     else: return x
 
-def kahan_dot(x, y, sort=False): # more stable dot product; 
+def kahan_dot(x, y, sort=False): # more stable dot product;
     xy = y * x
     sum   = jnp.array(0.0 ,dtype=xy.dtype)
     error = jnp.array(0.0, dtype=xy.dtype)
@@ -778,7 +778,7 @@ def iter( cycle, val ):
     generalized_hamiltonian = f(generalized_hamiltonian, d)
     if args.skipeigh: eigvals, eigvects = hamiltonian[0], hamiltonian
     else:
-        eigvects = _eigh(generalized_hamiltonian )[1] 
+        eigvects = _eigh(generalized_hamiltonian )[1]
 
     d = True and args.float32
     generalized_hamiltonian, cholesky = f(generalized_hamiltonian, d), f(cholesky, d)
@@ -814,7 +814,7 @@ def iter( cycle, val ):
     else: part_energies[cycle] =E_xc
 
 
-    # Added dynamic_update_slice to optimize compiler layout. 
+    # Added dynamic_update_slice to optimize compiler layout.
     if args.debug or True:
         N = density_matrix.shape[0]
         if type(dms) == type(jnp.array(1)):
@@ -849,7 +849,7 @@ def kahan_sum_sort(xy): # x is vector and y is matrix
 
 
 def xc(density_matrix, dms, cycle, ao, electron_repulsion, weights, vj, vk, hyb, num_calls):
-    # the f notation below allows testing the error when running entire dft in f64 except a single operation in f32. 
+    # the f notation below allows testing the error when running entire dft in f64 except a single operation in f32.
 
     n = density_matrix.shape[0]
 
@@ -873,17 +873,17 @@ def xc(density_matrix, dms, cycle, ao, electron_repulsion, weights, vj, vk, hyb,
 
     d = switch
     rho, ao0dm, ao = f(rho, d), f(ao0dm, d), f(ao, d)
-    d = 2 in args.sk  
+    d = 2 in args.sk
     rho = f(rho, d)
     rho                = jnp.concatenate([jnp.clip(rho[:1], CLIP_RHO_MIN, CLIP_RHO_MAX), rho[1:4]*2])
     d = switch
     rho = f(rho, d)
 
-    d = 3 in args.sk  
+    d = 3 in args.sk
     rho = f(rho, d)
     if args.xc == "b3lyp": E_xc, vrho, vgamma = b3lyp(rho, EPSILON_B3LYP)
     elif args.xc == "lda":
-        E_xc, vrho, vgamma = lda(rho,   EPSILON_B3LYP) 
+        E_xc, vrho, vgamma = lda(rho,   EPSILON_B3LYP)
         assert False, "-xc lda is not not supported. "
     else: E_xc, vrho, vgamma = b3lyp(rho, EPSILON_B3LYP)
     d = switch
@@ -891,13 +891,13 @@ def xc(density_matrix, dms, cycle, ao, electron_repulsion, weights, vj, vk, hyb,
 
     d = 5 in args.sk
     rho, weights, E_xc = f(rho, d), f(weights, d), f(E_xc, d)
-    E_xc =  jnp.sum( rho[0] * weights *  E_xc ) 
+    E_xc =  jnp.sum( rho[0] * weights *  E_xc )
     d = switch
     rho, weights, E_xc = f(rho, d), f(weights, d), f(E_xc, d)
 
     d = 6 in args.sk
     vrho, vgamma, rho, weights = f(vrho, d), f(vgamma, d), f(rho, d), f(weights, d)
-    weird_rho = (jnp.concatenate([vrho.reshape(1, -1)*.5, 2*vgamma*rho[1:4]], axis=0) * weights ) 
+    weird_rho = (jnp.concatenate([vrho.reshape(1, -1)*.5, 2*vgamma*rho[1:4]], axis=0) * weights )
     d = switch
     vrho, vgamma, rho, weights = f(vrho, d), f(vgamma, d), f(rho, d), f(weights, d)
 
@@ -914,14 +914,14 @@ def xc(density_matrix, dms, cycle, ao, electron_repulsion, weights, vj, vk, hyb,
     d = switch
     ao, V_xc = f(ao, d), f(V_xc, d)
 
-    d = 9 in args.sk 
+    d = 9 in args.sk
     V_xc = f(V_xc, d)
     V_xc      = V_xc + V_xc.T
     d = switch
     V_xc = f(V_xc, d)
 
 
-    if not args.skiperi: 
+    if not args.skiperi:
         d = num_calls.size
         c = 1
 
@@ -934,10 +934,10 @@ def xc(density_matrix, dms, cycle, ao, electron_repulsion, weights, vj, vk, hyb,
                                                 _tuple_indices,
                                                 _tuple_do_lists, _N, num_calls.size,
                                                 tuple(args.indxs.tolist()),
-                                                tuple(args.indxs.tolist()), 
+                                                tuple(args.indxs.tolist()),
                                                 int(args.threads),
                                                 v=int(args.multv)
-                                                ) 
+                                                )
 
             vj         = ipu_vj
             vk         = ipu_vk*hyb
@@ -946,7 +946,7 @@ def xc(density_matrix, dms, cycle, ao, electron_repulsion, weights, vj, vk, hyb,
             d = density_matrix.shape[0]
             c = 1
 
-            d = 11 in args.sk  
+            d = 11 in args.sk
             density_matrix, E = f(density_matrix, d), f(electron_repulsion, d),
 
             d = density_matrix.shape[0]
@@ -975,14 +975,14 @@ def xc(density_matrix, dms, cycle, ao, electron_repulsion, weights, vj, vk, hyb,
     V_xc, vj, vk = f(V_xc, d), f(vj, d), f(vk, d)
 
 
-    d = 14 in args.sk 
+    d = 14 in args.sk
     density_matrix, E_xc, vk = f(density_matrix, d), f(E_xc, d), f(vk, d)
     if args.float32 and not args.backend == "ipu": E_xc      = E_xc - kahan_dot(density_matrix.reshape(-1) , vk.T.reshape(-1)) *( .5 * .5)
-    else: E_xc      -= jnp.sum(density_matrix * vk.T) * .5 * .5 
+    else: E_xc      -= jnp.sum(density_matrix * vk.T) * .5 * .5
     d = switch
     density_matrix, E_xc, vk = f(density_matrix, d), f(E_xc, d), f(vk, d)
 
-    E_coulomb  = 0 # gets computed elsewhere. 
+    E_coulomb  = 0 # gets computed elsewhere.
 
     return E_xc, V_xc, E_coulomb, vj, vk
 
@@ -991,14 +991,14 @@ def _eigh(x):
     if args.backend == "ipu":
         t0 = time.time()
         print("tracing ipu eigh (%s): "%str(x.shape))
-        from jax_ipu_research.tile import ipu_eigh
+        from jax_ipu_experimental_addons.tile import ipu_eigh
         n = x.shape[0]
         pad = n % 2
         print(x.dtype)
         if pad:
             x = jnp.pad(x, [(0, 1), (0, 1)], mode='constant')
 
-        eigvects, eigvals = ipu_eigh(x, sort_eigenvalues=True, num_iters=12)   
+        eigvects, eigvals = ipu_eigh(x, sort_eigenvalues=True, num_iters=12)
 
         if pad:
             e1 = eigvects[-1:]
@@ -1008,7 +1008,7 @@ def _eigh(x):
             eigvects = jnp.roll(eigvects, -(-col))
             eigvects = eigvects[:-1]
     else:
-        eigvals, eigvects = jnp.linalg.eigh(f(x, args.float32))  
+        eigvals, eigvects = jnp.linalg.eigh(f(x, args.float32))
 
     return eigvals, eigvects
 
@@ -1029,7 +1029,7 @@ def DIIS(cycle, sdf, hamiltonian, _V, _H, mf_diis_H):
     # Shapes in initial code depended on min(cycle, _V.shape[0]).
     # To allow jax.jit, we always use nd=_V.shape[0] and zero out
     # the additional stuff with the following mask.
-    mask = jnp.where(np.arange(_V.shape[0]) < jnp.minimum(cycle+1, _V.shape[0]),       
+    mask = jnp.where(np.arange(_V.shape[0]) < jnp.minimum(cycle+1, _V.shape[0]),
                         jnp.ones(_V.shape[0], dtype=_V.dtype), jnp.zeros(_V.shape[0], dtype=_V.dtype))
     tmps = tmps * mask
 
@@ -1041,15 +1041,15 @@ def DIIS(cycle, sdf, hamiltonian, _V, _H, mf_diis_H):
     # Coefficients are computed as pseudo_inverse of mf_diis_H.
     # The first 8 iterations we are constructing mf_diis_H so it has shape (2,2), (3,3), (4,4), ...
     # To allow jax.jit we pad to (9, 9) and just zero out the additional stuff...
-    mask_            = jnp.concatenate([jnp.ones(1, dtype=mask.dtype), mask])                                    
+    mask_            = jnp.concatenate([jnp.ones(1, dtype=mask.dtype), mask])
     masked_mf_diis_H = mf_diis_H[:nd+1, :nd+1] * mask_.reshape(-1, 1) * mask_.reshape(1, -1)
 
-    if args.backend == "ipu":  
+    if args.backend == "ipu":
         #c               = pinv( masked_mf_diis_H )[0, :]
         c               = pinv0( masked_mf_diis_H )
-        #c               = jnp.linalg.pinv( masked_mf_diis_H )[0, :]  
+        #c               = jnp.linalg.pinv( masked_mf_diis_H )[0, :]
     else:
-        c = jnp.linalg.pinv(f(masked_mf_diis_H, args.float32))[0, :] 
+        c = jnp.linalg.pinv(f(masked_mf_diis_H, args.float32))[0, :]
 
 
     scaled_H         = _H[:nd] * c[1:].reshape(nd, 1)
@@ -1070,7 +1070,7 @@ def pinv0(a):  # take out first row
     cond =  9*1.1920929e-07
     #cond =  1.1920929e-07
     vals, vect = _eigh ( a )
-    c = vect @ ( jnp.where( jnp.abs(vals) > cond, 1/vals, 0) * vect[0, :]) 
+    c = vect @ ( jnp.where( jnp.abs(vals) > cond, 1/vals, 0) * vect[0, :])
     return c
 
 table = None
@@ -1107,7 +1107,7 @@ def recompute(args, molecules, id, num, our_fun, str="", atom_string=""):
       mf.diis = 0
       mf.diis_space = 0
 
-    mf.diis_space = 9 
+    mf.diis_space = 9
 
     repeats = 1
     if args.benchmark: repeats = 3
@@ -1143,7 +1143,7 @@ def recompute(args, molecules, id, num, our_fun, str="", atom_string=""):
     print("err_hlgap\t%15f"%np.abs((hl_gap_hartree * hartree_to_eV) - us_hlgap))
 
   else:
-    pyscf_energy, pyscf_hlgap, t_pyscf = -1, -1, -1 
+    pyscf_energy, pyscf_hlgap, t_pyscf = -1, -1, -1
 
   if molecules is not None: pcq_hlgap = molecules["hlgap"][id]
   else: pcq_hlgap = -1
@@ -1153,7 +1153,7 @@ def recompute(args, molecules, id, num, our_fun, str="", atom_string=""):
   print("us:\t\t%15f"%our_energy)
   print("mus:\t\t%15f"%np.mean(energies[-10:]))
   print("diff:\t\t%15f"%np.abs(pyscf_energy-our_energy))
-  print("mdiff:\t\t%15f"%np.abs(pyscf_energy-np.mean(energies[-10:])), np.std(energies[-10:])) 
+  print("mdiff:\t\t%15f"%np.abs(pyscf_energy-np.mean(energies[-10:])), np.std(energies[-10:]))
   print("chemAcc: \t%15f"%0.043)
   print("chemAcc/diff: \t%15f"%(0.043/np.abs(pyscf_energy-our_energy)))
   print("chemAcc/mdiff: \t%15f"%(0.043/np.abs(pyscf_energy-np.mean(energies[-10:]))))
@@ -1185,7 +1185,7 @@ def jax_dft(str):
     n_electrons_half  = n_electrons//2
     N                 = mol.nao_nr()
 
-    if args.num == -1 or args.benchmark:  
+    if args.num == -1 or args.benchmark:
         print("")
         print("> benchmarking ")
         print("[ basis set] ", args.basis)
@@ -1222,7 +1222,7 @@ def jax_dft(str):
     return energies * hartree_to_eV, e_tot, hlgap, t, t, hlgap
 
 
-if __name__ == "__main__":  
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Arguments for Density Functional Theory. ')
     parser.add_argument('-generate',         action="store_true", help='Enable conformer data generation mode (instead of single point computation). ')
     parser.add_argument('-num_conformers', default=1000, type=int, help='How many rdkit conformers to perfor DFT for. ')
@@ -1315,12 +1315,12 @@ if __name__ == "__main__":
     if args.backend == "cpu":
         args.seperate = False
 
-    if True:  
-        # currently tensor scaling is turned off by default. 
+    if True:
+        # currently tensor scaling is turned off by default.
         args.scale_w = 1
         args.scale_ao = 1
         if args.float32: args.scale_eri = 1
-        args.scale_eri = 1  
+        args.scale_eri = 1
         args.scale_cholesky= 1
         args.scale_ghamil = 1
         args.scale_eigvects = 1
@@ -1347,7 +1347,7 @@ if __name__ == "__main__":
         CLIP_RHO_MAX   = 1e12
 
     else:  # float64
-        config.update('jax_enable_x64', True) 
+        config.update('jax_enable_x64', True)
         EPSILON_B3LYP  = 1e-20
         CLIP_RHO_MIN   = 1e-9
         CLIP_RHO_MAX   = 1e12
@@ -1373,8 +1373,8 @@ if __name__ == "__main__":
             if args.gdb == 7:  args.smiles = [a for a in open("gdb/gdb11_size07_sorted.csv", "r").read().split("\n")]
             if args.gdb == 8:  args.smiles = [a for a in open("gdb/gdb11_size08_sorted.csv", "r").read().split("\n")]
 
-            # used as example data for quick testing. 
-            if args.gdb == 6:  args.smiles = ["c1ccccc1"]*1000 
+            # used as example data for quick testing.
+            if args.gdb == 6:  args.smiles = ["c1ccccc1"]*1000
             if args.gdb == 5:  args.smiles = ['CCCCC']*1000
             if args.gdb == 4:  args.smiles = ['CCCC']*1000
 
@@ -1393,10 +1393,10 @@ if __name__ == "__main__":
                 print(smile)
 
                 b = Chem.MolFromSmiles(smile)
-                if not args.nohs: b = Chem.AddHs(b, explicitOnly=False)  
+                if not args.nohs: b = Chem.AddHs(b, explicitOnly=False)
                 atoms = [atom.GetSymbol() for atom in b.GetAtoms()]
 
-                e = AllChem.EmbedMolecule(b) 
+                e = AllChem.EmbedMolecule(b)
                 if e == -1: continue
 
                 locs = b.GetConformer().GetPositions() * angstrom_to_bohr
@@ -1405,7 +1405,7 @@ if __name__ == "__main__":
                 print(string)
                 break
 
-            recompute(args, None, 0, 0, our_fun=jax_dft, str=string) 
+            recompute(args, None, 0, 0, our_fun=jax_dft, str=string)
 
     elif args.C > 0:
         _str = ";".join("C     1.56910  -0.65660  -0.93640;\
@@ -1435,4 +1435,3 @@ if __name__ == "__main__":
     elif args.H:       recompute(args, None, 0, 0, our_fun=jax_dft, str="H 0 0 0; H 1 1 1;")
     elif args.methane: recompute(args, None, 0, 0, our_fun=jax_dft, str="C 0 0 0; H 0 0 1; H 1 0 0; H 0 1 0; H 1 1 0;")
 
-    

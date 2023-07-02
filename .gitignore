@@ -1,3 +1,12 @@
+datasets/
+.graph_profile/
+.poptorch_cache/
+.system_profile/
+wandb/
+.vscode/
+slurm*
+*.popef
+
 .vscode/
 data/generated/
 cache/
@@ -6,7 +15,6 @@ cache/
 *.pkl
 *.jpg
 *.npz
-*.txt
 *.smi
 _cache/
 tmp/

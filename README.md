@@ -53,3 +53,8 @@ You can then start generating a dataset using the following command:
 python density_functional_theory.py -generate -save -fname dataset_name -level 0 -plevel 0 -gdb 9 -backend cpu -float32
 ```
 You can speed up the generation by using IPUs through https://www.paperspace.com/
+
+## Training SchNet on QM1B
+
+We used PySCF on IPU to generate the QM1B dataset with one billion training examples.
+See [Training SchNet on QM1B](./schnet_9m/README.md) for an example implementation of a neural network trained on this dataset. 
