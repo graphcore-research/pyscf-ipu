@@ -3,17 +3,13 @@
 # - remove plot
 # - numerical experiment stuff 
 
+# units; keep angstrom/bohr?
 import os
-os.environ['OMP_NUM_THREADS'] = "8"
+os.environ['OMP_NUM_THREADS'] = "32"
 import jax
 import jax.numpy as jnp
 from jax.config import config
 config.FLAGS.jax_platform_name = 'cpu'
-import matplotlib.pyplot as plt
-import seaborn as sns
-sns.set_style("darkgrid")
-from tqdm import tqdm
-import scipy
 import os
 import pyscf
 from pyscf import gto, scf
@@ -101,13 +97,6 @@ def _do_compute(density_matrix, kinetic, nuclear, overlap, ao,
         elif not args.seperate:
             num_calls = electron_repulsion.shape[0]
 
-        if args.skiperi: electron_repulsion = 1.
-        elif args.randeri:
-            print("Generating random eri")
-            t0 = time.time()
-            electron_repulsion = np.empty((N, N, N,N))
-            print(time.time()-t0)
-        if args.float16: electron_repulsion = electron_repulsion.astype(np.float16)
 
         generalized_hamiltonian = jnp.zeros(overlap.shape)
         hamiltonian = jnp.zeros(overlap.shape)
@@ -142,8 +131,6 @@ def _do_compute(density_matrix, kinetic, nuclear, overlap, ao,
 
 def density_functional_theory(atom_positions, mf_diis_space=9):                              
     if args.backend == "ipu": mf_diis_space = 9                                              
-
-    if args.generate: global mol
     
     nuclear_energy    = mol.energy_nuc()                                                      
     n_electrons       = mol.nelectron                                                         
@@ -209,23 +196,8 @@ def density_functional_theory(atom_positions, mf_diis_space=9):
 
 
 def f(x, float32):
-
     return x 
 
-def kahan_dot(x, y, sort=False): # more stable dot product; 
-    xy = y * x
-    sum   = jnp.array(0.0 ,dtype=xy.dtype)
-    error = jnp.array(0.0, dtype=xy.dtype)
-    if sort: xy = xy[jnp.argsort(jnp.abs(xy))]
-    def body(i, val):
-        xy, error, sum = val
-        prod = xy[i] - error
-        temp = sum + prod
-        error = (temp - sum) - prod
-        sum = temp
-        return (xy, error, sum)
-    xy, error, sum = jax.lax.fori_loop(np.zeros(1, dtype=np.int32), np.asarray(len(x), dtype=np.int32), body, (xy, error, sum))
-    return sum
 
 def iter( cycle, val ):
     mask, allvals, cs, energies, V_xc, density_matrix, _V, _H, mf_diis_H, vj, vk, eigvals, eigvects, energy, overlap, electron_repulsion, \
@@ -239,8 +211,7 @@ def iter( cycle, val ):
     # Step 2: Solve (generalized) eigenproblem for Hamiltonian:     generalized_hamiltonian = L_inv @ hamiltonian @ L_inv.T
     generalized_hamiltonian = L_inv @ hamiltonian @ L_inv.T
 
-    if args.skipeigh: eigvals, eigvects = hamiltonian[0], hamiltonian
-    else: eigvects = _eigh(generalized_hamiltonian )[1] 
+    eigvects = _eigh(generalized_hamiltonian )[1] 
     eigvects          = L_inv.T @ eigvects
 
     # Step 3: Use result from eigenproblem to build new density matrix.
@@ -258,35 +229,20 @@ def iter( cycle, val ):
     else: part_energies[cycle] = E_xc # this can also be done in the end! 
 
     # Added dynamic_update_slice to optimize compiler layout. 
-    if args.debug or True:
-        N = density_matrix.shape[0]
-        if type(dms) == type(jnp.array(1)):
-            dms = jax.lax.dynamic_update_slice(dms, density_matrix.reshape(1, 1, N, N),   (cycle, 0, 0, 0))
-            dms = jax.lax.dynamic_update_slice(dms, vj.reshape(1, 1, N, N),               (cycle, 1, 0, 0))
-            dms = jax.lax.dynamic_update_slice(dms, hamiltonian.reshape(1, 1, N, N),      (cycle, 2, 0, 0))
-            dms = jax.lax.dynamic_update_slice(dms, vk.reshape(1, 1, N, N),               (cycle, 3, 0, 0))
-        else:
-            dms[cycle, 0] = density_matrix.reshape(N,N)
-            dms[cycle, 1] = vj.reshape(N,N)
-            dms[cycle, 2] = hamiltonian.reshape(N,N)
-            dms[cycle, 3] = vk.reshape(N,N)
+    N = density_matrix.shape[0]
+    if type(dms) == type(jnp.array(1)):
+        dms = jax.lax.dynamic_update_slice(dms, density_matrix.reshape(1, 1, N, N),   (cycle, 0, 0, 0))
+        dms = jax.lax.dynamic_update_slice(dms, vj.reshape(1, 1, N, N),               (cycle, 1, 0, 0))
+        dms = jax.lax.dynamic_update_slice(dms, hamiltonian.reshape(1, 1, N, N),      (cycle, 2, 0, 0))
+        dms = jax.lax.dynamic_update_slice(dms, vk.reshape(1, 1, N, N),               (cycle, 3, 0, 0))
+    else:
+        dms[cycle, 0] = density_matrix.reshape(N,N)
+        dms[cycle, 1] = vj.reshape(N,N)
+        dms[cycle, 2] = hamiltonian.reshape(N,N)
+        dms[cycle, 3] = vk.reshape(N,N)
 
     ret = [mask, allvals, cs, energies, V_xc, density_matrix, _V, _H, mf_diis_H, vj, vk, eigvals, eigvects, energy, overlap, electron_repulsion, fixed_hamiltonian, L_inv, weights, hyb, ao, nuclear_energy, num_calls, cholesky, generalized_hamiltonian, sdf, errvec, hamiltonian, dms, part_energies]
     return ret
-
-def kahan_sum_sort(xy): # x is vector and y is matrix
-    # Initialize the sum and the error
-    sum   = jnp.zeros((xy.shape[0], xy.shape[2]),dtype=xy.dtype)
-    error = jnp.zeros((xy.shape[0], xy.shape[2]), dtype=xy.dtype)
-    def body(i, val):
-        xy, error, sum = val
-        prod = xy[:, i, :] - error
-        temp = sum + prod
-        error = (temp - sum) - prod
-        sum = temp
-        return (xy, error, sum)
-    xy, error, sum = jax.lax.fori_loop(0, xy.shape[1], body, (xy, error, sum))
-    return sum
 
 
 def xc(density_matrix, dms, cycle, ao, electron_repulsion, weights, vj, vk, hyb, num_calls):
@@ -298,8 +254,9 @@ def xc(density_matrix, dms, cycle, ao, electron_repulsion, weights, vj, vk, hyb,
     rho   = jnp.sum((ao0dm.reshape(1, -1, n)) * ao , axis=2)
     rho   = jnp.concatenate([jnp.clip(rho[:1], CLIP_RHO_MIN, CLIP_RHO_MAX), rho[1:4]*2])
 
-    E_xc, vrho, vgamma = b3lyp(rho, EPSILON_B3LYP)
-    E_xc =  jnp.sum( rho[0] * weights *  E_xc ) 
+    # could do this on host in last iteration? 
+    E_xc, vrho, vgamma = b3lyp(rho, EPSILON_B3LYP) 
+    E_xc = jnp.sum( rho[0] * weights * E_xc ) 
 
     weird_rho = (jnp.concatenate([vrho.reshape(1, -1)*.5, 2*vgamma*rho[1:4]], axis=0) * weights ) 
 
@@ -449,7 +406,6 @@ def recompute(args, molecules, id, num, our_fun, str="", atom_string=""):
     mf.diis_space = 9 
 
     repeats = 1
-    if args.benchmark: repeats = 3
 
 
     pyscf_energies = []
@@ -499,16 +455,6 @@ def recompute(args, molecules, id, num, our_fun, str="", atom_string=""):
   print("> diffs:")
   print(np.abs(energies.reshape(-1)[-5:] - pyscf_energy))
   print("mean+-var: %f +- %f"%( np.mean(np.abs(energies.reshape(-1)[-5:] - pyscf_energy)), np.var(np.abs(energies.reshape(-1)[-5:] - pyscf_energy))))
-  fig, ax = plt.subplots(1,2)
-  ax[0].plot(np.abs(energies)[-10:], label="JaxDFT")
-  ax[0].plot(np.arange(10), np.ones(10)*np.mean(np.abs(energies)[-10:]), label="Mean")
-  ax[0].plot(np.arange(10), np.ones(10)*np.abs(pyscf_energy), label="target")
-  ax[1].hist(energies[-200:], bins=20)
-  ax[1].plot([pyscf_energy, pyscf_energy], [0, 10], label="truth")
-  plt.legend()
-  plt.yscale("log")
-  plt.savefig("numerror.jpg")
-
 
 
 mol = None
@@ -524,17 +470,7 @@ def jax_dft(str):
     n_electrons_half  = n_electrons//2
     N                 = mol.nao_nr()
 
-    if args.num == -1 or args.benchmark:  
-        print("")
-        print("> benchmarking ")
-        print("[ basis set] ", args.basis)
-        print("[ num_ao   ] ", mol.nao_nr())
-        print("[ eri MB   ] ", mol.nao_nr()**4*4/10**6, (mol.nao_nr()**2, mol.nao_nr()**2), " !!not sparsified / symmetrized!!")
-        print("[ atom_str ] ", str)
-
     repeats = 1
-    if args.benchmark: repeats = 6
-
     atom_positions  = jnp.concatenate([np.array(atom_position).reshape(1,3) for atom_symbol, atom_position in mol._atom], axis=0)
 
     ts = []
@@ -547,7 +483,6 @@ def jax_dft(str):
 
         print(energies*hartree_to_eV)
 
-        if args.benchmark: print("[ it %4f ]"%t)
 
     mo_occ = jnp.concatenate([jnp.ones(n_electrons_half)*2, jnp.zeros(N-n_electrons_half)])
 
@@ -563,14 +498,8 @@ def jax_dft(str):
 
 if __name__ == "__main__":  
     parser = argparse.ArgumentParser(description='Arguments for Density Functional Theory. ')
-    parser.add_argument('-generate',         action="store_true", help='Enable conformer data generation mode (instead of single point computation). ')
-    parser.add_argument('-num_conformers', default=1000, type=int, help='How many rdkit conformers to perfor DFT for. ')
-    parser.add_argument('-nohs', action="store_true", help='Whether to not add hydrogens using RDKit (the default adds hydrogens). ')
+    parser.add_argument('-skipdiis',  action="store_true", help='Whether to skip DIIS; useful for benchmarking.')
     parser.add_argument('-verbose', action="store_true")
-    parser.add_argument('-choleskycpu',       action="store_true", help='Whether to do np.linalg.inv(np.linalg.cholesky(.)) on cpu/np/f64 as a post-processing step. ')
-    parser.add_argument('-resume',       action="store_true", help='In generation mode, dont recompute molecules found in storage folder. ')
-    parser.add_argument('-density_mixing',       action="store_true", help='Compute dm=(dm_old+dm)/2')
-    parser.add_argument('-skip_minao',       action="store_true", help='In generation mode re-uses minao init across conformers.')
     parser.add_argument('-num',       default=10,          type=int,   help='Run the first "num" test molecules. ')
     parser.add_argument('-id',        default=126,          type=int,   help='Run only test molecule "id". ')
     parser.add_argument('-its',       default=20,          type=int,   help='Number of Kohn-Sham iterations. ')
@@ -588,42 +517,13 @@ if __name__ == "__main__":
     parser.add_argument('-skip',      default=0,           help='Skip the first "skip" testcases. ', type=int)
     parser.add_argument('-backend',   default="cpu",       help='Which backend to use, e.g., -backend cpu or -backend ipu')
 
-    parser.add_argument('-benchmark', action="store_true", help='Print benchmark info inside our DFT computation. ')
-    parser.add_argument('-nan',       action="store_true", help='Whether to throw assertion on operation causing NaN, useful for debugging NaN arrising from jax.grad. ')
-    parser.add_argument('-skipdiis',  action="store_true", help='Whether to skip DIIS; useful for benchmarking.')
-    parser.add_argument('-skipeigh',  action="store_true", help='Whether to skip eigh; useful for benchmarking.')
-    parser.add_argument('-methane',  action="store_true", help='Simulate methane. ')
-    parser.add_argument('-H',        action="store_true", help='Simple hydrogen system. ')
-    parser.add_argument('-forloop',  action="store_true", help="Runs SCF iterations in python for loop; allows debugging on CPU, don't run this on IPU it will be super slow. ")
-    parser.add_argument('-he',       action="store_true", help="Just do a single He atom, fastest possible case. ")
     parser.add_argument('-level',    default=2, help="Level of the grids used by us (default=2). ", type=int)
     parser.add_argument('-plevel',   default=2, help="Level of the grids used by pyscf (default=2). ", type=int)
-    parser.add_argument('-C',         default=-1, type=int,  help='Number of carbons from C20 . ')
     parser.add_argument('-gdb',        default=-1, type=int,  help='Which version of GDP to load {10, 11, 13, 17}. ')
-    parser.add_argument('-skiperi',         action="store_true", help='Estimate time if eri wasn\'t used in computation by usig (N,N) matmul instead. ')
-    parser.add_argument('-randeri',         action="store_true", help='Initialize electron_repulsion=np.random.normal(0,1,(N,N,N,N))')
-    parser.add_argument('-save',         action="store_true", help='Save generated data. ')
-    parser.add_argument('-fname',    default="", type=str, help='Folder to save generated data in. ')
     parser.add_argument('-multv',    default=2, type=int, help='Which version of our einsum algorithm to use;comptues ERI@flat(v). Different versions trades-off for memory vs sequentiality. ')
     parser.add_argument('-intv',    default=1, type=int, help='Which version to use of our integral algorithm. ')
 
-    parser.add_argument('-scale_eri',       default=1, type=float,  help='Scale electron repulsion ')
-    parser.add_argument('-scale_w',         default=1, type=float,  help='Scaling of weights to get numerical stability. ')
-    parser.add_argument('-scale_ao',        default=1, type=float,  help='Scaling of ao to get numerical stability. ')
-    parser.add_argument('-scale_overlap',   default=1, type=float,  help='Scaling of overlap to get numerical stability. ')
-    parser.add_argument('-scale_cholesky',  default=1, type=float,  help='Scale electron repulsion ')
-    parser.add_argument('-scale_ghamil',  default=1, type=float,  help='Scale electron repulsion ')
-    parser.add_argument('-scale_eigvects',  default=1, type=float,  help='Scale electron repulsion ')
-    parser.add_argument('-scale_sdf',  default=1, type=float,  help='Scale electron repulsion ')
-    parser.add_argument('-scale_vj',  default=1, type=float,  help='Scale electron repulsion ')
-    parser.add_argument('-scale_errvec',  default=1, type=float,  help='Scale electron repulsion ')
-
-    parser.add_argument('-sk',  default=[-2], type=int, nargs="+", help='Used to perform a select number of operations in DFT using f32; this allows investigating the numerical errors of each individual operation, or multiple operations in combination. ')
-    parser.add_argument('-debug',  action="store_true", help='Used to turn on/off the f which is used by the above -sk to investigate float{32,64}. ')
-
     parser.add_argument('-jit',  action="store_true")
-    parser.add_argument('-enable64',  action="store_true", help="f64 is enabled by default; this argument may be useful in collaboration with -sk. ")
-    parser.add_argument('-rattled_std',  type=float, default=0, help="Add N(0, args.ratled_std) noise to atom positions before computing dft. ")
     parser.add_argument('-profile',  action="store_true", help="Stops script in generation mode after one molecule; useful when using popvision to profile for -backend ipu")
     parser.add_argument('-pyscf',  action="store_true", help="Used to compute with reference implementation. ")
     parser.add_argument('-uniform_pyscf',  default = -1, type=float, help="Use reference implementation PySCF if 'np.random.uniform(0,1,(1))<args.uniform_pyscf'")
@@ -643,7 +543,6 @@ if __name__ == "__main__":
 
     print("[BASIS]", args.basis)
 
-    if -1 in args.sk: args.sk = list(range(20))
 
     if args.checkc:
         args.pyscf = True
@@ -653,16 +552,6 @@ if __name__ == "__main__":
 
     if args.backend == "cpu":
         args.seperate = False
-
-    if True:  
-        # currently tensor scaling is turned off by default. 
-        args.scale_w = 1
-        args.scale_ao = 1
-        if args.float32: args.scale_eri = 1
-        args.scale_eri = 1  
-        args.scale_cholesky= 1
-        args.scale_ghamil = 1
-        args.scale_eigvects = 1
 
 
     sys.argv = sys.argv[:1]
@@ -676,11 +565,10 @@ if __name__ == "__main__":
 
     if args.backend == "ipu":  # allows use of cpu float64 in jnp while using float32 on ipu
         args.float32 = True
-        args.sk = list(range(20))
         args.debug = True
 
     if args.float32 or args.float16:
-        if args.enable64: config.update('jax_enable_x64', True) #
+        #if args.enable64: config.update('jax_enable_x64', True) #
         EPSILON_B3LYP  = 1e-20
         CLIP_RHO_MIN   = 1e-9
         CLIP_RHO_MAX   = 1e12
@@ -691,8 +579,6 @@ if __name__ == "__main__":
         CLIP_RHO_MIN   = 1e-9
         CLIP_RHO_MAX   = 1e12
 
-    if args.nan:
-        config.update("jax_debug_nans", True)
 
     backend = args.backend
     eigh = _eigh
@@ -702,76 +588,31 @@ if __name__ == "__main__":
         recompute(args, None, 0, 0, our_fun=jax_dft, str=args.str)
 
     elif args.gdb > 0:
+        if args.gdb == 10: args.smiles = [a for a in open("gdb/gdb11_size10_sorted.csv", "r").read().split("\n")]
+        if args.gdb == 9:  args.smiles = [a for a in open("gdb/gdb11_size09_sorted.csv", "r").read().split("\n")]
+        if args.gdb == 7:  args.smiles = [a for a in open("gdb/gdb11_size07_sorted.csv", "r").read().split("\n")]
+        if args.gdb == 8:  args.smiles = [a for a in open("gdb/gdb11_size08_sorted.csv", "r").read().split("\n")]
+        if args.gdb == 6:  args.smiles = ["c1ccccc1"]*1000 
+        if args.gdb == 5:  args.smiles = ['CCCCC']*1000
+        if args.gdb == 4:  args.smiles = ['CCCC']*1000
 
-        if args.gdb != 20 or True:
-            t0 = time.time()
-            print("loading gdb data")
+        print("Length GDB: ", len(args.smiles))
 
-            if args.gdb == 10: args.smiles = [a for a in open("gdb/gdb11_size10_sorted.csv", "r").read().split("\n")]
-            if args.gdb == 9:  args.smiles = [a for a in open("gdb/gdb11_size09_sorted.csv", "r").read().split("\n")]
-            if args.gdb == 7:  args.smiles = [a for a in open("gdb/gdb11_size07_sorted.csv", "r").read().split("\n")]
-            if args.gdb == 8:  args.smiles = [a for a in open("gdb/gdb11_size08_sorted.csv", "r").read().split("\n")]
+        for i in range(0, len(args.smiles)): 
+            smile = args.smiles[i]
+            smile = smile
 
-            # used as example data for quick testing. 
-            if args.gdb == 6:  args.smiles = ["c1ccccc1"]*1000 
-            if args.gdb == 5:  args.smiles = ['CCCCC']*1000
-            if args.gdb == 4:  args.smiles = ['CCCC']*1000
+            b = Chem.MolFromSmiles(smile)
+            b = Chem.AddHs(b)  
+            atoms = [atom.GetSymbol() for atom in b.GetAtoms()]
 
+            e = AllChem.EmbedMolecule(b) 
+            if e == -1: continue
 
-            print("DONE!", time.time()-t0)
+            locs = b.GetConformer().GetPositions() * angstrom_to_bohr
+            atom_string, string = get_atom_string(" ".join(atoms), locs)
 
-            print("Length GDB: ", len(args.smiles))
+            print(string)
+            break
 
-            if args.limit != -1:
-                args.smiles = args.smiles[:args.limit]
-
-            for i in range(int(args.id), int(args.id)+1000):
-                smile = args.smiles[i]
-                smile = smile
-
-                print(smile)
-
-                b = Chem.MolFromSmiles(smile)
-                if not args.nohs: b = Chem.AddHs(b, explicitOnly=False)  
-                atoms = [atom.GetSymbol() for atom in b.GetAtoms()]
-
-                e = AllChem.EmbedMolecule(b) 
-                if e == -1: continue
-
-                locs = b.GetConformer().GetPositions() * angstrom_to_bohr
-                atom_string, string = get_atom_string(" ".join(atoms), locs)
-
-                print(string)
-                break
-
-            recompute(args, None, 0, 0, our_fun=jax_dft, str=string) 
-
-    elif args.C > 0:
-        _str = ";".join("C     1.56910  -0.65660  -0.93640;\
-        C     1.76690   0.64310  -0.47200;\
-        C     0.47050  -0.66520  -1.79270;\
-        C     0.01160   0.64780  -1.82550;\
-        C     0.79300   1.46730  -1.02840;\
-        C    -0.48740  -1.48180  -1.21570;\
-        C    -1.56350  -0.65720  -0.89520;\
-        C    -1.26940   0.64900  -1.27670;\
-        C    -0.00230  -1.96180  -0.00720;\
-        C    -0.76980  -1.45320   1.03590;\
-        C    -1.75760  -0.63800   0.47420;\
-        C     1.28780  -1.45030   0.16290;\
-        C     1.28960  -0.65950   1.30470;\
-        C     0.01150  -0.64600   1.85330;\
-        C     1.58300   0.64540   0.89840;\
-        C     0.48480   1.43830   1.19370;\
-        C    -0.50320   0.64690   1.77530;\
-        C    -1.60620   0.67150   0.92310;\
-        C    -1.29590   1.48910  -0.16550;\
-        C    -0.01020   1.97270  -0.00630;".split(";")[:args.C])
-
-        print(_str)
-        recompute(args, None, 0, 0, our_fun=jax_dft, str=_str)
-
-    elif args.H:       recompute(args, None, 0, 0, our_fun=jax_dft, str="H 0 0 0; H 1 1 1;")
-    elif args.methane: recompute(args, None, 0, 0, our_fun=jax_dft, str="C 0 0 0; H 0 0 1; H 1 0 0; H 0 1 0; H 1 1 0;")
-
-    
+        recompute(args, None, 0, 0, our_fun=jax_dft, str=string) 
