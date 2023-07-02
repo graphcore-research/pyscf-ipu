@@ -7,49 +7,29 @@ from electron_repulsion.direct import prepare_integrals_2_inputs, compute_integr
 jax.config.FLAGS.jax_platform_name = 'cpu'
 hartree_to_eV    = 27.2114079527 
 
-def iter( cycle, val ):
-    mask, allvals, cs, energies, V_xc, density_matrix, _V, _H, mf_diis_H, vj, vk, eigvals, eigvects, energy, overlap, electron_repulsion, \
-        fixed_hamiltonian, L_inv, weights, hyb, ao, nuclear_energy, num_calls, cholesky, generalized_hamiltonian, sdf, errvec, hamiltonian, dms, part_energies = val
+def nanoGPT_iteration(i, vals):
+    mask, V_xc, density_matrix, _V, _H, mf_diis_H, vj, vk, overlap, electron_repulsion, \
+        fixed_hamiltonian, L_inv, weights, hyb, ao, num_calls, iter_matrices, part_energies = vals
+    N = density_matrix.shape[0]
 
     # Step 1: Build Hamiltonian
-    hamiltonian                    = fixed_hamiltonian + V_xc
-    sdf                            = overlap @ density_matrix @ hamiltonian
-    hamiltonian, _V, _H, mf_diis_H, errvec = DIIS(cycle, sdf, hamiltonian, _V, _H, mf_diis_H)
+    hamiltonian = fixed_hamiltonian + V_xc
+    sdf         = overlap @ density_matrix @ hamiltonian
+    hamiltonian, _V, _H, mf_diis_H = DIIS(i, sdf, hamiltonian, _V, _H, mf_diis_H)
 
-    # Step 2: Solve (generalized) eigenproblem for Hamiltonian:     generalized_hamiltonian = L_inv @ hamiltonian @ L_inv.T
-    generalized_hamiltonian = L_inv @ hamiltonian @ L_inv.T
-    eigvects = _eigh(generalized_hamiltonian )[1] 
-    eigvects          = L_inv.T @ eigvects
+    # Step 2: Solve eigh (L_inv turns generalized eigh into eigh). 
+    eigvects = L_inv.T @ _eigh(L_inv @ hamiltonian @ L_inv.T)[1] 
 
     # Step 3: Use result from eigenproblem to build new density matrix.
-    # Use masking instead of """eigvects[:, :n_electrons_half]""" to allow changing {C,O,N,F} without changing compute graph => compiling only once.
-    eigvects         = eigvects * mask.reshape(1, -1)
-    density_matrix   = (2 * eigvects @ eigvects.T)
+    eigvects           = eigvects * mask.reshape(1, -1) # the same as "eigvects[:, :n_electrons_half]"
+    density_matrix     = 2 * eigvects @ eigvects.T
+    E_xc, V_xc, vj, vk = xc( density_matrix, ao, electron_repulsion, weights, vj, vk, hyb, num_calls)
 
-    if type(electron_repulsion) == type([]):
-        if args.float32: E_xc, V_xc, vj, vk = xc( density_matrix.astype(np.float32), ao.astype(np.float32), electron_repulsion, weights.astype(np.float32), vj.astype(np.float32), vk.astype(np.float32), hyb, num_calls)
-    else:
-        if args.float32: E_xc, V_xc, vj, vk = xc( density_matrix.astype(np.float32), ao.astype(np.float32), electron_repulsion.astype(np.float32), weights.astype(np.float32), vj.astype(np.float32), vk.astype(np.float32), hyb, num_calls)
-        else: E_xc, V_xc, vj, vk = xc( density_matrix.astype(np.float64), ao.astype(np.float64), electron_repulsion.astype(np.float64), weights.astype(np.float64), vj.astype(np.float64), vk.astype(np.float64), hyb, num_calls)
+    # Tensors used to compute energy/hlgap on CPU in float64. 
+    part_energies = part_energies.at[i].set(  E_xc )
+    iter_matrices = jax.lax.dynamic_update_slice(iter_matrices, jnp.stack((density_matrix, vj, vk, hamiltonian)).reshape(1, 4, N, N), (i, 0, 0, 0))
 
-    if type(part_energies) == type(jnp.array(1)): part_energies = part_energies.at[cycle].set(  E_xc )
-    else: part_energies[cycle] = E_xc 
-
-    # Added dynamic_update_slice to optimize compiler layout. 
-    N = density_matrix.shape[0]
-    if type(dms) == type(jnp.array(1)):
-        dms = jax.lax.dynamic_update_slice(dms, density_matrix.reshape(1, 1, N, N),   (cycle, 0, 0, 0))
-        dms = jax.lax.dynamic_update_slice(dms, vj.reshape(1, 1, N, N),               (cycle, 1, 0, 0))
-        dms = jax.lax.dynamic_update_slice(dms, hamiltonian.reshape(1, 1, N, N),      (cycle, 2, 0, 0))
-        dms = jax.lax.dynamic_update_slice(dms, vk.reshape(1, 1, N, N),               (cycle, 3, 0, 0))
-    else:
-        dms[cycle, 0] = density_matrix.reshape(N,N)
-        dms[cycle, 1] = vj.reshape(N,N)
-        dms[cycle, 2] = hamiltonian.reshape(N,N)
-        dms[cycle, 3] = vk.reshape(N,N)
-
-    ret = [mask, allvals, cs, energies, V_xc, density_matrix, _V, _H, mf_diis_H, vj, vk, eigvals, eigvects, energy, overlap, electron_repulsion, fixed_hamiltonian, L_inv, weights, hyb, ao, nuclear_energy, num_calls, cholesky, generalized_hamiltonian, sdf, errvec, hamiltonian, dms, part_energies]
-    return ret
+    return [mask, V_xc, density_matrix, _V, _H, mf_diis_H, vj, vk, overlap, electron_repulsion, fixed_hamiltonian, L_inv, weights, hyb, ao, num_calls, iter_matrices, part_energies]
 
 def xc(density_matrix, ao, electron_repulsion, weights, vj, vk, hyb, num_calls):
     assert args.xc == "b3lyp"
@@ -81,15 +61,14 @@ def xc(density_matrix, ao, electron_repulsion, weights, vj, vk, hyb, num_calls):
         vj = jnp.sum(E.reshape(d**2, d**2) * density_matrix.reshape(1, -1), axis=1).reshape(d,d)
         vk = jnp.sum(E.transpose(1,2,0,3).reshape(d**2, d**2) * density_matrix.reshape(1, -1), axis=1).reshape(d,d)*jnp.asarray(hyb, dtype=E.dtype)
 
-    vj_m_vk = vj - vk/2
-    V_xc    = V_xc+ vj_m_vk 
+    V_xc    = V_xc + vj - vk/2
 
     return E_xc, V_xc, vj, vk
 
 
-def DIIS(cycle, sdf, hamiltonian, _V, _H, mf_diis_H):
+def DIIS(i, sdf, hamiltonian, _V, _H, mf_diis_H):
     # Update hamiltonian as linear combination of previous iterations
-    mf_diis_head      = cycle % _V.shape[0]
+    mf_diis_head      = i % _V.shape[0]
     nd, d             = _V.shape
 
     errvec = (sdf - sdf.T)
@@ -101,10 +80,10 @@ def DIIS(cycle, sdf, hamiltonian, _V, _H, mf_diis_H):
     tmps = (_V.reshape(nd, 1, d) @ errvec.reshape(1, d, 1))
     tmps = tmps.reshape(-1)
 
-    # Shapes in initial code depended on min(cycle, _V.shape[0]).
+    # Shapes in initial code depended on min(i, _V.shape[0]).
     # To allow jax.jit, we always use nd=_V.shape[0] and zero out
     # the additional stuff with the following mask.
-    mask = jnp.where(np.arange(_V.shape[0]) < jnp.minimum(cycle+1, _V.shape[0]),       
+    mask = jnp.where(np.arange(_V.shape[0]) < jnp.minimum(i+1, _V.shape[0]),       
                         jnp.ones(_V.shape[0], dtype=_V.dtype), jnp.zeros(_V.shape[0], dtype=_V.dtype))
     tmps = tmps * mask
 
@@ -125,8 +104,105 @@ def DIIS(cycle, sdf, hamiltonian, _V, _H, mf_diis_H):
     scaled_H         = _H[:nd] * c[1:].reshape(nd, 1)
     hamiltonian      = jnp.sum( scaled_H, axis=0 ).reshape(hamiltonian.shape)
 
-    return hamiltonian, _V, _H, mf_diis_H, errvec
+    return hamiltonian, _V, _H, mf_diis_H 
 
+
+def _nanoGPT(density_matrix, kinetic, nuclear, overlap, ao, 
+                electron_repulsion, weights, 
+                mf_diis_space, N, hyb, mask, _input_floats, _input_ints, L_inv=None):
+    # --- INITIALIZE MATRICES USED FOR DIIS --- #
+    mf_diis_H       = np.zeros((mf_diis_space+1, mf_diis_space+1))
+    mf_diis_H[0,1:] = mf_diis_H[1:,0] = 1
+    mf_diis_H       = np.array(mf_diis_H)
+
+    _V = np.zeros((mf_diis_space, N**2))
+    _H = np.zeros((mf_diis_space, N**2))
+
+    iter_matrices = np.zeros((args.its, 4, N, N))
+    part_energies = np.zeros(args.its)
+
+    fixed_hamiltonian = kinetic + nuclear
+
+    # Initialize values before main compute.
+    vj, vk, V_xc = [np.zeros(fixed_hamiltonian.shape) for _ in range(3)]
+
+    if args.backend == "ipu" and not args.ipumult:
+        _, _, _tuple_ijkl, _shapes, _sizes, _counts, indxs, indxs_inv, num_calls = prepare_integrals_2_inputs(mol)
+        args.indxs = indxs
+        electron_repulsion = compute_integrals_2( _input_floats, _input_ints, _tuple_ijkl, _shapes, _sizes, _counts, tuple(indxs_inv), num_threads=args.threads_int, v=args.intv)[0]
+        electron_repulsion = [a  for a in electron_repulsion]
+        print("bytes: ", np.sum([a.nbytes for a in electron_repulsion])/ 10**6) 
+    else: 
+        num_calls = electron_repulsion.shape[0]
+
+    _num_calls = np.zeros(num_calls)
+    _, V_xc, vj, vk = xc( density_matrix, ao, electron_repulsion, weights, vj, vk, hyb, _num_calls)
+
+    vals = jax.lax.fori_loop(0, args.its, nanoGPT_iteration, [mask, V_xc, density_matrix, _V, _H, mf_diis_H, vj, vk, overlap, electron_repulsion,  
+                                                             fixed_hamiltonian, L_inv, weights, hyb, ao, _num_calls, iter_matrices, part_energies])
+    iter_matrices = vals[-2]
+    part_energies = vals[-1]
+
+    return iter_matrices, fixed_hamiltonian, part_energies, L_inv 
+
+def nanoDFT(str, mf_diis_space=9):
+    mol = pyscf.gto.mole.Mole()
+    mol.build(atom=str, unit="Angstrom", basis=args.basis, spin=args.spin, verbose=0)
+
+    n_electrons       = mol.nelectron
+    n_electrons_half  = n_electrons//2
+    N                 = mol.nao_nr()
+    nuclear_energy    = mol.energy_nuc()                                                      
+    hyb               = pyscf.dft.libxc.hybrid_coeff(args.xc, mol.spin)                       
+
+    mask = np.ones(N)
+    mask[n_electrons_half:] = 0
+
+    # Initialize grid.
+    grids            = pyscf.dft.gen_grid.Grids(mol)
+    grids.level      = args.level 
+    grids.build()
+    weights          = grids.weights                                                         
+    ao               = mol.eval_gto('GTOval_cart_deriv1' if mol.cart else 'GTOval_sph_deriv1', grids.coords, 4)
+
+    # Initialize all (N, N) sized matrices. 
+    density_matrix  = pyscf.scf.hf.init_guess_by_minao(mol).reshape(N, N) 
+    kinetic         = mol.intor_symmetric('int1e_kin'). reshape(N, N)  
+    nuclear         = mol.intor_symmetric('int1e_nuc'). reshape(N, N)
+    overlap         = mol.intor_symmetric('int1e_ovlp').reshape(N, N)
+
+    if args.backend == "cpu" or args.ipumult: electron_repulsion = mol.intor("int2e_sph")
+
+    # Turns generalized eigenproblem into eigenproblem.
+    fixed_hamiltonian   = kinetic + nuclear
+    L_inv               = np.linalg.inv(np.linalg.cholesky(overlap.astype(np.float64)))
+
+    input_floats, input_ints = prepare_integrals_2_inputs(mol)[:2]
+
+    vals = jax.jit(_nanoGPT, static_argnums=(7,8))( density_matrix, kinetic, nuclear, overlap, ao, electron_repulsion, weights, 
+                                                    mf_diis_space, N, hyb , mask, input_floats, input_ints, L_inv)
+
+    iter_matrices, fixed_hamiltonian, part_energies, _  = [np.asarray(a).astype(np.float64) for a in vals]
+    density_matrices, vjs, vks, hamiltonians            = [iter_matrices[:, i] for i in range(4)]
+
+    mo_occ = np.concatenate([np.ones(n_electrons_half)*2, np.zeros(N-n_electrons_half)])
+    lumo   = np.argmin(np.array(mo_occ))
+    homo   = lumo - 1
+    d      = L_inv.shape[0]
+
+    energies = np.zeros(args.its)
+    hlgaps   = np.zeros(args.its)
+    for i in range(args.its):
+        density_matrix = density_matrices[i]
+        E_coulomb   = np.sum( density_matrix * vjs[i]) * .5
+        E_xc        = part_energies[i] - np.sum(density_matrix * vks[i]) * 0.25
+        energies[i] = np.sum(fixed_hamiltonian * density_matrices[i]) + E_coulomb + nuclear_energy + E_xc
+
+        mo_energy   = np.linalg.eigh(L_inv @ hamiltonians[-1].reshape(d, d) @ L_inv.T)[0]
+        hlgaps[i]   = np.abs( mo_energy[homo] - mo_energy[lumo] )
+
+    energies, hlgaps   = [a * hartree_to_eV for a in [energies, hlgaps]] 
+    return energies, hlgaps
 
 def _eigh(x):
     if args.backend == "ipu":
@@ -157,162 +233,6 @@ def pinv0(a):  # take out first row
     c = vect @ ( jnp.where( jnp.abs(vals) > cond, 1/vals, 0) * vect[0, :]) 
     return c
 
-
-def _nanoGPT(density_matrix, kinetic, nuclear, overlap, ao, 
-                electron_repulsion, weights, nuclear_energy, 
-                mf_diis_space, N, hyb, mask, _input_floats, _input_ints, L_inv=None):
-    # --- INITIALIZE MATRICES USED FOR DIIS --- #
-    mf_diis_H       = np.zeros((mf_diis_space+1, mf_diis_space+1))
-    mf_diis_H[0,1:] = mf_diis_H[1:,0] = 1
-    mf_diis_H       = np.array(mf_diis_H)
-
-    _V = np.zeros((mf_diis_space, N**2))
-    _H = np.zeros((mf_diis_space, N**2))
-
-    dms = np.zeros((args.its, 4, N, N))
-    part_energies = np.zeros(args.its)
-
-    fixed_hamiltonian = kinetic + nuclear
-
-    overlap = overlap
-
-    if L_inv is None:
-        cholesky = jnp.linalg.cholesky(overlap)
-        L_inv    = jnp.linalg.pinv(cholesky)
-    else:
-        cholesky = jnp.zeros(overlap.shape)
-
-    eigvals, eigvects, energy = np.zeros(fixed_hamiltonian.shape[0]), np.zeros(fixed_hamiltonian.shape), 0.
-    energies = np.zeros(args.its)
-
-    # Initialize values before main compute.
-    vj, vk, V_xc = [np.zeros(fixed_hamiltonian.shape) for _ in range(3)]
-    eigvals, eigvects, energy = np.zeros(fixed_hamiltonian.shape[0]), np.zeros(fixed_hamiltonian.shape), 0.
-    energies = np.zeros(args.its)
-    cs = np.zeros((args.its, mf_diis_space+1))
-    allvals = np.zeros((args.its, density_matrix.shape[0]))
-
-    if args.backend == "ipu" and not args.ipumult:
-        _, _, _tuple_ijkl, _shapes, _sizes, _counts, indxs, indxs_inv, num_calls = prepare_integrals_2_inputs(mol)
-        args.indxs = indxs
-        if not args.seperate:
-            electron_repulsion = compute_integrals_2( _input_floats, _input_ints, _tuple_ijkl, _shapes, _sizes, _counts, tuple(indxs_inv), num_threads=args.threads_int, v=args.intv)[0]
-            electron_repulsion = [a  for a in electron_repulsion]
-        print("bytes: ", np.sum([a.nbytes for a in electron_repulsion])/ 10**6) 
-    elif not args.seperate:
-        num_calls = electron_repulsion.shape[0]
-
-    generalized_hamiltonian = jnp.zeros(overlap.shape)
-    hamiltonian = jnp.zeros(overlap.shape)
-    sdf = jnp.zeros(overlap.shape)
-    errvec = jnp.zeros(overlap.shape)
-
-    _num_calls = np.zeros(num_calls)
-
-    if type(electron_repulsion) == type([]):
-        if args.float32: _, V_xc, vj, vk = xc( density_matrix.astype(np.float32), ao.astype(np.float32), electron_repulsion, weights.astype(np.float32), vj.astype(np.float32), vk.astype(np.float32), hyb, _num_calls)
-    else:
-        if args.float32: _, V_xc, vj, vk = xc( density_matrix.astype(np.float32), ao.astype(np.float32), electron_repulsion.astype(np.float32), weights.astype(np.float32), vj.astype(np.float32), vk.astype(np.float32), hyb, _num_calls)
-        else: _, V_xc, vj, vk = xc( density_matrix.astype(np.float64), ao.astype(np.float64), electron_repulsion.astype(np.float64), weights.astype(np.float64), vj.astype(np.float64), vk.astype(np.float64), hyb, _num_calls)
-
-    vals = [mask, allvals, cs, energies, V_xc, density_matrix, _V, _H, mf_diis_H,
-                vj, vk, eigvals, eigvects, energy, overlap, electron_repulsion,
-            fixed_hamiltonian, L_inv, weights, hyb, ao, nuclear_energy, _num_calls, cholesky, 
-            generalized_hamiltonian, sdf, errvec, hamiltonian, dms, part_energies]
-
-    vals = jax.lax.fori_loop(0, args.its, iter, vals)
-
-    eigenvalues   = vals[11]
-    eigenvectors  = vals[12]
-    energy        = vals[13]
-    energies      = vals[ 3]
-    dms           = vals[28]
-    part_energies = vals[29]
-
-    return energies, energy, eigenvalues, eigenvectors, dms, fixed_hamiltonian, part_energies, L_inv 
-
-
-def nanoDFT(str):
-    mf_diis_space = 9
-
-    mol = pyscf.gto.mole.Mole()
-    _str = str
-    mol.build(atom=str, unit="Angstrom", basis=args.basis, spin=args.spin, verbose=0)
-
-    n_electrons       = mol.nelectron
-    n_electrons_half  = n_electrons//2
-    N                 = mol.nao_nr()
-
-    atom_positions  = jnp.concatenate([np.array(atom_position).reshape(1,3) for atom_symbol, atom_position in mol._atom], axis=0)
-
-    if args.backend == "ipu": mf_diis_space = 9                                              
-    
-    nuclear_energy    = mol.energy_nuc()                                                      
-    n_electrons       = mol.nelectron                                                         
-    n_electrons_half  = n_electrons//2                                                        
-    hyb               = pyscf.dft.libxc.hybrid_coeff(args.xc, mol.spin)                       
-    N                 = mol.nao_nr()                                                          
-
-    mask = np.ones(N)
-    mask[n_electrons_half:] = 0
-    if args.float32:
-        mask = mask.astype(np.float32)
-
-    # Initialize grid.
-    grids            = pyscf.dft.gen_grid.Grids(mol)
-    grids.level      = args.level 
-    grids.build()
-    coords           = grids.coords                                                          
-    weights          = grids.weights                                                         
-    weights          = weights
-    ao              = mol.eval_gto('GTOval_cart_deriv1' if mol.cart else 'GTOval_sph_deriv1', coords, 4)
-
-    # Initialize all (N, N) sized matrices. 
-    density_matrix  = pyscf.scf.hf.init_guess_by_minao(mol).reshape(N, N) 
-    kinetic         = mol.intor_symmetric('int1e_kin'). reshape(N, N)  
-    nuclear         = mol.intor_symmetric('int1e_nuc'). reshape(N, N)
-    overlap         = mol.intor_symmetric('int1e_ovlp').reshape(N, N)
-
-    if (args.backend == "cpu" or args.ipumult) and not args.seperate: electron_repulsion = mol.intor("int2e_sph")
-    else: electron_repulsion = 0.
-
-    # Turns generalized eigenproblem into eigenproblem.
-    fixed_hamiltonian   = kinetic + nuclear
-    L_inv               = np.linalg.inv(np.linalg.cholesky(overlap.astype(np.float64)))
-
-
-    input_floats, input_ints = prepare_integrals_2_inputs(mol)[:2]
-
-    vals = jax.jit(_nanoGPT, static_argnums=(8,9)) ( density_matrix, kinetic, nuclear, overlap,
-                                                                                    ao, electron_repulsion, weights, nuclear_energy,
-                                                                                    mf_diis_space, N, hyb ,
-                                                                                    mask, input_floats, input_ints, L_inv)
-
-    energies_, energy, eigenvalues, eigenvectors, dms, fixed_hamiltonian, part_energies, _  = [np.asarray(a).astype(np.float64) for a in vals]
-    e = np.zeros(energies_.shape)
-    for i in range(energies_.shape[0]):
-        density_matrix = dms[i,0] 
-        vj = dms[i,1]  
-        vk = dms[i,3]  
-        E_coulomb = np.sum( (density_matrix) * vj) * .5
-        e[i] = part_energies[i] + np.dot(fixed_hamiltonian.reshape(-1) , dms[i, 0].reshape(-1))  + E_coulomb + nuclear_energy  - np.sum(density_matrix * vk.T) * .5 * .5  
-
-    vals = e, energy, eigenvalues, eigenvectors, dms, L_inv
-    energies, e_tot, mo_energy, mo_coeff, dms, L_inv = [np.asarray(a) for a in vals]
-    e_tot = energies[-1]*hartree_to_eV
-
-    mo_occ = jnp.concatenate([jnp.ones(n_electrons_half)*2, jnp.zeros(N-n_electrons_half)])
-
-    d = L_inv.shape[0]
-    mo_energy = np.linalg.eigh(L_inv @ np.mean(dms[-1:, 2], axis=0).reshape(d,d) @ L_inv.T)[0]
-    lumo            = np.argmin(np.array(mo_occ))
-    homo            = lumo - 1
-    hl_gap_hartree  = np.abs( mo_energy[homo] - mo_energy[lumo] )
-    hlgap           = hartree_to_eV*hl_gap_hartree
-
-    return energies * hartree_to_eV, e_tot, hlgap, hlgap
-
-
 if __name__ == "__main__":  
     import argparse
     parser = argparse.ArgumentParser(description='Arguments for Density Functional Theory. ')
@@ -325,8 +245,6 @@ if __name__ == "__main__":
     parser.add_argument('-str',       default="",          help='Molecule string, e.g., "H 0 0 0; H 0 0 1; O 1 0 0; "')
     parser.add_argument('-numerror', action="store_true",     help='Save all tensors to debug numerical errors. ')
     parser.add_argument('-ipumult', action="store_true",     help='On IPU do mult using full tensor ERI computed using PySCF (and not our Rys Quadrature implementation). ')
-    parser.add_argument('-skippyscf', action="store_true", help='Skip PySCF used for test case by default. ')
-    parser.add_argument('-skipus',    action="store_true", help='Skip our code (and only run PySCF). ')
     parser.add_argument('-float32',   action="store_true", help='Whether to use float32 (default is float64). ')
     parser.add_argument('-basis',     default="STO-3G",    help='Which basis set to use. ')
     parser.add_argument('-xc',        default="b3lyp",     help='Only support B3LYP. ')
@@ -346,7 +264,6 @@ if __name__ == "__main__":
     parser.add_argument('-threads_int',  default=1, type=int, help="Number of threads to use to do int2e_sph, accepts {1,...,6}. ")
     parser.add_argument('-split',  default=[1, 16], type=int, nargs="+", help='How to split during data generation over multiple POD16s. 7 47 means split dataset into 47 chunks and this IPU handles chunk 7 (zero indexed).')
     parser.add_argument('-limit', default=-1, type=int, help='smiles = args.smiles[:limit]; gdb molecules are sorted by hydrogens, this allows us to take the ones with fewer hydrogens for which DFT is faster. ')
-    parser.add_argument('-seperate',  action="store_true", help='Used to seperate electron integral computation from DFT computation over two chips to lower memory consumption. ')
     parser.add_argument('-gname',  default="", type=str, help='Folder name to store generate dataset; useful when using multiple pods to generate. ')
     parser.add_argument('-geneigh',  action="store_true" , help='Use generalized eigendecomposition like pyscf; relies on scipy, only works in debug mode with -forloop. ')
 
@@ -358,10 +275,6 @@ if __name__ == "__main__":
     print(natsorted(vars(args).items()) )
 
     print("[BASIS]", args.basis)
-
-    if args.backend == "cpu":
-        args.seperate = False
-
 
     sys.argv = sys.argv[:1]
 
@@ -444,12 +357,12 @@ if __name__ == "__main__":
 
     print("\t", molecule_string, end="")
 
-    if not args.skipus:
-        energies, our_energy, our_hlgap, us_hlgap = nanoDFT(molecule_string)
+    energies, hlgaps = nanoDFT(molecule_string)
 
-    mol = pyscf.gto.mole.Mole(atom=molecule_string, unit='Angstrom', basis=args.basis, spin=args.spin)
+    mol = pyscf.gto.mole.Mole()
     mol.verbose = 0
     pyscf.__config__.dft_rks_RKS_grids_level = args.plevel
+    mol.build(atom=molecule_string, unit='Angstrom', basis=args.basis, spin=args.spin)
 
     mol.max_cycle = args.its
     mf = pyscf.scf.RKS(mol)
@@ -467,15 +380,15 @@ if __name__ == "__main__":
     hl_gap_hartree = np.abs(mf.mo_energy[homo] - mf.mo_energy[lumo])
 
     print("pyscf_hlgap\t%15f"%( hl_gap_hartree * hartree_to_eV))
-    print("us_hlgap\t%15f"%(    us_hlgap))
-    print("err_hlgap\t%15f"%np.abs((hl_gap_hartree * hartree_to_eV) - us_hlgap))
+    print("us_hlgap\t%15f"%(    hlgaps[-1]))
+    print("err_hlgap\t%15f"%np.abs((hl_gap_hartree * hartree_to_eV) - hlgaps[-1]))
     print("pyscf:\t\t%15f"%pyscf_energy)
-    print("us:\t\t%15f"%our_energy)
+    print("us:\t\t%15f"%energies[-1])
     print("mus:\t\t%15f"%np.mean(energies[-10:]))
-    print("diff:\t\t%15f"%np.abs(pyscf_energy-our_energy))
+    print("diff:\t\t%15f"%np.abs(pyscf_energy-energies[-1]))
     print("mdiff:\t\t%15f"%np.abs(pyscf_energy-np.mean(energies[-10:])), np.std(energies[-10:])) 
     print("chemAcc: \t%15f"%0.043)
-    print("chemAcc/diff: \t%15f"%(0.043/np.abs(pyscf_energy-our_energy)))
+    print("chemAcc/diff: \t%15f"%(0.043/np.abs(pyscf_energy-energies[-1])))
     print("chemAcc/mdiff: \t%15f"%(0.043/np.abs(pyscf_energy-np.mean(energies[-10:]))))
     print("> diffs:")
     print(np.abs(energies.reshape(-1)[-5:] - pyscf_energy))
