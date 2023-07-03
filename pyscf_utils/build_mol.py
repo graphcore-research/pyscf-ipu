@@ -1,24 +1,24 @@
-
-import sys 
+# Copyright (c) 2023 Graphcore Ltd. All rights reserved.
+import sys
 
 
 def build_mol(self, dump_input=True, parse_arg=True,
               verbose=None, output=None, max_memory=None,
               atom=None, basis=None, unit=None, nucmod=None, ecp=None,
               charge=None, spin=0, symmetry=None, symmetry_subgroup=None,
-              cart=None, magmom=None): 
+              cart=None, magmom=None):
 
         if sys.version_info >= (3,):
             unicode = str
             #print(unicode)
             #print("ASD")
             #exit()
-        from pyscf import __config__ 
+        from pyscf import __config__
         DISABLE_GC = getattr(__config__, 'DISABLE_GC', False)
 
         if not DISABLE_GC and False:
             gc.collect()  # To release circular referred objects
-            pass 
+            pass
 
         if isinstance(dump_input, (str, unicode)):
             sys.stderr.write('Assigning the first argument %s to mol.atom\n' %
@@ -108,7 +108,7 @@ def build_mol(self, dump_input=True, parse_arg=True,
 
         if not self.magmom:
             self.magmom = [0.,]*self.natm
-        import numpy 
+        import numpy
         if self.spin == 0 and abs(numpy.sum(numpy.asarray(self.magmom)) - self.spin) > 1e-6:
             #don't check for unrestricted calcs.
             raise ValueError("mol.magmom is set incorrectly.")

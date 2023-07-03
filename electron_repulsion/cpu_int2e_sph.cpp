@@ -1,7 +1,7 @@
 /*
-        This is a modification of libcint for CPU. 
-        It is used mainly for debugging, comparing CPU/IPU implementation. 
-        Example: Compute a single integral (out of the N^4 integrals) to compare against IPU computation. 
+        This is a modification of libcint for CPU (https://github.com/sunqm/libcint)
+        It is used mainly for debugging, comparing CPU/IPU implementation.
+        Example: Compute a single integral (out of the N^4 integrals) to compare against IPU computation.
 
         Most of the comments are left-overs from libcint.
 */
@@ -11,7 +11,7 @@
 #include <iostream>
 #include <vector>
 using namespace poplar;
-using namespace poplar::program; 
+using namespace poplar::program;
 
 #define dtype double
 #define input_type double
@@ -22,7 +22,7 @@ bool test_CINT2e_loop_nopt = false;
 bool test_GTOnr2e_fill_s1 = false;
 
 #define debug_print false
-#define print_shapes false 
+#define print_shapes false
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -189,25 +189,25 @@ static dtype WEIGHTS_FOR_X0[] = { 1.0, 0.65214515486254614, 0.34785484513745385,
 
 
 
-extern "C" CACHE_SIZE_T int2e_sph(dtype *out, int n_out, int *dims, int *shls, int *atm, int natm, int *bas, int nbas, dtype *env, int n_env); 
-int CINTcgto_spinor(const int bas_id, const int *bas); 
+extern "C" CACHE_SIZE_T int2e_sph(dtype *out, int n_out, int *dims, int *shls, int *atm, int natm, int *bas, int nbas, dtype *env, int n_env);
+int CINTcgto_spinor(const int bas_id, const int *bas);
 dtype CINTcommon_fac_sp(int l);
 void CINTprim_to_ctr_0(dtype *gc, dtype *gp, dtype *coeff, size_t nf, int nprim, int nctr, int non0ctr, int *sortedidx);
 void CINTprim_to_ctr_1(dtype *gc, dtype *gp, dtype *coeff, size_t nf, int nprim, int nctr, int non0ctr, int *sortedidx);
 
 void CINTg2e_index_xyz(int *idx, int i_l, int j_l, int k_l, int l_l,
-                       int nfi, int nfj, int nfk, int nfl, 
+                       int nfi, int nfj, int nfk, int nfl,
                        int di, int dk, int dl, int dj, int g_size);
 
 
-int CINTg0_2e(dtype *g, int g_len, int kbase, int ibase, int di, int dk, int dl, int dj, int dm, int dn,int nroots, 
-                dtype aij, dtype akl, int g_size, dtype fac0, int nmax, 
-                int mmax, int li_ceil, int lj_ceil, int lk_ceil, int ll_ceil, 
+int CINTg0_2e(dtype *g, int g_len, int kbase, int ibase, int di, int dk, int dl, int dj, int dm, int dn,int nroots,
+                dtype aij, dtype akl, int g_size, dtype fac0, int nmax,
+                int mmax, int li_ceil, int lj_ceil, int lk_ceil, int ll_ceil,
                 dtype *rkrl, dtype *rirj, dtype rijrkl[], dtype rijrx[], dtype rklrx[]
 );
 
 
-void CINTg0_2e_2d(dtype *g,  int g_len, 
+void CINTg0_2e_2d(dtype *g,  int g_len,
         int nroots, int nmax, int mmax, int dm, int dn, int g_size
         ,const dtype *bcc00, const dtype *bcc0p, int bcc0_len, const dtype *b01, const dtype *b00, const dtype *b10, int b0_len
         );
@@ -215,12 +215,12 @@ void CINTg0_2e_2d(dtype *g,  int g_len,
 
 static dtype *sph2e_inner(dtype *gsph, dtype *gcart, int l, int nbra, int ncall, int sizsph, int sizcart);
 
-void CINTg0_lj2d_4d(dtype *g, int g_len, 
+void CINTg0_lj2d_4d(dtype *g, int g_len,
         int nmax, int mmax, int li, int lk, int lj, int nroots, int di,
         int d, int dl, int dj, const dtype *rirj, const dtype *rkrl, int g_size);
 void CINTg0_kj2d_4d(dtype *g, int g_len,
         int nmax, int mmax, int li, int ll, int lj, int nroots, int di, int dk, int dl, int dj, const dtype *rirj, const dtype *rkrl, int g_size);
-void CINTg0_il2d_4d(dtype *g,  int g_len, 
+void CINTg0_il2d_4d(dtype *g,  int g_len,
         int nmax, int mmax, int lk, int ll, int lj, int nroots,
         int di, int dk, int dl, int dj, const dtype *rirj, const dtype *rkrl, int g_size );
 void CINTg0_ik2d_4d(dtype *g, int g_len,
@@ -258,7 +258,7 @@ static void dcopy_iklj(dtype *fijkl, const dtype *gctr, const int ni, const int 
 
 void CINTOpt_log_max_pgto_coeff(dtype *log_maxc, dtype *coeff, int nprim, int nctr);
 void CINTOpt_non0coeff_byshell(int *sortedidx, int *non0ctr, dtype *ci, int iprim, int ictr);
-int CINTset_pairdata(PairData *pairdata, dtype *ai, dtype *aj, dtype *ri, dtype *rj, dtype *log_maxci, dtype *log_maxcj, 
+int CINTset_pairdata(PairData *pairdata, dtype *ai, dtype *aj, dtype *ri, dtype *rj, dtype *log_maxci, dtype *log_maxcj,
                                 int li_ceil, int lj_ceil, int iprim, int jprim, dtype rr_ij, dtype expcutoff);
 
 void CINTgout2e(dtype *g, dtype *gout, int *idx, int gout_empty, int envs_nf, int envs_nrys_roots);
@@ -297,8 +297,8 @@ void c2s_dset0(dtype *out, int *dims, int *counts);
 
 
 int CINT2e_loop_nopt(
-        dtype *gctr, 
-        dtype *env, 
+        dtype *gctr,
+        dtype *env,
         dtype *rk       ,dtype *ri       ,dtype *rj       ,dtype *rl       ,dtype expcutoff ,
         dtype *rkrl, dtype *rirj,
         dtype *envs_ai ,dtype *envs_aj ,dtype *envs_ak ,dtype *envs_al , dtype *envs_fac ,dtype *envs_rij ,dtype *envs_rkl ,
@@ -306,13 +306,13 @@ int CINT2e_loop_nopt(
         int len_gctr, int *empty, int *shls, int *bas,
         int n_env,    int i_ctr     ,int j_ctr,int k_ctr,int l_ctr        ,
         int n_comp,
-        int li_ceil ,int lj_ceil ,int lk_ceil ,int ll_ceil ,int i_l 
-        ,int j_l ,int k_l ,int l_l ,int nfi ,int nfj ,int nfk ,int nfl ,int nf ,int g_stride_i ,int g_stride_k 
+        int li_ceil ,int lj_ceil ,int lk_ceil ,int ll_ceil ,int i_l
+        ,int j_l ,int k_l ,int l_l ,int nfi ,int nfj ,int nfk ,int nfl ,int nf ,int g_stride_i ,int g_stride_k
         ,int g_stride_l ,int g_stride_j ,int nrys_roots ,int ibase ,int kbase ,int g_size ,int g2d_klmax ,int g2d_ijmax ,
         size_t leng) {
 
-        dtype rr_kl       = rkrl[0]*rkrl[0] + rkrl[1]*rkrl[1] + rkrl[2]*rkrl[2]; 
-        dtype square_rirj = rirj[0]*rirj[0] + rirj[1]*rirj[1] + rirj[2]*rirj[2]; 
+        dtype rr_kl       = rkrl[0]*rkrl[0] + rkrl[1]*rkrl[1] + rkrl[2]*rkrl[2];
+        dtype square_rirj = rirj[0]*rirj[0] + rirj[1]*rirj[1] + rirj[2]*rirj[2];
         dtype dist_kl     = rr_kl;
 
         int i_sh    = shls[0];
@@ -320,8 +320,8 @@ int CINT2e_loop_nopt(
         int k_sh    = shls[2];
         int l_sh    = shls[3];
 
-        int i_prim  = bas[BAS_SLOTS*i_sh + NPRIM_OF]; 
-        int j_prim  = bas[BAS_SLOTS*j_sh + NPRIM_OF]; 
+        int i_prim  = bas[BAS_SLOTS*i_sh + NPRIM_OF];
+        int j_prim  = bas[BAS_SLOTS*j_sh + NPRIM_OF];
         int k_prim  = bas[BAS_SLOTS*k_sh + NPRIM_OF];
         int l_prim  = bas[BAS_SLOTS*l_sh + NPRIM_OF];
 
@@ -345,7 +345,7 @@ int CINT2e_loop_nopt(
         PairData pdata_base[i_prim*j_prim];
         if (debug_print) printf("[i_primt*j_primt=%i]", i_prim*j_prim);
         if (print_shapes) printf("[pdata_base=%i]", i_prim*j_prim);
-        PairData *pdata_ij; 
+        PairData *pdata_ij;
 
         log_maxcj = log_maxci + i_prim;
         log_maxck = log_maxcj + j_prim;
@@ -366,7 +366,7 @@ int CINT2e_loop_nopt(
         CINTOpt_log_max_pgto_coeff(log_maxck, ck, k_prim, k_ctr);
         CINTOpt_log_max_pgto_coeff(log_maxcl, cl, l_prim, l_ctr);
 
-        dtype fac1i, fac1j, fac1k, fac1l; 
+        dtype fac1i, fac1j, fac1k, fac1l;
         int ip, jp, kp, lp;
         int _empty[5] = {1, 1, 1, 1, 1};
         int *iempty = _empty + 0;
@@ -374,9 +374,9 @@ int CINT2e_loop_nopt(
         int *kempty = _empty + 2;
         int *lempty = _empty + 3;
         int *gempty = _empty + 4;
-        
+
         dtype akl, ekl, expijkl, ccekl;
-        dtype *rij; // 
+        dtype *rij; //
         int idx[nf*3];
         if (debug_print) printf("[nf*3=%i]", nf*3);
         if (print_shapes) printf("[idx=%i]", nf*3);
@@ -422,30 +422,30 @@ int CINT2e_loop_nopt(
         //printf("[%i]", len);
         if (debug_print) printf("[len=%li]", len);
         if (print_shapes) printf("[len=%li]", len);
-        
+
         dtype *g1 = g + leng;
         dtype *gout, *gctri, *gctrj, *gctrk, *gctrl;
 
         //ALIAS_ADDR_IF_EQUAL(l, m);
-        if (m_ctr == 1) { gctrl = gctrm; lempty = mempty; } 
+        if (m_ctr == 1) { gctrl = gctrm; lempty = mempty; }
         else {            gctrl = g1;   g1 += lenl; }
         //ALIAS_ADDR_IF_EQUAL(k, l);
-        if (l_ctr == 1) { gctrk = gctrl; kempty = lempty; } 
+        if (l_ctr == 1) { gctrk = gctrl; kempty = lempty; }
         else {            gctrk = g1;   g1 += lenk; }
         //ALIAS_ADDR_IF_EQUAL(j, k);
-        if (k_ctr == 1) { gctrj = gctrk; jempty = kempty; } 
+        if (k_ctr == 1) { gctrj = gctrk; jempty = kempty; }
         else {            gctrj = g1;    g1 += lenj; }
         //ALIAS_ADDR_IF_EQUAL(i, j);
-        if (j_ctr == 1) { gctri = gctrj; iempty = jempty; } 
+        if (j_ctr == 1) { gctri = gctrj; iempty = jempty; }
         else {            gctri = g1;    g1 += leni; }
         //ALIAS_ADDR_IF_EQUAL(g, i);
-        if (i_ctr == 1) { gctrg = gctri; gempty = iempty; } 
+        if (i_ctr == 1) { gctrg = gctri; gempty = iempty; }
         else {            gctrg = g1;    g1 += leng; }
 
         if (debug_print) {
                 printf("[{m,l,k,j,i}_ctr = %i %i %i %i %i]", m_ctr, l_ctr, k_ctr, j_ctr, i_ctr);
                 printf("[gctr{l,k,j,i,g} = %f %f %f %f %f]", gctrl[0], gctrk[0], gctrj[0], gctri[0], gctrg[0]);
-                printf("[gctr[0,1,2,3]   = %f %f %f %f   ]\n\n", gctr[0], gctr[1], gctr[2], gctr[3]); 
+                printf("[gctr[0,1,2,3]   = %f %f %f %f   ]\n\n", gctr[0], gctr[1], gctr[2], gctr[3]);
                 fflush(stdout);
         }
 
@@ -463,9 +463,9 @@ int CINT2e_loop_nopt(
 
 
                 if (l_ctr == 1) {
-                        fac1l = common_factor * cl[lp]; 
+                        fac1l = common_factor * cl[lp];
                 } else {
-                        fac1l = common_factor; 
+                        fac1l = common_factor;
                         *kempty = 1;
                 }
                 for (kp = 0; kp < k_prim; kp++) {
@@ -483,48 +483,48 @@ int CINT2e_loop_nopt(
                         // Increasing expcutoff by ln(3) can guarantee to get
                         // the required accuracy in any circumstance.
 
-                        envs_ak[0]  = ak[kp]; 
+                        envs_ak[0]  = ak[kp];
                         envs_rkl[0] = (ak[kp]*rk[0] + al[lp]*rl[0]) / akl;
                         envs_rkl[1] = (ak[kp]*rk[1] + al[lp]*rl[1]) / akl;
                         envs_rkl[2] = (ak[kp]*rk[2] + al[lp]*rl[2]) / akl;
 
-                        ekl       = exp(-ekl); 
+                        ekl       = exp(-ekl);
 
-                        if (k_ctr == 1) { fac1k = fac1l * ck[kp]; } 
+                        if (k_ctr == 1) { fac1k = fac1l * ck[kp]; }
                         else { fac1k = fac1l; *jempty = 1; }
 
                         pdata_ij = pdata_base;
                         for (jp = 0; jp < j_prim; jp++) {
 
-                                envs_aj[0] = aj[jp]; // todo 
+                                envs_aj[0] = aj[jp]; // todo
 
-                                if (j_ctr == 1) { fac1j = fac1k * cj[jp]; } 
+                                if (j_ctr == 1) { fac1j = fac1k * cj[jp]; }
                                 else { fac1j = fac1k; *iempty = 1; }
 
                                 for (ip = 0; ip < i_prim; ip++, pdata_ij++) {
-                                        
-                                        
-                                        envs_ai[0] = ai[ip]; 
+
+
+                                        envs_ai[0] = ai[ip];
                                         rij = pdata_ij->rij;
                                         envs_rij[0] = rij[0];
                                         envs_rij[1] = rij[1];
                                         envs_rij[2] = rij[2];
                                         expijkl = pdata_ij->eij * ekl;
 
-                                        if (i_ctr == 1) { fac1i = fac1j*ci[ip]*expijkl; } 
+                                        if (i_ctr == 1) { fac1i = fac1j*ci[ip]*expijkl; }
                                         else { fac1i = fac1j*expijkl; }
 
                                         envs_fac[0] = fac1i;
-                                        
+
                                         rijrkl[0] = envs_rij[0] - envs_rkl[0];
                                         rijrkl[1] = envs_rij[1] - envs_rkl[1];
                                         rijrkl[2] = envs_rij[2] - envs_rkl[2] ;
                                         rijrx[0]  = envs_rij[0] - rx_in_rijrx[0];
-                                        rijrx[1]  = envs_rij[1] - rx_in_rijrx[1]; 
-                                        rijrx[2]  = envs_rij[2] - rx_in_rijrx[2]; 
-                                        rklrx[0]  = envs_rkl[0] - rx_in_rklrx[0]; 
-                                        rklrx[1]  = envs_rkl[1] - rx_in_rklrx[1]; 
-                                        rklrx[2]  = envs_rkl[2] - rx_in_rklrx[2]; 
+                                        rijrx[1]  = envs_rij[1] - rx_in_rijrx[1];
+                                        rijrx[2]  = envs_rij[2] - rx_in_rijrx[2];
+                                        rklrx[0]  = envs_rkl[0] - rx_in_rklrx[0];
+                                        rklrx[1]  = envs_rkl[1] - rx_in_rklrx[1];
+                                        rklrx[2]  = envs_rkl[2] - rx_in_rklrx[2];
 
                                         if ( test_CINTg0_2e ) {
 
@@ -546,10 +546,10 @@ int CINT2e_loop_nopt(
                                                 graph.setTileMapping(ipu_output, 0);
                                                 ComputeSet mulCS = graph.addComputeSet("mulCS");
 
-                                                auto v = graph.addVertex(mulCS, "poplar_CINTg0_2e", 
-                                                                        {{"ipu_input1", ipu_input1},  
+                                                auto v = graph.addVertex(mulCS, "poplar_CINTg0_2e",
+                                                                        {{"ipu_input1", ipu_input1},
                                                                         {"ipu_input2", ipu_input2},
-                                                                        {"ipu_output", ipu_output}}); 
+                                                                        {"ipu_output", ipu_output}});
 
                                                 graph.setTileMapping(v, 0);
 
@@ -560,30 +560,30 @@ int CINT2e_loop_nopt(
                                                 auto inStreamV = graph.addHostToDeviceFIFO("ipu_input2", FLOAT, 35);
                                                 auto outStream = graph.addDeviceToHostFIFO("ipu_output", FLOAT, _n);
 
-                                                auto prog = Sequence({Copy(inStreamM, ipu_input1), 
-                                                                Copy(inStreamV, ipu_input2),  
-                                                                mulProg, 
+                                                auto prog = Sequence({Copy(inStreamM, ipu_input1),
+                                                                Copy(inStreamV, ipu_input2),
+                                                                mulProg,
                                                                 Copy(ipu_output, outStream)});
 
                                                 Engine engine(graph, prog);
                                                 engine.load(device);
 
-                                                
-                                                float params[20+15] = {(float)len, (float)kbase, (float)ibase, (float)g_stride_i, (float)g_stride_k, (float)g_stride_l, (float)g_stride_j, 
-                                                                (float)g2d_klmax, (float)g2d_ijmax, (float)nrys_roots, (float)(envs_ai[0]+envs_aj[0]), 
-                                                                (float)(envs_ak[0]+al[lp]), 
+
+                                                float params[20+15] = {(float)len, (float)kbase, (float)ibase, (float)g_stride_i, (float)g_stride_k, (float)g_stride_l, (float)g_stride_j,
+                                                                (float)g2d_klmax, (float)g2d_ijmax, (float)nrys_roots, (float)(envs_ai[0]+envs_aj[0]),
+                                                                (float)(envs_ak[0]+al[lp]),
                                                                 (float)g_size, (float)envs_fac[0],
-                                                                (float)(li_ceil + lj_ceil), (float)(lk_ceil + ll_ceil), 
+                                                                (float)(li_ceil + lj_ceil), (float)(lk_ceil + ll_ceil),
                                                                 (float)(li_ceil), (float)lj_ceil, (float)lk_ceil, (float)ll_ceil,
                                                                         (float)rkrl[0], (float)rkrl[1], (float)rkrl[2],
                                                                         (float)rirj[0], (float)rirj[1], (float)rirj[2],
-                                                                        (float)rijrkl[0], (float)rijrkl[1], (float)rijrkl[2], 
-                                                                        (float)rijrx[0], (float)rijrx[1], (float)rijrx[2], 
-                                                                        (float)rklrx[0], (float)rklrx[1], (float)rklrx[2] }; 
+                                                                        (float)rijrkl[0], (float)rijrkl[1], (float)rijrkl[2],
+                                                                        (float)rijrx[0], (float)rijrx[1], (float)rijrx[2],
+                                                                        (float)rklrx[0], (float)rklrx[1], (float)rklrx[2] };
                                                 auto input1 = g;
                                                 auto input2 = params;
 
-                                                
+
                                                 engine.connectStream("ipu_input1",    input1);
                                                 engine.connectStream("ipu_input2",    input2);
                                                 engine.connectStream("ipu_output",    cpu_output.data());
@@ -591,7 +591,7 @@ int CINT2e_loop_nopt(
                                                 // Execute the program
                                                 printf("Running kernel..\n");
                                                 fflush(stdout);
-                                                
+
                                                 engine.run();
                                                 printf("done..\n");
                                                 fflush(stdout);
@@ -600,15 +600,15 @@ int CINT2e_loop_nopt(
                                         }
 
 
-                                        int ret = CINTg0_2e(g, len, 
-                                                kbase, ibase, 
-                                                g_stride_i, g_stride_k, g_stride_l, g_stride_j, 
-                                                g2d_klmax, g2d_ijmax, 
-                                                nrys_roots, 
-                                                envs_ai[0] + envs_aj[0], envs_ak[0] + al[lp], 
-                                                g_size, 
-                                                envs_fac[0], 
-                                                li_ceil + lj_ceil, lk_ceil + ll_ceil, li_ceil, lj_ceil, lk_ceil, ll_ceil, 
+                                        int ret = CINTg0_2e(g, len,
+                                                kbase, ibase,
+                                                g_stride_i, g_stride_k, g_stride_l, g_stride_j,
+                                                g2d_klmax, g2d_ijmax,
+                                                nrys_roots,
+                                                envs_ai[0] + envs_aj[0], envs_ak[0] + al[lp],
+                                                g_size,
+                                                envs_fac[0],
+                                                li_ceil + lj_ceil, lk_ceil + ll_ceil, li_ceil, lj_ceil, lk_ceil, ll_ceil,
                                                 rkrl, rirj, rijrkl, rijrx, rklrx);
 
 
@@ -626,11 +626,11 @@ int CINT2e_loop_nopt(
                                         if (ret) {
                                                 CINTgout2e(gout, g, idx, *gempty, nf, nrys_roots);
 
-                                                //#define PRIM2CTR(ctrsymb, gp, ngp) 
+                                                //#define PRIM2CTR(ctrsymb, gp, ngp)
                                                 if (i_ctr > 1) {
-                                                        if (*iempty) { CINTprim_to_ctr_0(gctri, gout, ci+ip, len0, i_prim, i_ctr, non0ctri[ip], non0idxi+ip*i_ctr); } 
-                                                        else { CINTprim_to_ctr_1(gctri, gout, ci+ip, len0, i_prim, i_ctr, non0ctri[ip], non0idxi+ip*i_ctr); } 
-                                                } 
+                                                        if (*iempty) { CINTprim_to_ctr_0(gctri, gout, ci+ip, len0, i_prim, i_ctr, non0ctri[ip], non0idxi+ip*i_ctr); }
+                                                        else { CINTprim_to_ctr_1(gctri, gout, ci+ip, len0, i_prim, i_ctr, non0ctri[ip], non0idxi+ip*i_ctr); }
+                                                }
                                                 *iempty = 0;
                                         }
 
@@ -638,8 +638,8 @@ int CINT2e_loop_nopt(
                                 if (!*iempty) {
                                         //PRIM2CTR(j, gctri, leni);
                                         if (j_ctr > 1) {
-                                                if (*jempty) { CINTprim_to_ctr_0(gctrj, gctri, cj+jp, leni, j_prim, j_ctr, non0ctrj[jp], non0idxj+jp*j_ctr); } 
-                                                else { CINTprim_to_ctr_1(gctrj, gctri, cj+jp, leni, j_prim, j_ctr, non0ctrj[jp], non0idxj+jp*j_ctr); } 
+                                                if (*jempty) { CINTprim_to_ctr_0(gctrj, gctri, cj+jp, leni, j_prim, j_ctr, non0ctrj[jp], non0idxj+jp*j_ctr); }
+                                                else { CINTprim_to_ctr_1(gctrj, gctri, cj+jp, leni, j_prim, j_ctr, non0ctrj[jp], non0idxj+jp*j_ctr); }
                                         }
 
                                 }
@@ -647,16 +647,16 @@ int CINT2e_loop_nopt(
                         if (!*jempty) {
                                 //PRIM2CTR(k, gctrj, lenj);
                                 if (k_ctr > 1) {
-                                        if (*kempty) { CINTprim_to_ctr_0(gctrk, gctrj, ck+kp, lenj, k_prim, k_ctr, non0ctrk[kp], non0idxk+kp*k_ctr); } 
-                                        else { CINTprim_to_ctr_1(gctrk, gctrj, ck+kp, lenj, k_prim, k_ctr, non0ctrk[kp], non0idxk+kp*k_ctr); } 
+                                        if (*kempty) { CINTprim_to_ctr_0(gctrk, gctrj, ck+kp, lenj, k_prim, k_ctr, non0ctrk[kp], non0idxk+kp*k_ctr); }
+                                        else { CINTprim_to_ctr_1(gctrk, gctrj, ck+kp, lenj, k_prim, k_ctr, non0ctrk[kp], non0idxk+kp*k_ctr); }
                                 }
                         }
                 } // end loop k_prim
                 if (!*kempty) {
                         //PRIM2CTR(l, gctrk, lenk);
                         if (l_ctr > 1) {
-                                if (*lempty) { CINTprim_to_ctr_0(gctrl, gctrk, cl+lp, lenk, l_prim, l_ctr, non0ctrl[lp], non0idxl+lp*l_ctr); } 
-                                else { CINTprim_to_ctr_1(gctrl, gctrk, cl+lp, lenk, l_prim, l_ctr, non0ctrl[lp], non0idxl+lp*l_ctr); } 
+                                if (*lempty) { CINTprim_to_ctr_0(gctrl, gctrk, cl+lp, lenk, l_prim, l_ctr, non0ctrl[lp], non0idxl+lp*l_ctr); }
+                                else { CINTprim_to_ctr_1(gctrl, gctrk, cl+lp, lenk, l_prim, l_ctr, non0ctrl[lp], non0idxl+lp*l_ctr); }
                         }
                 }
         } // end loop l_prim
@@ -666,8 +666,8 @@ int CINT2e_loop_nopt(
 
         if (n_comp > 1 && !*lempty) {
                 //TRANSPOSE(gctrl);
-                if (*empty) { CINTdmat_transpose(gctr, gctrl, nf*nc, n_comp); *empty = 0; } 
-                else { CINTdplus_transpose(gctr, gctrl, nf*nc, n_comp); } 
+                if (*empty) { CINTdmat_transpose(gctr, gctrl, nf*nc, n_comp); *empty = 0; }
+                else { CINTdplus_transpose(gctr, gctrl, nf*nc, n_comp); }
 
         }
 
@@ -984,7 +984,7 @@ extern "C" {
 
 
 
-void GTOnr2e_fill_s1( input_type *eri, int n_eri, dtype *buf, int n_buf, int comp, int ishp, int jshp, int *shls_slice, int *ao_loc, 
+void GTOnr2e_fill_s1( input_type *eri, int n_eri, dtype *buf, int n_buf, int comp, int ishp, int jshp, int *shls_slice, int *ao_loc,
                       int *atm, int natm, int *bas, int nbas, dtype *env, int n_env) {
 
         int ish0 = shls_slice[0];
@@ -1007,7 +1007,7 @@ void GTOnr2e_fill_s1( input_type *eri, int n_eri, dtype *buf, int n_buf, int com
         int jsh = jshp + jsh0;
         int i0 = ao_loc[ish] - ao_loc[ish0];
         int j0 = ao_loc[jsh] - ao_loc[jsh0];
-        //eri += nkl * (i0 * nj + j0); 
+        //eri += nkl * (i0 * nj + j0);
 
         int di = ao_loc[ish+1] - ao_loc[ish];
         int dj = ao_loc[jsh+1] - ao_loc[jsh];
@@ -1025,7 +1025,7 @@ void GTOnr2e_fill_s1( input_type *eri, int n_eri, dtype *buf, int n_buf, int com
         int max = -1;
         int c = 0;
 
-        // this is handling the translation between eri and the pointers 
+        // this is handling the translation between eri and the pointers
         for (ksh = ksh0; ksh < ksh1; ksh++) {
                 for (lsh = lsh0; lsh < lsh1; lsh++) {
                         shls[2] = ksh;
@@ -1037,10 +1037,10 @@ void GTOnr2e_fill_s1( input_type *eri, int n_eri, dtype *buf, int n_buf, int com
                         dijk = dij * dk;
                         dijkl = dijk * dl;
 
-                        
-                        if (int2e_sph(buf, n_buf, NULL, shls, atm, natm, bas, nbas, env, n_env) ) { 
 
-                                // move from buf to eri. 
+                        if (int2e_sph(buf, n_buf, NULL, shls, atm, natm, bas, nbas, env, n_env) ) {
+
+                                // move from buf to eri.
                                 eri0 = eri + k0*nl+l0;
                                 buf0 = buf;
                                 for (icomp = 0; icomp < comp; icomp++) {
@@ -1055,26 +1055,26 @@ void GTOnr2e_fill_s1( input_type *eri, int n_eri, dtype *buf, int n_buf, int com
                                                                                 printf("\rmax=%i current=%i", max, l*dijk);
                                                                                 fflush(stdout);
                                                                         }*/
-                                                                        //peri[k*nl+l] = (input_type)pbuf[l*dijk]; 
-                                                                        //eri0[k*nl+l+nkl*(i*nj+j)] = (input_type)pbuf[l*dijk]; 
-                                                                        //eri[k*nl+l+nkl*(i*nj+j)+ k0*nl+l0] = (input_type)pbuf[l*dijk]; 
-                                                                        eri[k*nl+l+nkl*(i*nj+j)+ k0*nl+l0+nkl * (i0 * nj + j0)] = 
-                                                                                        //(input_type)pbuf[l*dijk]; 
-                                                                                        //(input_type)buf0[l*dijk+k*dij + j*di + i]; 
-                                                                                        (input_type)buf[l*dijk+k*dij + j*di + i]; 
+                                                                        //peri[k*nl+l] = (input_type)pbuf[l*dijk];
+                                                                        //eri0[k*nl+l+nkl*(i*nj+j)] = (input_type)pbuf[l*dijk];
+                                                                        //eri[k*nl+l+nkl*(i*nj+j)+ k0*nl+l0] = (input_type)pbuf[l*dijk];
+                                                                        eri[k*nl+l+nkl*(i*nj+j)+ k0*nl+l0+nkl * (i0 * nj + j0)] =
+                                                                                        //(input_type)pbuf[l*dijk];
+                                                                                        //(input_type)buf0[l*dijk+k*dij + j*di + i];
+                                                                                        (input_type)buf[l*dijk+k*dij + j*di + i];
                                                                                         c+= 1;
-                                                                } 
+                                                                }
                                                         }
-                                                } 
+                                                }
                                         }
                                         buf0 += dijkl;
                                         eri0 += neri;
                                 }
 
 
-                        } 
-                        
-                } 
+                        }
+
+                }
         }
 
 
@@ -1092,21 +1092,21 @@ extern "C" {
 #endif
 
 // topfunction
-void GTOnr2e_fill_drv(          // SIZES BELOW ARE FOR THE AMINO ACID TEST CASE 
-        input_type *eri,        // (1, 37, 37, 37, 37) 
-        int n_eri, 
+void GTOnr2e_fill_drv(          // SIZES BELOW ARE FOR THE AMINO ACID TEST CASE
+        input_type *eri,        // (1, 37, 37, 37, 37)
+        int n_eri,
         int comp,               // 1
         int *shls_slice,        // (0, 25, 0, 25, 0, 25, 0, 25)         25 = nbas
         int *ao_loc,            // [0 1 2 ... 37]
-        int n_ao_loc, 
+        int n_ao_loc,
         int *atm,               // (13, 6)                              13 = n_atoms, 6 is fixed
         int n_atm,              // 13
-        int *bas,               // (25, 8)                              25 basis functions, 8 is fixed 
+        int *bas,               // (25, 8)                              25 basis functions, 8 is fixed
         int n_bas,              // 25
         input_type *_env,       // (132,)
         int n_env) {            // 132
 
-        int (*fprescreen)() = no_prescreen; 
+        int (*fprescreen)() = no_prescreen;
 
         const int ish0 = shls_slice[0]; // ( 0, 25, 0, 25, 0, 25, 0 ,25)
         const int ish1 = shls_slice[1];
@@ -1115,18 +1115,18 @@ void GTOnr2e_fill_drv(          // SIZES BELOW ARE FOR THE AMINO ACID TEST CASE
         const int nish = ish1 - ish0;
         const int njsh = jsh1 - jsh0;
 
-        // this is needed to allow different dtype to input type! 
-        // it allows us to check error from just storing input in float vs computing in float. 
+        // this is needed to allow different dtype to input type!
+        // it allows us to check error from just storing input in float vs computing in float.
         dtype *env = new dtype[n_env];
         for (int i = 0; i < n_env; i++){ env[i] = _env[i]; }
 
         const int di         = GTOmax_shell_dim(ao_loc, shls_slice, 4);
         const int cache_size = GTOmax_cache_size(shls_slice, 4, atm, n_atm, bas, n_bas, env, n_env);
 
-        int n_buf = di*di*di*di*comp+cache_size; 
+        int n_buf = di*di*di*di*comp+cache_size;
 
-        // TODO: this goes OOM with dtype[..] instead of malloc. 
-        #ifdef __cplusplus 
+        // TODO: this goes OOM with dtype[..] instead of malloc.
+        #ifdef __cplusplus
                 dtype *buf = static_cast<dtype*>(malloc(sizeof(dtype) * (n_buf)));
         #else
                 dtype *buf = malloc(sizeof(dtype) * (n_buf));
@@ -1139,24 +1139,24 @@ void GTOnr2e_fill_drv(          // SIZES BELOW ARE FOR THE AMINO ACID TEST CASE
         }
 
         int ij, i, j;
-        for (ij = 0; ij < nish*njsh; ij++) {  // 
+        for (ij = 0; ij < nish*njsh; ij++) {  //
                 i = ij / njsh;
                 j = ij % njsh;
 
 
                 /*
-                        run.py                
+                        run.py
 
-                        - move "fill_drv" with calls to "fill_s1" from C++ to python. 
-                        
-                        => switching between CPU/IPU can now be done in python. 
+                        - move "fill_drv" with calls to "fill_s1" from C++ to python.
+
+                        => switching between CPU/IPU can now be done in python.
                         => the fill_s1 code for IPU/CPU can be the same.
 
-                        impacts for numerical precision experiments. 
+                        impacts for numerical precision experiments.
 
-                        - can still do everything dtype CPU. 
-                        - input=float compute=dtype. 
-                
+                        - can still do everything dtype CPU.
+                        - input=float compute=dtype.
+
                 */
 
                 if (test_GTOnr2e_fill_s1) {
@@ -1173,16 +1173,16 @@ void GTOnr2e_fill_drv(          // SIZES BELOW ARE FOR THE AMINO ACID TEST CASE
 
                         int n_floats = n_eri+n_buf+n_env;
                         float input_floats[n_eri+n_buf+n_env];
-                        int start = 0; 
+                        int start = 0;
                         for (int i = start; i < start+n_eri; i++) input_floats[i] = eri[i];
-                        start += n_eri; 
+                        start += n_eri;
                         for (int i = start; i < start+n_buf; i++) input_floats[i] = buf[i-start];
-                        start += n_buf; 
+                        start += n_buf;
                         for (int i = start; i < start+n_env; i++) input_floats[i] = env[i-start];
 
                         int input_params[9] = {n_eri, n_buf, comp, i, j, n_atm, n_bas, n_env, n_ao_loc};
                         int n_ints = 9+8+n_ao_loc +n_atm*6+n_bas*8;
-                        int input_ints[n_ints]; 
+                        int input_ints[n_ints];
                         start = 0;
                         for (int i = start; i < start+9; i++)        input_ints[i] = input_params[i-start];
                         start += 9 ;
@@ -1195,7 +1195,7 @@ void GTOnr2e_fill_drv(          // SIZES BELOW ARE FOR THE AMINO ACID TEST CASE
                         for (int i = start; i < start+n_bas*8; i++)  input_ints[i] = bas[i-start];
 
 
-                        int input_ij[2] = {i, j}; 
+                        int input_ij[2] = {i, j};
 
                         Graph graph(target);
                         graph.addCodelets("GTOnr2e_fill_s1.cpp");
@@ -1213,8 +1213,8 @@ void GTOnr2e_fill_drv(          // SIZES BELOW ARE FOR THE AMINO ACID TEST CASE
                         // Create a compute set to hold the vertices to perform the calculation
                         ComputeSet mulCS = graph.addComputeSet("mulCS");
 
-                        auto v = graph.addVertex(mulCS, "poplar_CINTg0_2e", 
-                                                {{"ipu_floats", ipu_floats},  
+                        auto v = graph.addVertex(mulCS, "poplar_CINTg0_2e",
+                                                {{"ipu_floats", ipu_floats},
                                                  {"ipu_ints",   ipu_ints},
                                                  {"ipu_ij",     ipu_ij},
                                                  {"ipu_output", ipu_output}});
@@ -1229,10 +1229,10 @@ void GTOnr2e_fill_drv(          // SIZES BELOW ARE FOR THE AMINO ACID TEST CASE
                         auto instream_ij     = graph.addHostToDeviceFIFO("ipu_ij",     INT,   2);
                         auto outStream       = graph.addDeviceToHostFIFO("ipu_output", FLOAT, n_eri);
 
-                        auto prog = Sequence({Copy(instream_floats, ipu_floats), 
-                                              Copy(instream_ints,   ipu_ints),  
-                                              Copy(instream_ij,     ipu_ij),  
-                                              mulProg, 
+                        auto prog = Sequence({Copy(instream_floats, ipu_floats),
+                                              Copy(instream_ints,   ipu_ints),
+                                              Copy(instream_ij,     ipu_ij),
+                                              mulProg,
                                               Copy(ipu_output, outStream)
                                               });
 
@@ -1245,7 +1245,7 @@ void GTOnr2e_fill_drv(          // SIZES BELOW ARE FOR THE AMINO ACID TEST CASE
 
                         // Execute the program
                         fflush(stdout);
-                        
+
                         engine.run();
                         fflush(stdout);
                         #endif
@@ -1257,7 +1257,7 @@ void GTOnr2e_fill_drv(          // SIZES BELOW ARE FOR THE AMINO ACID TEST CASE
                         #ifdef __cplusplus
                         int errors = 0 ;
                         for (int t = 0; t < n_eri; t++) {
-                                if (std::abs(eri[t] - cpu_output[t]) < 1E-6) { 
+                                if (std::abs(eri[t] - cpu_output[t]) < 1E-6) {
                                         printf("eri[%i]=%f == cpu_output[%i]=%f \t PASS!\n", t, eri[t], t, cpu_output[t]);
                                 }
                                 else{
@@ -1281,7 +1281,7 @@ void GTOnr2e_fill_drv(          // SIZES BELOW ARE FOR THE AMINO ACID TEST CASE
 
         if (test_GTOnr2e_fill_s1){
                 #ifdef __cplusplus
-                for (int t = 1; t < n_eri; t++) eri[t] = cpu_output[t]; 
+                for (int t = 1; t < n_eri; t++) eri[t] = cpu_output[t];
                 #endif
         }
 
@@ -1319,7 +1319,7 @@ int CINTlen_spinor(const int bas_id, const int *bas)
         }
 }
 
-/* 
+/*
  * Num. of contracted cartesian GTO = 2j+1 * n_contraction
  */
 int CINTcgtos_cart(const int bas_id, const int *bas)
@@ -1333,7 +1333,7 @@ int CINTcgto_cart(const int bas_id, const int *bas)
         return (l+1)*(l+2)/2 * bas(NCTR_OF, bas_id);
 }
 
-/* 
+/*
  * Num. of contracted spheric GTO = 2j+1 * n_contraction
  */
 int CINTcgtos_spheric(const int bas_id, const int *bas)
@@ -1345,7 +1345,7 @@ int CINTcgto_spheric(const int bas_id, const int *bas)
         return (bas(ANG_OF, bas_id) * 2 + 1) * bas(NCTR_OF, bas_id);
 }
 
-/* 
+/*
  * Num. of contracted spinor GTO
  */
 int CINTcgtos_spinor(const int bas_id, const int *bas)
@@ -1439,7 +1439,7 @@ void CINTprim_to_ctr_1(dtype *gc, dtype *gp, dtype *coeff, size_t nf,
  * to optimize memory copy in cart2sph.c, remove the common factor for s
  * and p function in cart2sph
  */
-dtype CINTcommon_fac_sp(int l) 
+dtype CINTcommon_fac_sp(int l)
 {
         switch (l) {
                 case 0: return 0.282094791773878143;
@@ -1462,14 +1462,14 @@ dtype CINTcommon_fac_sp(int l)
 
 
 void CINTg2e_index_xyz(int *idx, int i_l, int j_l, int k_l, int l_l,
-                                                           int nfi, int nfj, int nfk, int nfl, 
+                                                           int nfi, int nfj, int nfk, int nfl,
                                                            int di,  int dk,  int dl,  int dj, int g_size)
 {
         int i, j, k, l, n;
         int ofx, ofkx, oflx;
         int ofy, ofky, ofly;
         int ofz, ofkz, oflz;
-        if (print_shapes)  printf("[i_nx=%i]", CART_MAX); 
+        if (print_shapes)  printf("[i_nx=%i]", CART_MAX);
         int i_nx[CART_MAX], i_ny[CART_MAX], i_nz[CART_MAX];
         int j_nx[CART_MAX], j_ny[CART_MAX], j_nz[CART_MAX];
         int k_nx[CART_MAX], k_ny[CART_MAX], k_nz[CART_MAX];
@@ -1552,7 +1552,7 @@ void CINTg2e_index_xyz(int *idx, int i_l, int j_l, int k_l, int l_l,
 
  */
 
-void CINTg0_2e_2d(dtype *g, int g_len, 
+void CINTg0_2e_2d(dtype *g, int g_len,
         int nroots, int nmax, int mmax, int dm, int dn, int g_size
         ,const dtype *__bcc00, const dtype *__bcc0p, int bcc0_len,
         const dtype *b01, const dtype *b00, const dtype *b10 , int b_len
@@ -1560,15 +1560,15 @@ void CINTg0_2e_2d(dtype *g, int g_len,
 
         //float _bcc00[bcc0_len];
         //for (int t = 0; t < bcc0_len; t++){ _bcc00[t] = bcc00[t]; }
-        //const float* __bcc00 = _bcc00; 
+        //const float* __bcc00 = _bcc00;
 
         //float _bcc0p[bcc0_len];
         //for (int t = 0; t < bcc0_len; t++){ _bcc0p[t] = bcc0p[t]; }
-        //const float* __bcc0p = _bcc0p; 
+        //const float* __bcc0p = _bcc0p;
 
         int i, j, m, n, off;
-        dtype *gx = g; 
-        dtype *gy = g + g_size; 
+        dtype *gx = g;
+        dtype *gy = g + g_size;
         dtype *gz = g + g_size * 2;
 
         const dtype *c00;
@@ -1648,7 +1648,7 @@ void CINTg0_2e_2d(dtype *g, int g_len,
                 // gx(irys,m,n+1) = c00(irys)*gx(irys,m,n)
                 // + n*b10(irys)*gx(irys,m,n-1)
                 // + m*b00(irys)*gx(irys,m-1,n)
-                int max = 0; 
+                int max = 0;
                 for (m = 1; m <= mmax; m++) {
                         for (n = 1; n < nmax; n++) {
                                 off = m * dm + n * dn;
@@ -1657,7 +1657,7 @@ void CINTg0_2e_2d(dtype *g, int g_len,
                                         g[j+dn         ] = c00[0]*g[j         ] +n*b10[i]*g[j-dn         ] + m*b00[i]*g[j-dm         ];
                                         g[j+dn+g_size  ] = c00[1]*g[j+g_size  ] +n*b10[i]*g[j-dn+g_size  ] + m*b00[i]*g[j-dm+g_size  ];
                                         g[j+dn+g_size*2] = c00[2]*g[j+g_size*2] +n*b10[i]*g[j-dn+g_size*2] + m*b00[i]*g[j-dm+g_size*2];
-                                        
+
                                         if (max < j+dn+g_size*2){max = j+dn+g_size*2;}
                                 }
                         }
@@ -1675,7 +1675,7 @@ void CINTg0_2e_2d(dtype *g, int g_len,
  * g0[i,k,l,j] = < ik | lj > = ( i j | k l )
  */
 /* 2d is based on l,j */
-void CINTg0_lj2d_4d(dtype *g, int g_len, 
+void CINTg0_lj2d_4d(dtype *g, int g_len,
         int nmax, int mmax, int li, int lk, int lj, int nroots, int di,
         int dk, int dl, int dj, const dtype *rirj, const dtype *rkrl, int g_size) {
 
@@ -1700,8 +1700,8 @@ void CINTg0_lj2d_4d(dtype *g, int g_len,
                                         g[n+g_size  ] = ry * g[n-di+g_size]     + g[n-di+dj+g_size  ];
                                         g[n+g_size*2] = rz * g[n-di+g_size*2]   + g[n-di+dj+g_size*2];
                                 }
-                        } 
-                } 
+                        }
+                }
         }
 
         // g(...,k,l,..) = rkrl * g(...,k-1,l,..) + g(...,k-1,l+1,..)
@@ -1714,8 +1714,8 @@ void CINTg0_lj2d_4d(dtype *g, int g_len,
                                         g[n+g_size  ] = _ry * g[n-dk+g_size  ] + g[n-dk+dl+g_size];
                                         g[n+g_size*2] = _rz * g[n-dk+g_size*2] + g[n-dk+dl+g_size*2];
                                 }
-                        } 
-                } 
+                        }
+                }
         }
 }
 /* 2d is based on k,j */
@@ -1742,8 +1742,8 @@ void CINTg0_kj2d_4d(dtype *g, int g_len, int nmax, int mmax, int li, int ll, int
                                         g[n+g_size]     = ry * g[n-di+g_size]   + g[n-di+dj+g_size];
                                         g[n+g_size*2]   = rz * g[n-di+g_size*2] + g[n-di+dj+g_size*2];
                                 }
-                        } 
-                } 
+                        }
+                }
         }
 
         // g(...,k,l,..) = rkrl * g(...,k,l-1,..) + g(...,k+1,l-1,..)
@@ -1756,13 +1756,13 @@ void CINTg0_kj2d_4d(dtype *g, int g_len, int nmax, int mmax, int li, int ll, int
                                         g[n+g_size  ] = _ry * g[n-dl+g_size]     + g[n-dl+dk+g_size];
                                         g[n+g_size*2] = _rz * g[n-dl+g_size*2]   + g[n-dl+dk+g_size*2];
                                 }
-                        } 
-                } 
+                        }
+                }
         }
 
 }
 /* 2d is based on i,l */
-void CINTg0_il2d_4d(dtype *g, int g_len, 
+void CINTg0_il2d_4d(dtype *g, int g_len,
         int nmax, int mmax, int lk, int ll, int lj, int nroots,
         int di, int dk, int dl, int dj, const dtype *rirj, const dtype *rkrl, int g_size) {
 
@@ -1788,8 +1788,8 @@ void CINTg0_il2d_4d(dtype *g, int g_len,
                                         g[n+g_size  ] = ry * g[n-dk+g_size  ] + g[n-dk+dl+g_size  ];
                                         g[n+g_size*2] = rz * g[n-dk+g_size*2] + g[n-dk+dl+g_size*2];
                                 }
-                        } 
-                } 
+                        }
+                }
         }
 
         // g(i,...,j) = rirj * g(i,...,j-1) +  g(i+1,...,j-1)
@@ -1802,16 +1802,16 @@ void CINTg0_il2d_4d(dtype *g, int g_len,
                                         g[n+g_size  ] = _ry * g[n-dj+g_size  ] + g[n-dj+di+g_size  ];
                                         g[n+g_size*2] = _rz * g[n-dj+g_size*2] + g[n-dj+di+g_size*2];
                                 }
-                        } 
-                } 
+                        }
+                }
         }
 
 
 }
 /* 2d is based on i,k */
-void CINTg0_ik2d_4d(dtype *g, int g_len, 
-        int nmax, int mmax, int lk, int ll, int lj, int nroots, int di, int dk, int dl, int dj, 
-        const dtype *rirj, const dtype *rkrl, 
+void CINTg0_ik2d_4d(dtype *g, int g_len,
+        int nmax, int mmax, int lk, int ll, int lj, int nroots, int di, int dk, int dl, int dj,
+        const dtype *rirj, const dtype *rkrl,
         int g_size) {
         int i, j, k, l, ptr, n;
 
@@ -1838,7 +1838,7 @@ void CINTg0_ik2d_4d(dtype *g, int g_len,
                                         g[n+g_size  ] = ry * g[n+g_size-dl]   + g[n+g_size-dl+dk];
                                         g[n+g_size*2] = rz * g[n+g_size*2-dl] + g[n+g_size*2-dl+dk];
                                 }
-                        } 
+                        }
                 }
         }
 
@@ -1852,14 +1852,14 @@ void CINTg0_ik2d_4d(dtype *g, int g_len,
                                         g[n+g_size]     = _ry * g[n+g_size-dj]   + g[n-dj+di+g_size];
                                         g[n+g_size*2]   = _rz * g[n+g_size*2-dj] + g[n-dj+di+g_size*2];
                                 }
-                        } 
-                } 
+                        }
+                }
         }
 
 
 
-        /*for (int t = 0; t < g_len; t++){ 
-                _g[t] = g[t]; 
+        /*for (int t = 0; t < g_len; t++){
+                _g[t] = g[t];
 
                 /*if ( g[t] != cpu_output[t]) {
 
@@ -1879,7 +1879,7 @@ void CINTg0_ik2d_4d(dtype *g, int g_len,
 
 int CINTg0_2e(dtype *g, int g_len,
         int kbase, int ibase, int di, int dk, int dl, int dj, int dm, int dn
-        ,int nroots, dtype aij, dtype akl, int g_size, dtype fac0, int nmax, int mmax, 
+        ,int nroots, dtype aij, dtype akl, int g_size, dtype fac0, int nmax, int mmax,
         int li_ceil, int lj_ceil, int lk_ceil, int ll_ceil, dtype *rkrl, dtype *rirj ,
         dtype rijrkl[], dtype rijrx[], dtype rklrx[]) {
 
@@ -1898,17 +1898,17 @@ int CINTg0_2e(dtype *g, int g_len,
         dtype x = a0 *(rijrkl[0] * rijrkl[0] + rijrkl[1] * rijrkl[1] + rijrkl[2] * rijrkl[2]);
 
         // https://pubs.acs.org/doi/10.1021/acs.jpca.6b10004
-        if (x < THRESHOLD_ZERO) { 
+        if (x < THRESHOLD_ZERO) {
                 int off = nroots * (nroots - 1) / 2;
                 int i;
                 for (i = 0; i < nroots; i++)  {
-                        u[i] = ROOTS_FOR_X0[off + i]; 
+                        u[i] = ROOTS_FOR_X0[off + i];
                         w[i] = WEIGHTS_FOR_X0[off + i];
                 }
         }
         else{
 
-                if (nroots == 1) { rys_root1(x, u, w);}  
+                if (nroots == 1) { rys_root1(x, u, w);}
                 if (nroots == 2) { rys_root2(x, u, w);}
                 if (nroots == 3) { rys_root3(x, u, w);}
                 if (nroots == 4) { rys_root4(x, u, w);}
@@ -1936,7 +1936,7 @@ int CINTg0_2e(dtype *g, int g_len,
         dtype remove_struct_b10[MXRYSROOTS];
 
         // @alex: some of the functions below need a constant version that doesn't change, others
-        // need a version that does allow changing. we add "_" forthe constant versions. 
+        // need a version that does allow changing. we add "_" forthe constant versions.
         dtype *c00 = remove_struct_c00;
         dtype *c0p = remove_struct_c0p;
         dtype *b00 = remove_struct_b00;
@@ -1972,7 +1972,7 @@ int CINTg0_2e(dtype *g, int g_len,
                 w[irys] *= fac1;
         }
 
-        // Write all of this into a single call! 
+        // Write all of this into a single call!
         // move the "create g copy and pass on to this place instead of inside the function!"
 
         // make float32 copy of g
@@ -1983,14 +1983,14 @@ int CINTg0_2e(dtype *g, int g_len,
         //CINTg0_2e_2d(g, g_len, nroots, li_ceil + lj_ceil, lk_ceil + ll_ceil, dm, dn, g_size, c00, c0p, MXRYSROOTS*3,  b01, b00, b10, MXRYSROOTS);
 
         if (kbase) {
-                if (ibase) {    CINTg0_ik2d_4d(g, g_len, li_ceil + lj_ceil, lk_ceil + ll_ceil, lk_ceil, ll_ceil, lj_ceil, nroots, di, dk, dl, dj, rirj, rkrl, g_size); } 
+                if (ibase) {    CINTg0_ik2d_4d(g, g_len, li_ceil + lj_ceil, lk_ceil + ll_ceil, lk_ceil, ll_ceil, lj_ceil, nroots, di, dk, dl, dj, rirj, rkrl, g_size); }
                 else {          CINTg0_kj2d_4d(g, g_len, li_ceil + lj_ceil, lk_ceil + ll_ceil, li_ceil, ll_ceil, lj_ceil, nroots, di, dk, dl, dj, rirj, rkrl, g_size); }
         } else {
-                if (ibase) {    CINTg0_il2d_4d(g, g_len, li_ceil + lj_ceil, lk_ceil + ll_ceil, lk_ceil, ll_ceil, lj_ceil, nroots, di, dk, dl, dj, rirj, rkrl, g_size); } 
+                if (ibase) {    CINTg0_il2d_4d(g, g_len, li_ceil + lj_ceil, lk_ceil + ll_ceil, lk_ceil, ll_ceil, lj_ceil, nroots, di, dk, dl, dj, rirj, rkrl, g_size); }
                 else {          CINTg0_lj2d_4d(g, g_len, li_ceil + lj_ceil, lk_ceil + ll_ceil, li_ceil, lk_ceil, lj_ceil, nroots, di, dk, dl, dj, rirj, rkrl, g_size);  }
         }
 
-        // move back 
+        // move back
         //for (int t = 0; t < g_len; t++){ g[t] = _g[t]; }
 
         return 1;
@@ -2035,7 +2035,7 @@ int CINTset_pairdata(PairData *pairdata, dtype *ai, dtype *aj, dtype *ri, dtype 
         n = 0;
         for (jp = 0; jp < jprim; jp++) {
                 for (ip = 0; ip < iprim; ip++) {
-                        
+
                         aij = 1/(ai[ip] + aj[jp]);
                         eij = rr_ij * ai[ip] * aj[jp] * aij;
                         cceij = eij - log_rr_ij - log_maxci[ip] - log_maxcj[jp];
@@ -2055,7 +2055,7 @@ int CINTset_pairdata(PairData *pairdata, dtype *ai, dtype *aj, dtype *ri, dtype 
                                 pdata->eij = 0;
                         }
 
-                        n ++ ; 
+                        n ++ ;
                 }
         }
         return empty;
@@ -2195,7 +2195,7 @@ void CINTdgemm_NN1(int m, int n, int k,
         }
 }
 
-// this does a matmul with the big matrix hardcoded in here! 
+// this does a matmul with the big matrix hardcoded in here!
 void CINTdgemm_NN(int m, int n, int k, dtype *a, dtype *b, dtype *c) {
         CINTdgemm_NN1(m, n, k, a, b, c, m);
 }
@@ -2235,7 +2235,7 @@ void CINTdgemm_TN(int m, int n, int k,
 
 
 static dtype g_trans_cart2sph[] = {
-        1, // factors of s and p are moved to CINTcommon_fac_sp 
+        1, // factors of s and p are moved to CINTcommon_fac_sp
         // px
 // by default, p orbitals are ordered px, py, pz
         // px
@@ -5763,8 +5763,8 @@ struct cart2sp_t {
 };
 
 // [*] = n(n+1)(n+2)(n+3)/4+(n+1)(n+2)(n+3)/6
-// TODO: OBS!!! 
-//static struct cart2sp_t g_c2s[] = {}; 
+// TODO: OBS!!!
+//static struct cart2sp_t g_c2s[] = {};
 static struct cart2sp_t g_c2s[] = {
         {g_trans_cart2sph     ,g_trans_cart2jR      , g_trans_cart2jI      , g_trans_cart2jR      , g_trans_cart2jI      },
         {g_trans_cart2sph+1   ,g_trans_cart2jR+4    , g_trans_cart2jI+4    , g_trans_cart2jR+16   , g_trans_cart2jI+16   },
@@ -5789,7 +5789,7 @@ static dtype *a_bra_cart2spheric(dtype *gsph, int nket, dtype *gcart, int l)
 {
         int nf = _len_cart[l];
         int nd = l * 2 + 1;
-        
+
 
         CINTdgemm_TN(nd, nket, nf, g_c2s[l].cart2sph, gcart, gsph);
         return gsph;
@@ -6049,7 +6049,7 @@ static dtype *g_ket_cart2spheric(dtype *gsph, dtype *gcart,
  * input, so return the input address optimize
 
 /
- * 
+ *
  */
 
 
@@ -6276,8 +6276,8 @@ static dtype *sph2e_inner(dtype *gsph, dtype *gcart, int l, int nbra, int ncall,
 {
         int n;
 
-        if (l == 0 || l == 1) return gcart; 
-        else if (l == 2) { 
+        if (l == 0 || l == 1) return gcart;
+        else if (l == 2) {
                         for (n = 0; n < ncall; n++) {
                                 d_ket_cart2spheric(gsph+n*sizsph, gcart+n*sizcart, nbra, nbra, l);
                         }
@@ -6546,7 +6546,7 @@ static void rys_root3(dtype X, dtype *roots, dtype *weights)
 {
 
         dtype R13, R23, W23, R33, W33;
-        dtype RT1, RT2, RT3, WW1, WW2, WW3; 
+        dtype RT1, RT2, RT3, WW1, WW2, WW3;
         dtype F1, F2, E, T1, T2, T3, A1, A2, Y;
 
         R13 = 1.90163509193487E-01;
@@ -6779,7 +6779,7 @@ static void rys_root3(dtype X, dtype *roots, dtype *weights)
                 A1 = F1-T1*WW1;
                 WW3 = (A2-T2*A1)/((T3-T2)*(T3-T1));
                 WW2 = (T3*A1-A2)/((T3-T2)*(T2-T1));
-                WW1 = WW1-WW2-WW3; 
+                WW1 = WW1-WW2-WW3;
         } else if (X < 47) {
                 WW1 = sqrt(PIE4/X);
                 E = exp(-X);
@@ -7115,7 +7115,7 @@ static void rys_root4(dtype X, dtype *roots, dtype *weights)
                          1.70830039597097E+04)*X-2.90517939780207E+05)*X +
                        (3.49059698304732E+07/X-1.64944522586065E+07)/X +
                        2.96817940164703E+06)*E + R44/(X-R44);
-                if (X <= 25) 
+                if (X <= 25)
                         WW4 = ((((((( 2.33766206773151E-07*X-
                                       3.81542906607063E-05)*X +3.51416601267000E-03)*X-
                                    1.66538571864728E-01)*X +4.80006136831847E+00)*X-
@@ -7681,7 +7681,7 @@ static void rys_root5(dtype X, dtype *roots, dtype *weights)
 }
 
 
-// converts from ddtype to dtype 
+// converts from ddtype to dtype
 CACHE_SIZE_T _int2e_sph(ddtype *out, int n_out, int *dims, int *shls, int *atm, int natm, int *bas, int nbas, ddtype *env, int n_env) {
         dtype _out[n_out];
         for (int i = 0; i < n_out; i++) _out[i] = out[i];
@@ -7694,17 +7694,17 @@ CACHE_SIZE_T _int2e_sph(ddtype *out, int n_out, int *dims, int *shls, int *atm, 
 
         CACHE_SIZE_T ret = int2e_sph(__out, n_out, dims, shls, atm, natm, bas, nbas, __env, n_env);
 
-        // move back 
+        // move back
         for (int i = 0; i < n_out; i++) out[i] = __out[i];
         for (int i = 0; i < n_env; i++) env[i] = __env[i];
 
-        return ret; 
+        return ret;
 }
 
 
-// only *out/*buf left. 
+// only *out/*buf left.
 CACHE_SIZE_T int2e_sph(dtype *out, int n_out, int *dims, int *shls, int *atm, int natm, int *bas, int nbas, dtype *env, int n_env) {
-        
+
         int ng[] = {0, 0, 0, 0, 0, 1, 1, 1};
 
         const int i_sh = shls[0];
@@ -7716,7 +7716,7 @@ CACHE_SIZE_T int2e_sph(dtype *out, int n_out, int *dims, int *shls, int *atm, in
         int j_l = bas[BAS_SLOTS * j_sh + ANG_OF];
         int k_l = bas[BAS_SLOTS * k_sh + ANG_OF];
         int l_l = bas[BAS_SLOTS * l_sh + ANG_OF];
-                        
+
         int _x_ctr[4];
         _x_ctr[0] = bas[BAS_SLOTS * i_sh + NCTR_OF];
         _x_ctr[1] = bas[BAS_SLOTS * j_sh + NCTR_OF];
@@ -7749,10 +7749,10 @@ CACHE_SIZE_T int2e_sph(dtype *out, int n_out, int *dims, int *shls, int *atm, in
         dtype expcutoff;
 
         dtype common_factor = (M_PI*M_PI*M_PI)*2/SQRTPI * CINTcommon_fac_sp(i_l) * CINTcommon_fac_sp(j_l) * CINTcommon_fac_sp(k_l) * CINTcommon_fac_sp(l_l);
-        if (env[PTR_EXPCUTOFF] == 0) { expcutoff = EXPCUTOFF; } 
+        if (env[PTR_EXPCUTOFF] == 0) { expcutoff = EXPCUTOFF; }
         else { expcutoff = MAX(MIN_EXPCUTOFF, env[PTR_EXPCUTOFF]) + 1; } // +1 to ensure accuracy. See comments in function CINT2e_loop_nopt
 
-        
+
         int li_ceil = i_l + ng[IINC];
         int lj_ceil = j_l + ng[JINC];
         int lk_ceil = k_l + ng[KINC];
@@ -7763,7 +7763,7 @@ CACHE_SIZE_T int2e_sph(dtype *out, int n_out, int *dims, int *shls, int *atm, in
 
         //printf("[root=%i] %i %i %i %i]", nrys_roots, i_sh, j_sh, k_sh, l_sh);
         //fflush(stdout);
-        /*if (nrys_roots == 5){ 
+        /*if (nrys_roots == 5){
                 printf("[root=5 %i %i %i %i]", i_sh, j_sh, k_sh, l_sh);
                 fflush(stdout);
         }*/
@@ -7796,11 +7796,11 @@ CACHE_SIZE_T int2e_sph(dtype *out, int n_out, int *dims, int *shls, int *atm, in
         int g_stride_j = nrys_roots * dli * dlk * dll;
         int g_size     = nrys_roots * dli * dlk * dll * dlj;
 
-        int g2d_klmax; 
-        int g2d_ijmax; 
+        int g2d_klmax;
+        int g2d_ijmax;
 
-        dtype * rx_in_rklrx; 
-        dtype * rx_in_rijrx; 
+        dtype * rx_in_rklrx;
+        dtype * rx_in_rijrx;
         dtype rkrl[3];
         dtype rirj[3];
 
@@ -7859,10 +7859,10 @@ CACHE_SIZE_T int2e_sph(dtype *out, int n_out, int *dims, int *shls, int *atm, in
         counts[3] = (l_l*2+1) * x_ctr[3];
 
         if (out == NULL) {
-                int i_prim = bas(NPRIM_OF, shls[0]); 
-                int j_prim = bas(NPRIM_OF, shls[1]); 
-                int k_prim = bas(NPRIM_OF, shls[2]); 
-                int l_prim = bas(NPRIM_OF, shls[3]); 
+                int i_prim = bas(NPRIM_OF, shls[0]);
+                int j_prim = bas(NPRIM_OF, shls[1]);
+                int k_prim = bas(NPRIM_OF, shls[2]);
+                int l_prim = bas(NPRIM_OF, shls[3]);
                 size_t pdata_size = ((i_prim*j_prim + k_prim*l_prim) * 5 + i_prim * x_ctr[0]  + j_prim * x_ctr[1] + k_prim * x_ctr[2] + l_prim * x_ctr[3] +(i_prim+j_prim+k_prim+l_prim)*2 + nf*3);
                 size_t len0       = nf*n_comp;
                 size_t cache_size = MAX(leng+len0+nc*n_comp*3 + pdata_size, nc*n_comp+nf*4);
@@ -7879,7 +7879,7 @@ CACHE_SIZE_T int2e_sph(dtype *out, int n_out, int *dims, int *shls, int *atm, in
 
         if (test_CINT2e_loop_nopt){
                 #ifdef __cplusplus
-                // do compute 
+                // do compute
                 auto manager    = DeviceManager::createDeviceManager();
                 auto devices    = manager.getDevices(poplar::TargetType::IPU, 1);
                 auto it         = std::find_if(devices.begin(), devices.end(), [](Device &device) { return device.attach(); });
@@ -7897,10 +7897,10 @@ CACHE_SIZE_T int2e_sph(dtype *out, int n_out, int *dims, int *shls, int *atm, in
                 graph.setTileMapping(ipu_output, 0);
                 ComputeSet mulCS = graph.addComputeSet("mulCS");
 
-                auto v = graph.addVertex(mulCS, "poplar_CINT2e_loop_nopt", 
-                                        {{"ipu_input1", ipu_input1},  
+                auto v = graph.addVertex(mulCS, "poplar_CINT2e_loop_nopt",
+                                        {{"ipu_input1", ipu_input1},
                                         {"ipu_input2", ipu_input2},
-                                        {"ipu_output", ipu_output}}); 
+                                        {"ipu_output", ipu_output}});
 
                 graph.setTileMapping(v, 0);
 
@@ -7911,32 +7911,32 @@ CACHE_SIZE_T int2e_sph(dtype *out, int n_out, int *dims, int *shls, int *atm, in
                 auto inStreamV = graph.addHostToDeviceFIFO("ipu_input2", FLOAT, 35);
                 auto outStream = graph.addDeviceToHostFIFO("ipu_output", FLOAT, _n);
 
-                auto prog = Sequence({Copy(inStreamM, ipu_input1), 
-                                Copy(inStreamV, ipu_input2),  
-                                mulProg, 
+                auto prog = Sequence({Copy(inStreamM, ipu_input1),
+                                Copy(inStreamV, ipu_input2),
+                                mulProg,
                                 Copy(ipu_output, outStream)});
 
                 Engine engine(graph, prog);
                 engine.load(device);
 
-                //n_gctr + n_env, 
+                //n_gctr + n_env,
                 #endif
 
 
         }
-        CINT2e_loop_nopt(gctr, env, rk, ri, rj, rl, expcutoff, rkrl, rirj, 
-                         ai, aj, ak, al, fac, rij, rkl, rx_in_rijrx, rx_in_rklrx, 
-                         common_factor, (lk_ceil+ll_ceil+1), nc*n_comp, &empty, shls, bas, // ints after this 
-                n_env, _x_ctr[0], _x_ctr[1], _x_ctr[2], _x_ctr[3], 
-                ncomp_e1 * ncomp_e2 * ncomp_tensor, 
-                li_ceil, lj_ceil, lk_ceil, ll_ceil, i_l, 
-                j_l, k_l, l_l, nfi, nfj, nfk, nfl, nf, g_stride_i, g_stride_k, 
-                g_stride_l, g_stride_j, nrys_roots, ibase, kbase, g_size, g2d_klmax, g2d_ijmax, 
-                leng); 
+        CINT2e_loop_nopt(gctr, env, rk, ri, rj, rl, expcutoff, rkrl, rirj,
+                         ai, aj, ak, al, fac, rij, rkl, rx_in_rijrx, rx_in_rklrx,
+                         common_factor, (lk_ceil+ll_ceil+1), nc*n_comp, &empty, shls, bas, // ints after this
+                n_env, _x_ctr[0], _x_ctr[1], _x_ctr[2], _x_ctr[3],
+                ncomp_e1 * ncomp_e2 * ncomp_tensor,
+                li_ceil, lj_ceil, lk_ceil, ll_ceil, i_l,
+                j_l, k_l, l_l, nfi, nfj, nfk, nfl, nf, g_stride_i, g_stride_k,
+                g_stride_l, g_stride_j, nrys_roots, ibase, kbase, g_size, g2d_klmax, g2d_ijmax,
+                leng);
 
 
         if (test_CINT2e_loop_nopt){
-                // check that CPU output and gctr gives the same! 
+                // check that CPU output and gctr gives the same!
                 for (int i = 0; i < nc*n_comp; i++){
                         if (std::abs(gctr[i]-cpu_output[i])>1E-6){
                                 printf("|gctr[%i]=%f-cpu_output[%i]=%f|=%f>1E-6", i, gctr[i], i, cpu_output[i], std::abs(gctr[i]-cpu_output[i]) );
@@ -7953,10 +7953,10 @@ CACHE_SIZE_T int2e_sph(dtype *out, int n_out, int *dims, int *shls, int *atm, in
 
         if (!empty) {
                 for (n = 0; n < n_comp; n++) {
-                        // @alex; 
+                        // @alex;
                         // this one is a bit annoying, has a lot of dependencies...
-                        // just coped in function for simplicity.. 
-                        //c2s_sph_2e1(out+nout*n, gctr+nc*n, dims, &envs, cache);  
+                        // just coped in function for simplicity..
+                        //c2s_sph_2e1(out+nout*n, gctr+nc*n, dims, &envs, cache);
                         int di = i_l * 2 + 1;
                         int dj = j_l * 2 + 1;
                         int dk = k_l * 2 + 1;
@@ -7983,44 +7983,44 @@ CACHE_SIZE_T int2e_sph(dtype *out, int n_out, int *dims, int *shls, int *atm, in
 
 
                         dtype buf[3*buflen];
-                        dtype * buf1 = buf; 
-                        dtype * buf2 = buf+buflen; 
-                        dtype * buf3 = buf+buflen*2; 
-                        //dtype * buf4 = buf+buflen*3; 
+                        dtype * buf1 = buf;
+                        dtype * buf2 = buf+buflen;
+                        dtype * buf3 = buf+buflen*2;
+                        //dtype * buf4 = buf+buflen*3;
 
                         //printf("buflen=%i\t", buflen);
 
                         dtype *pout;
                         dtype *tmp1;
-                        dtype *_tmp; 
+                        dtype *_tmp;
 
                         for (lc = 0; lc < l_ctr; lc++) {
                                 for (kc = 0; kc < k_ctr; kc++) {
                                         for (jc = 0; jc < j_ctr; jc++) {
                                                 for (ic = 0; ic < i_ctr; ic++) {
-                                                        // max 2 in our case! 
-                                                        tmp1 = c2s_ket_sph[j_l](buf1, gctr, nfikl, nfikl, j_l); 
+                                                        // max 2 in our case!
+                                                        tmp1 = c2s_ket_sph[j_l](buf1, gctr, nfikl, nfikl, j_l);
                                                         //if (j_l > 1) printf("[j_l=%i]", j_l);
                                                         //for (int v = 0; v < buflen; v++) buf1[v] = 0;
                                                         //sph2e_inner(dtype *gsph, dtype *gcart, int l, int nbra, int ncall, int sizsph, int sizcart);
                                                         tmp1 = sph2e_inner(     buf2, tmp1, l_l, nfik, dj,  nfik*dl, nfikl);
                                                         tmp1 = sph2e_inner(     buf3, tmp1, k_l, nfi,  dlj, nfi*dk,  nfik);
                                                         for (int v = 0; v < nc*n_comp; v++) gctr[v] = tmp1[v];
-                                                        _tmp = c2s_bra_sph[i_l](buf1, dk*dlj, gctr, i_l); 
+                                                        _tmp = c2s_bra_sph[i_l](buf1, dk*dlj, gctr, i_l);
                                                         pout = out + ofl * lc + ofk * kc + ofj * jc + di * ic;
                                                         dcopy_iklj(pout, _tmp, ni, nj, nk, nl, di, dj, dk, dl);
 
-                                                        //gctr += nf; // WARNING: 
-                                                } 
-                                        } 
-                                } 
+                                                        //gctr += nf; // WARNING:
+                                                }
+                                        }
+                                }
                         }
 
                 }
-        } 
+        }
         else {
                 for (n = 0; n < n_comp; n++) {
-                        c2s_dset0(out+nout*n, dims, counts); 
+                        c2s_dset0(out+nout*n, dims, counts);
                 }
         }
 
@@ -8046,7 +8046,7 @@ void NPdset0(ddtype *p, const size_t n)
 #define NOVALUE 0xffffffff
 
 //#if !defined(HAVE_DEFINED_INTORENV_H)
-#define FINT int 
+#define FINT int
 
 typedef struct {
     FINT **index_xyz_array; // LMAX1**4 pointers to index_xyz
@@ -8055,11 +8055,11 @@ typedef struct {
     FINT nbas;
     ddtype **log_max_coeff;
     PairData **pairdata;  // NULL indicates not-initialized, NO_VALUE can be skipped
-} CINTOpt; 
+} CINTOpt;
 #define HAVE_DEFINED_INTORENV_H
 typedef struct {
-        int v_ket_nsh;  // v_ket_sh1 - v_ket_sh0 
-        int offset0_outptr;  // v_bra_sh0 * v_ket_nsh + v_ket_sh0 
+        int v_ket_nsh;  // v_ket_sh1 - v_ket_sh0
+        int offset0_outptr;  // v_bra_sh0 * v_ket_nsh + v_ket_sh0
         int dm_dims[2];
         int *outptr;   // Offset array to index the data which are stored in stack //
         ddtype *data;  // Stack to store data //
@@ -8077,7 +8077,7 @@ typedef struct CVHFOpt_struct {
     //int (*r_vkscreen)(int *shls, struct CVHFOpt_struct *opt,
     //                  ddtype **dms_cond, int n_dm, ddtype *dm_atleast,
     //                  int *atm, int *bas, ddtype *env);
-} CVHFOpt; 
+} CVHFOpt;
 
 typedef struct {
         int ibra_shl0;  // = 0, 2, 4, 6. The index in shls_slice
@@ -8175,7 +8175,7 @@ static void nrs8_jk_s1il(ddtype *eri, ddtype *dm, JKArray *out, int *shls, int i
 
 
  // for given ksh, lsh, loop all ish, jsh
- 
+
 void CVHFdot_nrs1(JKOperator **jkop, JKArray **vjk,
                   ddtype **dms, ddtype *buf, int n_buf, ddtype *cache, int n_dm,
                   int *ishls, int *jshls, int *kshls, int *lshls,
@@ -8188,9 +8188,9 @@ void CVHFdot_nrs1(JKOperator **jkop, JKArray **vjk,
                         for (ksh = ksh0; ksh < ksh1; ksh++) {
                                 for (lsh = lsh0; lsh < lsh1; lsh++) {
                                         INTOR_AND_CONTRACT;
-                                } 
-                        } 
-                } 
+                                }
+                        }
+                }
         }
 }
 
@@ -8291,8 +8291,8 @@ void CVHFdot_nrs8( JKOperator **jkop, JKArray **vjk,
                 //printf("A!\n");
                 return CVHFdot_nrs4(jkop, vjk, dms, buf, n_buf, cache, n_dm,
                                     ishls, jshls, kshls, lshls, vhfopt, envs, n_env);
-        } 
-        else if (ishls[0] < kshls[0]) return; 
+        }
+        else if (ishls[0] < kshls[0]) return;
         else if ((ishls[1] <= jshls[0]) || (kshls[1] <= lshls[0])) {
                 //assert(ishls[1] == kshls[1]);
                 return;
@@ -8308,7 +8308,7 @@ void CVHFdot_nrs8( JKOperator **jkop, JKArray **vjk,
                 for (jsh = jsh0; jsh < MIN(jsh1, ish+1); jsh++) {
                         for (ksh = ksh0; ksh <= ish; ksh++) {
                                 for (lsh = lsh0; lsh < MIN(lsh1, ksh+1); lsh++) {
-                                        // comment below is from libcint 
+                                        // comment below is from libcint
                         // when ksh==ish, (lsh<jsh) misses some integrals (eg k<i&&l>j).
                         // These integrals are calculated in the next (ish,jsh) pair. To show
                         // that, we just need to prove that every elements in shell^4 appeared
@@ -8319,23 +8319,23 @@ void CVHFdot_nrs8( JKOperator **jkop, JKArray **vjk,
                                         //INTOR_AND_CONTRACT;
 
 
-                                        shls[0] = ish; 
-                                        shls[1] = jsh; 
-                                        shls[2] = ksh; 
-                                        shls[3] = lsh; 
-                                        notempty = int2e_sph(buf, n_buf, NULL, shls, atm, natm, bas, nbas, env, n_env); 
-                                        if (notempty) { 
-                                                i0 = ao_loc[ish] - ioff; 
-                                                j0 = ao_loc[jsh] - joff; 
-                                                k0 = ao_loc[ksh] - koff; 
-                                                l0 = ao_loc[lsh] - loff; 
-                                                i1 = ao_loc[ish+1] - ioff; 
-                                                j1 = ao_loc[jsh+1] - joff; 
-                                                k1 = ao_loc[ksh+1] - koff; 
-                                                l1 = ao_loc[lsh+1] - loff; 
-                                                /*for (idm = 0; idm < n_dm; idm++) { 
-                                                        pf = jkop[idm]->contract; 
-                                                        (*pf)(buf, dms[idm], vjk[idm], shls, i0, i1, j0, j1, k0, k1, l0, l1); 
+                                        shls[0] = ish;
+                                        shls[1] = jsh;
+                                        shls[2] = ksh;
+                                        shls[3] = lsh;
+                                        notempty = int2e_sph(buf, n_buf, NULL, shls, atm, natm, bas, nbas, env, n_env);
+                                        if (notempty) {
+                                                i0 = ao_loc[ish] - ioff;
+                                                j0 = ao_loc[jsh] - joff;
+                                                k0 = ao_loc[ksh] - koff;
+                                                l0 = ao_loc[lsh] - loff;
+                                                i1 = ao_loc[ish+1] - ioff;
+                                                j1 = ao_loc[jsh+1] - joff;
+                                                k1 = ao_loc[ksh+1] - koff;
+                                                l1 = ao_loc[lsh+1] - loff;
+                                                /*for (idm = 0; idm < n_dm; idm++) {
+                                                        pf = jkop[idm]->contract;
+                                                        (*pf)(buf, dms[idm], vjk[idm], shls, i0, i1, j0, j1, k0, k1, l0, l1);
                                                 } */
 
 
@@ -8344,9 +8344,9 @@ void CVHFdot_nrs8( JKOperator **jkop, JKArray **vjk,
 
                                         }
 
-                                } 
-                        } 
-                } 
+                                }
+                        }
+                }
         }
 
 }
@@ -8390,9 +8390,9 @@ void CVHFdeallocate_JKArray(JKArray *jkarray)
         free(jkarray);
 }
 
-ddtype *CVHFallocate_and_reorder_dm(JKOperator *op, 
+ddtype *CVHFallocate_and_reorder_dm(JKOperator *op,
                                     ddtype *dm,
-                                    int *shls_slice, 
+                                    int *shls_slice,
                                     int *ao_loc) {
         int ibra = op->ibra_shl0;
         int iket = op->iket_shl0;
@@ -8417,9 +8417,9 @@ ddtype *CVHFallocate_and_reorder_dm(JKOperator *op,
                         for (i = i0; i < i1; i++) {
                                 for (j = j0; j < j1; j++, ij++) {
                                         out[ij] = dm[i*ncol+j];
-                                } 
+                                }
                         }
-                } 
+                }
         }
         return out;
 }
@@ -8458,7 +8458,7 @@ void CVHFassemble_v(ddtype *vjk, JKOperator *op, JKArray *jkarray, int *shls_sli
                 for (jsh = jsh0; jsh < jsh1; jsh++) {
                         //printf("%i %i\n", ish, jsh);
                         //fflush(stoud);
-                        
+
                         optr = jkarray->outptr[ish*njsh+jsh-jkarray->offset0_outptr];
                         if (optr != NOVALUE) {
                                 di = ao_loc[ish+1] - ao_loc[ish];
@@ -8474,7 +8474,7 @@ void CVHFassemble_v(ddtype *vjk, JKOperator *op, JKArray *jkarray, int *shls_sli
                                         data += di * dj;
                                 }
                         }
-                } 
+                }
         }
 }
 
@@ -8529,7 +8529,7 @@ static int _shls_block_partition_lim(int *block_loc, int *shls_slice,
 //
 // * drv loop over ij, generate eris of kl for given ij, call fjk to
 // * calculate vj, vk.
-// * 
+// *
 // * n_dm is the number of dms for one [array(ij|kl)], it is also the size of dms and vjk
 // * ncomp is the number of components that produced by intor
 // * shls_slice = [ishstart, ishend, jshstart, jshend, kshstart, kshend, lshstart, lshend]
@@ -8537,27 +8537,27 @@ static int _shls_block_partition_lim(int *block_loc, int *shls_slice,
 // * ao_loc[i+1] = ao_loc[i] + CINTcgto_spheric(i, bas)  for i = 0..nbas
 // *
 // * Return [(ptr[ncomp,nao,nao] in C-contiguous) for ptr in vjk]
-// 
-extern "C" void CVHFnr_direct_drv(//int (*intor)(), void (*fdot)(), 
-                       JKOperator **jkop, 
+//
+extern "C" void CVHFnr_direct_drv(//int (*intor)(), void (*fdot)(),
+                       JKOperator **jkop,
 
                        //input_type **dms, input_type **vjk,  // this is input and output, both of size (NAO, NAO)
-                        dtype *dm, 
+                        dtype *dm,
                         ddtype **vjk,  // this is input and output, both of size (NAO, NAO)
-                        //ddtype vjk, 
+                        //ddtype vjk,
 
                        int n_dm, int ncomp,
                        int *shls_slice, int *ao_loc,
-                       int *atm, int natm, int *bas, int nbas, 
-                       //input_type *env, 
-                       ddtype *env, 
+                       int *atm, int natm, int *bas, int nbas,
+                       //input_type *env,
+                       ddtype *env,
                        int n_env) {
-                        
 
-                auto vhfopt = NULL; 
-                auto cintopt = NULL; 
 
-       
+                auto vhfopt = NULL;
+                auto cintopt = NULL;
+
+
         IntorEnvs envs = {natm, nbas, atm, bas, env, shls_slice, ao_loc, NULL, cintopt, ncomp};
         int idm ;
         ddtype *tile_dms[2];
@@ -8580,7 +8580,7 @@ extern "C" void CVHFnr_direct_drv(//int (*intor)(), void (*fdot)(),
         int njsh = jsh1 - jsh0;
         int nksh = ksh1 - ksh0;
         int nlsh = lsh1 - lsh0;
-        int *block_iloc = malloc(sizeof(int) * (nish + njsh + nksh + nlsh + 4)); // this is new 
+        int *block_iloc = malloc(sizeof(int) * (nish + njsh + nksh + nlsh + 4)); // this is new
         int *block_jloc = block_iloc + nish + 1;
         int *block_kloc = block_jloc + njsh + 1;
         int *block_lloc = block_kloc + nksh + 1;
@@ -8593,14 +8593,14 @@ extern "C" void CVHFnr_direct_drv(//int (*intor)(), void (*fdot)(),
 
         size_t i, j, k, l, r, blk_id;
         JKArray *v_priv[2];
-        
+
         v_priv[0] = CVHFallocate_JKArray(jkop[0], shls_slice, ao_loc, ncomp);
         v_priv[1] = CVHFallocate_JKArray(jkop[1], shls_slice, ao_loc, ncomp);
 
         ddtype *buf = malloc(sizeof(ddtype)* ( di*di*di*di*ncomp + di*di*2 + cache_size ));
         int n_buf = di*di*di*di*ncomp + di*di*2 + cache_size;
         ddtype *cache = buf + di*di*di*di*ncomp;
-        
+
 
         for (blk_id = 0; blk_id < nblock_jkl; blk_id++) {
                 r = blk_id;
@@ -8611,19 +8611,19 @@ extern "C" void CVHFnr_direct_drv(//int (*intor)(), void (*fdot)(),
 
                 for (i = 0; i < nblock_i; i++) {
 
-                        //printf("[%i %i %i]\n", blk_id, i, nblock_i); 
+                        //printf("[%i %i %i]\n", blk_id, i, nblock_i);
                         //fflush(stdout);
                         CVHFdot_nrs8(jkop, v_priv, tile_dms, buf, n_buf, cache, n_dm, block_iloc+i, block_jloc+j, block_kloc+k, block_lloc+l, vhfopt, &envs, n_env);
                 }
-                
+
         }
 
 
         // move everything into output
-                
-        for (i = 0; i < n_dm; i++) { 
+
+        for (i = 0; i < n_dm; i++) {
                 CVHFassemble_v(vjk[i], jkop[i], v_priv[i], shls_slice, ao_loc);
-                CVHFdeallocate_JKArray(v_priv[i]); 
+                CVHFdeallocate_JKArray(v_priv[i]);
         }
 
         free(buf);
@@ -8632,10 +8632,10 @@ extern "C" void CVHFnr_direct_drv(//int (*intor)(), void (*fdot)(),
         }
         free(block_iloc);
 
-        return; 
+        return;
 }
 
-// FILE nr_direct_Dot.c file 
+// FILE nr_direct_Dot.c file
 
 #define ASSERT(expr, msg) \
         if (!(expr)) { fprintf(stderr, "Fail at %s\n", msg); exit(1); }

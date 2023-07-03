@@ -1,3 +1,4 @@
+# Copyright (c) 2023 Graphcore Ltd. All rights reserved.
 import matplotlib.pyplot as plt
 import numpy
 import numpy as np

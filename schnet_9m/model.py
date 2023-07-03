@@ -1,3 +1,4 @@
+# Copyright (c) 2023 Graphcore Ltd. All rights reserved.
 from typing import Optional, List
 import torch
 import torch.nn as nn

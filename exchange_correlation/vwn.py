@@ -1,9 +1,16 @@
+# The functional definition in this file was ported to Python
+# from XCFun, which is Copyright Ulf Ekström and contributors 2009-2020
+# and provided under the Mozilla Public License (v2.0)
+# see also:
+#   - https://github.com/dftlibs/xcfun
+#   - https://github.com/dftlibs/xcfun/blob/master/LICENSE.md
+
 import jax.numpy as jnp
 import jax
 import numpy as np
 
 def __vwn(n):
-        # Precompute stuff in np.float64 
+        # Precompute stuff in np.float64
         p     = np.array( [-0.10498, 0.0621813817393097900698817274255, 3.72744, 12.9352])
         f     = p[0] * p[2] / (p[0] * p[0] + p[0] * p[2] + p[3]) - 1.0
         f_inv_p1 = 1/f+1
@@ -19,7 +26,7 @@ def __vwn(n):
         )
         log_s_c =  np.log( 3.0 /(4*np.pi) ) / 6
 
-        # Below cast to same dtype as input (allow easier comparison between f32/f64). 
+        # Below cast to same dtype as input (allow easier comparison between f32/f64).
         dtype = n.dtype
         p = p.astype(dtype)
         f = f.astype(dtype)

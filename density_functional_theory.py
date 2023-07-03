@@ -1,3 +1,4 @@
+# Copyright (c) 2023 Graphcore Ltd. All rights reserved.
 import os
 os.environ['OMP_NUM_THREADS'] = "8"
 

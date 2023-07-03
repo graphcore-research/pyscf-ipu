@@ -1,6 +1,7 @@
-import numpy as np 
-import numpy 
-from pyscf import gto 
+# Copyright (c) 2023 Graphcore Ltd. All rights reserved.
+import numpy as np
+import numpy
+from pyscf import gto
 
 GROUP_BOX_SIZE = 1.2
 GROUP_BOUNDARY_PENALTY = 4.2
@@ -9,7 +10,7 @@ def arg_group_grids(mol, coords, box_size=GROUP_BOX_SIZE):
     Parition the entire space into small boxes according to the input box_size.
     Group the grids against these boxes.
     '''
-    import numpy 
+    import numpy
     atom_coords = mol.atom_coords()
     boundary = [atom_coords.min(axis=0) - GROUP_BOUNDARY_PENALTY, atom_coords.max(axis=0) + GROUP_BOUNDARY_PENALTY]
     # how many boxes inside the boundary
@@ -28,7 +29,7 @@ def arg_group_grids(mol, coords, box_size=GROUP_BOX_SIZE):
     return rev_idx.argsort(kind='stable')
 
 from pyscf.dft import radi
-import numpy 
+import numpy
 
 def original_becke(g):
     '''Becke, JCP 88, 2547 (1988); DOI:10.1063/1.454033'''
@@ -76,7 +77,7 @@ def _get_partition(mol, atom_grids_tab,
                 g = 1/atm_dist[i,j] * (grid_dist[i]-grid_dist[j])
                 if f_radii_adjust is not None:
                     g = f_radii_adjust(i, j, g)
-                #g = becke_scheme(g)# gets passed the one which returns None 
+                #g = becke_scheme(g)# gets passed the one which returns None
                 g = original_becke(g)
                 #print(g)
                 pbecke[i] *= .5 * (1-g)
@@ -111,7 +112,7 @@ def build_grid(self):
   mol = self.mol
 
   atom_grids_tab            = self.gen_atomic_grids( mol, self.atom_grid, self.radi_method, self.level, self.prune)
-  self.coords, self.weights = get_partition(self, mol, atom_grids_tab, self.radii_adjust, self.atomic_radii, self.becke_scheme) 
+  self.coords, self.weights = get_partition(self, mol, atom_grids_tab, self.radii_adjust, self.atomic_radii, self.becke_scheme)
   idx = arg_group_grids(mol, self.coords)
   self.coords  = self.coords[idx]
   self.weights = self.weights[idx]
