@@ -13,19 +13,17 @@ Limitations
 
 PySCF on IPU requires Python 3.8, and Graphcore SDK 3.2.
 
-Install the base Python requirements:
+To run this package on a standard CPU machine (laptop or server ), 
+install the base Python requirements:
 ```bash
 pip install -r requirements.txt
 ```
-If running on a CPU machine (laptop or server), just install the standard `jax`:
+
+On IPU machines, please use the IPU requirements file:
 ```bash
-pip install jax==0.3.16 jaxlib==0.3.15
+pip install -r requirements_ipu.txt
 ```
-On IPU machines, please use Graphcore research experimental JAX:
-```bash
-pip install jax==0.3.16+ipu jaxlib==0.3.15+ipu.sdk320 -f https://graphcore-research.github.io/jax-experimental/wheels.html
-pip install git+https://github.com/graphcore-research/jax-ipu-experimental-addons.git@main
-```
+This will configure Graphcore research experimental JAX support in your python environment.
 
 ## Example DFT Computations
 The following commands may be useful to check the installation. Each command runs a test-case which compares PySCF against our DFT computation using different options. 
