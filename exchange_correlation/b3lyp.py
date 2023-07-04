@@ -1,3 +1,4 @@
+# Copyright (c) 2023 Graphcore Ltd. All rights reserved.
 import jax.numpy as jnp
 import jax
 
@@ -28,7 +29,7 @@ def b3lyp(rho, EPSILON_B3LYP=0):
     def lda(rho0):        return jax.vmap(jax.value_and_grad(lambda x: __lda(x)*0.08)) (rho0)
     def vwn(rho0):        return jax.vmap(jax.value_and_grad(lambda x: __vwn(x)*0.19)) (rho0)
 
-    # disabled gradient checkpointing 
+    # disabled gradient checkpointing
     #def b88(rho0, norms): return jax.vmap(jax.value_and_grad(lambda rho0, norm: jax.checkpoint(__b88)(rho0, norm)*0.72, (0, 1))) (rho0, norms)
     #def lyp(rho0, norms): return jax.vmap(jax.value_and_grad(lambda rho0, norm: jax.checkpoint(__lyp)(rho0, norm)*0.810, (0, 1))) (rho0, norms)
 

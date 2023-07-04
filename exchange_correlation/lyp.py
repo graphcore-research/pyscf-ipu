@@ -1,3 +1,10 @@
+# The functional definition in this file was ported to Python
+# from XCFun, which is Copyright Ulf Ekström and contributors 2009-2020
+# and provided under the Mozilla Public License (v2.0)
+# see also:
+#   - https://github.com/dftlibs/xcfun
+#   - https://github.com/dftlibs/xcfun/blob/master/LICENSE.md
+
 import jax
 import jax.numpy as jnp
 import numpy

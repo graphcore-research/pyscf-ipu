@@ -1,3 +1,4 @@
+# Copyright (c) 2023 Graphcore Ltd. All rights reserved.
 from typing import Optional, List
 from torch import Tensor
 from torch.nn import Module

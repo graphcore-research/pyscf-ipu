@@ -1,5 +1,6 @@
 /*
-        This code implements the integral computation on IPU. 
+        This code implements the integral computation on IPU.
+        It is based on https://github.com/sunqm/libcint
 */
 #include <poplar/Vertex.hpp>
 #include <algorithm>
@@ -23,8 +24,8 @@ using namespace poplar;
 #define NAMESPACE std
 #endif
 
-#define dtype float 
-#define input_type float 
+#define dtype float
+#define input_type float
 
 #define M_PI (float)3.1415926535897932384626433832795028841971693993751058209749445923078164062
 #define PIE4 (float)0.78539816339744827900
@@ -74,7 +75,7 @@ static float ROOTS_FOR_X0[]   = {0.5, 0.13069360623708471, 2.86930639376291528, 
 static float WEIGHTS_FOR_X0[] = {1.0, 0.65214515486254614, 0.34785484513745385, 0.46791393457269104, 0.36076157304813860, 0.17132449237917034, 0.36268378337836198, 0.31370664587788728, 0.22238103445337447, 0.10122853629037625, 0.29552422471475287, 0.26926671930999635, 0.21908636251598204, 0.14945134915058059, 0.06667134430868813, 0.24914704581340278, 0.23349253653835480, 0.20316742672306592, 0.16007832854334622, 0.10693932599531843, 0.04717533638651182, 0.21526385346315779, 0.20519846372129560, 0.18553839747793781, 0.15720316715819353, 0.12151857068790318, 0.08015808715976020, 0.03511946033175186, 0.18945061045506849, 0.18260341504492358, 0.16915651939500253, 0.14959598881657673, 0.12462897125553387, 0.09515851168249278, 0.06225352393864789, 0.02715245941175409, 0.16914238296314359, 0.16427648374583272, 0.15468467512626524, 0.14064291467065065, 0.12255520671147846, 0.10094204410628716, 0.07642573025488905, 0.04971454889496979, 0.02161601352648331, 0.15275338713072585, 0.14917298647260374, 0.14209610931838205, 0.13168863844917662, 0.11819453196151841, 0.10193011981724043, 0.08327674157670474, 0.06267204833410906, 0.04060142980038694, 0.01761400713915211, 0.13925187285563199, 0.13654149834601517, 0.13117350478706237, 0.12325237681051242, 0.11293229608053921, 0.10041414444288096, 0.08594160621706772, 0.06979646842452048, 0.05229333515268328, 0.03377490158481415, 0.01462799529827220, 0.12793819534675215, 0.12583745634682829, 0.12167047292780339, 0.11550566805372560, 0.10744427011596563, 0.09761865210411388, 0.08619016153195327, 0.07334648141108030, 0.05929858491543678, 0.04427743881741980, 0.02853138862893366, 0.01234122979998719, 0.11832141527926227, 0.11666044348529658, 0.11336181654631966, 0.10847184052857659, 0.10205916109442542, 0.09421380035591414, 0.08504589431348523, 0.07468414976565974, 0.06327404632957483, 0.05097582529714781, 0.03796238329436276, 0.02441785109263190, 0.01055137261734300, 0.11004701301647519, 0.10871119225829413, 0.10605576592284641, 0.10211296757806076, 0.09693065799792991, 0.09057174439303284, 0.08311341722890121, 0.07464621423456877, 0.06527292396699959, 0.05510734567571674, 0.04427293475900422, 0.03290142778230437, 0.02113211259277125, 0.00912428259309451, 0.10285265289355884, 0.10176238974840550, 0.09959342058679526, 0.09636873717464425, 0.09212252223778612, 0.08689978720108297, 0.08075589522942021, 0.07375597473770520, 0.06597422988218049, 0.05749315621761906, 0.04840267283059405, 0.03879919256962704, 0.02878470788332336, 0.01846646831109095, 0.00796819249616660, 0.09654008851472780, 0.09563872007927485, 0.09384439908080456, 0.09117387869576388, 0.08765209300440381, 0.08331192422694675, 0.07819389578707030, 0.07234579410884850, 0.06582222277636184, 0.05868409347853554, 0.05099805926237617, 0.04283589802222668, 0.03427386291302143, 0.02539206530926205, 0.01627439473090567, 0.00701861000947009, 0.09095674033025987, 0.09020304437064072, 0.08870189783569386, 0.08646573974703574, 0.08351309969984565, 0.07986844433977184, 0.07556197466003193, 0.07062937581425572, 0.06511152155407641, 0.05905413582752449, 0.05250741457267810, 0.04552561152335327, 0.03816659379638751, 0.03049138063844613, 0.02256372198549497, 0.01445016274859503, 0.00622914055590868, 0.08598327567039474, 0.08534668573933862, 0.08407821897966193, 0.08218726670433970, 0.07968782891207160, 0.07659841064587067, 0.07294188500565306, 0.06874532383573644, 0.06403979735501548, 0.05886014424532481, 0.05324471397775991, 0.04723508349026597, 0.04087575092364489, 0.03421381077030722, 0.02729862149856877, 0.02018151529773547, 0.01291594728406557, 0.00556571966424504, 0.08152502928038578, 0.08098249377059710, 0.07990103324352782, 0.07828784465821094, 0.07615366354844639, 0.07351269258474345, 0.07038250706689895, 0.06678393797914041, 0.06274093339213305, 0.05828039914699720, 0.05343201991033231, 0.04822806186075868, 0.04270315850467443, 0.03689408159402473, 0.03083950054517505, 0.02457973973823237, 0.01815657770961323, 0.01161344471646867, 0.00500288074963934, 0.07750594797842481, 0.07703981816424796, 0.07611036190062624, 0.07472316905796826, 0.07288658239580405, 0.07061164739128677, 0.06791204581523390, 0.06480401345660103, 0.06130624249292893, 0.05743976909939155, 0.05322784698393682, 0.04869580763507223, 0.04387090818567327, 0.03878216797447201, 0.03346019528254784, 0.02793700698002340, 0.02224584919416695, 0.01642105838190788, 0.01049828453115281, 0.00452127709853319, 0.07386423423217287, 0.07346081345346752, 0.07265617524380410, 0.07145471426517098, 0.06986299249259415, 0.06788970337652194, 0.06554562436490897, 0.06284355804500257, 0.05979826222758665, 0.05642636935801838, 0.05274629569917407, 0.04877814079280324, 0.04454357777196587, 0.04006573518069226, 0.03536907109759211, 0.03047924069960346, 0.02542295952611304, 0.02022786956905264, 0.01492244369735749, 0.00953622030174850, 0.00410599860464908, 0.07054915778935406, 0.07019768547355821, 0.06949649186157257, 0.06844907026936666, 0.06706063890629365, 0.06533811487918143, 0.06329007973320385, 0.06092673670156196, 0.05825985987759549, 0.05530273556372805, 0.05207009609170446, 0.04857804644835203, 0.04484398408197003, 0.04088651231034621, 0.03672534781380887, 0.03238122281206982, 0.02787578282128101, 0.02323148190201921, 0.01847148173681474, 0.01361958675557998, 0.00870048136752484, 0.00374540480311277, 0.06751868584903645, 0.06721061360067817, 0.06659587476845488, 0.06567727426778120, 0.06445900346713906, 0.06294662106439450, 0.06114702772465048, 0.05906843459554631, 0.05672032584399123, 0.05411341538585675, 0.05125959800714302, 0.04817189510171220, 0.04486439527731812, 0.04135219010967872, 0.03765130535738607, 0.03377862799910689, 0.02975182955220275, 0.02558928639713001, 0.02130999875413650, 0.01693351400783623, 0.01247988377098868, 0.00796989822972462, 0.00343030086810704, 0.06473769681268392, 0.06446616443595008, 0.06392423858464818, 0.06311419228625402, 0.06203942315989266, 0.06070443916589388, 0.05911483969839563, 0.05727729210040321, 0.05519950369998416, 0.05289018948519366, 0.05035903555385447, 0.04761665849249047, 0.04467456085669428, 0.04154508294346474, 0.03824135106583070, 0.03477722256477043, 0.03116722783279808, 0.02742650970835694, 0.02357076083932437, 0.01961616045735552, 0.01557931572294384, 0.01147723457923453, 0.00732755390127626, 0.00315334605230583, 0.06217661665534726, 0.06193606742068324, 0.06145589959031666, 0.06073797084177021, 0.05978505870426545, 0.05860084981322244, 0.05718992564772838, 0.05555774480621251, 0.05371062188899624, 0.05165570306958113, 0.04940093844946631, 0.04695505130394843, 0.04432750433880327, 0.04152846309014769, 0.03856875661258767, 0.03545983561514615, 0.03221372822357801, 0.02884299358053519, 0.02536067357001239, 0.02178024317012479, 0.01811556071348939, 0.01438082276148557, 0.01059054838365096, 0.00675979919574540, 0.00290862255315514, 0.05981036574529186, 0.05959626017124815, 0.05916881546604297, 0.05852956177181386, 0.05768078745252682, 0.05662553090236859, 0.05536756966930265, 0.05391140693275726, 0.05226225538390699, 0.05042601856634237, 0.04840926974407489, 0.04621922837278479, 0.04386373425900040, 0.04135121950056027, 0.03869067831042397, 0.03589163483509723, 0.03296410908971879, 0.02991858114714394, 0.02676595374650401, 0.02351751355398446, 0.02018489150798079, 0.01678002339630073, 0.01331511498234096, 0.00980263457946275, 0.00625552396297327, 0.00269131695004711, 0.05761753670714702, 0.05742613705411211, 0.05704397355879459, 0.05647231573062596, 0.05571306256058998, 0.05476873621305798, 0.05364247364755361, 0.05233801619829874, 0.05085969714618814, 0.04921242732452888, 0.04740167880644499, 0.04543346672827671, 0.04331432930959701, 0.04105130613664497, 0.03865191478210251, 0.03612412584038355, 0.03347633646437264, 0.03071734249787067, 0.02785630931059587, 0.02490274146720877, 0.02186645142285308, 0.01875752762146937, 0.01558630303592413, 0.01236332812884764, 0.00909936945550939, 0.00580561101523998, 0.00249748183576158, 0.05557974630651439, 0.05540795250324512, 0.05506489590176242, 0.05455163687088942, 0.05386976186571448, 0.05302137852401076, 0.05200910915174139, 0.05083608261779848, 0.04950592468304757, 0.04802274679360025, 0.04639113337300189, 0.04461612765269228, 0.04270321608466708, 0.04065831138474451, 0.03848773425924766, 0.03619819387231518, 0.03379676711561176, 0.03129087674731044, 0.02868826847382274, 0.02599698705839195, 0.02322535156256531, 0.02038192988240257, 0.01747551291140094, 0.01451508927802147, 0.01150982434038338, 0.00846906316330788, 0.00540252224601533, 0.00232385537577321, 0.05368111986333484, 0.05352634330405825, 0.05321723644657901, 0.05275469052637083, 0.05214003918366981, 0.05137505461828572, 0.05046194247995312, 0.04940333550896239, 0.04820228594541774, 0.04686225672902634, 0.04538711151481980, 0.04378110353364025, 0.04204886332958212, 0.04019538540986779, 0.03822601384585843, 0.03614642686708727, 0.03396262049341601, 0.03168089125380932, 0.02930781804416049, 0.02685024318198186, 0.02431525272496395, 0.02171015614014623, 0.01904246546189340, 0.01631987423497096, 0.01355023711298881, 0.01074155353287877, 0.00790197384999867, 0.00503998161265024, 0.00216772324962744, 0.05190787763122063, 0.05176794317491017, 0.05148845150098092, 0.05107015606985562, 0.05051418453250936, 0.04982203569055017, 0.04899557545575683, 0.04803703181997117, 0.04694898884891220, 0.04573437971611448, 0.04439647879578711, 0.04293889283593564, 0.04136555123558475, 0.03968069545238080, 0.03788886756924344, 0.03599489805108450, 0.03400389272494642, 0.03192121901929633, 0.02975249150078894, 0.02750355674992479, 0.02518047762152125, 0.02278951694399782, 0.02033712072945729, 0.01782990101420772, 0.01527461859678480, 0.01267816647681596, 0.01004755718228798, 0.00738993116334545, 0.00471272992695356, 0.00202681196887375, 0.05024800037525557, 0.05012106956904260, 0.04986752859495174, 0.04948801791969869, 0.04898349622051730, 0.04835523796347721, 0.04760483018410085, 0.04673416847841523, 0.04574545221456998, 0.04464117897712430, 0.04342413825804739, 0.04209740441038514, 0.04066432888241756, 0.03912853175196327, 0.03749389258228027, 0.03576454062276843, 0.03394484437941086, 0.03203940058162502, 0.03005302257399023, 0.02799072816331500, 0.02585772695402506, 0.02365940720868315, 0.02140132227767030, 0.01908917665857351, 0.01672881179017760, 0.01432619182380677, 0.01188739011701071, 0.00941857942842056, 0.00692604190183109, 0.00441633345693098, 0.00189920567951372, };
 
 
-dtype CINTcommon_fac_sp(int l) 
+dtype CINTcommon_fac_sp(int l)
 {
         switch (l) {
                 case 0: return 0.282094791773878143;
@@ -84,47 +85,47 @@ dtype CINTcommon_fac_sp(int l)
 }
 
 
-//dtype _sqrt(dtype num) {return num;} 
-//dtype _sqrt(dtype num) {return sqrt(num);} 
-dtype _sqrt(dtype num) { return exp(log(num)*1/2);} 
-//dtype _sqrt(dtype num) { return num;} 
+//dtype _sqrt(dtype num) {return num;}
+//dtype _sqrt(dtype num) {return sqrt(num);}
+dtype _sqrt(dtype num) { return exp(log(num)*1/2);}
+//dtype _sqrt(dtype num) { return num;}
 
 //static void rys_root1(dtype X, dtype *roots,  Output<Vector<float>> weights, int g_size) {
 static void rys_root1(dtype X, dtype *roots,  float* weights, int g_size) {
         dtype Y, F1;
 
 
-        if (X > (float)33.) { 
-                weights[0+g_size*2] = _sqrt(PIE4/X);  
-                roots  [0         ] = (float)0.5E+00 / ( X - (float)0.5E+00 ); 
-                return; 
+        if (X > (float)33.) {
+                weights[0+g_size*2] = _sqrt(PIE4/X);
+                roots  [0         ] = (float)0.5E+00 / ( X - (float)0.5E+00 );
+                return;
         }
-        else if ( X < (float)3.e-7 ) { 
-                weights[0+g_size*2] = (float)1.0E+00 - X / (float)3.0E+00; 
-                roots  [0         ] = (float)0.5E+00 - X / (float)5.0E+00; 
-                return; 
+        else if ( X < (float)3.e-7 ) {
+                weights[0+g_size*2] = (float)1.0E+00 - X / (float)3.0E+00;
+                roots  [0         ] = (float)0.5E+00 - X / (float)5.0E+00;
+                return;
         }
 
-        dtype E = exp(-X); 
+        dtype E = exp(-X);
 
 
         if (X > (float)15.) {
                 F1 = ((( ( (float)1.9623264149430E-01) / X - (float)4.9695241464490E-01) / X -
                            (float)6.0156581186481E-05)* E + _sqrt(PIE4/X) - E) / X * (float)0.5;
-        } 
+        }
         else if (X > (float)10.) {
                 Y = (float)1./X;
                 F1 = ((((-(float)1.8784686463512E-01*Y+(float)2.2991849164985E-01)*Y -
                           (float)4.9893752514047E-01)*Y-(float)2.1916512131607E-05)* E
                         + _sqrt(PIE4/X) - E)*Y*(float)0.5;
-        } 
+        }
         else if (X > (float)5.) {
                 Y = (float)1./X;
                 F1 = ((((((( (float)4.6897511375022E-01*Y-(float)6.9955602298985E-01)*Y +
                              (float)5.3689283271887E-01)*Y-(float)3.2883030418398E-01)*Y +
                              (float)2.4645596956002E-01)*Y-(float)4.9984072848436E-01)*Y -
                              (float)3.1501078774085E-06)* E + _sqrt(PIE4/X) - E)*Y*(float)0.5;
-        } 
+        }
         else if (X > (float)3.){
                 Y = X-(float)4.0E+00;
                 F1 = ((((((((((-(float)2.62453564772299E-11*Y+(float)3.24031041623823E-10 )*Y-
@@ -133,7 +134,7 @@ static void rys_root1(dtype X, dtype *roots,  float* weights, int g_size) {
                           (float)2.290098979647E-05)*Y+(float)1.526537461148E-04)*Y-
                         (float)8.81947375894379E-04 )*Y+(float)4.33207949514611E-03 )*Y-
                       (float)1.75257821619926E-02 )*Y+(float)5.28406320615584E-02;
-        } 
+        }
         else if (X > (float)1.) {
                 Y = X-(float)2.0E+00;
                 F1 = ((((((((((-(float)1.61702782425558E-10 *Y+(float)1.96215250865776E-09 )*Y-
@@ -142,8 +143,8 @@ static void rys_root1(dtype X, dtype *roots,  float* weights, int g_size) {
                                 (float)1.16740298039895E-04)*Y+(float)7.24888732052332E-04 )*Y-
                                 (float)3.79490003707156E-03)*Y+(float)1.61723488664661E-02 )*Y-
                                 (float)5.29428148329736E-02)*Y+(float)1.15702180856167E-01;
-        } 
-        else { 
+        }
+        else {
                 F1 = ((((((((-(float)8.36313918003957E-08 *X + (float)1.21222603512827E-06)*X-
                               (float)1.15662609053481E-05)*X + (float)9.25197374512647E-05)*X-
                               (float)6.40994113129432E-04)*X + (float)3.78787044215009E-03)*X-
@@ -151,13 +152,13 @@ static void rys_root1(dtype X, dtype *roots,  float* weights, int g_size) {
                               (float)1.99999999997023E-01)*X + (float)3.33333333333318E-01;
         }
 
-        dtype WW1 = (float)2. * X * F1 + E; 
-        weights[0+g_size*2] = WW1; 
+        dtype WW1 = (float)2. * X * F1 + E;
+        weights[0+g_size*2] = WW1;
         roots[0] = F1 / (WW1 - F1);
 }
 
-static void rys_root2(dtype X, dtype *roots, float* weights, int g_size) { 
-        // added (float) to all 2.12312E-01 numbers; 
+static void rys_root2(dtype X, dtype *roots, float* weights, int g_size) {
+        // added (float) to all 2.12312E-01 numbers;
         dtype R12, R22, W22;
 
         dtype RT1, RT2, WW1, WW2;
@@ -172,7 +173,7 @@ static void rys_root2(dtype X, dtype *roots, float* weights, int g_size) {
                 RT2 = (float)2.86930639376291E+00 -(float)6.37623643058102E-01 *X;
                 WW1 = (float)6.52145154862545E-01 -(float)1.22713621927067E-01 *X;
                 WW2 = (float)3.47854845137453E-01 -(float)2.10619711404725E-01 *X;
-        } 
+        }
         else if (X < (float)1.) {
                 F1 = ((((((((-(float)8.36313918003957E-08*X+(float)1.21222603512827E-06 )*X-
                             (float)1.15662609053481E-05 )*X+(float)9.25197374512647E-05 )*X-
@@ -198,8 +199,8 @@ static void rys_root2(dtype X, dtype *roots, float* weights, int g_size) {
 
                 WW1 = WW1-WW2;
 
-        } 
-        else if (X < (float)3.) { 
+        }
+        else if (X < (float)3.) {
 
                 Y = X-(float)2.0E+00;
                 F1 = ((((((((((-(float)1.61702782425558E-10*Y+(float)1.96215250865776E-09 )*Y-
@@ -207,14 +208,14 @@ static void rys_root2(dtype X, dtype *roots, float* weights, int g_size) {
                             (float)1.98850171329371E-06 )*Y+(float)1.62429321438911E-05 )*Y-
                           (float)1.16740298039895E-04 )*Y+(float)7.24888732052332E-04 )*Y-
                         (float)3.79490003707156E-03 )*Y+(float)1.61723488664661E-02 )*Y-
-                      (float)5.29428148329736E-02 )*Y+(float)1.15702180856167E-01; // 800k cycles 
+                      (float)5.29428148329736E-02 )*Y+(float)1.15702180856167E-01; // 800k cycles
                 WW1 = (X+X)*F1+exp(-X);
                 RT1 = (((((((((-(float)6.36859636616415E-12*Y+(float)8.47417064776270E-11)*Y-
                               (float)5.152207846962E-10)*Y-(float)3.846389873308E-10)*Y+
                             (float)8.472253388380E-08)*Y-(float)1.85306035634293E-06 )*Y+
                           (float)2.47191693238413E-05 )*Y-(float)2.49018321709815E-04 )*Y+
                         (float)2.19173220020161E-03 )*Y-(float)1.63329339286794E-02 )*Y+
-                        (float)8.68085688285261E-02; // 800k cycles 
+                        (float)8.68085688285261E-02; // 800k cycles
                 RT2 = ((((((((( (float)1.45331350488343E-10*Y+(float)2.07111465297976E-09)*Y-
                               (float)1.878920917404E-08)*Y-(float)1.725838516261E-07)*Y+
                             (float)2.247389642339E-06)*Y+(float)9.76783813082564E-06 )*Y-
@@ -223,8 +224,8 @@ static void rys_root2(dtype X, dtype *roots, float* weights, int g_size) {
                         (float)1.80400974537950E+00; // 800k cycles
                 WW2 = ((F1-WW1)*RT1+F1)*((float)1.0E+00+RT2)/(RT2-RT1);
                 WW1 = WW1-WW2;
-        } 
-        
+        }
+
         else if (X < (float)5.){
 
                 Y = X-(float)4.0E+00;
@@ -319,7 +320,7 @@ static void rys_root2(dtype X, dtype *roots, float* weights, int g_size) {
                 RT2 = R22/(X-R22);
                 WW2 = W22*WW1;
                 WW1 = WW1-WW2;
-        } 
+        }
         roots[0] = RT1;
         roots[1] = RT2;
         weights[0+g_size*2] = WW1;
@@ -331,7 +332,7 @@ static void rys_root2(dtype X, dtype *roots, float* weights, int g_size) {
 static void rys_root3(dtype X, dtype *roots, float* weights, int g_size) {
 
         dtype R13, R23, W23, R33, W33;
-        dtype RT1, RT2, RT3, WW1, WW2, WW3; 
+        dtype RT1, RT2, RT3, WW1, WW2, WW3;
         dtype F1, F2, E, T1, T2, T3, A1, A2, Y;
 
         R13 = (float)1.90163509193487E-01;
@@ -519,7 +520,7 @@ static void rys_root3(dtype X, dtype *roots, float* weights, int g_size) {
                 WW3 = (A2-T2*A1)/((T3-T2)*(T3-T1));
                 WW2 = (T3*A1-A2)/((T3-T2)*(T2-T1));
                 WW1 = WW1-WW2-WW3;
-        } 
+        }
         else if (X < (float)33) {
                 E = exp(-X);
                 WW1 = (( (float)1.9623264149430E-01/X-(float)4.9695241464490E-01)/X -
@@ -565,7 +566,7 @@ static void rys_root3(dtype X, dtype *roots, float* weights, int g_size) {
                 A1 = F1-T1*WW1;
                 WW3 = (A2-T2*A1)/((T3-T2)*(T3-T1));
                 WW2 = (T3*A1-A2)/((T3-T2)*(T2-T1));
-                WW1 = WW1-WW2-WW3; 
+                WW1 = WW1-WW2-WW3;
         } else if (X < (float)47) {
                 WW1 = _sqrt(PIE4/X);
                 E = exp(-X);
@@ -598,9 +599,9 @@ static void rys_root3(dtype X, dtype *roots, float* weights, int g_size) {
         weights[2+g_size*2] = WW3;
 }
 
-static void rys_root4(dtype X, dtype *roots, 
-//Output<Vector<float>> weights, int g_size) 
-float* weights, int g_size) 
+static void rys_root4(dtype X, dtype *roots,
+//Output<Vector<float>> weights, int g_size)
+float* weights, int g_size)
 {
         dtype R14, R24, W24, R34, W34, R44, W44;
         dtype RT1, RT2, RT3, RT4, WW1, WW2, WW3, WW4;
@@ -903,7 +904,7 @@ float* weights, int g_size)
                          (float)1.70830039597097E+04)*X-(float)2.90517939780207E+05)*X +
                        ((float)3.49059698304732E+07/X-(float)1.64944522586065E+07)/X +
                        (float)2.96817940164703E+06)*E + R44/(X-R44);
-                if (X <= (float)25) 
+                if (X <= (float)25)
                         WW4 = ((((((( (float)2.33766206773151E-07*X-
                                       (float)3.81542906607063E-05)*X +(float)3.51416601267000E-03)*X-
                                    (float)1.66538571864728E-01)*X +(float)4.80006136831847E+00)*X-
@@ -928,7 +929,7 @@ float* weights, int g_size)
                        (float)6.0156581186481E-05)*E + WW1-WW2-WW3-WW4;
         } else if (X <= (float)53) {
                 WW1 = _sqrt(PIE4/X);
-                E = exp(-X)*pow(X,4); 
+                E = exp(-X)*pow(X,4);
                 RT4 = ((-(float)2.19135070169653E-03*X-(float)1.19108256987623E-01)*X -
                        (float)7.50238795695573E-01)*E + R44/(X-R44);
                 RT3 = ((-(float)9.65842534508637E-04*X-(float)4.49822013469279E-02)*X +
@@ -966,9 +967,9 @@ float* weights, int g_size)
 }
 
 // this is called for 6-31G*
-static void rys_root5(dtype X, dtype *roots,  
-//Output<Vector<float>> weights, int g_size) 
-float* weights, int g_size) 
+static void rys_root5(dtype X, dtype *roots,
+//Output<Vector<float>> weights, int g_size)
+float* weights, int g_size)
 {
         dtype R15,R25,W25,R35,W35,R45,W45,R55,W55;
         dtype RT1, RT2, RT3, RT4, RT5, WW1, WW2, WW3, WW4, WW5;
@@ -1471,7 +1472,7 @@ float* weights, int g_size)
         weights[4+g_size*2] = WW5;
 }
 
-void CINTg0_2e_2d(float* g, int g_len, 
+void CINTg0_2e_2d(float* g, int g_len,
         int nroots, int nmax, int mmax, int dm, int dn, int g_size
         ,const dtype *__bcc00, const dtype *__bcc0p, int bcc0_len,
         const dtype *b01, const dtype *b00, const dtype *b10 , int b_len
@@ -1481,8 +1482,8 @@ void CINTg0_2e_2d(float* g, int g_len,
 
         //int i, j, m, n, off;
         unsigned short i, j, m, n, off;
-        dtype *gx = g; 
-        dtype *gy = g + g_size; 
+        dtype *gx = g;
+        dtype *gy = g + g_size;
         dtype *gz = g + g_size * 2;
 
         const float *c00;
@@ -1498,7 +1499,7 @@ void CINTg0_2e_2d(float* g, int g_len,
         }
 
 
-        // 200k 
+        // 200k
         if (nmax > 0) {
                 // gx(irys,0,1) = c00(irys) * gx(irys,0,0)
                 //for (c00 = __bcc00, i = 0; i < nroots; i++, c00+=3) {
@@ -1520,13 +1521,13 @@ void CINTg0_2e_2d(float* g, int g_len,
                                 g[j+dn         ] = c00[0] * g[j         ] + n * b10[i] * g[j-dn         ];
                                 g[j+dn+g_size  ] = c00[1] * g[j+g_size  ] + n * b10[i] * g[j-dn+g_size  ];
                                 g[j+dn+g_size*2] = c00[2] * g[j+g_size*2] + n * b10[i] * g[j-dn+g_size*2];
-                                j++; 
+                                j++;
                                 c00+=3;
                         }
                 }
         }
 
-        // 200k 
+        // 200k
         if (mmax > 0) {
                 // gx(irys,1,0) = c0p(irys) * gx(irys,0,0)
                 for (c0p = __bcc0p, i = 0; i < nroots; i++, c0p+=3) {
@@ -1546,7 +1547,7 @@ void CINTg0_2e_2d(float* g, int g_len,
                 }
         }
 
-        // 400k 
+        // 400k
         if (nmax > 0 && mmax > 0) {
                 // gx(irys,1,1) = c0p(irys)*gx(irys,0,1)
                 // + b00(irys)*gx(irys,0,0)
@@ -1583,7 +1584,7 @@ void CINTg0_2e_2d(float* g, int g_len,
                         }
                 }
         }
-        
+
 
 }
 
@@ -1593,7 +1594,7 @@ void CINTg0_2e_2d(float* g, int g_len,
  * g0[i,k,l,j] = < ik | lj > = ( i j | k l )
  */
 /* 2d is based on l,j */
-void CINTg0_lj2d_4d(float* g, int g_len, 
+void CINTg0_lj2d_4d(float* g, int g_len,
         int nmax, int mmax, int li, int lk, int lj, int nroots, int di,
         int dk, int dl, int dj, const dtype *rirj, const dtype *rkrl, int g_size) {
 
@@ -1620,8 +1621,8 @@ void CINTg0_lj2d_4d(float* g, int g_len,
                                         g[n+g_size  ] = ry * g[n-di+g_size]     + g[n-di+dj+g_size  ];
                                         g[n+g_size*2] = rz * g[n-di+g_size*2]   + g[n-di+dj+g_size*2];
                                 }
-                        } 
-                } 
+                        }
+                }
         }
 
         // g(...,k,l,..) = rkrl * g(...,k-1,l,..) + g(...,k-1,l+1,..)
@@ -1634,8 +1635,8 @@ void CINTg0_lj2d_4d(float* g, int g_len,
                                         g[n+g_size  ] = _ry * g[n-dk+g_size  ] + g[n-dk+dl+g_size];
                                         g[n+g_size*2] = _rz * g[n-dk+g_size*2] + g[n-dk+dl+g_size*2];
                                 }
-                        } 
-                } 
+                        }
+                }
         }
 }
 /* 2d is based on k,j */
@@ -1663,8 +1664,8 @@ void CINTg0_kj2d_4d(float* g, int g_len, int nmax, int mmax, int li, int ll, int
                                         g[n+g_size]     = ry * g[n-di+g_size]   + g[n-di+dj+g_size];
                                         g[n+g_size*2]   = rz * g[n-di+g_size*2] + g[n-di+dj+g_size*2];
                                 }
-                        } 
-                } 
+                        }
+                }
         }
 
         // g(...,k,l,..) = rkrl * g(...,k,l-1,..) + g(...,k+1,l-1,..)
@@ -1677,13 +1678,13 @@ void CINTg0_kj2d_4d(float* g, int g_len, int nmax, int mmax, int li, int ll, int
                                         g[n+g_size  ] = _ry * g[n-dl+g_size]     + g[n-dl+dk+g_size];
                                         g[n+g_size*2] = _rz * g[n-dl+g_size*2]   + g[n-dl+dk+g_size*2];
                                 }
-                        } 
-                } 
+                        }
+                }
         }
 
 }
 /* 2d is based on i,l */
-void CINTg0_il2d_4d(float* g, int g_len, 
+void CINTg0_il2d_4d(float* g, int g_len,
         int nmax, int mmax, int lk, int ll, int lj, int nroots,
         int di, int dk, int dl, int dj, const dtype *rirj, const dtype *rkrl, int g_size) {
 
@@ -1710,8 +1711,8 @@ void CINTg0_il2d_4d(float* g, int g_len,
                                         g[n+g_size  ] = ry * g[n-dk+g_size  ] + g[n-dk+dl+g_size  ];
                                         g[n+g_size*2] = rz * g[n-dk+g_size*2] + g[n-dk+dl+g_size*2];
                                 }
-                        } 
-                } 
+                        }
+                }
         }
 
         // g(i,...,j) = rirj * g(i,...,j-1) +  g(i+1,...,j-1)
@@ -1724,16 +1725,16 @@ void CINTg0_il2d_4d(float* g, int g_len,
                                         g[n+g_size  ] = _ry * g[n-dj+g_size  ] + g[n-dj+di+g_size  ];
                                         g[n+g_size*2] = _rz * g[n-dj+g_size*2] + g[n-dj+di+g_size*2];
                                 }
-                        } 
-                } 
+                        }
+                }
         }
 
 
 }
 /* 2d is based on i,k */
-void CINTg0_ik2d_4d(float* g, int g_len, 
-        int nmax, int mmax, int lk, int ll, int lj, int nroots, int di, int dk, int dl, int dj, 
-        const dtype *rirj, const dtype *rkrl, 
+void CINTg0_ik2d_4d(float* g, int g_len,
+        int nmax, int mmax, int lk, int ll, int lj, int nroots, int di, int dk, int dl, int dj,
+        const dtype *rirj, const dtype *rkrl,
         int g_size) {
         //unsigned short i, j, k, l, ptr, n;
         unsigned short i, j, k, l, ptr, n;
@@ -1760,7 +1761,7 @@ void CINTg0_ik2d_4d(float* g, int g_len,
                                         g[n+g_size  ] = ry * g[n+g_size-dl]   + g[n+g_size-dl+dk];
                                         g[n+g_size*2] = rz * g[n+g_size*2-dl] + g[n+g_size*2-dl+dk];
                                 }
-                        } 
+                        }
                 }
         }
 
@@ -1774,16 +1775,16 @@ void CINTg0_ik2d_4d(float* g, int g_len,
                                         g[n+g_size]     = _ry * g[n+g_size-dj]   + g[n-dj+di+g_size];
                                         g[n+g_size*2]   = _rz * g[n+g_size*2-dj] + g[n-dj+di+g_size*2];
                                 }
-                        } 
-                } 
+                        }
+                }
         }
 }
 
 
-// code size takes 50.2 kb 
+// code size takes 50.2 kb
 int CINTg0_2e( float* g, int g_len,
 int kbase, int ibase, int di, int dk, int dl, int dj, int dm, int dn
-,int nroots, dtype aij, dtype akl, int g_size, dtype fac0, int nmax, int mmax, 
+,int nroots, dtype aij, dtype akl, int g_size, dtype fac0, int nmax, int mmax,
 int li_ceil, int lj_ceil, int lk_ceil, int ll_ceil, dtype *rkrl, dtype *rirj ,
 dtype rijrkl[], dtype rijrx[], dtype rklrx[]) {
 
@@ -1796,28 +1797,28 @@ dtype rijrkl[], dtype rijrx[], dtype rklrx[]) {
         dtype x    = a0 *(rijrkl[0] * rijrkl[0] + rijrkl[1] * rijrkl[1] + rijrkl[2] * rijrkl[2]);
 
         // rys roots compute some integral thingy: https://pubs.acs.org/doi/10.1021/acs.jpca.6b10004
-        if (x < (float)1E-15) { 
+        if (x < (float)1E-15) {
                 int off = nroots * (nroots - 1) / 2;
-                int i; 
+                int i;
                 for (i = 0; i < nroots; i++)  {
-                        u[i]          = ROOTS_FOR_X0[off + i]; 
+                        u[i]          = ROOTS_FOR_X0[off + i];
                         g[i+g_size*2] = WEIGHTS_FOR_X0[off + i];
                 }
         }
-        else{ 
+        else{
 
                 // Code:        1.9 KiB 49.3 KiB(47.4 KiB)
-                // Cycles: 
+                // Cycles:
 
-                // todo; We can remove all 1e-10 without changing numerics. 
-                // for rys_root5 this may be 30% of the code! 
+                // todo; We can remove all 1e-10 without changing numerics.
+                // for rys_root5 this may be 30% of the code!
 
-                if (nroots == 1) { rys_root1(x, u, g, g_size);}   // 22 KiB for theese 
-                if (nroots == 2) { rys_root2(x, u, g, g_size);} 
+                if (nroots == 1) { rys_root1(x, u, g, g_size);}   // 22 KiB for theese
+                if (nroots == 2) { rys_root2(x, u, g, g_size);}
                 if (nroots == 3) { rys_root3(x, u, g, g_size);}
-                if (nroots == 4) { rys_root4(x, u, g, g_size);}  
-                if (nroots == 5) { rys_root5(x, u, g, g_size);}  // adding float: -12.3 KiB (from 49.3 KiB to 37.0 KiB) 
-                
+                if (nroots == 4) { rys_root4(x, u, g, g_size);}
+                if (nroots == 5) { rys_root5(x, u, g, g_size);}  // adding float: -12.3 KiB (from 49.3 KiB to 37.0 KiB)
+
         }
 
         if (g_size == 1) {
@@ -1837,7 +1838,7 @@ dtype rijrkl[], dtype rijrx[], dtype rklrx[]) {
         dtype remove_struct_b10[MXRYSROOTS];
 
         // @alex: some of the functions below need a constant version that doesn't change, others
-        // need a version that does allow changing. we add "_" forthe constant versions. 
+        // need a version that does allow changing. we add "_" forthe constant versions.
         dtype *c00 = remove_struct_c00;
         dtype *c0p = remove_struct_c0p;
         dtype *b00 = remove_struct_b00;
@@ -1852,7 +1853,7 @@ dtype rijrkl[], dtype rijrx[], dtype rklrx[]) {
         //for (unsigned short irys = 0; irys < nroots; irys++, c00+=3, c0p+=3) {
         for (int irys = 0; irys < nroots; irys++, c00+=3, c0p+=3) {
                 u2 = a0 * u[irys];
-                tmp4 = (float).5 / (u2 * (aij + akl) + a1); 
+                tmp4 = (float).5 / (u2 * (aij + akl) + a1);
                 tmp5 = u2 * tmp4;
                 tmp1 = (float)2. * tmp5;
                 tmp2 = tmp1 * akl;
@@ -1876,11 +1877,11 @@ dtype rijrkl[], dtype rijrx[], dtype rklrx[]) {
         // Cycles:  800k each (1.6M total)
         CINTg0_2e_2d(g, g_len, nroots, li_ceil + lj_ceil, lk_ceil + ll_ceil, dm, dn, g_size, _c00, _c0p, MXRYSROOTS*(float)3,  _b01, _b00, _b10, MXRYSROOTS);
         if (kbase) {
-                if (ibase) {    CINTg0_ik2d_4d(g, g_len, li_ceil + lj_ceil, lk_ceil + ll_ceil, lk_ceil, ll_ceil, lj_ceil, nroots, di, dk, dl, dj, rirj, rkrl, g_size); } 
+                if (ibase) {    CINTg0_ik2d_4d(g, g_len, li_ceil + lj_ceil, lk_ceil + ll_ceil, lk_ceil, ll_ceil, lj_ceil, nroots, di, dk, dl, dj, rirj, rkrl, g_size); }
                 else {          CINTg0_kj2d_4d(g, g_len, li_ceil + lj_ceil, lk_ceil + ll_ceil, li_ceil, ll_ceil, lj_ceil, nroots, di, dk, dl, dj, rirj, rkrl, g_size); }
-        } 
+        }
         else {
-                if (ibase) {    CINTg0_il2d_4d(g, g_len, li_ceil + lj_ceil, lk_ceil + ll_ceil, lk_ceil, ll_ceil, lj_ceil, nroots, di, dk, dl, dj, rirj, rkrl, g_size); } 
+                if (ibase) {    CINTg0_il2d_4d(g, g_len, li_ceil + lj_ceil, lk_ceil + ll_ceil, lk_ceil, ll_ceil, lj_ceil, nroots, di, dk, dl, dj, rirj, rkrl, g_size); }
                 else {          CINTg0_lj2d_4d(g, g_len, li_ceil + lj_ceil, lk_ceil + ll_ceil, li_ceil, lk_ceil, lj_ceil, nroots, di, dk, dl, dj, rirj, rkrl, g_size);  }
         }
 
@@ -1902,7 +1903,7 @@ typedef struct {
 
 
 void CINTOpt_log_max_pgto_coeff(dtype *log_maxc, const dtype *coeff, int nprim, int nctr) {
-        short i, ip; // max is 32k 
+        short i, ip; // max is 32k
         dtype maxc;
         for (ip = 0; ip < nprim; ip++) {
                 maxc = 0;
@@ -1941,7 +1942,7 @@ void CINTcart_comp(int *nx, int *ny, int *nz, const int lmax)
 // other boundaries
 #define CART_MAX        136 // > (ANG_MAX*(ANG_MAX+1)/2)
 void CINTg2e_index_xyz(int *idx, int i_l, int j_l, int k_l, int l_l,
-                                                           int nfi, int nfj, int nfk, int nfl, 
+                                                           int nfi, int nfj, int nfk, int nfl,
                                                            int di,  int dk,  int dl,  int dj, int g_size) {
         int i, j, k, l, n;
         int ofx, ofkx, oflx;
@@ -2028,7 +2029,7 @@ void CINTg2e_index_xyz(int *idx, int i_l, int j_l, int k_l, int l_l,
 void CINTOpt_non0coeff_byshell(int *sortedidx, int *non0ctr, const dtype *ci,
                                int iprim, int ictr)
 {
-        int ip, j, k, kp; // hard coding! 
+        int ip, j, k, kp; // hard coding!
         //int zeroidx[ictr];
         int zeroidx[1];
         for (ip = 0; ip < iprim; ip++) {
@@ -2409,7 +2410,7 @@ int CINTset_pairdata(PairData *pairdata, const dtype *ai, const dtype *aj, const
                      dtype rr_ij, dtype expcutoff, dtype*eri) {
         int ip, jp, n;
         dtype aij, eij, cceij;
-        // the comment below was commented from libcint. 
+        // the comment below was commented from libcint.
         // This estimation is based on the assumption that the two gaussian charge
         // distributions are separated in space. If two gaussians are too close (the
         // distance between gaussian product ij and gaussian product kl < 1), rr
@@ -2422,7 +2423,7 @@ int CINTset_pairdata(PairData *pairdata, const dtype *ai, const dtype *aj, const
         for (jp = 0; jp < jprim; jp++) {
                 for (ip = 0; ip < iprim; ip++) {
                         //printf("%i %i %i\n", n, jp, ip);
-                        
+
                         aij = 1/(ai[ip] + aj[jp]);
                         eij = rr_ij * ai[ip] * aj[jp] * aij;
                         cceij = eij - log_rr_ij - log_maxci[ip] - log_maxcj[jp];
@@ -2442,15 +2443,15 @@ int CINTset_pairdata(PairData *pairdata, const dtype *ai, const dtype *aj, const
                                 pdata->eij = 0;
                         }
 
-                        n ++ ; 
+                        n ++ ;
                 }
         }
         return empty;
 }
 
 int CINT2e_loop_nopt(
-        dtype *gctr, 
-        const dtype *env, 
+        dtype *gctr,
+        const dtype *env,
         const dtype *rk       , const dtype *ri       , const dtype *rj       , const dtype *rl       ,dtype expcutoff ,
         dtype *rkrl, dtype *rirj,
         dtype *envs_ai ,dtype *envs_aj ,dtype *envs_ak ,dtype *envs_al , dtype *envs_fac ,dtype *envs_rij ,dtype *envs_rkl ,
@@ -2458,14 +2459,14 @@ int CINT2e_loop_nopt(
         int len_gctr, int *empty, const int *shls, const int *bas,
         int n_env,    int i_ctr     ,int j_ctr,int k_ctr,int l_ctr        ,
         int n_comp,
-        int li_ceil ,int lj_ceil ,int lk_ceil ,int ll_ceil ,int i_l 
-        ,int j_l ,int k_l ,int l_l ,int nfi ,int nfj ,int nfk ,int nfl ,int nf ,int g_stride_i ,int g_stride_k 
+        int li_ceil ,int lj_ceil ,int lk_ceil ,int ll_ceil ,int i_l
+        ,int j_l ,int k_l ,int l_l ,int nfi ,int nfj ,int nfk ,int nfl ,int nf ,int g_stride_i ,int g_stride_k
         ,int g_stride_l ,int g_stride_j ,int nrys_roots ,int ibase ,int kbase ,int g_size ,int g2d_klmax ,int g2d_ijmax ,
         size_t leng, dtype* eri, dtype * tile_g, int * tile_idx) {
 
 
-  dtype rr_kl       = rkrl[0]*rkrl[0] + rkrl[1]*rkrl[1] + rkrl[2]*rkrl[2]; 
-  dtype square_rirj = rirj[0]*rirj[0] + rirj[1]*rirj[1] + rirj[2]*rirj[2]; 
+  dtype rr_kl       = rkrl[0]*rkrl[0] + rkrl[1]*rkrl[1] + rkrl[2]*rkrl[2];
+  dtype square_rirj = rirj[0]*rirj[0] + rirj[1]*rirj[1] + rirj[2]*rirj[2];
   dtype dist_kl     = rr_kl;
 
   int i_sh    = shls[0];
@@ -2473,17 +2474,17 @@ int CINT2e_loop_nopt(
   int k_sh    = shls[2];
   int l_sh    = shls[3];
 
-  int i_prim  = bas[BAS_SLOTS*i_sh + NPRIM_OF];  
-  int j_prim  = bas[BAS_SLOTS*j_sh + NPRIM_OF]; 
+  int i_prim  = bas[BAS_SLOTS*i_sh + NPRIM_OF];
+  int j_prim  = bas[BAS_SLOTS*j_sh + NPRIM_OF];
   int k_prim  = bas[BAS_SLOTS*k_sh + NPRIM_OF];
   int l_prim  = bas[BAS_SLOTS*l_sh + NPRIM_OF];
 
-  const dtype *ai = env + bas[BAS_SLOTS*i_sh+PTR_EXP]; 
+  const dtype *ai = env + bas[BAS_SLOTS*i_sh+PTR_EXP];
   const dtype *aj = env + bas[BAS_SLOTS*j_sh+PTR_EXP];
   const dtype *ak = env + bas[BAS_SLOTS*k_sh+PTR_EXP];
   const dtype *al = env + bas[BAS_SLOTS*l_sh+PTR_EXP];
 
-  const dtype *ci = env + bas[BAS_SLOTS*i_sh+PTR_COEFF]; 
+  const dtype *ci = env + bas[BAS_SLOTS*i_sh+PTR_COEFF];
   const dtype *cj = env + bas[BAS_SLOTS*j_sh+PTR_COEFF];
   const dtype *ck = env + bas[BAS_SLOTS*k_sh+PTR_COEFF];
   const dtype *cl = env + bas[BAS_SLOTS*l_sh+PTR_COEFF];
@@ -2494,7 +2495,7 @@ int CINT2e_loop_nopt(
 
   // TODO:allocate
   PairData pdata_base[64]; // 6-31G=6-31G*=35
-  PairData *pdata_ij; 
+  PairData *pdata_ij;
 
   log_maxcj = log_maxci + i_prim;
   log_maxck = log_maxcj + j_prim;
@@ -2512,7 +2513,7 @@ int CINT2e_loop_nopt(
   CINTOpt_log_max_pgto_coeff(log_maxck, ck, k_prim, k_ctr);
   CINTOpt_log_max_pgto_coeff(log_maxcl, cl, l_prim, l_ctr);
 
-  dtype fac1i, fac1j, fac1k, fac1l; 
+  dtype fac1i, fac1j, fac1k, fac1l;
   int _empty[5] = {1, 1, 1, 1, 1};
   int *iempty = _empty + 0;
   int *jempty = _empty + 1;
@@ -2521,16 +2522,16 @@ int CINT2e_loop_nopt(
   int *gempty = _empty + 4;
 
   dtype akl, ekl, expijkl, ccekl;
-  dtype *rij; // 
-  // TODO:allocate 
+  dtype *rij; //
+  // TODO:allocate
   //int idx[256];  // 6-31G = 240?
-  int * idx = tile_idx; 
-  //int idx[3888]; 
-  
-  // This allocated ~ [3,4] kB but doesn't really spend many cycles. 
+  int * idx = tile_idx;
+  //int idx[3888];
+
+  // This allocated ~ [3,4] kB but doesn't really spend many cycles.
   CINTg2e_index_xyz(idx, i_l, j_l, k_l, l_l, nfi, nfj, nfk, nfl, g_stride_i , g_stride_k , g_stride_l , g_stride_j, g_size);
 
-  int non0ctri[64], *non0ctrj, *non0ctrk, *non0ctrl; 
+  int non0ctri[64], *non0ctrj, *non0ctrk, *non0ctrl;
   int *non0idxi, *non0idxj, *non0idxk, *non0idxl;
   non0ctrj = non0ctri + i_prim;
   non0ctrk = non0ctrj + j_prim;
@@ -2553,29 +2554,29 @@ int CINT2e_loop_nopt(
   size_t len0 = nf * n_comp; // gout
   size_t len = leng + lenl + lenk + lenj + leni + len0;
 
-  //dtype g[16384]; // this becomes 1053 at some point? 
-  //dtype g[1053]; // this becomes 1053 at some point? 
+  //dtype g[16384]; // this becomes 1053 at some point?
+  //dtype g[1053]; // this becomes 1053 at some point?
   dtype *g = tile_g;
-  //dtype g[3500]; // for C20 it looks like it doesn't use all 13230 possible entries. 
+  //dtype g[3500]; // for C20 it looks like it doesn't use all 13230 possible entries.
   dtype *g1 = g + leng;
   dtype *gout, *gctri, *gctrj, *gctrk, *gctrl;
 
   //ALIAS_ADDR_IF_EQUAL(l, m);
-  if (m_ctr == 1) { gctrl = gctrm; lempty = mempty; } 
+  if (m_ctr == 1) { gctrl = gctrm; lempty = mempty; }
   else {            gctrl = g1;   g1 += lenl; }
   //ALIAS_ADDR_IF_EQUAL(k, l);
-  if (l_ctr == 1) { gctrk = gctrl; kempty = lempty; } 
+  if (l_ctr == 1) { gctrk = gctrl; kempty = lempty; }
   else {            gctrk = g1;   g1 += lenk; }
   //ALIAS_ADDR_IF_EQUAL(j, k);
-  if (k_ctr == 1) { gctrj = gctrk; jempty = kempty; } 
+  if (k_ctr == 1) { gctrj = gctrk; jempty = kempty; }
   else {            gctrj = g1;    g1 += lenj; }
   //ALIAS_ADDR_IF_EQUAL(i, j);
-  if (j_ctr == 1) { gctri = gctrj; iempty = jempty; } 
+  if (j_ctr == 1) { gctri = gctrj; iempty = jempty; }
   else {            gctri = g1;    g1 += leni; }
   //ALIAS_ADDR_IF_EQUAL(g, i);
-  if (i_ctr == 1) { gctrg = gctri; gempty = iempty; } 
+  if (i_ctr == 1) { gctrg = gctri; gempty = iempty; }
   else {            gctrg = g1;    g1 += leng; }
-  
+
 
   dtype rijrkl[3];
   dtype rijrx[3];
@@ -2587,9 +2588,9 @@ int CINT2e_loop_nopt(
   for (lp = 0; lp < l_prim; lp++) {
 
                 if (l_ctr == 1) {
-                        fac1l = common_factor * cl[lp]; 
+                        fac1l = common_factor * cl[lp];
                 } else {
-                        fac1l = common_factor; 
+                        fac1l = common_factor;
                         *kempty = 1;
                 }
                 for (kp = 0; kp < k_prim; kp++) {
@@ -2607,72 +2608,72 @@ int CINT2e_loop_nopt(
                         // Increasing expcutoff by ln(3) can guarantee to get
                         // the required accuracy in any circumstance.
 
-                        envs_ak[0]  = ak[kp]; 
+                        envs_ak[0]  = ak[kp];
                         envs_rkl[0] = (ak[kp]*rk[0] + al[lp]*rl[0]) / akl;
                         envs_rkl[1] = (ak[kp]*rk[1] + al[lp]*rl[1]) / akl;
                         envs_rkl[2] = (ak[kp]*rk[2] + al[lp]*rl[2]) / akl;
 
-                        ekl       = exp(-ekl); 
+                        ekl       = exp(-ekl);
 
-                        if (k_ctr == 1) { fac1k = fac1l * ck[kp]; } 
+                        if (k_ctr == 1) { fac1k = fac1l * ck[kp]; }
                         else { fac1k = fac1l; *jempty = 1; }
 
                         pdata_ij = pdata_base;
                         for (jp = 0; jp < j_prim; jp++) {
 
-                                envs_aj[0] = aj[jp]; // todo 
+                                envs_aj[0] = aj[jp]; // todo
 
-                                if (j_ctr == 1) { fac1j = fac1k * cj[jp]; } 
+                                if (j_ctr == 1) { fac1j = fac1k * cj[jp]; }
                                 else { fac1j = fac1k; *iempty = 1; }
 
                                 for (ip = 0; ip < i_prim; ip++, pdata_ij++) {
                                         //printf("\t%i %i %i %i\n", lp, kp, jp, ip);
-                                        
-                                        envs_ai[0] = ai[ip]; 
+
+                                        envs_ai[0] = ai[ip];
                                         rij = pdata_ij->rij;
                                         envs_rij[0] = rij[0];
                                         envs_rij[1] = rij[1];
                                         envs_rij[2] = rij[2];
                                         expijkl = pdata_ij->eij * ekl;
 
-                                        if (i_ctr == 1) { fac1i = fac1j*ci[ip]*expijkl; } 
+                                        if (i_ctr == 1) { fac1i = fac1j*ci[ip]*expijkl; }
                                         else { fac1i = fac1j*expijkl; }
 
                                         envs_fac[0] = fac1i;
-                                        
+
                                         rijrkl[0] = envs_rij[0] - envs_rkl[0];
                                         rijrkl[1] = envs_rij[1] - envs_rkl[1];
                                         rijrkl[2] = envs_rij[2] - envs_rkl[2] ;
                                         rijrx[0]  = envs_rij[0] - rx_in_rijrx[0];
-                                        rijrx[1]  = envs_rij[1] - rx_in_rijrx[1]; 
-                                        rijrx[2]  = envs_rij[2] - rx_in_rijrx[2]; 
-                                        rklrx[0]  = envs_rkl[0] - rx_in_rklrx[0]; 
-                                        rklrx[1]  = envs_rkl[1] - rx_in_rklrx[1]; 
-                                        rklrx[2]  = envs_rkl[2] - rx_in_rklrx[2]; 
+                                        rijrx[1]  = envs_rij[1] - rx_in_rijrx[1];
+                                        rijrx[2]  = envs_rij[2] - rx_in_rijrx[2];
+                                        rklrx[0]  = envs_rkl[0] - rx_in_rklrx[0];
+                                        rklrx[1]  = envs_rkl[1] - rx_in_rklrx[1];
+                                        rklrx[2]  = envs_rkl[2] - rx_in_rklrx[2];
 
 
-                                        // 3.08M to 700k ; so this is 2.2M 
-                                       int ret = CINTg0_2e(g, len, 
-                                                kbase, ibase, 
-                                                g_stride_i, g_stride_k, g_stride_l, g_stride_j, 
-                                                g2d_klmax, g2d_ijmax, 
-                                                nrys_roots, 
-                                                envs_ai[0] + envs_aj[0], envs_ak[0] + al[lp], 
-                                                g_size, 
-                                                envs_fac[0], 
-                                                li_ceil + lj_ceil, lk_ceil + ll_ceil, li_ceil, lj_ceil, lk_ceil, ll_ceil, 
+                                        // 3.08M to 700k ; so this is 2.2M
+                                       int ret = CINTg0_2e(g, len,
+                                                kbase, ibase,
+                                                g_stride_i, g_stride_k, g_stride_l, g_stride_j,
+                                                g2d_klmax, g2d_ijmax,
+                                                nrys_roots,
+                                                envs_ai[0] + envs_aj[0], envs_ak[0] + al[lp],
+                                                g_size,
+                                                envs_fac[0],
+                                                li_ceil + lj_ceil, lk_ceil + ll_ceil, li_ceil, lj_ceil, lk_ceil, ll_ceil,
                                                 rkrl, rirj, rijrkl, rijrx, rklrx);
 
 
-                                        // this takes ~ 700k? 
+                                        // this takes ~ 700k?
                                         if (ret) {
-                                                CINTgout2e(gout, g, idx, *gempty, nf, nrys_roots);// this may be the one where default case is a bit slower 
+                                                CINTgout2e(gout, g, idx, *gempty, nf, nrys_roots);// this may be the one where default case is a bit slower
 
-                                                //#define PRIM2CTR(ctrsymb, gp, ngp) 
+                                                //#define PRIM2CTR(ctrsymb, gp, ngp)
                                                 if (i_ctr > 1) {
-                                                        if (*iempty) { CINTprim_to_ctr_0(gctri, gout, ci+ip, len0, i_prim, i_ctr, non0ctri[ip], non0idxi+ip*i_ctr); } 
-                                                        else { CINTprim_to_ctr_1(gctri, gout, ci+ip, len0, i_prim, i_ctr, non0ctri[ip], non0idxi+ip*i_ctr); } 
-                                                } 
+                                                        if (*iempty) { CINTprim_to_ctr_0(gctri, gout, ci+ip, len0, i_prim, i_ctr, non0ctri[ip], non0idxi+ip*i_ctr); }
+                                                        else { CINTprim_to_ctr_1(gctri, gout, ci+ip, len0, i_prim, i_ctr, non0ctri[ip], non0idxi+ip*i_ctr); }
+                                                }
                                                 *iempty = 0;
                                         }
 
@@ -2680,8 +2681,8 @@ int CINT2e_loop_nopt(
                                 if (!*iempty) {
                                         //PRIM2CTR(j, gctri, leni);
                                         if (j_ctr > 1) {
-                                                if (*jempty) { CINTprim_to_ctr_0(gctrj, gctri, cj+jp, leni, j_prim, j_ctr, non0ctrj[jp], non0idxj+jp*j_ctr); } 
-                                                else { CINTprim_to_ctr_1(gctrj, gctri, cj+jp, leni, j_prim, j_ctr, non0ctrj[jp], non0idxj+jp*j_ctr); } 
+                                                if (*jempty) { CINTprim_to_ctr_0(gctrj, gctri, cj+jp, leni, j_prim, j_ctr, non0ctrj[jp], non0idxj+jp*j_ctr); }
+                                                else { CINTprim_to_ctr_1(gctrj, gctri, cj+jp, leni, j_prim, j_ctr, non0ctrj[jp], non0idxj+jp*j_ctr); }
                                         }
 
                                 }
@@ -2689,8 +2690,8 @@ int CINT2e_loop_nopt(
                         if (!*jempty) {
                                 //PRIM2CTR(k, gctrj, lenj);
                                 if (k_ctr > 1) {
-                                        if (*kempty) { CINTprim_to_ctr_0(gctrk, gctrj, ck+kp, lenj, k_prim, k_ctr, non0ctrk[kp], non0idxk+kp*k_ctr); } 
-                                        else { CINTprim_to_ctr_1(gctrk, gctrj, ck+kp, lenj, k_prim, k_ctr, non0ctrk[kp], non0idxk+kp*k_ctr); } 
+                                        if (*kempty) { CINTprim_to_ctr_0(gctrk, gctrj, ck+kp, lenj, k_prim, k_ctr, non0ctrk[kp], non0idxk+kp*k_ctr); }
+                                        else { CINTprim_to_ctr_1(gctrk, gctrj, ck+kp, lenj, k_prim, k_ctr, non0ctrk[kp], non0idxk+kp*k_ctr); }
                                 }
                         }
 
@@ -2698,8 +2699,8 @@ int CINT2e_loop_nopt(
                 if (!*kempty) {
                         //PRIM2CTR(l, gctrk, lenk);
                         if (l_ctr > 1) {
-                                if (*lempty) { CINTprim_to_ctr_0(gctrl, gctrk, cl+lp, lenk, l_prim, l_ctr, non0ctrl[lp], non0idxl+lp*l_ctr); } 
-                                else { CINTprim_to_ctr_1(gctrl, gctrk, cl+lp, lenk, l_prim, l_ctr, non0ctrl[lp], non0idxl+lp*l_ctr); } 
+                                if (*lempty) { CINTprim_to_ctr_0(gctrl, gctrk, cl+lp, lenk, l_prim, l_ctr, non0ctrl[lp], non0idxl+lp*l_ctr); }
+                                else { CINTprim_to_ctr_1(gctrl, gctrk, cl+lp, lenk, l_prim, l_ctr, non0ctrl[lp], non0idxl+lp*l_ctr); }
                         }
                 }
 
@@ -2709,8 +2710,8 @@ int CINT2e_loop_nopt(
 
       if (n_comp > 1 && !*lempty) {
                 //TRANSPOSE(gctrl);
-                if (*empty) { CINTdmat_transpose(gctr, gctrl, nf*nc, n_comp); *empty = 0; } 
-                else { CINTdplus_transpose(gctr, gctrl, nf*nc, n_comp); } 
+                if (*empty) { CINTdmat_transpose(gctr, gctrl, nf*nc, n_comp); *empty = 0; }
+                else { CINTdplus_transpose(gctr, gctrl, nf*nc, n_comp); }
 
         }
 
@@ -2719,7 +2720,7 @@ int CINT2e_loop_nopt(
 
         }
 static dtype g_trans_cart2sph[] = {
-        1, 
+        1,
         1,
         0,
         0,
@@ -3240,7 +3241,7 @@ static dtype g_trans_cart2sph[] = {
         -0.5323327660595425, 0, 0, 7.452658724833595, 0, 7.452658724833595, 0, 0, 0, 0, 0, 0, -111.7898808725039, 0, 0, 0, 0, 0, 0, 0, 0, -7.452658724833595, 0, 111.7898808725039, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.5323327660595425, 0, -7.452658724833595, 0, 0, 0, 0, 0, 0,
         0, 0, 2.91570664069932, 0, 0, 0, 0, -61.22983945468572, 0, 0, 0, 0, 0, 0, 0, 0, 102.0497324244762, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -20.40994648489524, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.72892666017483, 0, 0, -20.40994648489524, 0, 0, 0, 0, 0, 0, 51.0248662122381, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -20.40994648489524, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.72892666017483, 0, 0, 0, 0, 0, 0, 0, 0,
-        // l = 9 ;; don't ever have angular momentum > 5 ;; decreased from 80KB to 8kb on every tile. 
+        // l = 9 ;; don't ever have angular momentum > 5 ;; decreased from 80KB to 8kb on every tile.
         /*0, 6.740108566678694, 0, 0, 0, 0, -62.9076799556678, 0, 0, 0, 0, 0, 0, 0, 0, 94.36151993350171, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -26.96043426671477, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.7489009518531882, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 25.41854119163758, 0, 0, 0, 0, 0, 0, -177.9297883414631, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 177.9297883414631, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -25.41854119163758, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -3.814338369408373, 0, 0, 0, 0, 15.25735347763349, 0, 61.02941391053396, 0, 0, 0, 0, 0, 0, 7.628676738816745, 0, -305.1470695526698, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -10.89810962688107, 0, 183.0882417316019, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.5449054813440533, 0, -8.718487701504852, 0, 0, 0, 0, 0, 0, 0,
@@ -3430,7 +3431,7 @@ static dtype g_trans_cart2sph[] = {
  * / xyz_alpha \
  * \ xyz_beta  /
  */
- // this takes up 135 KiB code 
+ // this takes up 135 KiB code
 static dtype g_trans_cart2jR[] = {
         0,
         1,
@@ -6174,13 +6175,13 @@ struct cart2sp_t {
 //static struct cart2sp_t g_c2s[] = {};
 
 
-// removed the ones not used to reduce code size, see below. 
-/*static struct cart2sp_t g_c2s[] = { 
-        {g_trans_cart2sph     ,g_trans_cart2jR      , g_trans_cart2jI      , g_trans_cart2jR      , g_trans_cart2jI      }, // 1 
-        {g_trans_cart2sph+1   ,g_trans_cart2jR+4    , g_trans_cart2jI+4    , g_trans_cart2jR+16   , g_trans_cart2jI+16   }, // 2 
-        {g_trans_cart2sph+10  ,g_trans_cart2jR+40   , g_trans_cart2jI+40   , g_trans_cart2jR+88   , g_trans_cart2jI+88   }, //3 
+// removed the ones not used to reduce code size, see below.
+/*static struct cart2sp_t g_c2s[] = {
+        {g_trans_cart2sph     ,g_trans_cart2jR      , g_trans_cart2jI      , g_trans_cart2jR      , g_trans_cart2jI      }, // 1
+        {g_trans_cart2sph+1   ,g_trans_cart2jR+4    , g_trans_cart2jI+4    , g_trans_cart2jR+16   , g_trans_cart2jI+16   }, // 2
+        {g_trans_cart2sph+10  ,g_trans_cart2jR+40   , g_trans_cart2jI+40   , g_trans_cart2jR+88   , g_trans_cart2jI+88   }, //3
         {g_trans_cart2sph+40  ,g_trans_cart2jR+160  , g_trans_cart2jI+160  , g_trans_cart2jR+280  , g_trans_cart2jI+280  }, // 4
-        {g_trans_cart2sph+110 ,g_trans_cart2jR+440  , g_trans_cart2jI+440  , g_trans_cart2jR+680  , g_trans_cart2jI+680  }, //5 
+        {g_trans_cart2sph+110 ,g_trans_cart2jR+440  , g_trans_cart2jI+440  , g_trans_cart2jR+680  , g_trans_cart2jI+680  }, //5
         {g_trans_cart2sph+245 ,g_trans_cart2jR+980  , g_trans_cart2jI+980  , g_trans_cart2jR+1400 , g_trans_cart2jI+1400 },
         {g_trans_cart2sph+476 ,g_trans_cart2jR+1904 , g_trans_cart2jI+1904 , g_trans_cart2jR+2576 , g_trans_cart2jI+2576 },
         {g_trans_cart2sph+840 ,g_trans_cart2jR+3360 , g_trans_cart2jI+3360 , g_trans_cart2jR+4368 , g_trans_cart2jI+4368 },
@@ -6191,16 +6192,16 @@ struct cart2sp_t {
         {g_trans_cart2sph+6370,g_trans_cart2jR+25480, g_trans_cart2jI+25480, g_trans_cart2jR+29848, g_trans_cart2jI+29848},
         {g_trans_cart2sph+8645,  NULL, NULL, NULL, NULL},
         {g_trans_cart2sph+11480, NULL, NULL, NULL, NULL},
-        {g_trans_cart2sph+14960, NULL, NULL, NULL, NULL}, 
+        {g_trans_cart2sph+14960, NULL, NULL, NULL, NULL},
 };*/
 
 
-static struct cart2sp_t g_c2s[] = { 
-        {g_trans_cart2sph     }, // 1 
-        {g_trans_cart2sph+1   }, // 2 
-        {g_trans_cart2sph+10  }, //3 
+static struct cart2sp_t g_c2s[] = {
+        {g_trans_cart2sph     }, // 1
+        {g_trans_cart2sph+1   }, // 2
+        {g_trans_cart2sph+10  }, //3
         {g_trans_cart2sph+40  }, // 4
-        {g_trans_cart2sph+110 }, //5 
+        {g_trans_cart2sph+110 }, //5
         {g_trans_cart2sph+245 },
         {g_trans_cart2sph+476 },
         {g_trans_cart2sph+840 },
@@ -6554,7 +6555,7 @@ dtype *(*c2s_ket_sph[])(dtype *gsph, dtype *gcart,
         a_ket_cart2spheric,
         a_ket_cart2spheric,
 };
-        
+
 
 
  /* use f_ket to transform k,l for gctr(i,j,k,l), where
@@ -6566,8 +6567,8 @@ static dtype *sph2e_inner(dtype *gsph, dtype *gcart, int l, int nbra, int ncall,
 {
         int n;
 
-        if (l == 0 || l == 1) return gcart; 
-        else if (l == 2){ 
+        if (l == 0 || l == 1) return gcart;
+        else if (l == 2){
                         for (n = 0; n < ncall; n++) {
                                 d_ket_cart2spheric(gsph+n*sizsph, gcart+n*sizcart, nbra, nbra, l);
                         }
@@ -6759,7 +6760,7 @@ int int2e_sph(dtype *out, int n_out, int *dims, const int *shls, const int *atm,
   int j_l = bas[BAS_SLOTS * j_sh + ANG_OF];
   int k_l = bas[BAS_SLOTS * k_sh + ANG_OF];
   int l_l = bas[BAS_SLOTS * l_sh + ANG_OF];
-                  
+
   int _x_ctr[4];
   _x_ctr[0] = bas[BAS_SLOTS * i_sh + NCTR_OF];
   _x_ctr[1] = bas[BAS_SLOTS * j_sh + NCTR_OF];
@@ -6780,7 +6781,7 @@ int int2e_sph(dtype *out, int n_out, int *dims, const int *shls, const int *atm,
   dtype expcutoff;
 
   dtype common_factor = (M_PI*M_PI*M_PI)*2/SQRTPI * CINTcommon_fac_sp(i_l) * CINTcommon_fac_sp(j_l) * CINTcommon_fac_sp(k_l) * CINTcommon_fac_sp(l_l);
-  if (env[PTR_EXPCUTOFF] == 0) { expcutoff = EXPCUTOFF; } 
+  if (env[PTR_EXPCUTOFF] == 0) { expcutoff = EXPCUTOFF; }
   else { expcutoff = std::fmax(static_cast<dtype>(MIN_EXPCUTOFF), env[PTR_EXPCUTOFF]) + 1; } // +1 to ensure accuracy. See comments in function CINT2e_loop_nopt
 
   int gbits        = ng[GSHIFT];
@@ -6821,13 +6822,13 @@ int int2e_sph(dtype *out, int n_out, int *dims, const int *shls, const int *atm,
   int g_stride_k = nrys_roots * dli;
   int g_stride_l = nrys_roots * dli * dlk;
   int g_stride_j = nrys_roots * dli * dlk * dll;
-  int g_size     = nrys_roots * dli * dlk * dll * dlj; // definition of g_size 
+  int g_size     = nrys_roots * dli * dlk * dll * dlj; // definition of g_size
 
-  int g2d_klmax; 
-  int g2d_ijmax; 
+  int g2d_klmax;
+  int g2d_ijmax;
 
-  const dtype * rx_in_rklrx; 
-  const dtype * rx_in_rijrx; 
+  const dtype * rx_in_rklrx;
+  const dtype * rx_in_rijrx;
   dtype rkrl[3];
   dtype rirj[3];
 
@@ -6885,35 +6886,35 @@ int int2e_sph(dtype *out, int n_out, int *dims, const int *shls, const int *atm,
 
   size_t nc = nf * x_ctr[0] * x_ctr[1] * x_ctr[2] * x_ctr[3];
 
-  // this is never called on ipu because we already have cache size! 
-  // it's used before all the main compute to figure out how big a cache to allocate. 
+  // this is never called on ipu because we already have cache size!
+  // it's used before all the main compute to figure out how big a cache to allocate.
   if (out == NULL) {
-          int i_prim = bas(NPRIM_OF, shls[0]); 
-          int j_prim = bas(NPRIM_OF, shls[1]); 
-          int k_prim = bas(NPRIM_OF, shls[2]); 
-          int l_prim = bas(NPRIM_OF, shls[3]); 
+          int i_prim = bas(NPRIM_OF, shls[0]);
+          int j_prim = bas(NPRIM_OF, shls[1]);
+          int k_prim = bas(NPRIM_OF, shls[2]);
+          int l_prim = bas(NPRIM_OF, shls[3]);
           size_t pdata_size = ((i_prim*j_prim + k_prim*l_prim) * 5 + i_prim * x_ctr[0]  + j_prim * x_ctr[1] + k_prim * x_ctr[2] + l_prim * x_ctr[3] +(i_prim+j_prim+k_prim+l_prim)*2 + nf*3);
           size_t len0       = nf*n_comp;
-          size_t cache_size = (size_t)std::fmax((float)(leng+len0+nc*n_comp*3 + pdata_size), (float)(nc*n_comp+nf*4)); // @alex: using fmax which takes only float, so have to cast. 
+          size_t cache_size = (size_t)std::fmax((float)(leng+len0+nc*n_comp*3 + pdata_size), (float)(nc*n_comp+nf*4)); // @alex: using fmax which takes only float, so have to cast.
           return cache_size;
   }
-  
-  //dtype gctr[nc*n_comp]; 
-  dtype gctr[1296+1];  // hardcoded, may not be big enough for some cases. 
+
+  //dtype gctr[nc*n_comp];
+  dtype gctr[1296+1];  // hardcoded, may not be big enough for some cases.
 
   int n;
   int empty = 1;
 
-  CINT2e_loop_nopt(gctr, env, rk, ri, rj, rl, expcutoff, rkrl, rirj, 
-                         ai, aj, ak, al, fac, rij, rkl, rx_in_rijrx, rx_in_rklrx, 
-                         common_factor, (lk_ceil+ll_ceil+1), nc*n_comp, &empty, shls, bas, // ints after this 
-                n_env, _x_ctr[0], _x_ctr[1], _x_ctr[2], _x_ctr[3], 
-                ncomp_e1 * ncomp_e2 * ncomp_tensor, 
-                li_ceil, lj_ceil, lk_ceil, ll_ceil, i_l, 
-                j_l, k_l, l_l, nfi, nfj, nfk, nfl, nf, g_stride_i, g_stride_k, 
-                g_stride_l, g_stride_j, nrys_roots, ibase, kbase, g_size, g2d_klmax, g2d_ijmax, 
+  CINT2e_loop_nopt(gctr, env, rk, ri, rj, rl, expcutoff, rkrl, rirj,
+                         ai, aj, ak, al, fac, rij, rkl, rx_in_rijrx, rx_in_rklrx,
+                         common_factor, (lk_ceil+ll_ceil+1), nc*n_comp, &empty, shls, bas, // ints after this
+                n_env, _x_ctr[0], _x_ctr[1], _x_ctr[2], _x_ctr[3],
+                ncomp_e1 * ncomp_e2 * ncomp_tensor,
+                li_ceil, lj_ceil, lk_ceil, ll_ceil, i_l,
+                j_l, k_l, l_l, nfi, nfj, nfk, nfl, nf, g_stride_i, g_stride_k,
+                g_stride_l, g_stride_j, nrys_roots, ibase, kbase, g_size, g2d_klmax, g2d_ijmax,
                 leng, eri, tile_g, tile_idx);
-                
+
 
 
 
@@ -6921,7 +6922,7 @@ int int2e_sph(dtype *out, int n_out, int *dims, const int *shls, const int *atm,
   if (dims == NULL) { dims = counts; }
   int nout = dims[0] * dims[1] * dims[2] * dims[3];
 
-        
+
   if (!empty) {
           for (n = 0; n < n_comp; n++) {
                   int di = i_l * 2 + 1;
@@ -6943,56 +6944,56 @@ int int2e_sph(dtype *out, int n_out, int *dims, const int *shls, const int *atm,
                   int buflen = nfikl*dj;
 
                   // This increase from 80 to 1200 in 631g to 6-31g*
-                  /*dtype buf1[81]; 
+                  /*dtype buf1[81];
                   dtype buf2[81];
                   dtype buf3[81];
                   dtype buf4[81];*/
-                  
+
                   dtype * buf1 = tile_buf;
                   dtype * buf2 = tile_buf+buflen;
                   dtype * buf3 = tile_buf+buflen*2;
                   //dtype * buf4 = tile_buf+buflen*3;
 
-                  //tile_g[0] = buflen; 
-                  //tile_g[3] = 3*buflen; 
+                  //tile_g[0] = buflen;
+                  //tile_g[3] = 3*buflen;
 
 
-                  /*dtype buf1[1080]; 
+                  /*dtype buf1[1080];
                   dtype buf2[1080];
                   dtype buf3[1080];
                   dtype buf4[1080];*/
 
                   dtype *pout;
                   dtype *tmp1;
-                  dtype *_tmp; 
+                  dtype *_tmp;
 
                   for (lc = 0; lc < l_ctr; lc++) {
                           for (kc = 0; kc < k_ctr; kc++) {
                                   for (jc = 0; jc < j_ctr; jc++) {
                                           for (ic = 0; ic < i_ctr; ic++) {
-                                                  //tmp1 = c2s_ket_sph[j_l](buf1, _gctr, nfikl, nfikl, j_l); 
-                                                  tmp1 = c2s_ket_sph[j_l](buf1, gctr, nfikl, nfikl, j_l); 
+                                                  //tmp1 = c2s_ket_sph[j_l](buf1, _gctr, nfikl, nfikl, j_l);
+                                                  tmp1 = c2s_ket_sph[j_l](buf1, gctr, nfikl, nfikl, j_l);
 
                                                   tmp1 = sph2e_inner(     buf2, tmp1, l_l, nfik, dj, nfik*dl, nfikl);
                                                   tmp1 = sph2e_inner(     buf3, tmp1, k_l, nfi, dlj, nfi*dk, nfik);
 
-                                                  //tmp1 = c2s_bra_sph[i_l](buf4, dk*dlj, tmp1, i_l); 
+                                                  //tmp1 = c2s_bra_sph[i_l](buf4, dk*dlj, tmp1, i_l);
                                                   for (int v = 0; v < nc*n_comp; v++) gctr[v] = tmp1[v];
-                                                  _tmp = c2s_bra_sph[i_l](buf1, dk*dlj, gctr, i_l); 
-                                                  
+                                                  _tmp = c2s_bra_sph[i_l](buf1, dk*dlj, gctr, i_l);
+
                                                   pout = out + ofl * lc + ofk * kc + ofj * jc + di * ic;
                                                   dcopy_iklj(pout, _tmp, ni, nj, nk, nl, di, dj, dk, dl);
-                                                  //gctr += nf; // WARNING: 
-                                          } 
-                                  } 
-                          } 
+                                                  //gctr += nf; // WARNING:
+                                          }
+                                  }
+                          }
                   }
 
           }
-  } 
+  }
   else {
           for (n = 0; n < n_comp; n++) {
-                  c2s_dset0(out+nout*n, dims, counts); 
+                  c2s_dset0(out+nout*n, dims, counts);
           }
   }
 
@@ -7000,7 +7001,7 @@ int int2e_sph(dtype *out, int n_out, int *dims, const int *shls, const int *atm,
 }
 
 
-void GTOnr2e_fill_s1( dtype *eri, int n_eri, dtype *buf, int n_buf, int comp, int ishp, int jshp, int *shls_slice, int *ao_loc, 
+void GTOnr2e_fill_s1( dtype *eri, int n_eri, dtype *buf, int n_buf, int comp, int ishp, int jshp, int *shls_slice, int *ao_loc,
                       int *atm, int natm, int *bas, int nbas, dtype *env, int n_env) {
 
   int ish0 = shls_slice[0];
@@ -7025,11 +7026,11 @@ void GTOnr2e_fill_s1( dtype *eri, int n_eri, dtype *buf, int n_buf, int comp, in
   int i0 = ao_loc[ish] - ao_loc[ish0];
   int j0 = ao_loc[jsh] - ao_loc[jsh0];
 
-  dtype *_eri = eri;  // before moving pointer make a copy of old pointer. 
+  dtype *_eri = eri;  // before moving pointer make a copy of old pointer.
 
-  //eri += nkl * (i0 * nj + j0);  
+  //eri += nkl * (i0 * nj + j0);
   // this still gives all the right entries, we just have to put them the right place in ERI
-  // when readjusting the size of eri, we have to be careful because different tiles can have differently sized stuff. 
+  // when readjusting the size of eri, we have to be careful because different tiles can have differently sized stuff.
 
   int di = ao_loc[ish+1] - ao_loc[ish];
   int dj = ao_loc[jsh+1] - ao_loc[jsh];
@@ -7038,15 +7039,15 @@ void GTOnr2e_fill_s1( dtype *eri, int n_eri, dtype *buf, int n_buf, int comp, in
   int i, j, k, l, icomp;
   int ksh, lsh;
   int shls[4];
-  input_type *eri0, *peri; 
+  input_type *eri0, *peri;
   dtype *buf0, *pbuf;
 
   shls[0] = ish;
   shls[1] = jsh;
 
-  int c = 0; 
+  int c = 0;
 
-  // this is handling the translation between eri and the pointers 
+  // this is handling the translation between eri and the pointers
   for (ksh = ksh0; ksh < ksh1; ksh++) {
           for (lsh = lsh0; lsh < lsh1; lsh++) {
                   shls[2] = ksh;
@@ -7057,11 +7058,11 @@ void GTOnr2e_fill_s1( dtype *eri, int n_eri, dtype *buf, int n_buf, int comp, in
                   dl = ao_loc[lsh+1] - ao_loc[lsh];
                   dijk = dij * dk;
                   dijkl = dijk * dl;
-                  //cache = buf + dijkl * comp; 
+                  //cache = buf + dijkl * comp;
 
-                  if (int2e_sph(buf, n_buf, NULL, shls, atm, natm, bas, nbas, env, n_env, _eri, NULL, NULL, NULL) ) { 
+                  if (int2e_sph(buf, n_buf, NULL, shls, atm, natm, bas, nbas, env, n_env, _eri, NULL, NULL, NULL) ) {
 
-                          // move from buf to eri. 
+                          // move from buf to eri.
                           eri0 = eri + k0*nl+l0;
                           buf0 = buf;
                           for (icomp = 0; icomp < comp; icomp++) {
@@ -7070,23 +7071,23 @@ void GTOnr2e_fill_s1( dtype *eri, int n_eri, dtype *buf, int n_buf, int comp, in
                                                   peri = eri0 + nkl*(i*nj+j);
                                                   for (k = 0; k < dk; k++) {
                                                           for (pbuf = buf0 + k*dij + j*di + i, l = 0; l < dl; l++) {
-                                                                  //peri[k*nl+l] = (input_type)pbuf[l*dijk]; // write to output has to be hardcoded float, can't template it. 
-                                                                  //eri[k*nl+l+nkl*(i*nj+j)+ k0*nl+l0+nkl * (i0 * nj + j0)] = 
-                                                                  eri[c] = 
-                                                                                        (input_type)buf[l*dijk+k*dij + j*di + i]; 
+                                                                  //peri[k*nl+l] = (input_type)pbuf[l*dijk]; // write to output has to be hardcoded float, can't template it.
+                                                                  //eri[k*nl+l+nkl*(i*nj+j)+ k0*nl+l0+nkl * (i0 * nj + j0)] =
+                                                                  eri[c] =
+                                                                                        (input_type)buf[l*dijk+k*dij + j*di + i];
                                                                 c += 1;
-                                                          } 
+                                                          }
                                                   }
-                                          } 
+                                          }
                                   }
                                   buf0 += dijkl;
                                   eri0 += neri;
                           }
 
 
-                  } 
-                  
-          } 
+                  }
+
+          }
   }
 
 
@@ -7105,7 +7106,7 @@ static bool aligned(const FloatType *a, const FloatType *b) {
   return (combine<FloatType>(a, b) & Mask) == 0;
 }
 
-class poplar_int2e_sph : public Vertex { 
+class poplar_int2e_sph : public Vertex {
 public:
         /*InOut<Vector<float>>  ipu_floats;
         InOut<Vector<int>>    ipu_ints;
@@ -7130,8 +7131,8 @@ public:
 
         bool compute() {
 
-                const float * floats = ipu_floats.data(); 
-                const int   * ints   = ipu_ints  .data(); 
+                const float * floats = ipu_floats.data();
+                const int   * ints   = ipu_ints  .data();
 
                 int n_eri    = ipu_ints[0];
                 int n_buf    = ipu_ints[1];
@@ -7143,15 +7144,15 @@ public:
                 int offset = 6;
                 const int *ao_loc     = ints + offset;
                 offset += n_ao_loc;
-                const int *atm        = ints + offset; 
+                const int *atm        = ints + offset;
                 offset += n_atm*6;
-                const int *bas        = ints + offset; 
+                const int *bas        = ints + offset;
 
                 const float * env = floats;
                 float * eri = ipu_output.data();
 
 
-                for (int i = 0; i < ipu_output.size(); i++){ eri[i] = 0; }  
+                for (int i = 0; i < ipu_output.size(); i++){ eri[i] = 0; }
 
                 //for (unsigned short i = 0; i < tile_g.size(); i++) tile_g[i] = 0;
                 //for (unsigned short i = 0; i < tile_idx.size(); i++) tile_idx[i] = 0;
@@ -7176,7 +7177,7 @@ public:
 
 
 
-class poplar_int2e_sph_forloop : public Vertex { 
+class poplar_int2e_sph_forloop : public Vertex {
 public:
         Input<Vector<float>>  ipu_floats;
         Input<Vector<int>>    ipu_ints;
@@ -7192,9 +7193,9 @@ public:
         Input<Vector<float>>  integral_size;
 
         bool compute() {
-                // the output size is rather small 
-                const float * floats = ipu_floats.data(); 
-                const int   * ints   = ipu_ints  .data(); 
+                // the output size is rather small
+                const float * floats = ipu_floats.data();
+                const int   * ints   = ipu_ints  .data();
 
                 int n_eri    = ipu_ints[0];
                 int n_buf    = ipu_ints[1];
@@ -7206,9 +7207,9 @@ public:
                 int offset = 6;
                 const int *ao_loc     = ints + offset;
                 offset += n_ao_loc;
-                const int *atm        = ints + offset; 
+                const int *atm        = ints + offset;
                 offset += n_atm*6;
-                const int *bas        = ints + offset; 
+                const int *bas        = ints + offset;
 
                 const float * env = floats;
 
@@ -7216,21 +7217,21 @@ public:
                 //float * eri = ipu_output.data();
 
 
-                for (int j = 0; j < chunks.size(); j++ ){ 
+                for (int j = 0; j < chunks.size(); j++ ){
                 //for (int j = 0; j < 1; j++ ){
 
-                        //float array[integral_size.size()] = {0.}; 
-                        //for (int i = 0; i < 81; i++){ eri[i] = 0; }  
-                        //float array[81] = {0.}; 
-                        float array[625] = {0.}; 
-                        float * eri = array; 
+                        //float array[integral_size.size()] = {0.};
+                        //for (int i = 0; i < 81; i++){ eri[i] = 0; }
+                        //float array[81] = {0.};
+                        float array[625] = {0.};
+                        float * eri = array;
 
                         //for (unsigned short i = 0; i < tile_g.size(); i++) tile_g[i] = 0;
                         //for (unsigned short i = 0; i < tile_idx.size(); i++) tile_idx[i] = 0;
                         //for (unsigned short i = 0; i < tile_buf.size(); i++) tile_buf[i] = 0;
 
                         int arr[] = {ipu_ij[0+j*4], ipu_ij[1+j*4], ipu_ij[2+j*4], ipu_ij[3+j*4]};
-                        const int* shls = arr; 
+                        const int* shls = arr;
 
                         dtype *_eri = eri;
 
@@ -7243,7 +7244,7 @@ public:
                         //for (int i = 0; i < 100; i++) tile_idx[i] = 3.;
                         //for (int i = 0; i < 100; i++) tile_buf[i] = 3.;
 
-                        for (int i = 0; i < integral_size.size(); i++){ ipu_output[j*integral_size.size()+i] = eri[i]; }  
+                        for (int i = 0; i < integral_size.size(); i++){ ipu_output[j*integral_size.size()+i] = eri[i]; }
                 }
 
 
@@ -7253,9 +7254,9 @@ public:
 };
 
 
-class poplar_int2e_sph_forloop__broken : public Vertex { 
+class poplar_int2e_sph_forloop__broken : public Vertex {
 public:
-        // same as poplar_int2_sph but just has a forloop inside C++ instead of python. 
+        // same as poplar_int2_sph but just has a forloop inside C++ instead of python.
 
         Input<Vector<float>>  ipu_floats;
         Input<Vector<int>>    ipu_ints;
@@ -7267,18 +7268,18 @@ public:
         Output<Vector<int>>    tile_idx;
         Output<Vector<float>>  tile_buf;
 
-        Input<Vector<float>>    chunks;       // size of this is the number of chunks. 
-        Input<Vector<float>>    integral_size; // size of each intergral output 
+        Input<Vector<float>>    chunks;       // size of this is the number of chunks.
+        Input<Vector<float>>    integral_size; // size of each intergral output
 
 
         bool compute() {
 
                 float * eri = ipu_output.data();
-                for (int i = 0; i < ipu_output.size(); i++){ eri[i] = 0; }   
+                for (int i = 0; i < ipu_output.size(); i++){ eri[i] = 0; }
 
-                int integral_output_size = integral_size.size(); //di*dj*dk*dl; 
-                const float * floats = ipu_floats.data(); 
-                const int   * ints   = ipu_ints  .data(); 
+                int integral_output_size = integral_size.size(); //di*dj*dk*dl;
+                const float * floats = ipu_floats.data();
+                const int   * ints   = ipu_ints  .data();
                 int n_eri    = ipu_ints[0];
                 int n_buf    = ipu_ints[1];
                 int n_atm    = ipu_ints[2];
@@ -7289,16 +7290,16 @@ public:
                 int offset = 6;
                 const int *ao_loc     = ints + offset;
                 offset += n_ao_loc;
-                const int *atm        = ints + offset; 
+                const int *atm        = ints + offset;
                 offset += n_atm*6;
-                const int *bas        = ints + offset; 
+                const int *bas        = ints + offset;
 
                 const float * env = floats;
 
                 //for (int j = 0; j < chunks.size(); j++){
                 for (int j = 0; j < 1; j++){
 
-                        eri += integral_output_size; 
+                        eri += integral_output_size;
 
                         //for (unsigned short i = 0; i < tile_g.size(); i++) tile_g[i] = 0;
                         //for (unsigned short i = 0; i < tile_idx.size(); i++) tile_idx[i] = 0;
@@ -7307,7 +7308,7 @@ public:
                         dtype *_eri = eri;
 
                         int arr[] = {ipu_ij[0+j*4], ipu_ij[1+j*4], ipu_ij[2+j*4], ipu_ij[3+j*4]};
-                        const int* shls = arr; 
+                        const int* shls = arr;
 
                         int2e_sph(eri, n_buf, NULL, shls, atm, n_atm, bas, n_bas, env, n_env, _eri, tile_g.data(), tile_idx.data(), tile_buf.data()) ;
                         //int2e_sph(eri, n_buf, NULL, __ipu_ij, atm, n_atm, bas, n_bas, env, n_env, _eri) ;
@@ -7325,8 +7326,8 @@ public:
 
 };
 
-// single tile version 
-class poplar_transform : public Vertex { 
+// single tile version
+class poplar_transform : public Vertex {
 public:
         InOut<Vector<float>>  ipu_floats;
         InOut<Vector<int>>    ipu_ints;
@@ -7336,8 +7337,8 @@ public:
 
         bool compute() {
 
-                float * floats = ipu_floats.data(); 
-                int   * ints   = ipu_ints  .data(); 
+                float * floats = ipu_floats.data();
+                int   * ints   = ipu_ints  .data();
 
                 int offset = 6;
                 int *ao_loc     = ints + offset;
@@ -7348,7 +7349,7 @@ public:
                 float * indices = ipu_ij.data();
                 int c = 0;
 
-                int N = ints[0];//4;//ao_loc[1]; 
+                int N = ints[0];//4;//ao_loc[1];
                 int di,dj,dk,dl,i0,j0,k0,l0;
 
                 /*ni = ao_loc[shls_slice[1]] - ao_loc[0];
@@ -7375,9 +7376,9 @@ public:
                                                 k0 = ipu_ij[8*c+6];
                                                 l0 = ipu_ij[8*c+7];
 
-                                                //for _i in range(di): 
-                                                //        for _j in range(dj): 
-                                                //                for _k in range(dk): 
+                                                //for _i in range(di):
+                                                //        for _j in range(dj):
+                                                //                for _k in range(dk):
                                                 //                        for _l in range(dl):
                                                 for (int _i = 0; _i < di; _i++){
                                                         for (int _j = 0; _j < dj; _j++){
@@ -7432,13 +7433,13 @@ public:
                                                         }
                                                 }
 
-                                                c += 1; 
+                                                c += 1;
                                         }
                                 }
                         }
                 }
 
-              
+
                 return true;
         }
 
@@ -7446,30 +7447,30 @@ public:
 
 
 void set(dtype * _eri, int index, dtype val, int min, int max, int size){
-        if (min <= index && index < max)  { 
-                //_eri[index % size] = val; 
+        if (min <= index && index < max)  {
+                //_eri[index % size] = val;
                 _eri[index - min] = val;  // reduced from 200k to 40k cycles
         }
 }
 
-// multi tile version 
-class poplar_transform_multi : public Vertex { 
+// multi tile version
+class poplar_transform_multi : public Vertex {
 public:
         InOut<Vector<float>>  ipu_floats;
         InOut<Vector<int>>    ipu_ints;
         InOut<Vector<float>>  ipu_ij;
 
-        InOut<Vector<int>> i; 
+        InOut<Vector<int>> i;
 
         InOut<Vector<float>> ipu_output_sharded;
 
         bool compute() {
-                float * floats = ipu_floats.data(); 
-                int   * ints   = ipu_ints  .data(); 
-                
+                float * floats = ipu_floats.data();
+                int   * ints   = ipu_ints  .data();
+
                 int count = ints[8];
                 int tile_how_much_we_store_on_each_tile = ints[6];
-                int offset = 0; 
+                int offset = 0;
                 int *ao_loc     = ints + offset;
                 float * _eri = ipu_output_sharded.data();
 
@@ -7480,19 +7481,19 @@ public:
                 int N = ints[1];
                 int di,dj,dk,dl,i0,j0,k0,l0;
 
-                int iteration = i[0]; 
+                int iteration = i[0];
 
-                // Update ERI at index when index\in[min,max] then we have ERI replicated on all tiles. 
-                int size = N * N * N; 
-                int min = N * N * N * iteration; 
+                // Update ERI at index when index\in[min,max] then we have ERI replicated on all tiles.
+                int size = N * N * N;
+                int min = N * N * N * iteration;
                 int max = N * N * N * (iteration+1);
 
-                int ni = N; 
+                int ni = N;
                 int nj = N;
                 int nk = N;
                 int nl = N;
 
-                c = count; 
+                c = count;
                 di = ipu_ij[+0];
                 dj = ipu_ij[+1];
                 dk = ipu_ij[+2];
@@ -7518,64 +7519,64 @@ public:
                                 for (int _k = 0; _k < dk; _k++){
                                         for (int _l = 0; _l < dl; _l++){
 
-                                                // sharded over all tiles 
+                                                // sharded over all tiles
                                                 float v = ipu_floats[ _l*di*dj*dk + _k*di*dj + _j*di + _i];
 
-                                                // ERI, replicated on all tiles 
+                                                // ERI, replicated on all tiles
                                                 // if we shard instead, it will become smaller by ?i,j?
                                                 set(_eri,
                                                         (_i+i0) * N * N * N +
                                                         (_j+j0) * N * N +
                                                         (_k+k0) * N +
-                                                        (_l+l0) , 
+                                                        (_l+l0) ,
                                                         v, min,max, size); // ijkl
 
                                                 set(_eri,
-                                                        (_i+i0) * N * N * N + 
-                                                        (_j+j0) * N * N + 
-                                                        (_l+l0) * N + 
-                                                        (_k+k0), 
+                                                        (_i+i0) * N * N * N +
+                                                        (_j+j0) * N * N +
+                                                        (_l+l0) * N +
+                                                        (_k+k0),
                                                         v, min, max, size); // ijlk
 
                                                 set(_eri,
                                                         (_j+j0) * N * N * N +
-                                                        (_i+i0) * N * N + 
-                                                        (_k+k0) * N + 
+                                                        (_i+i0) * N * N +
+                                                        (_k+k0) * N +
                                                         (_l+l0),
                                                         v, min, max, size); // jikl
 
                                                 set(_eri,
-                                                        (_j+j0) * N * N * N  + 
-                                                        (_i+i0) * N * N + 
-                                                        (_l+l0) * N + 
+                                                        (_j+j0) * N * N * N  +
+                                                        (_i+i0) * N * N +
+                                                        (_l+l0) * N +
                                                         (_k+k0),
                                                         v, min, max, size);//# jilk
 
                                                 set(_eri,
-                                                        (_k+k0) * N * N * N + 
+                                                        (_k+k0) * N * N * N +
                                                         (_l+l0) * N * N +
-                                                        (_i+i0) * N + 
+                                                        (_i+i0) * N +
                                                         (_j+j0),
                                                         v, min, max, size); // klij
 
                                                 set(_eri,
-                                                        (_k+k0) * N * N * N + 
-                                                        (_l+l0) * N * N + 
-                                                        (_j+j0) * N + 
+                                                        (_k+k0) * N * N * N +
+                                                        (_l+l0) * N * N +
+                                                        (_j+j0) * N +
                                                         (_i+i0),
                                                         v, min, max, size); // klji
 
                                                 set(_eri,
-                                                        (_l+l0) * N * N * N + 
-                                                        (_k+k0) * N * N + 
-                                                        (_i+i0) * N + 
+                                                        (_l+l0) * N * N * N +
+                                                        (_k+k0) * N * N +
+                                                        (_i+i0) * N +
                                                         (_j+j0),
                                                         v, min, max, size); // lkij
 
                                                 set(_eri,
-                                                        (_l+l0) * N * N * N + 
-                                                        (_k+k0) * N * N + 
-                                                        (_j+j0) * N + 
+                                                        (_l+l0) * N * N * N +
+                                                        (_k+k0) * N * N +
+                                                        (_j+j0) * N +
                                                         (_i+i0),
                                                         v, min, max, size); // lkji
 
@@ -7583,7 +7584,7 @@ public:
                                 }
                         }
                 }
-              
+
                 return true;
         }
 
@@ -7592,9 +7593,9 @@ public:
 
 
 
-// multi tile version 
+// multi tile version
 // takes DM and eri_s1 as input and comptues vj, vk
-class poplar_direct_s1  : public Vertex { 
+class poplar_direct_s1  : public Vertex {
 public:
         Input<Vector<float>>    integral;
         Input<Vector<int>>      indices;
@@ -7616,13 +7617,13 @@ public:
         bool compute() {
                 /*
                 For -C 6 the copy input to output costs the following amount of cycles.
-                        FROM:  2K,  5.4K, 14.9K, 39.4K,  84  K 
+                        FROM:  2K,  5.4K, 14.9K, 39.4K,  84  K
                         TO:   26K, 30  K, 39  k, 64  K, 108.7K
-                */for (unsigned short i = 0; i < vj.size(); i++){  // this costs 20k cycles. so around 25$ 
+                */for (unsigned short i = 0; i < vj.size(); i++){  // this costs 20k cycles. so around 25$
                         vj[i] = in_vj[i];
                         vk[i] = in_vk[i];
                 }
-                
+
                 /// change to multivertex and get a thread_id\in{0,1,2,3,4,5}
 
                 int di = indices[0];
@@ -7635,20 +7636,20 @@ public:
                 int k0 = indices[6];
                 int l0 = indices[7];
 
-                int N = std::sqrt(dm.size()); 
+                int N = std::sqrt(dm.size());
 
                 float val = 0;
 
-                // we have do_list = {True,...,False} of length 8. 
+                // we have do_list = {True,...,False} of length 8.
                 for (unsigned short _i = i0, ci = 0; _i < i0+di; _i++, ci++){
                         for (unsigned short _j = j0, cj = 0; _j < j0+dj; _j++, cj++){
                                 for (unsigned short _k = k0, ck = 0; _k < k0+dk; _k++, ck++){
                                         for (unsigned short _l = l0, cl = 0; _l < l0+dl; _l++, cl++){
                                                 //val = integral[  cl + ck*dl + cj*dl*dk + ci*dl*dk*dj  ];
                                                 val = integral[ ci+cj*di+ck*dj*di+cl*dj*dk*di ]; // no more than 81
-                                                                
 
-                                                if (do_list[0] != 0){ 
+
+                                                if (do_list[0] != 0){
                                                         vj[_k*N+ _l] += dm[_j*N+_i] * val;
                                                         vk[_i*N+ _l] += dm[_j*N+_k] * val;
                                                 }
@@ -7684,16 +7685,16 @@ public:
                                 }
                         }
                 }
-              
+
                 return true;
         }
 
 };
 
 
-class poplar_direct_s1_forloop  : public Vertex {  
+class poplar_direct_s1_forloop  : public Vertex {
 public:
-        // same as above, but moved for loop from python to C++ code; 
+        // same as above, but moved for loop from python to C++ code;
         Input<Vector<float>>    integral;
         Input<Vector<int>>      indices;
         Input<Vector<int>>      do_list;
@@ -7715,14 +7716,14 @@ public:
         bool compute() {
                 /*
                 For -C 6 the copy input to output costs the following amount of cycles.
-                        FROM:  2K,  5.4K, 14.9K, 39.4K,  84  K 
+                        FROM:  2K,  5.4K, 14.9K, 39.4K,  84  K
                         TO:   26K, 30  K, 39  k, 64  K, 108.7K
                 */
                 for (unsigned short i = 0; i < vj.size(); i++){  // this costs 20k cycles ~ 25%
                         vj[i] = in_vj[i];
                         vk[i] = in_vk[i];
                 }
-                
+
                 int chunks = chunk_size.size();
 
 
@@ -7740,11 +7741,11 @@ public:
                         int k0 = indices[6+chunk_i*8];
                         int l0 = indices[7+chunk_i*8];
 
-                        int N = std::sqrt(dm.size()); 
+                        int N = std::sqrt(dm.size());
 
                         float val = 0;
 
-                        // we have do_list = {True,...,False} of length 8. 
+                        // we have do_list = {True,...,False} of length 8.
                         for (unsigned short _i = i0, ci = 0; _i < i0+di; _i++, ci++){
                                 for (unsigned short _j = j0, cj = 0; _j < j0+dj; _j++, cj++){
                                         for (unsigned short _k = k0, ck = 0; _k < k0+dk; _k++, ck++){
@@ -7752,9 +7753,9 @@ public:
                                                         //val = integral[  cl + ck*dl + cj*dl*dk + ci*dl*dk*dj  ];
                                                         //val = integral[ ci+cj*di+ck*dj*di+cl*dj*dk*di ]; // no more than 81
                                                         val = integral[ ci+cj*di+ck*dj*di+cl*dj*dk*di +integral_size*chunk_i]; // no more than 81
-                                                                        
 
-                                                        if (do_list[0+chunk_i*8] != 0){ 
+
+                                                        if (do_list[0+chunk_i*8] != 0){
                                                                 vj[_k*N+ _l] += dm[_j*N+_i] * val;
                                                                 vk[_i*N+ _l] += dm[_j*N+_k] * val;
                                                         }
@@ -7793,7 +7794,7 @@ public:
 
                         //return true;
                 }
-              
+
                 return true;
         }
 
@@ -7802,7 +7803,7 @@ public:
 
 
 
-class poplar_direct_s1_forloop_vj  : public Vertex {  
+class poplar_direct_s1_forloop_vj  : public Vertex {
 public:
         // same as above "poplar_direct_S1_forloop"  but only handles vk (not vj, vk)
         // performing sequentially saves 89*2MB for gdb9 in 631g*
@@ -7825,13 +7826,13 @@ public:
         bool compute() {
                 /*
                 For -C 6 the copy input to output costs the following amount of cycles.
-                        FROM:  2K,  5.4K, 14.9K, 39.4K,  84  K 
+                        FROM:  2K,  5.4K, 14.9K, 39.4K,  84  K
                         TO:   26K, 30  K, 39  k, 64  K, 108.7K
                 */
-                for (unsigned short i = 0; i < vj.size(); i++){  
+                for (unsigned short i = 0; i < vj.size(); i++){
                         vj[i] = in_vj[i];
                 }
-                
+
                 int chunks = chunk_size.size();
 
 
@@ -7849,11 +7850,11 @@ public:
                         int k0 = indices[6+chunk_i*8];
                         int l0 = indices[7+chunk_i*8];
 
-                        int N = std::sqrt(dm.size()); 
+                        int N = std::sqrt(dm.size());
 
                         float val = 0;
 
-                        // we have do_list = {True,...,False} of length 8. 
+                        // we have do_list = {True,...,False} of length 8.
                         for (unsigned short _i = i0, ci = 0; _i < i0+di; _i++, ci++){
                                 for (unsigned short _j = j0, cj = 0; _j < j0+dj; _j++, cj++){
                                         for (unsigned short _k = k0, ck = 0; _k < k0+dk; _k++, ck++){
@@ -7861,9 +7862,9 @@ public:
                                                         //val = integral[  cl + ck*dl + cj*dl*dk + ci*dl*dk*dj  ];
                                                         //val = integral[ ci+cj*di+ck*dj*di+cl*dj*dk*di ]; // no more than 81
                                                         val = integral[ ci+cj*di+ck*dj*di+cl*dj*dk*di +integral_size*chunk_i]; // no more than 81
-                                                                        
 
-                                                        if (do_list[0+chunk_i*8] != 0){ 
+
+                                                        if (do_list[0+chunk_i*8] != 0){
                                                                 vj[_k*N+ _l] += dm[_j*N+_i] * val;
                                                         }
                                                         if (do_list[1+chunk_i*8] != 0){
@@ -7893,13 +7894,13 @@ public:
                         }
 
                 }
-              
+
                 return true;
         }
 
 };
 
-class poplar_direct_s1_forloop_vk  : public Vertex {  
+class poplar_direct_s1_forloop_vk  : public Vertex {
 public:
 
         // same as above "poplar_direct_S1_forloop"  but only handles vk (not vj, vk)
@@ -7923,13 +7924,13 @@ public:
         bool compute() {
                 /*
                 For -C 6 the copy input to output costs the following amount of cycles.
-                        FROM:  2K,  5.4K, 14.9K, 39.4K,  84  K 
+                        FROM:  2K,  5.4K, 14.9K, 39.4K,  84  K
                         TO:   26K, 30  K, 39  k, 64  K, 108.7K
                 */
-                for (unsigned short i = 0; i < vk.size(); i++){  
+                for (unsigned short i = 0; i < vk.size(); i++){
                         vk[i] = in_vk[i];
                 }
-                
+
                 int chunks = chunk_size.size();
 
 
@@ -7947,11 +7948,11 @@ public:
                         int k0 = indices[6+chunk_i*8];
                         int l0 = indices[7+chunk_i*8];
 
-                        int N = std::sqrt(dm.size()); 
+                        int N = std::sqrt(dm.size());
 
                         float val = 0;
 
-                        // we have do_list = {True,...,False} of length 8. 
+                        // we have do_list = {True,...,False} of length 8.
                         for (unsigned short _i = i0, ci = 0; _i < i0+di; _i++, ci++){
                                 for (unsigned short _j = j0, cj = 0; _j < j0+dj; _j++, cj++){
                                         for (unsigned short _k = k0, ck = 0; _k < k0+dk; _k++, ck++){
@@ -7959,9 +7960,9 @@ public:
                                                         //val = integral[  cl + ck*dl + cj*dl*dk + ci*dl*dk*dj  ];
                                                         //val = integral[ ci+cj*di+ck*dj*di+cl*dj*dk*di ]; // no more than 81
                                                         val = integral[ ci+cj*di+ck*dj*di+cl*dj*dk*di +integral_size*chunk_i]; // no more than 81
-                                                                        
 
-                                                        if (do_list[0+chunk_i*8] != 0){ 
+
+                                                        if (do_list[0+chunk_i*8] != 0){
                                                                 vk[_i*N+ _l] += dm[_j*N+_k] * val;
                                                         }
                                                         if (do_list[1+chunk_i*8] != 0){
@@ -7991,16 +7992,16 @@ public:
                         }
 
                 }
-              
+
                 return true;
         }
 
 };
 
 
-// multi tile version 
+// multi tile version
 // takes DM and eri_s1 as input and comptues vj, vk
-class poplar_direct_s1_vj  : public Vertex { 
+class poplar_direct_s1_vj  : public Vertex {
 public:
         Input<Vector<float>>    integral;
         Input<Vector<int>>      indices;
@@ -8020,12 +8021,12 @@ public:
         bool compute() {
                 /*
                 For -C 6 the copy input to output costs the following amount of cycles.
-                        FROM:  2K,  5.4K, 14.9K, 39.4K,  84  K 
+                        FROM:  2K,  5.4K, 14.9K, 39.4K,  84  K
                         TO:   26K, 30  K, 39  k, 64  K, 108.7K
-                */for (unsigned short i = 0; i < vj.size(); i++){  // this costs 20k cycles. 
+                */for (unsigned short i = 0; i < vj.size(); i++){  // this costs 20k cycles.
                         vj[i] = in_vj[i];
                 }
-                
+
 
                 int di = indices[0];
                 int dj = indices[1];
@@ -8037,20 +8038,20 @@ public:
                 int k0 = indices[6];
                 int l0 = indices[7];
 
-                int N = std::sqrt(dm.size()); 
+                int N = std::sqrt(dm.size());
 
                 float val = 0;
 
-                // we have do_list = {True,...,False} of length 8. 
+                // we have do_list = {True,...,False} of length 8.
                 for (unsigned short _i = i0, ci = 0; _i < i0+di; _i++, ci++){
                         for (unsigned short _j = j0, cj = 0; _j < j0+dj; _j++, cj++){
                                 for (unsigned short _k = k0, ck = 0; _k < k0+dk; _k++, ck++){
                                         for (unsigned short _l = l0, cl = 0; _l < l0+dl; _l++, cl++){
                                                 //val = integral[  cl + ck*dl + cj*dl*dk + ci*dl*dk*dj  ];
                                                 val = integral[ ci+cj*di+ck*dj*di+cl*dj*dk*di ]; // no more than 81
-                                                                
 
-                                                if (do_list[0] != 0){ 
+
+                                                if (do_list[0] != 0){
                                                         vj[_k*N+ _l] += dm[_j*N+_i] * val;
                                                 }
                                                 if (do_list[1] != 0){
@@ -8078,16 +8079,16 @@ public:
                                 }
                         }
                 }
-              
+
                 return true;
         }
 
 };
 
 
-// multi tile version 
+// multi tile version
 // takes DM and eri_s1 as input and comptues vj, vk
-class poplar_direct_s1_vk  : public Vertex { 
+class poplar_direct_s1_vk  : public Vertex {
 public:
         Input<Vector<float>>    integral;
         Input<Vector<int>>      indices;
@@ -8107,12 +8108,12 @@ public:
         bool compute() {
                 /*
                 For -C 6 the copy input to output costs the following amount of cycles.
-                        FROM:  2K,  5.4K, 14.9K, 39.4K,  84  K 
+                        FROM:  2K,  5.4K, 14.9K, 39.4K,  84  K
                         TO:   26K, 30  K, 39  k, 64  K, 108.7K
-                */for (unsigned short i = 0; i < vk.size(); i++){  
+                */for (unsigned short i = 0; i < vk.size(); i++){
                         vk[i] = in_vk[i];
                 }
-                
+
 
                 int di = indices[0];
                 int dj = indices[1];
@@ -8124,20 +8125,20 @@ public:
                 int k0 = indices[6];
                 int l0 = indices[7];
 
-                int N = std::sqrt(dm.size()); 
+                int N = std::sqrt(dm.size());
 
                 float val = 0;
 
-                // we have do_list = {True,...,False} of length 8. 
+                // we have do_list = {True,...,False} of length 8.
                 for (unsigned short _i = i0, ci = 0; _i < i0+di; _i++, ci++){
                         for (unsigned short _j = j0, cj = 0; _j < j0+dj; _j++, cj++){
                                 for (unsigned short _k = k0, ck = 0; _k < k0+dk; _k++, ck++){
                                         for (unsigned short _l = l0, cl = 0; _l < l0+dl; _l++, cl++){
                                                 //val = integral[  cl + ck*dl + cj*dl*dk + ci*dl*dk*dj  ];
                                                 val = integral[ ci+cj*di+ck*dj*di+cl*dj*dk*di ]; // no more than 81
-                                                                
 
-                                                if (do_list[0] != 0){ 
+
+                                                if (do_list[0] != 0){
                                                         vk[_i*N+ _l] += dm[_j*N+_k] * val;
                                                 }
                                                 if (do_list[1] != 0){
@@ -8165,15 +8166,15 @@ public:
                                 }
                         }
                 }
-              
+
                 return true;
         }
 
 };
 
 
-// multi tile version 
-class poplar_transform_multi_inside : public Vertex { 
+// multi tile version
+class poplar_transform_multi_inside : public Vertex {
 public:
         /*InOut<Vector<float>>  ipu_floats;
         InOut<Vector<int>>    ipu_ints;
@@ -8182,42 +8183,42 @@ public:
         Input<Vector<float>>  ipu_floats;
         Input<Vector<int>>    ipu_ints;
         Input<Vector<int>>    ipu_ij;
-        Input<Vector<int>>    i; 
+        Input<Vector<int>>    i;
 
         //InOut<Vector<float>>  ipu_output_sharded;
         Output<Vector<float>>  ipu_output_sharded;
 
         bool compute() {
-                //const float * floats = ipu_floats.data(); 
-                const int   * ints   = ipu_ints  .data(); 
+                //const float * floats = ipu_floats.data();
+                const int   * ints   = ipu_ints  .data();
 
-                int iteration                  = i[0]; 
+                int iteration                  = i[0];
                 int num_integrals_on_each_tile = i[1];
 
-                int n_ao_loc = ipu_ints[5]; // this is the same in all "rows" so we can just take the first one. 
+                int n_ao_loc = ipu_ints[5]; // this is the same in all "rows" so we can just take the first one.
                 int size_ints = n_ao_loc + 10 ;
 
                 int n = ints[0];
                 int N = ints[1];
                 int di,dj,dk,dl,i0,j0,k0,l0;
 
-                int offset = 0; 
+                int offset = 0;
                 const int *ao_loc     = ints + offset;
 
-                int N_N = N * N; 
-                int N_N_N = N_N * N; 
+                int N_N = N * N;
+                int N_N_N = N_N * N;
                 int size = N_N_N;
-                int min = size * iteration; 
+                int min = size * iteration;
                 int max = size * (iteration+1);
 
                 float * _eri = ipu_output_sharded.data();
-                
-                
+
+
 
                 for (unsigned short c = 0; c < num_integrals_on_each_tile; c++) {
 
 
-                        // Update ERI at index when index\in[min,max] then we have ERI replicated on all tiles. 
+                        // Update ERI at index when index\in[min,max] then we have ERI replicated on all tiles.
                         di = ipu_ij[8*c+0];
                         dj = ipu_ij[8*c+1];
                         dk = ipu_ij[8*c+2];
@@ -8233,29 +8234,29 @@ public:
                                         for (unsigned short _k = 0; _k < dk; _k++){
                                                 for (unsigned short _l = 0; _l < dl; _l++){
 
-                                                        // sharded over all tiles 
+                                                        // sharded over all tiles
                                                         float v = ipu_floats[ _l*di*dj*dk + _k*di*dj + _j*di + _i + c*81];
 
-                                                        // ERI, replicated on all tiles 
+                                                        // ERI, replicated on all tiles
                                                         // if we shard instead, it will become smaller by ?i,j?
                                                         set(_eri,
                                                                 (_i+i0) * N_N_N +
                                                                 (_j+j0) * N_N +
                                                                 (_k+k0) * N +
-                                                                (_l+l0) , 
+                                                                (_l+l0) ,
                                                                 v, min,max, size); // ijkl
 
                                                         set(_eri,
                                                                 (_i+i0) * N_N_N +
                                                                 (_j+j0) * N_N +
-                                                                (_l+l0) * N + 
-                                                                (_k+k0), 
+                                                                (_l+l0) * N +
+                                                                (_k+k0),
                                                                 v, min, max, size); // ijlk
 
                                                         set(_eri,
                                                                 (_j+j0) * N_N_N +
                                                                 (_i+i0) * N_N +
-                                                                (_k+k0) * N + 
+                                                                (_k+k0) * N +
                                                                 (_l+l0),
                                                                 v, min, max, size); // jikl
 
@@ -8269,28 +8270,28 @@ public:
                                                         set(_eri,
                                                                 (_k+k0) * N_N_N+
                                                                 (_l+l0) * N_N+
-                                                                (_i+i0) * N+ 
+                                                                (_i+i0) * N+
                                                                 (_j+j0),
                                                                 v, min, max, size); // klij
 
                                                         set(_eri,
                                                                 (_k+k0) * N_N_N+
                                                                 (_l+l0) * N_N+
-                                                                (_j+j0) * N+ 
+                                                                (_j+j0) * N+
                                                                 (_i+i0),
                                                                 v, min, max, size); // klji
 
                                                         set(_eri,
                                                                 (_l+l0) * N_N_N+
                                                                 (_k+k0) * N_N+
-                                                                (_i+i0) * N+ 
+                                                                (_i+i0) * N+
                                                                 (_j+j0),
                                                                 v, min, max, size); // lkij
 
                                                         set(_eri,
                                                                 (_l+l0) * N_N_N+
                                                                 (_k+k0) * N_N+
-                                                                (_j+j0) * N+ 
+                                                                (_j+j0) * N+
                                                                 (_i+i0),
                                                                 v, min, max, size); // lkji
 
@@ -8301,14 +8302,14 @@ public:
 
                 }
 
-                
-              
+
+
                 return true;
         }
 
 };
 
-class poplar_int2e_sph_direct : public Vertex { 
+class poplar_int2e_sph_direct : public Vertex {
 public:
         InOut<Vector<float>>  ipu_floats;
         InOut<Vector<int>>    ipu_ints;
@@ -8319,8 +8320,8 @@ public:
 
         bool compute() {
 
-                float * floats = ipu_floats.data(); 
-                int   * ints   = ipu_ints  .data(); 
+                float * floats = ipu_floats.data();
+                int   * ints   = ipu_ints  .data();
 
                 int n_eri    = ipu_ints[0];
                 int n_buf    = ipu_ints[1];
@@ -8332,15 +8333,15 @@ public:
                 int offset = 6;
                 int *ao_loc     = ints + offset;
                 offset += n_ao_loc;
-                int *atm        = ints + offset; 
+                int *atm        = ints + offset;
                 offset += n_atm*6;
-                int *bas        = ints + offset; 
+                int *bas        = ints + offset;
 
                 float * env = floats;
                 float * eri = ipu_output.data();
 
                 float * dm = floats + n_buf;
-                //for (int i = 0; i < ipu_output.size(); i++){ eri[i] = 0; } 
+                //for (int i = 0; i < ipu_output.size(); i++){ eri[i] = 0; }
 
                 dtype *_eri = eri;
 
@@ -8370,7 +8371,7 @@ void NPdset0(ddtype *p, const size_t n)
 #define NOVALUE 0xffffffff
 
 //#if !defined(HAVE_DEFINED_INTORENV_H)
-#define FINT int 
+#define FINT int
 
 typedef struct {
     FINT **index_xyz_array; // LMAX1**4 pointers to index_xyz
@@ -8379,11 +8380,11 @@ typedef struct {
     FINT nbas;
     ddtype **log_max_coeff;
     PairData **pairdata;  // NULL indicates not-initialized, NO_VALUE can be skipped
-} CINTOpt; 
+} CINTOpt;
 #define HAVE_DEFINED_INTORENV_H
 typedef struct {
-        int v_ket_nsh;  // v_ket_sh1 - v_ket_sh0 
-        int offset0_outptr;  // v_bra_sh0 * v_ket_nsh + v_ket_sh0 
+        int v_ket_nsh;  // v_ket_sh1 - v_ket_sh0
+        int offset0_outptr;  // v_bra_sh0 * v_ket_nsh + v_ket_sh0
         int dm_dims[2];
         int *outptr;   // Offset array to index the data which are stored in stack //
         ddtype *data;  // Stack to store data //
@@ -8401,7 +8402,7 @@ typedef struct CVHFOpt_struct {
     //int (*r_vkscreen)(int *shls, struct CVHFOpt_struct *opt,
     //                  ddtype **dms_cond, int n_dm, ddtype *dm_atleast,
     //                  int *atm, int *bas, ddtype *env);
-} CVHFOpt; 
+} CVHFOpt;
 
 typedef struct {
         int ibra_shl0;  // = 0, 2, 4, 6. The index in shls_slice
@@ -8498,7 +8499,7 @@ int CVHFnoscreen(int *shls, CVHFOpt *opt, int *atm, int *bas, ddtype *env)
 
 
  // for given ksh, lsh, loop all ish, jsh
- 
+
 void CVHFdot_nrs1(JKOperator **jkop, JKArray **vjk,
                   ddtype **dms, ddtype *buf, int n_buf, ddtype *cache, int n_dm,
                   int *ishls, int *jshls, int *kshls, int *lshls,
@@ -8613,8 +8614,8 @@ void CVHFdot_nrs8( JKOperator **jkop, JKArray **vjk,
                 //printf("A!\n");
                 return CVHFdot_nrs4(jkop, vjk, dms, buf, n_buf, cache, n_dm,
                                     ishls, jshls, kshls, lshls, vhfopt, envs, n_env);
-        } 
-        else if (ishls[0] < kshls[0]) return; 
+        }
+        else if (ishls[0] < kshls[0]) return;
         else if ((ishls[1] <= jshls[0]) || (kshls[1] <= lshls[0])) {
                 //assert(ishls[1] == kshls[1]);
                 return;
@@ -8641,23 +8642,23 @@ void CVHFdot_nrs8( JKOperator **jkop, JKArray **vjk,
                                         //INTOR_AND_CONTRACT;
 
 
-                                        shls[0] = ish; 
-                                        shls[1] = jsh; 
-                                        shls[2] = ksh; 
-                                        shls[3] = lsh; 
-                                        notempty = int2e_sph(buf, n_buf, NULL, shls, atm, natm, bas, nbas, env, n_env, NULL, NULL, NULL, NULL); 
-                                        if (notempty) { 
-                                                i0 = ao_loc[ish] - ioff; 
-                                                j0 = ao_loc[jsh] - joff; 
-                                                k0 = ao_loc[ksh] - koff; 
-                                                l0 = ao_loc[lsh] - loff; 
-                                                i1 = ao_loc[ish+1] - ioff; 
-                                                j1 = ao_loc[jsh+1] - joff; 
-                                                k1 = ao_loc[ksh+1] - koff; 
-                                                l1 = ao_loc[lsh+1] - loff; 
-                                                /*for (idm = 0; idm < n_dm; idm++) { 
-                                                        pf = jkop[idm]->contract; 
-                                                        (*pf)(buf, dms[idm], vjk[idm], shls, i0, i1, j0, j1, k0, k1, l0, l1); 
+                                        shls[0] = ish;
+                                        shls[1] = jsh;
+                                        shls[2] = ksh;
+                                        shls[3] = lsh;
+                                        notempty = int2e_sph(buf, n_buf, NULL, shls, atm, natm, bas, nbas, env, n_env, NULL, NULL, NULL, NULL);
+                                        if (notempty) {
+                                                i0 = ao_loc[ish] - ioff;
+                                                j0 = ao_loc[jsh] - joff;
+                                                k0 = ao_loc[ksh] - koff;
+                                                l0 = ao_loc[lsh] - loff;
+                                                i1 = ao_loc[ish+1] - ioff;
+                                                j1 = ao_loc[jsh+1] - joff;
+                                                k1 = ao_loc[ksh+1] - koff;
+                                                l1 = ao_loc[lsh+1] - loff;
+                                                /*for (idm = 0; idm < n_dm; idm++) {
+                                                        pf = jkop[idm]->contract;
+                                                        (*pf)(buf, dms[idm], vjk[idm], shls, i0, i1, j0, j1, k0, k1, l0, l1);
                                                 } */
 
 
@@ -8668,9 +8669,9 @@ void CVHFdot_nrs8( JKOperator **jkop, JKArray **vjk,
 
                                         //printf("%i %i %i %i\n", ish, jsh, ksh, lsh);
                                         //fflush(stdout);
-                                } 
-                        } 
-                } 
+                                }
+                        }
+                }
         }
 
         //printf("DONE!\n");
@@ -8717,9 +8718,9 @@ void CVHFdeallocate_JKArray(JKArray *jkarray)
         free(jkarray);*/
 }
 
-ddtype *CVHFallocate_and_reorder_dm(JKOperator *op, 
+ddtype *CVHFallocate_and_reorder_dm(JKOperator *op,
                                     ddtype *dm,
-                                    int *shls_slice, 
+                                    int *shls_slice,
                                     int *ao_loc) {
         int ibra = op->ibra_shl0;
         int iket = op->iket_shl0;
@@ -8747,9 +8748,9 @@ ddtype *CVHFallocate_and_reorder_dm(JKOperator *op,
                         for (i = i0; i < i1; i++) {
                                 for (j = j0; j < j1; j++, ij++) {
                                         out[ij] = dm[i*ncol+j];
-                                } 
+                                }
                         }
-                } 
+                }
         }
         return out;
 }
@@ -8790,7 +8791,7 @@ void CVHFassemble_v(ddtype *vjk, JKOperator *op, JKArray *jkarray,
                 for (jsh = jsh0; jsh < jsh1; jsh++) {
                         //printf("%i %i\n", ish, jsh);
                         //fflush(stoud);
-                        
+
                         optr = jkarray->outptr[ish*njsh+jsh-jkarray->offset0_outptr];
                         if (optr != NOVALUE) {
                                 di = ao_loc[ish+1] - ao_loc[ish];
@@ -8806,7 +8807,7 @@ void CVHFassemble_v(ddtype *vjk, JKOperator *op, JKArray *jkarray,
                                         data += di * dj;
                                 }
                         }
-                } 
+                }
         }
 }
 
@@ -8861,7 +8862,7 @@ static int _shls_block_partition_lim(int *block_loc, int *shls_slice,
 //
 // * drv loop over ij, generate eris of kl for given ij, call fjk to
 // * calculate vj, vk.
-// * 
+// *
 // * n_dm is the number of dms for one [array(ij|kl)], it is also the size of dms and vjk
 // * ncomp is the number of components that produced by intor
 // * shls_slice = [ishstart, ishend, jshstart, jshend, kshstart, kshend, lshstart, lshend]
@@ -8869,9 +8870,9 @@ static int _shls_block_partition_lim(int *block_loc, int *shls_slice,
 // * ao_loc[i+1] = ao_loc[i] + CINTcgto_spheric(i, bas)  for i = 0..nbas
 // *
 // * Return [(ptr[ncomp,nao,nao] in C-contiguous) for ptr in vjk]
-// 
-extern "C" void CVHFnr_direct_drv(//int (*intor)(), void (*fdot)(), 
-                       JKOperator **jkop, 
+//
+extern "C" void CVHFnr_direct_drv(//int (*intor)(), void (*fdot)(),
+                       JKOperator **jkop,
 
                        //input_type **dms, input_type **vjk,  // this is input and output, both of size (NAO, NAO)
                        ddtype **dms, ddtype **vjk,  // this is input and output, both of size (NAO, NAO)
@@ -8879,30 +8880,30 @@ extern "C" void CVHFnr_direct_drv(//int (*intor)(), void (*fdot)(),
                        int n_dm, int ncomp,
                        int *shls_slice, int *ao_loc,
                        CINTOpt *cintopt, CVHFOpt *vhfopt,
-                       int *atm, int natm, int *bas, int nbas, 
-                       //input_type *env, 
-                       ddtype *env, 
+                       int *atm, int natm, int *bas, int nbas,
+                       //input_type *env,
+                       ddtype *env,
                        int n_env) {
-                        
+
 
 
         //ddtype __env[n_env];
         //for (int i= 0; i < n_env; i++) __env[i] = _env[i];
-        //ddtype *env = __env; 
+        //ddtype *env = __env;
 
         // n_dm = 2 because (vj, vk)
 
         IntorEnvs envs = {natm, nbas, atm, bas, env, shls_slice, ao_loc, NULL, cintopt, ncomp};
         int idm ;
         ddtype *tile_dms[2];
-        //CVHFzero_out_vjk(vjk[idm], jkop[idm], shls_slice, ao_loc, ncomp); 
+        //CVHFzero_out_vjk(vjk[idm], jkop[idm], shls_slice, ao_loc, ncomp);
         tile_dms[0] = CVHFallocate_and_reorder_dm(jkop[0], dms[0], shls_slice, ao_loc);
         tile_dms[1] = CVHFallocate_and_reorder_dm(jkop[1], dms[1], shls_slice, ao_loc);
         //printf("idm=%i\n", idm);
         //}
 
 
-        // TODO 
+        // TODO
         size_t di      = 1024; //GTOmax_shell_dim(ao_loc, shls_slice, 4);
         int cache_size = 1024;//GTOmax_cache_size(shls_slice, 4, atm, natm, bas, nbas, env, n_env);
 
@@ -8918,8 +8919,8 @@ extern "C" void CVHFnr_direct_drv(//int (*intor)(), void (*fdot)(),
         int njsh = jsh1 - jsh0;
         int nksh = ksh1 - ksh0;
         int nlsh = lsh1 - lsh0;
-        //int *block_iloc = malloc(sizeof(int) * (nish + njsh + nksh + nlsh + 4)); // this is new 
-        int *block_iloc = new int[1024]; //malloc(sizeof(int) * (nish + njsh + nksh + nlsh + 4)); // this is new 
+        //int *block_iloc = malloc(sizeof(int) * (nish + njsh + nksh + nlsh + 4)); // this is new
+        int *block_iloc = new int[1024]; //malloc(sizeof(int) * (nish + njsh + nksh + nlsh + 4)); // this is new
         int *block_jloc = block_iloc + nish + 1;
         int *block_kloc = block_jloc + njsh + 1;
         int *block_lloc = block_kloc + nksh + 1;
@@ -8937,7 +8938,7 @@ extern "C" void CVHFnr_direct_drv(//int (*intor)(), void (*fdot)(),
         v_priv[1] = CVHFallocate_JKArray(jkop[1], shls_slice, ao_loc, ncomp);
         //}
 
-        
+
 
 
 
@@ -8945,7 +8946,7 @@ extern "C" void CVHFnr_direct_drv(//int (*intor)(), void (*fdot)(),
         ddtype *buf = new ddtype[1024]; //malloc(sizeof(ddtype)* ( di*di*di*di*ncomp + di*di*2 + cache_size ));
         int n_buf = di*di*di*di*ncomp + di*di*2 + cache_size;
         ddtype *cache = buf + di*di*di*di*ncomp;
-        
+
 
         for (blk_id = 0; blk_id < nblock_jkl; blk_id++) {
                 r = blk_id;
@@ -8956,18 +8957,18 @@ extern "C" void CVHFnr_direct_drv(//int (*intor)(), void (*fdot)(),
 
                 for (i = 0; i < nblock_i; i++) {
 
-                        //printf("[%i %i %i]\n", blk_id, i, nblock_i); // it only ends up calling once? 
+                        //printf("[%i %i %i]\n", blk_id, i, nblock_i); // it only ends up calling once?
                         //fflush(stdout);
                         CVHFdot_nrs8(jkop, v_priv, tile_dms, buf, n_buf, cache, n_dm, block_iloc+i, block_jloc+j, block_kloc+k, block_lloc+l, vhfopt, &envs, n_env);
                 }
-                
+
         }
 
 
-                
-        for (i = 0; i < n_dm; i++) { 
+
+        for (i = 0; i < n_dm; i++) {
                 CVHFassemble_v(vjk[i], jkop[i], v_priv[i], shls_slice, ao_loc);
-                CVHFdeallocate_JKArray(v_priv[i]); 
+                CVHFdeallocate_JKArray(v_priv[i]);
         }
 
         /*free(buf);
@@ -8976,10 +8977,10 @@ extern "C" void CVHFnr_direct_drv(//int (*intor)(), void (*fdot)(),
         }
         free(block_iloc);*/
 
-        return; 
+        return;
 }
 
-// FILE nr_direct_Dot.c file 
+// FILE nr_direct_Dot.c file
 
 
 #define ASSERT(expr, msg) \

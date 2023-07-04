@@ -1,3 +1,4 @@
+# Copyright (c) 2023 Graphcore Ltd. All rights reserved.
 from dataclasses import dataclass
 from functools import partial
 from pprint import pprint

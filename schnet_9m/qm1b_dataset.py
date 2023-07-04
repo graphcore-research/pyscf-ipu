@@ -1,3 +1,4 @@
+# Copyright (c) 2023 Graphcore Ltd. All rights reserved.
 import torch
 import os.path as osp
 from glob import glob

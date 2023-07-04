@@ -1,10 +1,11 @@
-from pyscf import gto 
-import numpy as np 
+# Copyright (c) 2023 Graphcore Ltd. All rights reserved.
+from pyscf import gto
+import numpy as np
 
 def minao(mol):
     from pyscf.scf import atom_hf
     from pyscf.scf import addons
-    import time 
+    import time
 
     times = []
     times.append(time.time())
@@ -113,7 +114,7 @@ def minao(mol):
     pmol._atm, pmol._bas, pmol._env = pmol.make_env(new_atom, basis, [])
     times.append(time.time())
     pmol._built = True
-    dm = addons.project_dm_nr2nr(pmol, np.diag(occ), mol) 
+    dm = addons.project_dm_nr2nr(pmol, np.diag(occ), mol)
 
     times.append(time.time())
 
