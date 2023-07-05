@@ -8,13 +8,12 @@ sys.path.append("../")
 from exchange_correlation.b3lyp import b3lyp
 from electron_repulsion.direct import prepare_integrals_2_inputs, compute_integrals_2, ipu_direct_mult, prepare_ipu_direct_mult_inputs
 
-HARTREE_TO_EV    = 27.2114079527
-EPSILON_B3LYP  = 1e-20
-CLIP_RHO_MIN   = 1e-9
-CLIP_RHO_MAX   = 1e12
+HARTREE_TO_EV = 27.2114079527
+EPSILON_B3LYP = 1e-20
+CLIP_RHO_MIN  = 1e-9
+CLIP_RHO_MAX  = 1e12
 
 def nanoDFT_iteration(i, vals):
-    # 
     mask, V_xc, density_matrix, _V, _H, DIIS_H, vj, vk, overlap, electron_repulsion, \
         fixed_hamiltonian, L_inv, weights, hyb, ao, num_calls, iter_matrices, part_energies = vals
     N = density_matrix.shape[0]
@@ -39,9 +38,6 @@ def nanoDFT_iteration(i, vals):
     return [mask, V_xc, density_matrix, _V, _H, DIIS_H, vj, vk, overlap, electron_repulsion, fixed_hamiltonian, L_inv, weights, hyb, ao, num_calls, iter_matrices, part_energies]
 
 def exchange_correlation(density_matrix, ao, electron_repulsion, weights, vj, vk, hyb, num_calls):
-    # 
-    # 
-    #
     assert args.xc == "b3lyp"
     n = density_matrix.shape[0]
 
@@ -72,9 +68,9 @@ def exchange_correlation(density_matrix, ao, electron_repulsion, weights, vj, vk
     return E_xc, V_xc, vj, vk
 
 def DIIS(i, sdf, hamiltonian, _V, _H, DIIS_H):
-    # DIIS is an optional technique to improve DFT convergence. DIIS computes 
+    # DIIS improves DFT convergence by computing:
     #   hamiltonian_i = c_1 hamiltonian_{i-1} + ... + c_8 hamiltonian_{i-8}  where  c=pinv(some_matrix)[0,:]
-    # I thus like to think of DIIS as "fancy momentum". 
+    # We thus like to think of DIIS as "fancy momentum". 
     DIIS_head = i % _V.shape[0]
     nd, d        = _V.shape
 
@@ -158,38 +154,34 @@ def nanoDFT(args, str, DIIS_space=9):
     # jax_finalize  
     # (n, N)
 
-    # consider type annotatins 
-
     mol = pyscf.gto.mole.Mole()
     mol.build(atom=str, unit="Angstrom", basis=args.basis, spin=0, verbose=0)
 
-    # TODO: compare type annotation to running c6h6 example .
-    n_electrons      = mol.nelectron   # n = c6h6;      30 electrons
-    n_electrons_half = n_electrons//2  # 
-    N                = mol.nao_nr()
-    nuclear_energy   = mol.energy_nuc()                                                      
-    hyb              = pyscf.dft.libxc.hybrid_coeff(args.xc, mol.spin)                       
-    print(n_electrons)
+    n_electrons      = mol.nelectron    # n    = 42 for C6H6
+    n_electrons_half = n_electrons//2   # n//2 = 21 for C6H6 
+    N                = mol.nao_nr()     # N    = 66 for C6H6 
+    nuclear_energy   = mol.energy_nuc() # float = 202.4065 [Hartree] for C6H6 
+    hyb              = pyscf.dft.libxc.hybrid_coeff(args.xc, mol.spin) # float = 0.2 for b3lyp/spin=0
 
-    mask = np.ones(N)
-    mask[n_electrons_half:] = 0
+    mask = np.ones(N)                   
+    mask[n_electrons_half:] = 0         # [1, ..., 1, 0, ..., 0] for C6H6
 
     # Initialize grid.
     grids            = pyscf.dft.gen_grid.Grids(mol)
     grids.level      = args.level 
     grids.build()
-    weights          = grids.weights                                        # (1, N) = (1, 5689) for c6h6                  
+    weights          = grids.weights  # (g,) = (33080,) for CH4 w/ -level 2
     coord_str        = 'GTOval_cart_deriv1' if mol.cart else 'GTOval_sph_deriv1'
-    ao               = mol.eval_gto(coord_str, grids.coords, 4)          # (4, 5689)
+    ao               = mol.eval_gto(coord_str, grids.coords, 4) # (4, g, N) = (4, 33080, 9) for CH4 /w -level 2
 
     # Initialize all (N, N) sized matrices. 
-    density_matrix  = pyscf.scf.hf.init_guess_by_minao(mol)    # (N,N)=(67,67) for c6h6  
+    density_matrix  = pyscf.scf.hf.init_guess_by_minao(mol)    # (N,N)=(9,9) for CH4
     kinetic         = mol.intor_symmetric('int1e_kin')         # (N,N)
     nuclear         = mol.intor_symmetric('int1e_nuc')         # (N,N)
     overlap         = mol.intor_symmetric('int1e_ovlp')        # (N,N) 
 
     if args.backend != "ipu": 
-        electron_repulsion = mol.intor("int2e_sph") # (N,N,N,N)=(67,67,67,67) for c6h6
+        electron_repulsion = mol.intor("int2e_sph") # (N,N,N,N)=(9,9,9,9) for CH4
     else: 
         electron_repulsion = None # will be computed on device
 
@@ -271,14 +263,9 @@ def pyscf_reference(args, molecule_string):
     mol.max_cycle = args.its
     mf = pyscf.scf.RKS(mol)
     mf.xc = args.xc
-
-    if args.skipDIIS:
-        print("\n[ TURNING OFF DIIS IN PYSCF ]")
-        mf.DIIS = 0
-        mf.DIIS_space = 0
     mf.DIIS_space = 9 
 
-    pyscf_energy    = mf.kernel()  * HARTREE_TO_EV
+    pyscf_energy   = mf.kernel()  * HARTREE_TO_EV
     lumo           = np.argmin(mf.mo_occ)
     homo           = lumo - 1
     hl_gap_hartree = np.abs(mf.mo_energy[homo] - mf.mo_energy[lumo])
@@ -298,20 +285,16 @@ def print_difference(energies, hlgaps, pyscf_energy, hl_gap_hartree):
     print("chemAcc/diff: \t%15f"%(0.043/np.abs(pyscf_energy-energies[-1])))
     print("chemAcc/mdiff: \t%15f"%(0.043/np.abs(pyscf_energy-np.mean(energies[-10:]))))
 
-
 def nanoDFT_parser(
         its: int = 20,
         mol_str: str = "",
-        ipumult: bool = False,
         float32: bool = False,
-        basis: str = "STO-3G",
+        basis: str = "6-31G",
         xc: str = "b3lyp",
         backend: str = "cpu",
-        level: int = 2,
-        gdb: int = -1,
+        level: int = 1,
         multv: int = 2,
         intv: int = 1,
-        skipDIIS: bool = False,
         threads: int = 1,
         threads_int: int = 1,
 ):
@@ -321,7 +304,6 @@ def nanoDFT_parser(
     Args:
         its (int): Number of Kohn-Sham iterations.
         mol_str (str): Molecule string, e.g., "H 0 0 0; H 0 0 1; O 1 0 0; "
-        ipumult (bool): For IPU. Use (N, N, N, N) ERI computed with PySCF on CPU. (and not our Rys Quadrature implementation).
         float32 (bool) : Whether to use float32 (default is float64).
         basis (str): Which Gaussian basis set to use.
         xc (str): Exchange-correlation functional. Only support B3LYP
@@ -330,57 +312,15 @@ def nanoDFT_parser(
         gdb (int): Which version of GDP to load {10, 11, 13, 17}.
         multv (int): Which version of our einsum algorithm to use;comptues ERI@flat(v). Different versions trades-off for memory vs sequentiality
         intv (int): Which version to use of our integral algorithm.
-        skipDIIS (bool): Whether to skip DIIS; useful for benchmarking.
         threads (int): For -backend ipu. Number of threads for einsum(ERI, dm) with custom C++ (trades-off speed vs memory).
         threads_int (int): For -backend ipu. Number of threads for computing ERI with custom C++ (trades off speed vs memory).
     """
+    if mol_str == "":  # default to benzene?
+        mol_str = "C        0.0000    0.0000    0.0000; C        1.4000    0.0000    0.0000; C        2.1000    1.2124    0.0000; C        1.4000    2.4249    0.0000; C        0.0000    2.4249    0.0000; C       -0.7000    1.2124    0.0000; H       -0.5500   -0.9526    0.0000; H       -0.5500    3.3775    0.0000; H        1.9500   -0.9526    0.0000; H       -1.8000    1.2124    0.0000; H        3.2000    1.2124    0.0000; H        1.9500    3.3775    0.0000;"
     args = locals()
     args = Namespace(**args)
     jax.config.update('jax_enable_x64', not float32)
-
-    if gdb > 0:
-        if gdb == 10: smiles = [a for a in open("gdb/gdb11_size10_sorted.csv", "r").read().split("\n")]
-        if gdb == 9:  smiles = [a for a in open("gdb/gdb11_size09_sorted.csv", "r").read().split("\n")]
-        if gdb == 8:  smiles = [a for a in open("gdb/gdb11_size08_sorted.csv", "r").read().split("\n")]
-        if gdb == 7:  smiles = [a for a in open("gdb/gdb11_size07_sorted.csv", "r").read().split("\n")]
-
-        from rdkit import Chem 
-        from rdkit.Chem import AllChem
-        from rdkit import RDLogger
-        lg = RDLogger.logger()
-        lg.setLevel(RDLogger.CRITICAL)
-
-        # TODO(AM): remove for loop?
-        for i in range(0, len(smiles)):
-            smile = smiles[i]
-            smile = smile
-
-            b = Chem.MolFromSmiles(smile)
-            b = Chem.AddHs(b)  
-            atoms = [atom.GetSymbol() for atom in b.GetAtoms()]
-
-            e = AllChem.EmbedMolecule(b) 
-            if e == -1: continue
-
-            locs = b.GetConformer().GetPositions()
-            
-            def get_atom_string(atoms, locs):
-                import re
-                atom_string = atoms
-                atoms = re.findall('[a-zA-Z][^A-Z]*', atoms)
-                str = ""
-                for atom, loc in zip(atoms, locs):
-                    str += "%s %4f %4f %4f; "%((atom,) + tuple(loc) )
-                return atom_string, str
-
-            _, string = get_atom_string(" ".join(atoms), locs)
-
-            break
-        # TODO(AM): print loaded structure
-        args.mol_str = string
-
     return args
-
 
 if __name__ == "__main__":
     args = CLI(nanoDFT_parser)
