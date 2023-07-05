@@ -19,7 +19,7 @@ Limitations
 
 PySCF on IPU requires Python 3.8, and Graphcore SDK 3.2.
 
-To run this package on a standard CPU machine (laptop or server ), 
+To run this package on a standard CPU machine (laptop or server), 
 install the base Python requirements:
 ```bash
 pip install -r requirements.txt
