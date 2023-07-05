@@ -1,9 +1,10 @@
+# Copyright (c) 2023 Graphcore Ltd. All rights reserved.
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pyscf
 from jsonargparse import CLI, Namespace
-import sys 
+import sys
 sys.path.append("../")
 from exchange_correlation.b3lyp import b3lyp
 from electron_repulsion.direct import prepare_integrals_2_inputs, compute_integrals_2, ipu_direct_mult, prepare_ipu_direct_mult_inputs
@@ -29,8 +30,8 @@ def nanoDFT_iteration(i, vals):
     sdf         = overlap @ density_matrix @ hamiltonian
     hamiltonian, _V, _H, DIIS_H = DIIS(i, sdf, hamiltonian, _V, _H, DIIS_H)
 
-    # Step 2: Solve eigh (L_inv turns generalized eigh into eigh). 
-    eigvects = L_inv.T @ _eigh(L_inv @ hamiltonian @ L_inv.T)[1] 
+    # Step 2: Solve eigh (L_inv turns generalized eigh into eigh).
+    eigvects = L_inv.T @ _eigh(L_inv @ hamiltonian @ L_inv.T)[1]
 
     # Step 3: Use result from eigenproblem to build new density matrix.
     eigvects           = eigvects * mask.reshape(1, -1) # the same as "eigvects[:, :n_electrons_half]"
@@ -53,10 +54,10 @@ def exchange_correlation(density_matrix, ao, electron_repulsion, weights, vj, vk
     rho   = jnp.sum((ao0dm.reshape(1, -1, n)) * ao , axis=2)
     rho   = jnp.concatenate([jnp.clip(rho[:1], CLIP_RHO_MIN, CLIP_RHO_MAX), rho[1:4]*2])
 
-    E_xc, vrho, vgamma = b3lyp(rho, EPSILON_B3LYP) 
-    E_xc = jnp.sum( rho[0] * weights * E_xc ) 
+    E_xc, vrho, vgamma = b3lyp(rho, EPSILON_B3LYP)
+    E_xc = jnp.sum( rho[0] * weights * E_xc )
 
-    weird_rho = (jnp.concatenate([vrho.reshape(1, -1)*.5, 2*vgamma*rho[1:4]], axis=0) * weights ) 
+    weird_rho = (jnp.concatenate([vrho.reshape(1, -1)*.5, 2*vgamma*rho[1:4]], axis=0) * weights )
 
     n, p = weird_rho.shape
     V_xc = jnp.sum( (ao * weird_rho.reshape(n, p, 1)), axis=0)
@@ -65,10 +66,10 @@ def exchange_correlation(density_matrix, ao, electron_repulsion, weights, vj, vk
 
     if args.backend != "ipu":
         vj = jnp.einsum('ijkl,ji->kl', electron_repulsion, density_matrix)
-        vk = jnp.einsum('ijkl,jk->il', electron_repulsion, density_matrix) * jnp.asarray(hyb , dtype=electron_repulsion.dtype) 
+        vk = jnp.einsum('ijkl,jk->il', electron_repulsion, density_matrix) * jnp.asarray(hyb , dtype=electron_repulsion.dtype)
     else:
         _tuple_indices, _tuple_do_lists, _N = prepare_ipu_direct_mult_inputs(num_calls.size , mol)
-        vj, vk = jax.jit(ipu_direct_mult, backend="ipu", static_argnums=(2,3,4,5,6,7,8,9))( electron_repulsion, density_matrix, _tuple_indices, _tuple_do_lists, _N, num_calls.size, tuple(args.indxs.tolist()), tuple(args.indxs.tolist()), int(args.threads), v=int(args.multv)) 
+        vj, vk = jax.jit(ipu_direct_mult, backend="ipu", static_argnums=(2,3,4,5,6,7,8,9))( electron_repulsion, density_matrix, _tuple_indices, _tuple_do_lists, _N, num_calls.size, tuple(args.indxs.tolist()), tuple(args.indxs.tolist()), int(args.threads), v=int(args.multv))
         vk = vk*hyb
 
     V_xc    = V_xc + vj - vk/2
@@ -93,7 +94,7 @@ def DIIS(i, sdf, hamiltonian, _V, _H, DIIS_H):
     # Shapes in initial code depended on min(i, _V.shape[0]).
     # To allow jax.jit, we always use nd=_V.shape[0] and zero out
     # the additional stuff with the following mask.
-    mask = jnp.where(np.arange(_V.shape[0]) < jnp.minimum(i+1, _V.shape[0]),       
+    mask = jnp.where(np.arange(_V.shape[0]) < jnp.minimum(i+1, _V.shape[0]),
                         jnp.ones(_V.shape[0], dtype=_V.dtype), jnp.zeros(_V.shape[0], dtype=_V.dtype))
     tmps = tmps * mask
 
@@ -105,11 +106,11 @@ def DIIS(i, sdf, hamiltonian, _V, _H, DIIS_H):
     # Coefficients are computed as pseudo_inverse of DIIS_H.
     # The first 8 iterations we are constructing DIIS_H so it has shape (2,2), (3,3), (4,4), ...
     # To allow jax.jit we pad to (9, 9) and just zero out the additional stuff...
-    mask_            = jnp.concatenate([jnp.ones(1, dtype=mask.dtype), mask])                                    
+    mask_            = jnp.concatenate([jnp.ones(1, dtype=mask.dtype), mask])
     masked_DIIS_H = DIIS_H[:nd+1, :nd+1] * mask_.reshape(-1, 1) * mask_.reshape(1, -1)
 
     if args.backend == "ipu":  c = pinv0( masked_DIIS_H )
-    else:                      c = jnp.linalg.pinv(masked_DIIS_H)[0, :] 
+    else:                      c = jnp.linalg.pinv(masked_DIIS_H)[0, :]
 
     scaled_H         = _H[:nd] * c[1:].reshape(nd, 1)
     hamiltonian      = jnp.sum( scaled_H, axis=0 ).reshape(hamiltonian.shape)
@@ -117,7 +118,7 @@ def DIIS(i, sdf, hamiltonian, _V, _H, DIIS_H):
     return hamiltonian, _V, _H, DIIS_H
 
 def make_jitted_nanoDFT(backend):
-    return jax.jit(_nanoDFT, static_argnames=("DIIS_space", "N"), backend=backend) 
+    return jax.jit(_nanoDFT, static_argnames=("DIIS_space", "N"), backend=backend)
 
 def _nanoDFT(nuclear_energy, density_matrix, kinetic, nuclear, overlap, ao, electron_repulsion, weights, 
               DIIS_space, N, hyb, mask, _input_floats, _input_ints, L_inv):
@@ -146,13 +147,14 @@ def _nanoDFT(nuclear_energy, density_matrix, kinetic, nuclear, overlap, ao, elec
     _num_calls = np.zeros(num_calls)
     _, V_xc, vj, vk = exchange_correlation( density_matrix, ao, electron_repulsion, weights, vj, vk, hyb, _num_calls)
 
+
     vals = jax.lax.fori_loop(0, args.its, nanoDFT_iteration, [nuclear_energy, mask, V_xc, density_matrix, _V, _H, DIIS_H, vj, vk, overlap, electron_repulsion,  
                                                              fixed_hamiltonian, L_inv, weights, hyb, ao, _num_calls, iter_matrices, part_energies])
     iter_matrices = vals[-2]
     part_energies = vals[-1]
 
-    return iter_matrices, fixed_hamiltonian, part_energies
 
+    return iter_matrices, fixed_hamiltonian, part_energies
 
 def init_dft_tensors_cpu(args, DIIS_space=9):
     mol = pyscf.gto.mole.Mole()
@@ -162,7 +164,7 @@ def init_dft_tensors_cpu(args, DIIS_space=9):
     nuclear_energy   = mol.energy_nuc() # float = 202.4065 [Hartree] for C6H6 
     hyb              = pyscf.dft.libxc.hybrid_coeff(args.xc, mol.spin) # float = 0.2 for b3lyp/spin=0
     grids            = pyscf.dft.gen_grid.Grids(mol)
-    grids.level      = args.level 
+    grids.level      = args.level
     grids.build()
     weights         = grids.weights  # (g,) = (45624,) for C6H6 
     coord_str       = 'GTOval_cart_deriv1' if mol.cart else 'GTOval_sph_deriv1'
@@ -187,6 +189,7 @@ def init_dft_tensors_cpu(args, DIIS_space=9):
 def nanoDFT(args):
     tensors, n_electrons_half, nuclear_energy, N, L_inv = init_dft_tensors_cpu(args)
 
+
     vals = jitted_nanoDFT(*tensors) 
     iter_matrices, fixed_hamiltonian, part_energies = [np.asarray(a).astype(np.float64) for a in vals]
 
@@ -199,7 +202,6 @@ def nanoDFT(args):
         hlgaps[i]   = hlgap(L_inv, hamiltonians[i], n_electrons_half, np)
     energies, hlgaps   = [a * HARTREE_TO_EV for a in [energies, hlgaps]] 
     print(part_energies)
-
     return energies, hlgaps
 
 def hlgap(L_inv, hamiltonian, n_electrons_half, _np):
@@ -216,7 +218,7 @@ def _eigh(x):
         if pad:
             x = jnp.pad(x, [(0, 1), (0, 1)], mode='constant')
 
-        eigvects, eigvals = ipu_eigh(x, sort_eigenvalues=True, num_iters=12)   
+        eigvects, eigvals = ipu_eigh(x, sort_eigenvalues=True, num_iters=12)
 
         if pad:
             e1 = eigvects[-1:]
@@ -226,14 +228,14 @@ def _eigh(x):
             eigvects = jnp.roll(eigvects, -(-col))
             eigvects = eigvects[:-1]
     else:
-        eigvals, eigvects = jnp.linalg.eigh(x) 
+        eigvals, eigvects = jnp.linalg.eigh(x)
 
     return eigvals, eigvects
 
 def pinv0(a):  # take out first row
     cond =  9*1.1920929e-07
     vals, vect = _eigh ( a )
-    c = vect @ ( jnp.where( jnp.abs(vals) > cond, 1/vals, 0) * vect[0, :]) 
+    c = vect @ ( jnp.where( jnp.abs(vals) > cond, 1/vals, 0) * vect[0, :])
     return c
 
 def pyscf_reference(args):
@@ -262,11 +264,12 @@ def print_difference(energies, hlgaps, pyscf_energy, hl_gap_hartree):
     print("us:\t\t%15f"%energies[-1])
     print("mus:\t\t%15f"%np.mean(energies[-10:]))
     print("diff:\t\t%15f"%np.abs(pyscf_energy-energies[-1]))
-    print("mdiff:\t\t%15f"%np.abs(pyscf_energy-np.mean(energies[-10:])), np.std(energies[-10:])) 
+    print("mdiff:\t\t%15f"%np.abs(pyscf_energy-np.mean(energies[-10:])), np.std(energies[-10:]))
     print("chemAcc: \t%15f"%0.043)
     print("chemAcc/diff: \t%15f"%(0.043/np.abs(pyscf_energy-energies[-1])))
     print("chemAcc/mdiff: \t%15f"%(0.043/np.abs(pyscf_energy-np.mean(energies[-10:]))))
 
+    
 def nanoDFT_parser(
         its: int = 20,
         mol_str: str = "benzene",
