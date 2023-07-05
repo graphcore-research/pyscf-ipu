@@ -6,10 +6,14 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pyscf
+from jsonargparse import CLI, Namespace
 from exchange_correlation.b3lyp import b3lyp
 from electron_repulsion.direct import prepare_integrals_2_inputs, compute_integrals_2, ipu_direct_mult, prepare_ipu_direct_mult_inputs
-jax.config.FLAGS.jax_platform_name = 'cpu'
-hartree_to_eV    = 27.2114079527
+
+HARTREE_TO_EV    = 27.2114079527
+EPSILON_B3LYP  = 1e-20
+CLIP_RHO_MIN   = 1e-9
+CLIP_RHO_MAX   = 1e12
 
 def nanoDFT_iteration(i, vals):
     # 
@@ -220,7 +224,7 @@ def nanoDFT(args, str, DIIS_space=9):
         mo_energy   = np.linalg.eigh(L_inv @ hamiltonians[-1].reshape(d, d) @ L_inv.T)[0]
         hlgaps[i]   = np.abs( mo_energy[homo] - mo_energy[lumo] )
 
-    energies, hlgaps   = [a * hartree_to_eV for a in [energies, hlgaps]] 
+    energies, hlgaps   = [a * HARTREE_TO_EV for a in [energies, hlgaps]] 
     return energies, hlgaps
 
 def _eigh(x):
@@ -268,7 +272,7 @@ def pyscf_reference(args, molecule_string):
         mf.DIIS_space = 0
     mf.DIIS_space = 9 
 
-    pyscf_energy    = mf.kernel()  * hartree_to_eV
+    pyscf_energy    = mf.kernel()  * HARTREE_TO_EV
     lumo           = np.argmin(mf.mo_occ)
     homo           = lumo - 1
     hl_gap_hartree = np.abs(mf.mo_energy[homo] - mf.mo_energy[lumo])
@@ -276,9 +280,9 @@ def pyscf_reference(args, molecule_string):
 
 def print_difference(energies, hlgaps, pyscf_energy, hl_gap_hartree):
     #TODO(HH): rename to match caller variable names
-    print("pyscf_hlgap\t%15f"%( hl_gap_hartree * hartree_to_eV))
+    print("pyscf_hlgap\t%15f"%( hl_gap_hartree * HARTREE_TO_EV))
     print("us_hlgap\t%15f"%(    hlgaps[-1]))
-    print("err_hlgap\t%15f"%np.abs((hl_gap_hartree * hartree_to_eV) - hlgaps[-1]))
+    print("err_hlgap\t%15f"%np.abs((hl_gap_hartree * HARTREE_TO_EV) - hlgaps[-1]))
     print("pyscf:\t\t%15f"%pyscf_energy)
     print("us:\t\t%15f"%energies[-1])
     print("mus:\t\t%15f"%np.mean(energies[-10:]))
@@ -288,38 +292,51 @@ def print_difference(energies, hlgaps, pyscf_energy, hl_gap_hartree):
     print("chemAcc/diff: \t%15f"%(0.043/np.abs(pyscf_energy-energies[-1])))
     print("chemAcc/mdiff: \t%15f"%(0.043/np.abs(pyscf_energy-np.mean(energies[-10:]))))
 
-if __name__ == "__main__":  
-    import argparse
-    parser = argparse.ArgumentParser(description='Arguments for Density Functional Theory. ')
-    parser.add_argument('-its',       default=20,            type=int,   help='Number of Kohn-Sham iterations. ')
-    parser.add_argument('-str',       default="",            help='Molecule string, e.g., "H 0 0 0; H 0 0 1; O 1 0 0; "')
-    parser.add_argument('-ipumult',   action="store_true",   help='For IPU. Use (N, N, N, N) ERI computed with PySCF on CPU. (and not our Rys Quadrature implementation). ')
-    parser.add_argument('-float32',   action="store_true",   help='Whether to use float32 (default is float64). ')
-    parser.add_argument('-basis',     default="STO-3G",      help='Which basis set to use. ')
-    parser.add_argument('-xc',        default="b3lyp",       help='Only support B3LYP. ')
-    parser.add_argument('-backend',   default="cpu",         help='Which backend to use: "-backend cpu" or "-backend ipu".')
-    parser.add_argument('-level',     default=2,             help="Level of grids for XC numerical integration (default=2). ", type=int)
-    parser.add_argument('-gdb',       default=-1, type=int,  help='Which version of GDP to load {10, 11, 13, 17}. ')
-    parser.add_argument('-multv',     default=2,  type=int,  help='Which version of our einsum algorithm to use;comptues ERI@flat(v). Different versions trades-off for memory vs sequentiality. ')
-    parser.add_argument('-intv',      default=1,  type=int,  help='Which version to use of our integral algorithm. ')
-    parser.add_argument('-skipDIIS',  action="store_true",   help='Whether to skip DIIS; useful for benchmarking.')
-    parser.add_argument('-threads',      default=1, type=int, help="For -backend ipu. Number of threads for einsum(ERI, dm) with custom C++ (trades-off speed vs memory).  ")
-    parser.add_argument('-threads_int',  default=1, type=int, help="For -backend ipu. Number of threads for computing ERI with custom C++ (trades off speed vs memory). ")
-    args = parser.parse_args()
 
-    from natsort import natsorted
-    print(natsorted(vars(args).items()) )
+def nanoDFT_parser(
+        its: int = 20,
+        mol_str: str = "",
+        ipumult: bool = False,
+        float32: bool = False,
+        basis: str = "STO-3G",
+        xc: str = "b3lyp",
+        backend: str = "cpu",
+        level: int = 2,
+        gdb: int = -1,
+        multv: int = 2,
+        intv: int = 1,
+        skipDIIS: bool = False,
+        threads: int = 1,
+        threads_int: int = 1,
+):
+    """
+    nanoDFT
 
-    EPSILON_B3LYP  = 1e-20
-    CLIP_RHO_MIN   = 1e-9
-    CLIP_RHO_MAX   = 1e12
-    if not args.float32: jax.config.update('jax_enable_x64', True) 
+    Args:
+        its (int): Number of Kohn-Sham iterations.
+        mol_str (str): Molecule string, e.g., "H 0 0 0; H 0 0 1; O 1 0 0; "
+        ipumult (bool): For IPU. Use (N, N, N, N) ERI computed with PySCF on CPU. (and not our Rys Quadrature implementation).
+        float32 (bool) : Whether to use float32 (default is float64).
+        basis (str): Which Gaussian basis set to use.
+        xc (str): Exchange-correlation functional. Only support B3LYP
+        backend (str): Accelerator backend to use: "-backend cpu" or "-backend ipu".
+        level (int): Level of grids for XC numerical integration.
+        gdb (int): Which version of GDP to load {10, 11, 13, 17}.
+        multv (int): Which version of our einsum algorithm to use;comptues ERI@flat(v). Different versions trades-off for memory vs sequentiality
+        intv (int): Which version to use of our integral algorithm.
+        skipDIIS (bool): Whether to skip DIIS; useful for benchmarking.
+        threads (int): For -backend ipu. Number of threads for einsum(ERI, dm) with custom C++ (trades-off speed vs memory).
+        threads_int (int): For -backend ipu. Number of threads for computing ERI with custom C++ (trades off speed vs memory).
+    """
+    args = locals()
+    args = Namespace(**args)
+    jax.config.update('jax_enable_x64', not float32)
 
-    if args.gdb > 0:
-        if args.gdb == 10: args.smiles = [a for a in open("gdb/gdb11_size10_sorted.csv", "r").read().split("\n")]
-        if args.gdb == 9:  args.smiles = [a for a in open("gdb/gdb11_size09_sorted.csv", "r").read().split("\n")]
-        if args.gdb == 8:  args.smiles = [a for a in open("gdb/gdb11_size08_sorted.csv", "r").read().split("\n")]
-        if args.gdb == 7:  args.smiles = [a for a in open("gdb/gdb11_size07_sorted.csv", "r").read().split("\n")]
+    if gdb > 0:
+        if gdb == 10: smiles = [a for a in open("gdb/gdb11_size10_sorted.csv", "r").read().split("\n")]
+        if gdb == 9:  smiles = [a for a in open("gdb/gdb11_size09_sorted.csv", "r").read().split("\n")]
+        if gdb == 8:  smiles = [a for a in open("gdb/gdb11_size08_sorted.csv", "r").read().split("\n")]
+        if gdb == 7:  smiles = [a for a in open("gdb/gdb11_size07_sorted.csv", "r").read().split("\n")]
 
         from rdkit import Chem 
         from rdkit.Chem import AllChem
@@ -328,8 +345,8 @@ if __name__ == "__main__":
         lg.setLevel(RDLogger.CRITICAL)
 
         # TODO(AM): remove for loop?
-        for i in range(0, len(args.smiles)):
-            smile = args.smiles[i]
+        for i in range(0, len(smiles)):
+            smile = smiles[i]
             smile = smile
 
             b = Chem.MolFromSmiles(smile)
@@ -340,6 +357,7 @@ if __name__ == "__main__":
             if e == -1: continue
 
             locs = b.GetConformer().GetPositions()
+            
             def get_atom_string(atoms, locs):
                 import re
                 atom_string = atoms
@@ -349,17 +367,22 @@ if __name__ == "__main__":
                     str += "%s %4f %4f %4f; "%((atom,) + tuple(loc) )
                 return atom_string, str
 
-            atom_string, string = get_atom_string(" ".join(atoms), locs)
+            _, string = get_atom_string(" ".join(atoms), locs)
 
             break
         # TODO(AM): print loaded structure
-        args.str = string
+        args.mol_str = string
+
+    return args
+
+
+if __name__ == "__main__":
+    args = CLI(nanoDFT_parser)
 
     # Test Case: Compare nanoDFT against PySCF.
-    molecule_string = args.str
     mol = pyscf.gto.mole.Mole()
-    mol.build(atom=molecule_string, unit="Angstrom", basis=args.basis, spin=0, verbose=0)
+    mol.build(atom=args.mol_str, unit="Angstrom", basis=args.basis, spin=0, verbose=0)
 
-    nanoDFT_E, nanoDFT_hlgap = nanoDFT(args, molecule_string)
-    pyscf_E, pyscf_hlgap = pyscf_reference(args, molecule_string)
+    nanoDFT_E, nanoDFT_hlgap = nanoDFT(args, args.mol_str)
+    pyscf_E, pyscf_hlgap = pyscf_reference(args, args.mol_str)
     print_difference(nanoDFT_E, nanoDFT_hlgap, pyscf_E, pyscf_hlgap)

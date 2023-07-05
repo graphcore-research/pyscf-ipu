@@ -9,6 +9,7 @@ tqdm
 pytest
 natsort
 rdkit
+jsonargparse[all]
 
 # silence warnings about setuptools + numpy
 setuptools < 60.0
