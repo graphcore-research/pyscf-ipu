@@ -108,7 +108,6 @@ def DIIS(i, sdf, hamiltonian, _V, _H, DIIS_H):
 
     return hamiltonian, _V, _H, DIIS_H
 
-
 def make_jitted_nanoDFT(backend):
     return jax.jit(_nanoDFT, static_argnames=("DIIS_space", "N"), backend=backend) 
 
@@ -203,7 +202,7 @@ def nanoDFT(args, str, DIIS_space=9):
     # this will allow us compare the energy computation errors? 
     # also, compare the different terms?
 
-    iter_matrices, fixed_hamiltonian, part_energies, _  = [np.asarray(a).astype(np.float32) for a in vals]
+    iter_matrices, fixed_hamiltonian, part_energies, _  = [np.asarray(a).astype(np.float64) for a in vals]
     density_matrices, vjs, vks, hamiltonians            = [iter_matrices[:, i] for i in range(4)]
 
     mo_occ = np.concatenate([np.ones(n_electrons_half)*2, np.zeros(N-n_electrons_half)])
