@@ -1,12 +1,10 @@
-# barebone DFT implementation
-# several sacrifices
-# - f32 
-# - add autograd? 
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pyscf
 from jsonargparse import CLI, Namespace
+import sys 
+sys.path.append("../")
 from exchange_correlation.b3lyp import b3lyp
 from electron_repulsion.direct import prepare_integrals_2_inputs, compute_integrals_2, ipu_direct_mult, prepare_ipu_direct_mult_inputs
 
@@ -61,13 +59,13 @@ def exchange_correlation(density_matrix, ao, electron_repulsion, weights, vj, vk
     V_xc = ao[0].T @ V_xc
     V_xc = V_xc + V_xc.T
 
-    if args.backend == "ipu":
+    if args.backend != "ipu":
+        vj = jnp.einsum('ijkl,ji->kl', electron_repulsion, density_matrix)
+        vk = jnp.einsum('ijkl,jk->il', electron_repulsion, density_matrix) * jnp.asarray(hyb , dtype=electron_repulsion.dtype) 
+    else:
         _tuple_indices, _tuple_do_lists, _N = prepare_ipu_direct_mult_inputs(num_calls.size , mol)
         vj, vk = jax.jit(ipu_direct_mult, backend="ipu", static_argnums=(2,3,4,5,6,7,8,9))( electron_repulsion, density_matrix, _tuple_indices, _tuple_do_lists, _N, num_calls.size, tuple(args.indxs.tolist()), tuple(args.indxs.tolist()), int(args.threads), v=int(args.multv)) 
         vk = vk*hyb
-    else:
-        vj = jnp.einsum('ijkl,ji->kl', electron_repulsion, density_matrix)
-        vk = jnp.einsum('ijkl,jk->il', electron_repulsion, density_matrix) * jnp.asarray(hyb , dtype=electron_repulsion.dtype) 
 
     V_xc    = V_xc + vj - vk/2
 
@@ -114,11 +112,11 @@ def DIIS(i, sdf, hamiltonian, _V, _H, DIIS_H):
 
     return hamiltonian, _V, _H, DIIS_H
 
+def make_jitted_nanoDFT(backend):
+    return jax.jit(_nanoDFT, static_argnames=("DIIS_space", "N"), backend=backend) 
 
-def _nanoDFT(density_matrix, kinetic, nuclear, overlap, ao, 
-                electron_repulsion, weights, 
-                DIIS_space, N, hyb, mask, _input_floats, _input_ints, L_inv):
-    # --- INITIALIZE MATRICES USED FOR DIIS --- #
+def _nanoDFT(density_matrix, kinetic, nuclear, overlap, ao, electron_repulsion, weights, 
+              DIIS_space, N, hyb, mask, _input_floats, _input_ints, L_inv):
     DIIS_H       = np.zeros((DIIS_space+1, DIIS_space+1))
     DIIS_H[0,1:] = DIIS_H[1:,0] = 1
     DIIS_H       = np.array(DIIS_H)
@@ -134,7 +132,7 @@ def _nanoDFT(density_matrix, kinetic, nuclear, overlap, ao,
     # Initialize values before main compute.
     vj, vk, V_xc = [np.zeros(fixed_hamiltonian.shape) for _ in range(3)]
 
-    if args.backend == "ipu" and not args.ipumult:
+    if args.backend == "ipu":
         _, _, _tuple_ijkl, _shapes, _sizes, _counts, indxs, indxs_inv, num_calls = prepare_integrals_2_inputs(mol)
         args.indxs = indxs
         electron_repulsion = compute_integrals_2( _input_floats, _input_ints, _tuple_ijkl, _shapes, _sizes, _counts, tuple(indxs_inv), num_threads=args.threads_int, v=args.intv)[0]
@@ -152,20 +150,26 @@ def _nanoDFT(density_matrix, kinetic, nuclear, overlap, ao,
     return iter_matrices, fixed_hamiltonian, part_energies, L_inv 
 
 def nanoDFT(args, str, DIIS_space=9):
+    # TODO(): docstrings
     # TODO(): figure out code patterns that map between NN -> DFT
     # CPU/pyscf_init (NN weight init?)
     # jax_init (compiled pre-computation e.g. ERI)
     # jax_forloop (SCF iteration)
     # jax_finalize  
+    # (n, N)
+
+    # consider type annotatins 
 
     mol = pyscf.gto.mole.Mole()
     mol.build(atom=str, unit="Angstrom", basis=args.basis, spin=0, verbose=0)
 
-    n_electrons       = mol.nelectron
-    n_electrons_half  = n_electrons//2
-    N                 = mol.nao_nr()
-    nuclear_energy    = mol.energy_nuc()                                                      
-    hyb               = pyscf.dft.libxc.hybrid_coeff(args.xc, mol.spin)                       
+    # TODO: compare type annotation to running c6h6 example .
+    n_electrons      = mol.nelectron   # n = c6h6;      30 electrons
+    n_electrons_half = n_electrons//2  # 
+    N                = mol.nao_nr()
+    nuclear_energy   = mol.energy_nuc()                                                      
+    hyb              = pyscf.dft.libxc.hybrid_coeff(args.xc, mol.spin)                       
+    print(n_electrons)
 
     mask = np.ones(N)
     mask[n_electrons_half:] = 0
@@ -174,17 +178,20 @@ def nanoDFT(args, str, DIIS_space=9):
     grids            = pyscf.dft.gen_grid.Grids(mol)
     grids.level      = args.level 
     grids.build()
-    weights          = grids.weights                                                         
-    ao               = mol.eval_gto('GTOval_cart_deriv1' if mol.cart else 'GTOval_sph_deriv1', grids.coords, 4)
+    weights          = grids.weights                                        # (1, N) = (1, 5689) for c6h6                  
+    coord_str        = 'GTOval_cart_deriv1' if mol.cart else 'GTOval_sph_deriv1'
+    ao               = mol.eval_gto(coord_str, grids.coords, 4)          # (4, 5689)
 
     # Initialize all (N, N) sized matrices. 
-    density_matrix  = pyscf.scf.hf.init_guess_by_minao(mol).reshape(N, N) 
-    kinetic         = mol.intor_symmetric('int1e_kin'). reshape(N, N)  
-    nuclear         = mol.intor_symmetric('int1e_nuc'). reshape(N, N)
-    overlap         = mol.intor_symmetric('int1e_ovlp').reshape(N, N)
+    density_matrix  = pyscf.scf.hf.init_guess_by_minao(mol)    # (N,N)=(67,67) for c6h6  
+    kinetic         = mol.intor_symmetric('int1e_kin')         # (N,N)
+    nuclear         = mol.intor_symmetric('int1e_nuc')         # (N,N)
+    overlap         = mol.intor_symmetric('int1e_ovlp')        # (N,N) 
 
-    if args.backend == "cpu" or args.ipumult: electron_repulsion = mol.intor("int2e_sph")
-    else: electron_repulsion = None 
+    if args.backend != "ipu": 
+        electron_repulsion = mol.intor("int2e_sph") # (N,N,N,N)=(67,67,67,67) for c6h6
+    else: 
+        electron_repulsion = None # will be computed on device
 
     # Turns generalized eigenproblem into eigenproblem.
     fixed_hamiltonian   = kinetic + nuclear
@@ -192,15 +199,14 @@ def nanoDFT(args, str, DIIS_space=9):
 
     input_floats, input_ints = prepare_integrals_2_inputs(mol)[:2]
 
-    vals = jax.jit(_nanoDFT, static_argnums=(7,8), backend=args.backend)( density_matrix, kinetic, nuclear, overlap, ao, electron_repulsion, weights, 
+    vals = jitted_nanoDFT ( density_matrix, kinetic, nuclear, overlap, ao, electron_repulsion, weights, 
                                                     DIIS_space, N, hyb , mask, input_floats, input_ints, L_inv)
-
 
     # compute both in f32/f64 and compare. 
     # this will allow us compare the energy computation errors? 
     # also, compare the different terms?
 
-    iter_matrices, fixed_hamiltonian, part_energies, _  = [np.asarray(a).astype(np.float32) for a in vals]
+    iter_matrices, fixed_hamiltonian, part_energies, _  = [np.asarray(a).astype(np.float64) for a in vals]
     density_matrices, vjs, vks, hamiltonians            = [iter_matrices[:, i] for i in range(4)]
 
     mo_occ = np.concatenate([np.ones(n_electrons_half)*2, np.zeros(N-n_electrons_half)])
@@ -378,6 +384,8 @@ def nanoDFT_parser(
 
 if __name__ == "__main__":
     args = CLI(nanoDFT_parser)
+
+    jitted_nanoDFT = make_jitted_nanoDFT(args.backend)
 
     # Test Case: Compare nanoDFT against PySCF.
     mol = pyscf.gto.mole.Mole()
