@@ -15,49 +15,62 @@ CLIP_RHO_MIN  = 1e-9
 CLIP_RHO_MAX  = 1e12
 
 def energy(part_energies, nuclear_energy, density_matrix, vk, vj, fixed_hamiltonian, _np):
-    E_coulomb = _np.sum( density_matrix * vj) * .5
-    E_xc      = part_energies - _np.sum(density_matrix * vk) * 0.25
+    # TODO(): rename part_energies 
+    # TODO(): rename energies for all the stuff?
+    E_coulomb = _np.sum(density_matrix * vj) * .5
+    E_xc      = part_energies - _np.sum(density_matrix * vk) * 0.5 * 0.5 
     return _np.sum(fixed_hamiltonian * density_matrix) + E_coulomb + nuclear_energy + E_xc
-
 
 def nanoDFT_iteration(i, vals):
     nuclear_energy, mask, V_xc, density_matrix, _V, _H, DIIS_H, vj, vk, overlap, electron_repulsion, \
         fixed_hamiltonian, L_inv, weights, hyb, ao, num_calls, iter_matrices, part_energies = vals
-    N = density_matrix.shape[0]
+    N = density_matrix.shape[0] # number of atomic (and molecular) orbitals  TODO(): is this both atom/mol? 
 
     # Step 1: Build Hamiltonian
-    hamiltonian = fixed_hamiltonian + V_xc
-    sdf         = overlap @ density_matrix @ hamiltonian
-    hamiltonian, _V, _H, DIIS_H = DIIS(i, sdf, hamiltonian, _V, _H, DIIS_H)
+    hamiltonian = fixed_hamiltonian + V_xc                       # (N, N) = (66, 66) for C6H6
+    sdf         = overlap @ density_matrix @ hamiltonian         # (N, N)
+    hamiltonian, _V, _H, DIIS_H = DIIS(i, sdf, hamiltonian, _V, _H, DIIS_H) # (optional) speeds up convergence
 
     # Step 2: Solve eigh (L_inv turns generalized eigh into eigh).
-    eigvects = L_inv.T @ _eigh(L_inv @ hamiltonian @ L_inv.T)[1]
+    eigvects = L_inv.T @ _eigh(L_inv @ hamiltonian @ L_inv.T)[1] # (N, N) = (66, 66)
 
     # Step 3: Use result from eigenproblem to build new density matrix.
-    eigvects           = eigvects * mask.reshape(1, -1) # the same as "eigvects[:, :n_electrons_half]"
-    density_matrix     = 2 * eigvects @ eigvects.T
-    E_xc, V_xc, vj, vk = exchange_correlation( density_matrix, ao, electron_repulsion, weights, vj, vk, hyb, num_calls)
+    eigvects           = eigvects * mask.reshape(1, -1)         # (N, N) * (1, N) = (66, 66) for C6H6
+    density_matrix     = 2 * eigvects @ eigvects.T              # (N, N)
 
-    # Compute energy here? 
-    e = energy(E_xc, nuclear_energy, density_matrix, vk, vj, fixed_hamiltonian, jnp)
+    # TODO(): change name to "get_veff", something like effective electronic potential? 
+    E_xc, V_xc, vj, vk = exchange_correlation( density_matrix, ao, electron_repulsion, weights, vj, vk, hyb, num_calls) 
+
+    e = energy(E_xc, nuclear_energy, density_matrix, vk, vj, fixed_hamiltonian, jnp) # float=-232.0436 [Hartree] for C6H6 at convergence
+
+    # TODO(): find better name for part_energies 
     part_energies = part_energies.at[i].set(  jnp.array( [E_xc, e] ) )
+    # TODO(): find better name for iter_matrices.. 
     iter_matrices = jax.lax.dynamic_update_slice(iter_matrices, jnp.stack((density_matrix, vj, vk, hamiltonian)).reshape(1, 4, N, N), (i, 0, 0, 0))
 
     return [nuclear_energy, mask, V_xc, density_matrix, _V, _H, DIIS_H, vj, vk, overlap, electron_repulsion, 
             fixed_hamiltonian, L_inv, weights, hyb, ao, num_calls, iter_matrices, part_energies]
 
-def exchange_correlation(density_matrix, ao, electron_repulsion, weights, vj, vk, hyb, num_calls):
-    assert args.xc == "b3lyp"
-    n = density_matrix.shape[0]
+def exchange_correlation(density_matrix,  # name ok 
+                         ao,  # TODO() fix name 
+                         electron_repulsion,  
+                         weights,  # TODO(): fix name, e.g. grid_weights, or atomic_orbitals_weights
+                         vj,  # 
+                         vk,  # 
+                         hyb,   # change name 
+                         num_calls # change name? perhaps even change to global or smth, super annoying to pass through, only used for IPU mult..
+                         ):
+    n     = density_matrix.shape[0]
+    gsize = ao.shape[1]
 
-    ao0dm = ao[0] @ density_matrix
-    rho   = jnp.sum((ao0dm.reshape(1, -1, n)) * ao , axis=2)
-    rho   = jnp.concatenate([jnp.clip(rho[:1], CLIP_RHO_MIN, CLIP_RHO_MAX), rho[1:4]*2])
+    ao0dm = ao[0] @ density_matrix                           # (gsize, N) @ (N, N) = (45624, 66) (66, 66) = (45624, 66)
+    rho   = jnp.sum((ao0dm.reshape(1, gsize, n)) * ao , axis=2) # (1, 45624, 66) * (4, gsize, N) 
+    rho   = jnp.concatenate([jnp.clip(rho[:1], CLIP_RHO_MIN, CLIP_RHO_MAX), rho[1:4]*2])  # move clip inside b3lyp, basically it  has (asd)/rho[0] 
 
     E_xc, vrho, vgamma = b3lyp(rho, EPSILON_B3LYP)
-    E_xc = jnp.sum( rho[0] * weights * E_xc )
+    E_xc    = jnp.sum(rho[0] * weights * E_xc)
 
-    weird_rho = (jnp.concatenate([vrho.reshape(1, -1)*.5, 2*vgamma*rho[1:4]], axis=0) * weights )
+    weird_rho = jnp.concatenate([vrho.reshape(1, -1)*.5, 2*vgamma*rho[1:4]], axis=0) * weights 
 
     n, p = weird_rho.shape
     V_xc = jnp.sum( (ao * weird_rho.reshape(n, p, 1)), axis=0)
@@ -65,14 +78,15 @@ def exchange_correlation(density_matrix, ao, electron_repulsion, weights, vj, vk
     V_xc = V_xc + V_xc.T
 
     if args.backend != "ipu":
-        vj = jnp.einsum('ijkl,ji->kl', electron_repulsion, density_matrix)
-        vk = jnp.einsum('ijkl,jk->il', electron_repulsion, density_matrix) * jnp.asarray(hyb , dtype=electron_repulsion.dtype)
+        vj = jnp.einsum('ijkl,ji->kl', electron_repulsion, density_matrix) # (N, N, N, N) (N, N) -> (N,N)
+        vk = jnp.einsum('ijkl,jk->il', electron_repulsion, density_matrix) * hyb 
     else:
+        # custom c++ implementation that utilizes 8x sparsity in ERI (and custom memory layout). 
         _tuple_indices, _tuple_do_lists, _N = prepare_ipu_direct_mult_inputs(num_calls.size , mol)
         vj, vk = jax.jit(ipu_direct_mult, backend="ipu", static_argnums=(2,3,4,5,6,7,8,9))( electron_repulsion, density_matrix, _tuple_indices, _tuple_do_lists, _N, num_calls.size, tuple(args.indxs.tolist()), tuple(args.indxs.tolist()), int(args.threads), v=int(args.multv))
         vk = vk*hyb
 
-    V_xc    = V_xc + vj - vk/2
+    V_xc    = V_xc + vj - vk/2 # (N, N) = (66, 66) for C6H6
 
     return E_xc, V_xc, vj, vk
 
@@ -125,16 +139,11 @@ def _nanoDFT(nuclear_energy, density_matrix, kinetic, nuclear, overlap, ao, elec
     DIIS_H       = np.zeros((DIIS_space+1, DIIS_space+1))
     DIIS_H[0,1:] = DIIS_H[1:,0] = 1
     DIIS_H       = np.array(DIIS_H)
-
     _V = np.zeros((DIIS_space, N**2))
     _H = np.zeros((DIIS_space, N**2))
-
     iter_matrices = np.zeros((args.its, 4, N, N))
     part_energies = np.zeros((args.its, 2))
-
     fixed_hamiltonian = kinetic + nuclear
-
-    # Initialize values before main compute.
     vj, vk, V_xc = [np.zeros(fixed_hamiltonian.shape) for _ in range(3)]
 
     if args.backend == "ipu":
@@ -187,21 +196,21 @@ def init_dft_tensors_cpu(args, DIIS_space=9):
     return tensors, n_electrons_half, nuclear_energy, N, L_inv 
 
 def nanoDFT(args):
+    # Init DFT tensors from CPU using PySCF. 
     tensors, n_electrons_half, nuclear_energy, N, L_inv = init_dft_tensors_cpu(args)
 
-
+    # Run SCF iterations on hardware accelerator. 
     vals = jitted_nanoDFT(*tensors) 
     iter_matrices, fixed_hamiltonian, part_energies = [np.asarray(a).astype(np.float64) for a in vals]
 
+    # Optionally, recompute final result in float64. 
     density_matrices, vjs, vks, hamiltonians = [iter_matrices[:, i] for i in range(4)]
     energies, hlgaps = np.zeros(args.its), np.zeros(args.its)
     for i in range(args.its):
         e = energy(part_energies[i,0], nuclear_energy, density_matrices[i], vks[i], vjs[i], fixed_hamiltonian, np)
-        print(e)
         energies[i] =  e 
         hlgaps[i]   = hlgap(L_inv, hamiltonians[i], n_electrons_half, np)
     energies, hlgaps   = [a * HARTREE_TO_EV for a in [energies, hlgaps]] 
-    print(part_energies)
     return energies, hlgaps
 
 def hlgap(L_inv, hamiltonian, n_electrons_half, _np):
