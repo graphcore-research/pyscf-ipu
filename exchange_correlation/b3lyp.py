@@ -18,11 +18,7 @@ except:
     from vwn import __vwn
 
 
-import time
-
 def b3lyp(rho, EPSILON_B3LYP=0):
-    print(rho.shape, rho.dtype)
-
     rho0  = rho.T[:, 0]
     norms = jnp.linalg.norm(rho[1:], axis=0).T**2+EPSILON_B3LYP
 

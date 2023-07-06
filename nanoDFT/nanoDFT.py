@@ -14,20 +14,35 @@ EPSILON_B3LYP = 1e-20
 CLIP_RHO_MIN  = 1e-9
 CLIP_RHO_MAX  = 1e12
 
-def energy(part_energies, nuclear_energy, density_matrix, vk, vj, fixed_hamiltonian, _np):
-    # TODO(): rename part_energies 
-    # TODO(): rename energies for all the stuff?
-    E_coulomb = _np.sum(density_matrix * vj) * .5
-    E_xc      = part_energies - _np.sum(density_matrix * vk) * 0.5 * 0.5 
-    return _np.sum(fixed_hamiltonian * density_matrix) + E_coulomb + nuclear_energy + E_xc
+
+def total_energy(density_matrix, H_core, J, K, E_xc, E_nuc, _np=jax.numpy) -> float:
+    """ Density Functional Theory (DFT) solves the optimisation problem:
+
+        min_{density_matrix} total_energy(density_matrix, ...)
+
+    We like to think of `total_energy(...)` as a loss function. `density_matrix`
+    represents the electron density:
+
+        rho(r) = sum_(ij)^N density_matrix_ij X_i(r) X_j(r)  where X_i(r)~exp(-r^2)
+
+    Here N is the number of atomic orbitals and molecular orbitals. The basis
+    functions {X_i(r)} are referred to as Gaussian Type Orbitals (GTO). All input 
+    matrices (density_matrix, H_core, J, K) are (N, N)
+    """
+    E_core = _np.sum(density_matrix * H_core) # float = -712.04[Ha] for C6H6
+    E_J = _np.sum(density_matrix * J)         # float = 624.38[Ha] for C6H6
+    E_K = _np.sum(density_matrix * K)         # float = 26.53[Ha] for C6H6
+
+    return E_core + 1/2*E_J - 1/4*E_K + E_xc + E_nuc # float = -232.04[Ha] for C6H6
+
 
 def nanoDFT_iteration(i, vals):
-    nuclear_energy, mask, V_xc, density_matrix, _V, _H, DIIS_H, vj, vk, overlap, electron_repulsion, \
-        fixed_hamiltonian, L_inv, weights, hyb, ao, num_calls, iter_matrices, part_energies = vals
+    E_nuc, mask, V_xc, density_matrix, _V, _H, DIIS_H, J, K, overlap, electron_repulsion, \
+        H_core, L_inv, weights, hyb, ao, num_calls, history, E_xcs, energies = vals
     N = density_matrix.shape[0] # number of atomic (and molecular) orbitals  TODO(): is this both atom/mol? 
 
     # Step 1: Build Hamiltonian
-    hamiltonian = fixed_hamiltonian + V_xc                       # (N, N) = (66, 66) for C6H6
+    hamiltonian = H_core + V_xc                       # (N, N) = (66, 66) for C6H6
     sdf         = overlap @ density_matrix @ hamiltonian         # (N, N)
     hamiltonian, _V, _H, DIIS_H = DIIS(i, sdf, hamiltonian, _V, _H, DIIS_H) # (optional) speeds up convergence
 
@@ -39,17 +54,17 @@ def nanoDFT_iteration(i, vals):
     density_matrix     = 2 * eigvects @ eigvects.T              # (N, N)
 
     # TODO(): change name to "get_veff", something like effective electronic potential? 
-    E_xc, V_xc, vj, vk = exchange_correlation( density_matrix, ao, electron_repulsion, weights, vj, vk, hyb, num_calls) 
+    E_xc, V_xc, J, K = exchange_correlation( density_matrix, ao, electron_repulsion, weights, J, K, hyb, num_calls) 
 
-    e = energy(E_xc, nuclear_energy, density_matrix, vk, vj, fixed_hamiltonian, jnp) # float=-232.0436 [Hartree] for C6H6 at convergence
+    # Optional saving of SCF iteration metrics
+    # TODO(AM): investigate compiler optimisation for history.at
+    history = jax.lax.dynamic_update_slice(history, jnp.stack((density_matrix, J, K, hamiltonian)).reshape(1, 4, N, N), (i, 0, 0, 0))
+    E_xcs = E_xcs.at[i].set(E_xc)
+    e = total_energy(density_matrix, H_core, K, J, E_xc, E_nuc) # float=-232.0436 [Hartree] for C6H6 at convergence
+    energies = energies.at[i].set(e)
 
-    # TODO(): find better name for part_energies 
-    part_energies = part_energies.at[i].set(  jnp.array( [E_xc, e] ) )
-    # TODO(): find better name for iter_matrices.. 
-    iter_matrices = jax.lax.dynamic_update_slice(iter_matrices, jnp.stack((density_matrix, vj, vk, hamiltonian)).reshape(1, 4, N, N), (i, 0, 0, 0))
-
-    return [nuclear_energy, mask, V_xc, density_matrix, _V, _H, DIIS_H, vj, vk, overlap, electron_repulsion, 
-            fixed_hamiltonian, L_inv, weights, hyb, ao, num_calls, iter_matrices, part_energies]
+    return [E_nuc, mask, V_xc, density_matrix, _V, _H, DIIS_H, J, K, overlap, electron_repulsion, 
+            H_core, L_inv, weights, hyb, ao, num_calls, history, E_xcs, energies]
 
 def exchange_correlation(density_matrix,  # name ok 
                          ao,  # TODO() fix name 
@@ -142,7 +157,8 @@ def _nanoDFT(nuclear_energy, density_matrix, kinetic, nuclear, overlap, ao, elec
     _V = np.zeros((DIIS_space, N**2))
     _H = np.zeros((DIIS_space, N**2))
     iter_matrices = np.zeros((args.its, 4, N, N))
-    part_energies = np.zeros((args.its, 2))
+    part_energies = np.zeros((args.its))
+    energies = np.zeros((args.its))
     fixed_hamiltonian = kinetic + nuclear
     vj, vk, V_xc = [np.zeros(fixed_hamiltonian.shape) for _ in range(3)]
 
@@ -158,9 +174,9 @@ def _nanoDFT(nuclear_energy, density_matrix, kinetic, nuclear, overlap, ao, elec
 
 
     vals = jax.lax.fori_loop(0, args.its, nanoDFT_iteration, [nuclear_energy, mask, V_xc, density_matrix, _V, _H, DIIS_H, vj, vk, overlap, electron_repulsion,  
-                                                             fixed_hamiltonian, L_inv, weights, hyb, ao, _num_calls, iter_matrices, part_energies])
-    iter_matrices = vals[-2]
-    part_energies = vals[-1]
+                                                             fixed_hamiltonian, L_inv, weights, hyb, ao, _num_calls, iter_matrices, part_energies, energies])
+    iter_matrices = vals[-3]
+    part_energies = vals[-2]
 
 
     return iter_matrices, fixed_hamiltonian, part_energies
@@ -207,8 +223,7 @@ def nanoDFT(args):
     density_matrices, vjs, vks, hamiltonians = [iter_matrices[:, i] for i in range(4)]
     energies, hlgaps = np.zeros(args.its), np.zeros(args.its)
     for i in range(args.its):
-        e = energy(part_energies[i,0], nuclear_energy, density_matrices[i], vks[i], vjs[i], fixed_hamiltonian, np)
-        energies[i] =  e 
+        energies[i] = total_energy(density_matrices[i], fixed_hamiltonian, vjs[i], vks[i], part_energies[i], nuclear_energy, np)
         hlgaps[i]   = hlgap(L_inv, hamiltonians[i], n_electrons_half, np)
     energies, hlgaps   = [a * HARTREE_TO_EV for a in [energies, hlgaps]] 
     return energies, hlgaps
