@@ -1019,6 +1019,98 @@ def prepare_ipu_direct_mult_inputs(num_calls, mol):
         tuple_do_lists = tuple(map(tuple, do_lists.astype(np.int32).tolist()))
         return tuple_indices, tuple_do_lists, N
 
+
+
+def _prepare_ipu_direct_mult_inputs(mol):
+        atm, bas, env   = mol._atm, mol._bas, mol._env
+        n_atm, n_bas, N = atm.shape[0], bas.shape[0], mol.nao_nr()
+        ao_loc          = np.cumsum(np.concatenate([np.zeros(1), (bas[:,1]*2+1) * bas[:,3] ])).astype(np.int32)
+        n = n_bas
+        c = 0
+        dct = {}
+        lst = []
+
+        # Compute how many distinct integrals after 8x symmetry.
+        num_calls = 0
+        for i in range(n_bas):
+                for j in range(n_bas):
+                        for k in range(n_bas):
+                                for l in range(n_bas):
+                                        # * 8-fold symmetry, k>=l, k>=i>=j,
+                                        if not ( i >= j and k >= l and i*j >= k * l): continue
+                                        num_calls+=1
+
+        do_lists = np.zeros((num_calls, 8), dtype=np.int32)
+        indices  = np.zeros((num_calls, 8))
+
+        for i in tqdm(range(n)):
+                for j in range(n):
+                        for k in range(n):
+                                for l in range(n):
+                                        if not (i >= j and k >= l and i*j >= k * l): continue
+
+                                        # the output of integral (i,j,k,l) has shape (di, dj, dk, dl)
+                                        # where di,dj,dk,dl are in {1,2,3,4,5} because assuming
+                                        #  - only use {c,h,o,n}
+                                        #  - represent electrons as pcq dataset 6-31G* (or sto3g/6-31g)
+                                        di = ao_loc[i+1] - ao_loc[i]
+                                        dj = ao_loc[j+1] - ao_loc[j]
+                                        dk = ao_loc[k+1] - ao_loc[k]
+                                        dl = ao_loc[l+1] - ao_loc[l]
+
+                                        # knowing the shape of integral (i,j,k,l) we can fetch it.
+                                        #integral = np.transpose( eri_s1[c][ :di*dj*dk*dl].reshape(dl,dk,dj,di), (3,2,1,0) )
+
+                                        # we now need to compute where the current integral 'block' goes in
+                                        # the final output matrix.
+                                        i0 = ao_loc[i] - ao_loc[0]
+                                        j0 = ao_loc[j] - ao_loc[0]
+                                        k0 = ao_loc[k] - ao_loc[0]
+                                        l0 = ao_loc[l] - ao_loc[0]
+
+                                        indices[c] = np.array([ di, dj, dk, dl, i0, j0, k0, l0 ])
+
+                                        do_list = [False]*8
+
+                                        if not ( i0,j0,k0,l0 ) in dct:
+                                                dct [ i0, j0, k0, l0 ] = 8
+                                                do_list[0] = True
+
+                                        if not ( i0, j0, l0, k0) in dct:
+                                                dct [ i0, j0, l0, k0] = 9
+                                                do_list[1] = True
+
+                                        if not ( j0, i0, k0, l0 ) in dct:
+                                                dct[ j0, i0, k0, l0 ] = 10
+                                                do_list[2] = True
+
+                                        if not ( j0, i0, l0, k0 ) in dct:
+                                                dct[ j0, i0, l0, k0 ] = 11
+                                                do_list[3] = True
+
+                                        if not ( k0, l0, i0, j0 ) in dct:
+                                                dct[ k0, l0, i0, j0 ] = 12
+                                                do_list[4] = True
+
+                                        if not ( k0, l0, j0, i0  ) in dct:
+                                                dct[ k0, l0, j0, i0 ]  = 13
+                                                do_list[5] = True
+
+                                        if not ( l0, k0, i0, j0  ) in dct:
+                                                dct[ l0, k0, i0, j0 ]  = 14
+                                                do_list[6] = True
+                                        if not ( l0, k0, j0, i0 ) in dct:
+                                                dct [ l0, k0, j0, i0 ]  = 15
+                                                do_list[7] = True
+
+                                        do_lists[c] = np.array(do_list)
+                                        c += 1
+
+
+        tuple_indices  = tuple(map(tuple, indices.astype(np.int32).tolist()))
+        tuple_do_lists = tuple(map(tuple, do_lists.astype(np.int32).tolist()))
+        return tuple_indices, tuple_do_lists, N, num_calls
+
 def compute_eri(mol, atom_str, eri_them, eri_them_s8):
         print("")
         print("###################")
