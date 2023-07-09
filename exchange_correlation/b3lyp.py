@@ -17,8 +17,13 @@ except:
     from b88 import __b88
     from vwn import __vwn
 
+CLIP_RHO_MIN  = 1e-9
+CLIP_RHO_MAX  = 1e12
 
 def b3lyp(rho, EPSILON_B3LYP=0):
+
+    rho   = jnp.concatenate([jnp.clip(rho[:1], CLIP_RHO_MIN, CLIP_RHO_MAX), rho[1:4]*2])  
+
     rho0  = rho.T[:, 0]
     norms = jnp.linalg.norm(rho[1:], axis=0).T**2+EPSILON_B3LYP
 
@@ -29,16 +34,16 @@ def b3lyp(rho, EPSILON_B3LYP=0):
     #def b88(rho0, norms): return jax.vmap(jax.value_and_grad(lambda rho0, norm: jax.checkpoint(__b88)(rho0, norm)*0.72, (0, 1))) (rho0, norms)
     #def lyp(rho0, norms): return jax.vmap(jax.value_and_grad(lambda rho0, norm: jax.checkpoint(__lyp)(rho0, norm)*0.810, (0, 1))) (rho0, norms)
 
-    def b88(rho0, norms): return jax.vmap(jax.value_and_grad(lambda rho0, norm: __b88(rho0, norm)*0.72, (0,1))) (rho0, norms)
-    def lyp(rho0, norms): return jax.vmap(jax.value_and_grad(lambda rho0, norm: __lyp(rho0, norm)*0.810, (0,1)))  (rho0, norms)
+    def b88(rho0, norms): return jax.vmap(jax.value_and_grad(lambda rho0, norm: __b88(rho0, norm)*0.72, (0,1)))(rho0, norms)
+    def lyp(rho0, norms): return jax.vmap(jax.value_and_grad(lambda rho0, norm: __lyp(rho0, norm)*0.810, (0,1)))(rho0, norms)
 
     e_xc_lda, v_rho_lda               = jax.jit(lda)(rho0)
     e_xc_vwn, v_rho_vwn               = jax.jit(vwn)(rho0)
     e_xc_b88, (v_rho_b88, v_norm_b88) = jax.jit(b88)(rho0, norms)
     e_xc_lyp, (v_rho_lyp, v_norm_lyp) = jax.jit(lyp)(rho0, norms)
 
-    e_xc       = e_xc_lda + (e_xc_vwn + e_xc_b88 + e_xc_lyp) / rho[0]
-    v_xc_rho   = v_rho_lda*4*rho[0] + v_rho_vwn + v_rho_b88 + v_rho_lyp
+    e_xc       = e_xc_lda + (e_xc_vwn + e_xc_b88 + e_xc_lyp) / rho0 
+    v_xc_rho   = v_rho_lda*4*rho0 + v_rho_vwn + v_rho_b88 + v_rho_lyp
     v_xc_norms = v_norm_b88 + v_norm_lyp
 
     return e_xc, v_xc_rho, v_xc_norms

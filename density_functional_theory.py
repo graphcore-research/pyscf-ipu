@@ -876,7 +876,7 @@ def xc(density_matrix, dms, cycle, ao, electron_repulsion, weights, vj, vk, hyb,
     rho, ao0dm, ao = f(rho, d), f(ao0dm, d), f(ao, d)
     d = 2 in args.sk
     rho = f(rho, d)
-    rho                = jnp.concatenate([jnp.clip(rho[:1], CLIP_RHO_MIN, CLIP_RHO_MAX), rho[1:4]*2])
+    #rho                = jnp.concatenate([jnp.clip(rho[:1], CLIP_RHO_MIN, CLIP_RHO_MAX), rho[1:4]*2]) # moved inside b3lyp 
     d = switch
     rho = f(rho, d)
 
@@ -898,7 +898,7 @@ def xc(density_matrix, dms, cycle, ao, electron_repulsion, weights, vj, vk, hyb,
 
     d = 6 in args.sk
     vrho, vgamma, rho, weights = f(vrho, d), f(vgamma, d), f(rho, d), f(weights, d)
-    weird_rho = (jnp.concatenate([vrho.reshape(1, -1)*.5, 2*vgamma*rho[1:4]], axis=0) * weights )
+    weird_rho = (jnp.concatenate([vrho.reshape(1, -1)*.5, 4*vgamma*rho[1:4]], axis=0) * weights )
     d = switch
     vrho, vgamma, rho, weights = f(vrho, d), f(vgamma, d), f(rho, d), f(weights, d)
 

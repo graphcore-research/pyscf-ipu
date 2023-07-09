@@ -87,8 +87,7 @@ def ipu_direct_mult_v0(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, i
 
         indxs = np.array(indxs)
 
-
-        print(threads)
+        #print(threads)
         num_threads = threads
         num_tiles = NUM_TILES-1
 
@@ -177,7 +176,7 @@ def ipu_direct_mult_v1(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, i
 
         indxs = np.array(indxs)
 
-        print(threads)
+        #print(threads)
         num_threads = threads
         num_tiles = NUM_TILES-1
 
@@ -312,7 +311,7 @@ def ipu_direct_mult_v2(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, i
 
         indxs = np.array(indxs)
 
-        print(threads)
+        #print(threads)
         num_threads = threads
         num_tiles = NUM_TILES-1
 
@@ -338,7 +337,7 @@ def ipu_direct_mult_v2(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, i
 
                         _indices  = np.array(indices). reshape(-1, 8)[indxs][start:stop]
                         _do_lists = np.array(do_lists).reshape(-1, 8)[indxs][start:stop]
-                        print(num, eri_s8.shape, _indices.shape, _do_lists.shape)
+                        if print_sizes: print(num, eri_s8.shape, _indices.shape, _do_lists.shape)
 
                         chunk_size = len(tiles)
                         count      = eri_s8.shape[0]
@@ -355,7 +354,7 @@ def ipu_direct_mult_v2(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, i
                         if chunks > 0:
 
                                 all_stop     = _stop
-                                print(_indices.shape, len(tiles), chunks, 8, all_stop)
+                                if print_sizes: print(_indices.shape, len(tiles), chunks, 8, all_stop)
 
                                 all_indices  = _indices [0:all_stop].reshape( len(tiles), chunks, 8 )
                                 all_do_lists = _do_lists[0:all_stop].reshape( len(tiles), chunks, 8 )
@@ -418,7 +417,7 @@ def ipu_direct_mult_v2(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, i
 
                         _indices  = np.array(indices). reshape(-1, 8)[indxs][start:stop]
                         _do_lists = np.array(do_lists).reshape(-1, 8)[indxs][start:stop]
-                        print(num, eri_s8.shape, _indices.shape, _do_lists.shape)
+                        if print_sizes: print(num, eri_s8.shape, _indices.shape, _do_lists.shape)
 
                         chunk_size = len(tiles)
                         count      = eri_s8.shape[0]
@@ -435,7 +434,7 @@ def ipu_direct_mult_v2(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, i
                         if chunks > 0:
 
                                 all_stop     = _stop
-                                print(_indices.shape, len(tiles), chunks, 8, all_stop)
+                                if print_sizes: print(_indices.shape, len(tiles), chunks, 8, all_stop)
 
                                 all_indices  = _indices [0:all_stop].reshape( len(tiles), chunks, 8 )
                                 all_do_lists = _do_lists[0:all_stop].reshape( len(tiles), chunks, 8 )
@@ -489,8 +488,9 @@ def ipu_direct_mult_v2(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, i
 
         return vj, vk
 
+@partial(jax.jit, backend="ipu", static_argnums=(2,3,4,5,6,7,8,9))
 def ipu_direct_mult(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, indxs, threads=1, v=2):
-        print("THREADS!", threads)
+        #print("THREADS!", threads)
 
         if v == 0:
                 return ipu_direct_mult_v0(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, indxs, threads=threads)
@@ -500,15 +500,19 @@ def ipu_direct_mult(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, indx
         elif v == 2:
                 return ipu_direct_mult_v2(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, indxs, threads=threads)
 
+ipu_einsum = ipu_direct_mult
+
 @partial(jax.jit, backend="ipu", static_argnums=(2,3,4,5,6,7,8))
 def compute_integrals_2(input_floats, input_ints, input_ijkl, shapes, sizes, counts, indxs_inv, num_threads=3, v=1):
-        print("[version]", v)
-        print("[threads]", num_threads)
+        #print("[version]", v)
+        #print("[threads]", num_threads)
         if v == 0:
                 return integrals_v0(input_floats, input_ints, input_ijkl, shapes, sizes, counts, indxs_inv, num_threads=num_threads)
 
         if v == 1:
                 return integrals_v1(input_floats, input_ints, input_ijkl, shapes, sizes, counts, indxs_inv, num_threads=num_threads)
+
+electron_repulsion_integrals = compute_integrals_2 
 
 def integrals_v0(input_floats, input_ints, input_ijkl, shapes, sizes, counts, indxs_inv, num_threads=3):
 
@@ -531,7 +535,7 @@ def integrals_v0(input_floats, input_ints, input_ijkl, shapes, sizes, counts, in
         num_tiles = NUM_TILES-1
 
         num_calls = len(indxs_inv)
-        print(num_calls)
+        #print(num_calls)
 
         if num_calls < num_tiles*num_threads:
                 tiles       = tuple((np.arange(num_calls)+1).tolist())
@@ -606,7 +610,7 @@ def integrals_v1(input_floats, input_ints, input_ijkl, shapes, sizes, counts, in
         num_tiles = NUM_TILES-1
 
         num_calls = len(indxs_inv)
-        print(num_calls)
+        #print(num_calls)
 
         if num_calls < num_tiles*num_threads:  tiles       = tuple((np.arange(num_calls)+1).tolist())
         else:                                  tiles       = tuple((np.arange(num_tiles*num_threads)%(num_tiles)+1).tolist())
@@ -660,7 +664,7 @@ def integrals_v1(input_floats, input_ints, input_ijkl, shapes, sizes, counts, in
                                 batched_out = jnp.concatenate(list_cpu_output)
                                 print(batched_out.shape)
                         else:
-                                print(">>", cpu_output.shape, _indices.shape , chunks.shape, integral_size.shape)
+                                #print(">>", cpu_output.shape, _indices.shape , chunks.shape, integral_size.shape)
 
                                 batched_out , _, _, _= tile_map_primitive(int2e_sph_forloop,
                                                                         tile_floats,
@@ -939,6 +943,8 @@ def prepare_integrals_2_inputs(mol):
 
         return input_floats, input_ints, tuple_ijkl, tuple(shapes), tuple(sizes.tolist()), tuple(counts.tolist()), indxs, indxs_inv, num_calls
 
+prepare_electron_repulsion_integrals = prepare_integrals_2_inputs
+
 def prepare_ipu_direct_mult_inputs(num_calls, mol):
         atm, bas, env   = mol._atm, mol._bas, mol._env
         n_atm, n_bas, N = atm.shape[0], bas.shape[0], mol.nao_nr()
@@ -951,7 +957,8 @@ def prepare_ipu_direct_mult_inputs(num_calls, mol):
         do_lists = np.zeros((num_calls, 8), dtype=np.int32)
         indices  = np.zeros((num_calls, 8))
 
-        for i in tqdm(range(n)):
+        #for i in tqdm(range(n)):
+        for i in range(n):
                 for j in range(n):
                         for k in range(n):
                                 for l in range(n):
@@ -1019,9 +1026,7 @@ def prepare_ipu_direct_mult_inputs(num_calls, mol):
         tuple_do_lists = tuple(map(tuple, do_lists.astype(np.int32).tolist()))
         return tuple_indices, tuple_do_lists, N
 
-
-
-def _prepare_ipu_direct_mult_inputs(mol):
+def prepare_einsum_inputs(mol):
         atm, bas, env   = mol._atm, mol._bas, mol._env
         n_atm, n_bas, N = atm.shape[0], bas.shape[0], mol.nao_nr()
         ao_loc          = np.cumsum(np.concatenate([np.zeros(1), (bas[:,1]*2+1) * bas[:,3] ])).astype(np.int32)
@@ -1043,7 +1048,8 @@ def _prepare_ipu_direct_mult_inputs(mol):
         do_lists = np.zeros((num_calls, 8), dtype=np.int32)
         indices  = np.zeros((num_calls, 8))
 
-        for i in tqdm(range(n)):
+        #for i in tqdm(range(n)):
+        for i in range(n):
                 for j in range(n):
                         for k in range(n):
                                 for l in range(n):
@@ -2000,7 +2006,7 @@ def runjk(dm1, mol, nao, *namejk):
     else:
         dtype = np.float32
 
-    print(dtype)
+    #print(dtype)
 
     dm1    = dm1.astype(dtype)
     c_atm  = numpy.array(mol._atm, dtype=numpy.int32)
