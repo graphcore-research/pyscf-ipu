@@ -491,7 +491,6 @@ def ipu_direct_mult_v2(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, i
 @partial(jax.jit, backend="ipu", static_argnums=(2,3,4,5,6,7,8,9))
 def ipu_direct_mult(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, indxs, threads=1, v=2):
         #print("THREADS!", threads)
-
         if v == 0:
                 return ipu_direct_mult_v0(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, indxs, threads=threads)
         elif v == 1:
@@ -500,19 +499,22 @@ def ipu_direct_mult(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, indx
         elif v == 2:
                 return ipu_direct_mult_v2(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, indxs, threads=threads)
 
-ipu_einsum = ipu_direct_mult
+def ipu_einsum(__out3, dm, mol, threads=1, v=2):
+        _tuple_indices, _tuple_do_lists, _N, num_calls = prepare_einsum_inputs(mol) 
+        N = mol.nao_nr()
+        _, _, _tuple_ijkl, _shapes, _sizes, _counts, indxs, indxs_inv, _ = prepare_electron_repulsion_integrals(mol)
+        return ipu_direct_mult( __out3, dm, _tuple_indices, _tuple_do_lists, N, num_calls, tuple(indxs_inv), tuple(indxs), threads, v)
 
 @partial(jax.jit, backend="ipu", static_argnums=(2,3,4,5,6,7,8))
 def compute_integrals_2(input_floats, input_ints, input_ijkl, shapes, sizes, counts, indxs_inv, num_threads=3, v=1):
-        #print("[version]", v)
-        #print("[threads]", num_threads)
         if v == 0:
                 return integrals_v0(input_floats, input_ints, input_ijkl, shapes, sizes, counts, indxs_inv, num_threads=num_threads)
-
         if v == 1:
                 return integrals_v1(input_floats, input_ints, input_ijkl, shapes, sizes, counts, indxs_inv, num_threads=num_threads)
 
-electron_repulsion_integrals = compute_integrals_2 
+def electron_repulsion_integrals(input_floats, input_ints, mol, num_threads=3, v=1):
+        _, _, _tuple_ijkl, _shapes, _sizes, _counts, indxs, indxs_inv, _ = prepare_electron_repulsion_integrals(mol)
+        return compute_integrals_2(input_floats, input_ints, _tuple_ijkl, _shapes, _sizes, _counts, tuple(indxs_inv), num_threads, v)[0]
 
 def integrals_v0(input_floats, input_ints, input_ijkl, shapes, sizes, counts, indxs_inv, num_threads=3):
 
