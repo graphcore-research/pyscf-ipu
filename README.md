@@ -7,6 +7,8 @@
 | [**Generating new datasets**](#generating-new-datasets)
 | [**Training SchNet**](#training-schnet-on-qm1b)
 
+[![Run on Gradient](https://assets.paperspace.io/img/gradient-badge.svg)](https://console.paperspace.com/github/graphcore-research/pyscf-ipu?container=graphcore%2Fpytorch-jupyter%3A3.2.0-ubuntu-20.04&machine=Free-IPU-POD4&file=%2Fnotebooks%2FnanoDFT-demo.ipynb)
+
 Port of PySCF to Graphcore IPU.
 
 Limitations
@@ -19,7 +21,7 @@ Limitations
 
 PySCF on IPU requires Python 3.8, and Graphcore SDK 3.2.
 
-To run this package on a standard CPU machine (laptop or server), 
+To run this package on a standard CPU machine (laptop or server),
 install the base Python requirements:
 ```bash
 pip install -r requirements.txt
