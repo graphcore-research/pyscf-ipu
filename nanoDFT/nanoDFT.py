@@ -156,7 +156,7 @@ def nanoDFT(args):
         hlgaps[i]   = hlgap(L_inv, H[i], n_electrons_half, np)
     energies, logged_energies, hlgaps = [a * HARTREE_TO_EV for a in [energies, logged_energies, hlgaps]]
     mo_energy, mo_coeff = np.linalg.eigh(L_inv @ H[-1] @ L_inv.T)
-    mo_coeff = L_inv.T @ mo_coeff 
+    mo_coeff = L_inv.T @ mo_coeff
     return energies, logged_energies, hlgaps, mo_energy, mo_coeff, grid_coords, grid_weights
 
 def DIIS(i, H, density_matrix, O, diis_history):
@@ -193,7 +193,8 @@ def hlgap(L_inv, H, n_electrons_half, _np):
 
 def linalg_eigh(x):
     if args.backend == "ipu":
-        from jax_ipu_experimental_addons.tile import ipu_eigh
+        from tessellate_ipu.linalg import ipu_eigh
+
         n = x.shape[0]
         pad = n % 2
         if pad:
@@ -219,13 +220,13 @@ def pinv0(a):  # take out first row
     c = vect @ ( jnp.where( jnp.abs(vals) > cond, 1/vals, 0) * vect[0, :])
     return c
 
-def grad_elec(weight, grid_AO, eri, s1, h1aos, natm, aoslices, mask, mo_energy, mo_coeff): 
+def grad_elec(weight, grid_AO, eri, s1, h1aos, natm, aoslices, mask, mo_energy, mo_coeff):
     # Electronic part of RHF/RKS gradients
-    dm0  = 2 * (mo_coeff*mask) @ mo_coeff.T                                 # (N, N) = (66, 66) for C6H6. 
-    dme0 = 2 * (mo_coeff * mask*mo_energy) @  mo_coeff.T                    # (N, N) = (66, 66) for C6H6> 
+    dm0  = 2 * (mo_coeff*mask) @ mo_coeff.T                                 # (N, N) = (66, 66) for C6H6.
+    dme0 = 2 * (mo_coeff * mask*mo_energy) @  mo_coeff.T                    # (N, N) = (66, 66) for C6H6>
 
-    # Code identical to exchange correlation. 
-    rho             = jnp.sum( grid_AO[:1] @ dm0 * grid_AO, axis=2)         # (10, grid_size) = (10, 45624) for C6H6. 
+    # Code identical to exchange correlation.
+    rho             = jnp.sum( grid_AO[:1] @ dm0 * grid_AO, axis=2)         # (10, grid_size) = (10, 45624) for C6H6.
     _, vrho, vgamma = b3lyp(rho, EPSILON_B3LYP)                             # (grid_size,) (grid_size,)
     V_xc            = jnp.concatenate([vrho.reshape(1, -1)/2, 4*vgamma.reshape(1, -1)*rho[1:4]], axis=0)  # (4, grid_size)
 
@@ -240,11 +241,11 @@ def grad_elec(weight, grid_AO, eri, s1, h1aos, natm, aoslices, mask, mo_energy, 
     de = jnp.einsum('lxij,ij->lx', h1aos, dm0)   # (natm, 3)
     for k, ia in enumerate(range(natm)):
         p0, p1 = aoslices[ia][2], aoslices[ia][3]
-        de = de.at[k].add(jnp.einsum('xij,ij->x', vhf[:, p0:p1], dm0[p0:p1]) * 2)  
+        de = de.at[k].add(jnp.einsum('xij,ij->x', vhf[:, p0:p1], dm0[p0:p1]) * 2)
         de = de.at[k].add(-jnp.einsum('xij,ij->x', s1[:, p0:p1], dme0[p0:p1]) * 2)
     return de
 
-def grad_nuc(charges, coords): 
+def grad_nuc(charges, coords):
     # Derivatives of nuclear repulsion energy wrt nuclear coordinates
     natm = charges.shape[0]
     pairwise_charges    = charges.reshape(natm, 1) * charges.reshape(1, natm)                # (natm, natm)
@@ -256,10 +257,10 @@ def grad_nuc(charges, coords):
     all = all.at[jnp.diag_indices(natm)].set(0)                                              # (natm, natm, 3)
     return jnp.sum(all, axis=0)                                                              # (natm, natm)
 
-def grad(mol, coords, weight, mo_coeff, mo_energy): 
-    # Initialize DFT tensors on CPU using PySCF. 
-    ao = pyscf.dft.numint.NumInt().eval_ao(mol, coords, deriv=2) 
-    eri = mol.intor("int2e_ip1") 
+def grad(mol, coords, weight, mo_coeff, mo_energy):
+    # Initialize DFT tensors on CPU using PySCF.
+    ao = pyscf.dft.numint.NumInt().eval_ao(mol, coords, deriv=2)
+    eri = mol.intor("int2e_ip1")
     s1  = - mol.intor('int1e_ipovlp', comp=3)
     kin = - mol.intor('int1e_ipkin',  comp=3)
     nuc = - mol.intor('int1e_ipnuc',  comp=3)
@@ -285,7 +286,7 @@ def grad(mol, coords, weight, mo_coeff, mo_energy):
     charges = np.zeros((mol.natm))
     coords = np.zeros((mol.natm,3))
     for j in range(mol.natm):
-        charges[j] = mol.atom_charge(j) 
+        charges[j] = mol.atom_charge(j)
         coords[j]= mol.atom_coord(j)
 
     _grad_elec = jax.jit(grad_elec, static_argnames=["aoslices", "natm"], backend="cpu")
@@ -303,20 +304,20 @@ def pyscf_reference(args):
     mf = pyscf.scf.RKS(mol)
     mf.max_cycle = args.its
     mf.xc = args.xc
-    mf.diis_space = 9 
-    if not args.diis:  # 
-        mf.diis_space = 0 
-        mf.diis = False 
+    mf.diis_space = 9
+    if not args.diis:  #
+        mf.diis_space = 0
+        mf.diis = False
     pyscf_energies = []
-    pyscf_hlgaps = [] 
-    lumo         = mol.nelectron//2 
+    pyscf_hlgaps = []
+    lumo         = mol.nelectron//2
     homo         = lumo - 1
-    def callback(envs): 
+    def callback(envs):
         pyscf_energies.append(envs["e_tot"]*HARTREE_TO_EV)
         hl_gap_hartree = np.abs(envs["mo_energy"][homo] - envs["mo_energy"][lumo]) * HARTREE_TO_EV
         pyscf_hlgaps.append(hl_gap_hartree)
     mf.callback = callback
-    mf.kernel()  
+    mf.kernel()
     forces = mf.nuc_grad_method().kernel()
     return np.array(pyscf_energies), np.array(pyscf_hlgaps), np.array(forces)
 
@@ -334,12 +335,12 @@ def print_difference(nanoDFT_E, nanoDFT_forces, nanoDFT_logged_E, nanoDFT_hlgap,
     print("chemAcc/diff: \t%15f"%(0.043/np.abs(pyscf_E[-1]-nanoDFT_E[-1, 0])))
     print("chemAcc/mdiff: \t%15f"%(0.043/np.abs(pyscf_E[-1]-np.mean(nanoDFT_E[-10:, 0]))))
     print("")
-    pyscf_E = np.concatenate([pyscf_E, np.ones(nanoDFT_E.shape[0]-pyscf_E.shape[0])*pyscf_E[-1]])  
-    pyscf_hlgap = np.concatenate([pyscf_hlgap, np.ones(nanoDFT_hlgap.shape[0]-pyscf_hlgap.shape[0])*pyscf_hlgap[-1]])  
+    pyscf_E = np.concatenate([pyscf_E, np.ones(nanoDFT_E.shape[0]-pyscf_E.shape[0])*pyscf_E[-1]])
+    pyscf_hlgap = np.concatenate([pyscf_hlgap, np.ones(nanoDFT_hlgap.shape[0]-pyscf_hlgap.shape[0])*pyscf_hlgap[-1]])
     print("%18s"%"", "\t".join(["%10s"%str("iter %i "%i) for i in np.arange(1, nanoDFT_E.shape[0]+1)[1::3]]))
     print("%18s"%"Error Energy [eV]", "\t".join(["%10s"%str("%.2e"%f) for f in (pyscf_E[1::3] - nanoDFT_E[1::3, 0]).reshape(-1)]))
     print("%18s"%"Error HLGAP [eV]", "\t".join(["%10s"%str("%.2e"%f) for f in (pyscf_hlgap[1::3]   - nanoDFT_hlgap[1::3]).reshape(-1)]))
- 
+
     # E_core, E_J/2, -E_K/4, E_xc, E_nuc
     print()
     print("%18s"%"E_core [eV]", "\t".join(["%10s"%str("%.5f"%f) for f in (nanoDFT_E[1::3, 1]).reshape(-1)]))
@@ -348,10 +349,10 @@ def print_difference(nanoDFT_E, nanoDFT_forces, nanoDFT_logged_E, nanoDFT_hlgap,
     print("%18s"%"E_xc [eV]", "\t".join(["%10s"%str("%.5f"%f) for f in (nanoDFT_E[1::3, 4]).reshape(-1)]))
     print("%18s"%"E_nuc [eV]", "\t".join(["%10s"%str("%.5f"%f) for f in (nanoDFT_E[1::3, 5]).reshape(-1)]))
 
-    # Forces 
-    print() 
+    # Forces
+    print()
     print("np.max(|nanoDFT_F-PySCF_F|):", np.max(np.abs(nanoDFT_forces-pyscf_forces)))
-    
+
 def nanoDFT_parser(
         its: int = 20,
         mol_str: str = "benzene",
@@ -364,7 +365,7 @@ def nanoDFT_parser(
         intv: int = 1,
         threads: int = 1,
         threads_int: int = 1,
-        diis: bool = True, 
+        diis: bool = True,
         structure_optimization: bool = False, # AKA gradient descent on energy wrt nuclei
 ):
     """
@@ -384,28 +385,28 @@ def nanoDFT_parser(
         threads (int): For -backend ipu. Number of threads for einsum(ERI, dm) with custom C++ (trades-off speed vs memory).
         threads_int (int): For -backend ipu. Number of threads for computing ERI with custom C++ (trades off speed vs memory).
     """
-    if mol_str == "benzene":  
+    if mol_str == "benzene":
         mol_str = "C        0.0000    0.0000    0.0000; C        1.4000    0.0000    0.0000; C        2.1000    1.2124    0.0000; C        1.4000    2.4249    0.0000; C        0.0000    2.4249    0.0000; C       -0.7000    1.2124    0.0000; H       -0.5500   -0.9526    0.0000; H       -0.5500    3.3775    0.0000; H        1.9500   -0.9526    0.0000; H       -1.8000    1.2124    0.0000; H        3.2000    1.2124    0.0000; H        1.9500    3.3775    0.0000;"
     elif mol_str == "methane":
         mol_str = "C 0 0 0; H 0 0 1; H 0 1 0; H 1 0 0; H 1 1 1;"
     args = locals()
     args = Namespace(**args)
-    if not args.float32: 
+    if not args.float32:
         jax.config.update('jax_enable_x64', not float32)
         print("float64")
     else:
         print("float32")
     return args
 
-if __name__ == "__main__": 
-    # Limit PySCF threads to mitigate problem with NUMA nodes. 
+if __name__ == "__main__":
+    # Limit PySCF threads to mitigate problem with NUMA nodes.
     import os
     os.environ['OMP_NUM_THREADS'] = "16"
     jax.config.FLAGS.jax_platform_name = 'cpu'
     args = CLI(nanoDFT_parser)
     assert args.xc == "b3lyp"
 
-    jitted_nanoDFT = make_jitted_nanoDFT(args.backend) # used later inside nanoDFT 
+    jitted_nanoDFT = make_jitted_nanoDFT(args.backend) # used later inside nanoDFT
 
     if not args.structure_optimization:
         # Test Case: Compare nanoDFT against PySCF.
@@ -416,24 +417,24 @@ if __name__ == "__main__":
         nanoDFT_forces = grad(mol, grid_coords, grid_weights, mo_coeff, mo_energy)
         pyscf_E, pyscf_hlgap, pyscf_forces = pyscf_reference(args)
         print_difference(nanoDFT_E, nanoDFT_forces, nanoDFT_logged_E, nanoDFT_hlgap, pyscf_E, pyscf_forces, pyscf_hlgap)
-    else: 
+    else:
         # pip install mogli imageio[ffmpeg] matplotlib
-        import mogli 
-        import imageio 
-        import matplotlib.pyplot as plt 
+        import mogli
+        import imageio
+        import matplotlib.pyplot as plt
         args.basis = "6-31G"
         p = np.array([[0,1,1], [0,2,2], [0,3,3],
-                      [0,4,4], [0,5,5], [0,6,6]]) 
+                      [0,4,4], [0,5,5], [0,6,6]])
         np.random.seed(42)
-        p = p + np.random.normal(0, 0.3, p.shape) # slightly break symmetry 
-        A = ["H", "O", "H", "H", "O", "H"] 
+        p = p + np.random.normal(0, 0.3, p.shape) # slightly break symmetry
+        A = ["H", "O", "H", "H", "O", "H"]
         natm = p.shape[0]
         os.makedirs("_tmp/", exist_ok=True)
         E = []
         ims = []
         for i in range(20):
             mol = pyscf.gto.mole.Mole()
-            args.mol_str = "".join([f"{A[i]} {p[i]};".replace("[", "]").replace("]", "") for i in range(natm)]) 
+            args.mol_str = "".join([f"{A[i]} {p[i]};".replace("[", "]").replace("]", "") for i in range(natm)])
             mol.build(atom=args.mol_str, unit="Angstrom", basis=args.basis, spin=0, verbose=0)
             nanoDFT_E, nanoDFT_logged_E, nanoDFT_hlgap, mo_energy, mo_coeff, grid_coords, grid_weights = nanoDFT(args)
             f = open(f"_tmp/{i}.xyz", "w")
@@ -447,11 +448,11 @@ if __name__ == "__main__":
             ims.append(imageio.v2.imread(f"_tmp/{i}.png/"))
             E.append(nanoDFT_E[-1, 0])
             nanoDFT_forces = grad(mol, grid_coords, grid_weights, mo_coeff, mo_energy)
-            p = p - nanoDFT_forces 
+            p = p - nanoDFT_forces
             print(nanoDFT_E[-1, 0], i)
         writer = imageio.get_writer('test.gif', loop=0, duration=3)
         fig, ax = plt.subplots(1, 2, figsize=(10, 4))
-        for c, i in enumerate(ims): 
+        for c, i in enumerate(ims):
             for a in ax: a.cla()
             ax[0].axis("off")
             ax[1].set_ylabel("Energy [eV]")

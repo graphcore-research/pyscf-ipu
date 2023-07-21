@@ -19,7 +19,7 @@ Limitations
 
 ## Installation
 
-PySCF on IPU requires Python 3.8, and Graphcore SDK 3.2.
+PySCF on IPU requires Python 3.8, [JAX IPU experimental](https://github.com/graphcore-research/jax-experimental), [TessellateIPU library](https://github.com/graphcore-research/tessellate-ipu) and [Graphcore Poplar SDK 3.2](https://www.graphcore.ai/products/poplar).
 
 To run this package on a standard CPU machine (laptop or server),
 install the base Python requirements:
@@ -27,7 +27,7 @@ install the base Python requirements:
 pip install -r requirements.txt
 ```
 
-On IPU machines, please use the IPU requirements file:
+On IPU machines, please additionally use the IPU requirements file:
 ```bash
 pip install -r requirements_ipu.txt
 ```

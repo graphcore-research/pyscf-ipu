@@ -876,7 +876,7 @@ def xc(density_matrix, dms, cycle, ao, electron_repulsion, weights, vj, vk, hyb,
     rho, ao0dm, ao = f(rho, d), f(ao0dm, d), f(ao, d)
     d = 2 in args.sk
     rho = f(rho, d)
-    #rho                = jnp.concatenate([jnp.clip(rho[:1], CLIP_RHO_MIN, CLIP_RHO_MAX), rho[1:4]*2]) # moved inside b3lyp 
+    #rho                = jnp.concatenate([jnp.clip(rho[:1], CLIP_RHO_MIN, CLIP_RHO_MAX), rho[1:4]*2]) # moved inside b3lyp
     d = switch
     rho = f(rho, d)
 
@@ -992,7 +992,7 @@ def _eigh(x):
     if args.backend == "ipu":
         t0 = time.time()
         print("tracing ipu eigh (%s): "%str(x.shape))
-        from jax_ipu_experimental_addons.tile import ipu_eigh
+        from tessellate_ipu.linalg import ipu_eigh
         n = x.shape[0]
         pad = n % 2
         print(x.dtype)
