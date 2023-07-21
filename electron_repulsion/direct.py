@@ -22,7 +22,7 @@ import os.path as osp
 
 # lazy load to allow using with CPU without JAX IPU experimental addons
 try:
-    from jax_ipu_experimental_addons.tile import create_ipu_tile_primitive, ipu_hw_cycle_count, tile_map_primitive, tile_put_sharded, tile_put_replicated
+    from tessellate_ipu import create_ipu_tile_primitive, ipu_cycle_count, tile_map, tile_put_sharded, tile_put_replicated
 except:
     pass
 
@@ -68,9 +68,9 @@ def single(input_floats, input_ints, input_ijkl, tiles):
         tile_idx    = tile_put_replicated(jnp.zeros(3888+1, dtype = jnp.int32) ,  tiles)
         tile_buf    = tile_put_replicated(jnp.zeros(1080*4+1) ,                   tiles)
 
-        tile_floats, start = ipu_hw_cycle_count(tile_floats)
-        cpu_output, tile_g, _, _= tile_map_primitive(int2e_sph, tile_floats, tile_ints, tile_ijkl, cpu_output, tile_g, tile_idx, tile_buf)
-        tile_floats, stop = ipu_hw_cycle_count(tile_floats)
+        tile_floats, start = ipu_cycle_count(tile_floats)
+        cpu_output, tile_g, _, _= tile_map(int2e_sph, tile_floats, tile_ints, tile_ijkl, cpu_output, tile_g, tile_idx, tile_buf)
+        tile_floats, stop = ipu_cycle_count(tile_floats)
 
         return cpu_output, start, stop
 
@@ -139,7 +139,7 @@ def ipu_direct_mult_v0(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, i
                                         print("eri", np.prod(_eri_s8.shape)*4/10**6)
 
 
-                        _vj, _vk = tile_map_primitive(          poplar_direct_s1,
+                        _vj, _vk = tile_map(                    poplar_direct_s1,
                                         tile_put_sharded(       _eri_s8.  reshape(len(tiles), -1),             tiles=tiles),
                                         tile_put_sharded(       np.array(__indices). reshape(len(tiles), 8),   tiles=tiles),
                                         tile_put_sharded(       np.array(__do_lists).reshape(len(tiles), 8),   tiles=tiles),
@@ -224,7 +224,7 @@ def ipu_direct_mult_v1(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, i
                         all_eri_s8   = eri_s8   [0:all_stop].reshape( len(tiles), chunks, eri_s8.shape[1] )
                         _chunk_size   = tile_put_replicated( np.ones((1,chunks)), tiles=tiles)
 
-                        _vj, _vk = tile_map_primitive(          poplar_direct_s1_forloop,
+                        _vj, _vk = tile_map(                            poplar_direct_s1_forloop,
                                                 tile_put_sharded(       all_eri_s8,             tiles=tiles),
                                                 tile_put_sharded(       all_indices,   tiles=tiles),
                                                 tile_put_sharded(       all_do_lists,   tiles=tiles),
@@ -258,7 +258,7 @@ def ipu_direct_mult_v1(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, i
                                         print("eri", np.prod(_eri_s8.shape)*4/10**6)
 
 
-                        _vj, _vk = tile_map_primitive(          poplar_direct_s1,
+                        _vj, _vk = tile_map(                    poplar_direct_s1,
                                         tile_put_sharded(       _eri_s8.  reshape(len(tiles), -1),             tiles=tiles),
                                         tile_put_sharded(       np.array(__indices). reshape(len(tiles), 8),   tiles=tiles),
                                         tile_put_sharded(       np.array(__do_lists).reshape(len(tiles), 8),   tiles=tiles),
@@ -362,7 +362,7 @@ def ipu_direct_mult_v2(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, i
                                 _chunk_size   = tile_put_replicated( np.ones((1,chunks)), tiles=tiles)
 
 
-                                _vj= tile_map_primitive(          poplar_direct_s1_forloop_vj,
+                                _vj= tile_map(          poplar_direct_s1_forloop_vj,
                                                         tile_put_sharded(       all_eri_s8,             tiles=tiles),
                                                         tile_put_sharded(       all_indices,   tiles=tiles),
                                                         tile_put_sharded(       all_do_lists,   tiles=tiles),
@@ -393,7 +393,7 @@ def ipu_direct_mult_v2(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, i
                                                 print("eri", np.prod(_eri_s8.shape)*4/10**6)
 
 
-                                _vj= tile_map_primitive(          poplar_direct_s1_vj,
+                                _vj= tile_map(                          poplar_direct_s1_vj,
                                                 tile_put_sharded(       _eri_s8.  reshape(len(tiles), -1),             tiles=tiles),
                                                 tile_put_sharded(       np.array(__indices). reshape(len(tiles), 8),   tiles=tiles),
                                                 tile_put_sharded(       np.array(__do_lists).reshape(len(tiles), 8),   tiles=tiles),
@@ -441,7 +441,7 @@ def ipu_direct_mult_v2(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, i
                                 all_eri_s8   = eri_s8   [0:all_stop].reshape( len(tiles), chunks, eri_s8.shape[1] )
                                 _chunk_size   = tile_put_replicated( np.ones((1,chunks)), tiles=tiles)
 
-                                _vk= tile_map_primitive(          poplar_direct_s1_forloop_vk,
+                                _vk= tile_map(          poplar_direct_s1_forloop_vk,
                                                         tile_put_sharded(       all_eri_s8,             tiles=tiles),
                                                         tile_put_sharded(       all_indices,   tiles=tiles),
                                                         tile_put_sharded(       all_do_lists,   tiles=tiles),
@@ -472,7 +472,7 @@ def ipu_direct_mult_v2(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, i
                                                 print("eri", np.prod(_eri_s8.shape)*4/10**6)
 
 
-                                _vk = tile_map_primitive(          poplar_direct_s1_vk,
+                                _vk = tile_map(                         poplar_direct_s1_vk,
                                                 tile_put_sharded(       _eri_s8.  reshape(len(tiles), -1),             tiles=tiles),
                                                 tile_put_sharded(       np.array(__indices). reshape(len(tiles), 8),   tiles=tiles),
                                                 tile_put_sharded(       np.array(__do_lists).reshape(len(tiles), 8),   tiles=tiles),
@@ -500,7 +500,7 @@ def ipu_direct_mult(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, indx
                 return ipu_direct_mult_v2(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, indxs, threads=threads)
 
 def ipu_einsum(__out3, dm, mol, threads=1, v=2):
-        _tuple_indices, _tuple_do_lists, _N, num_calls = prepare_einsum_inputs(mol) 
+        _tuple_indices, _tuple_do_lists, _N, num_calls = prepare_einsum_inputs(mol)
         N = mol.nao_nr()
         _, _, _tuple_ijkl, _shapes, _sizes, _counts, indxs, indxs_inv, _ = prepare_electron_repulsion_integrals(mol)
         return ipu_direct_mult( __out3, dm, _tuple_indices, _tuple_do_lists, N, num_calls, tuple(indxs_inv), tuple(indxs), threads, v)
@@ -568,15 +568,15 @@ def integrals_v0(input_floats, input_ints, input_ijkl, shapes, sizes, counts, in
                         cpu_output  = tile_put_sharded(   cpu_output+j,   tiles)
                         tile_ijkl   = tile_put_sharded(   indices ,     tiles)
 
-                        _cpu_output, _, _, _= tile_map_primitive(int2e_sph,
-                                                                 tile_floats[:len(tiles)],
-                                                                 tile_ints[:len(tiles)],
-                                                                 tile_ijkl,
-                                                                 cpu_output,
-                                                                 tile_g[:len(tiles)],
-                                                                 tile_idx[:len(tiles)],
-                                                                 tile_buf[:len(tiles)]
-                                                                )
+                        _cpu_output, _, _, _= tile_map( int2e_sph,
+                                                        tile_floats[:len(tiles)],
+                                                        tile_ints[:len(tiles)],
+                                                        tile_ijkl,
+                                                        cpu_output,
+                                                        tile_g[:len(tiles)],
+                                                        tile_idx[:len(tiles)],
+                                                        tile_buf[:len(tiles)]
+                                                        )
                         list_cpu_output.append(_cpu_output.array)
 
                 cpu_outputs.append(jnp.concatenate(list_cpu_output)  )
@@ -648,17 +648,17 @@ def integrals_v1(input_floats, input_ints, input_ijkl, shapes, sizes, counts, in
                         integral_size = tile_put_replicated( jnp.zeros(size), tiles)
 
                         if False:
-                                _cpu_output, _, _, _= tile_map_primitive(int2e_sph_forloop,
-                                                                                tile_floats,
-                                                                                tile_ints,
-                                                                                _indices[:, :, :],
-                                                                                cpu_output[:, :, :],
-                                                                                tile_g,
-                                                                                tile_idx,
-                                                                                tile_buf,
-                                                                                chunks[:,:],
-                                                                                integral_size
-                                                                                )
+                                _cpu_output, _, _, _= tile_map(int2e_sph_forloop,
+                                                                tile_floats,
+                                                                tile_ints,
+                                                                _indices[:, :, :],
+                                                                cpu_output[:, :, :],
+                                                                tile_g,
+                                                                tile_idx,
+                                                                tile_buf,
+                                                                chunks[:,:],
+                                                                integral_size
+                                                                )
 
                                 for j in range( count // chunk_size ):
                                         print("!!", _cpu_output.shape)
@@ -668,17 +668,17 @@ def integrals_v1(input_floats, input_ints, input_ijkl, shapes, sizes, counts, in
                         else:
                                 #print(">>", cpu_output.shape, _indices.shape , chunks.shape, integral_size.shape)
 
-                                batched_out , _, _, _= tile_map_primitive(int2e_sph_forloop,
-                                                                        tile_floats,
-                                                                        tile_ints,
-                                                                        _indices,
-                                                                        cpu_output,
-                                                                        tile_g,
-                                                                        tile_idx,
-                                                                        tile_buf,
-                                                                        chunks,
-                                                                        integral_size
-                                                                        )
+                                batched_out , _, _, _= tile_map(int2e_sph_forloop,
+                                                                tile_floats,
+                                                                tile_ints,
+                                                                _indices,
+                                                                cpu_output,
+                                                                tile_g,
+                                                                tile_idx,
+                                                                tile_buf,
+                                                                chunks,
+                                                                integral_size
+                                                                )
                                 batched_out = jnp.transpose(batched_out.array, (1, 0, 2)).reshape(-1, size)
 
 
@@ -693,15 +693,15 @@ def integrals_v1(input_floats, input_ints, input_ijkl, shapes, sizes, counts, in
                         cpu_output = jnp.empty((len(tiles), size))
                         cpu_output  = tile_put_sharded(   cpu_output+j,   tiles)
 
-                        _cpu_output, _, _, _= tile_map_primitive(int2e_sph,
-                                                                 tile_floats[:len(tiles)],
-                                                                 tile_ints[:len(tiles)],
-                                                                 tile_ijkl,
-                                                                 cpu_output,
-                                                                 tile_g[:len(tiles)],
-                                                                 tile_idx[:len(tiles)],
-                                                                 tile_buf[:len(tiles)]
-                                                                )
+                        _cpu_output, _, _, _= tile_map( int2e_sph,
+                                                        tile_floats[:len(tiles)],
+                                                        tile_ints[:len(tiles)],
+                                                        tile_ijkl,
+                                                        cpu_output,
+                                                        tile_g[:len(tiles)],
+                                                        tile_idx[:len(tiles)],
+                                                        tile_buf[:len(tiles)]
+                                                )
 
                 if count//chunk_size>0:cpu_outputs.append(jnp.concatenate([batched_out, _cpu_output.array])  )
                 else: cpu_outputs.append(_cpu_output.array   )
@@ -1340,9 +1340,9 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
                         tile_idx    = tile_put_replicated(jnp.zeros(3888+1, dtype = jnp.int32) ,  tiles)
                         tile_buf    = tile_put_replicated(jnp.zeros(1080*4+1) ,                   tiles)
 
-                        tile_floats, start = ipu_hw_cycle_count(tile_floats)
-                        cpu_output, tile_g, _, _= tile_map_primitive(int2e_sph, tile_floats, tile_ints, tile_ijkl, cpu_output, tile_g, tile_idx, tile_buf)
-                        tile_floats, stop = ipu_hw_cycle_count(tile_floats)
+                        tile_floats, start = ipu_cycle_count(tile_floats)
+                        cpu_output, tile_g, _, _= tile_map(int2e_sph, tile_floats, tile_ints, tile_ijkl, cpu_output, tile_g, tile_idx, tile_buf)
+                        tile_floats, stop = ipu_cycle_count(tile_floats)
 
                         start_index += count
                         cpu_outputs.append(cpu_output)
@@ -1377,7 +1377,7 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
                 for i in range( num_calls // num_tiles ):
                         start, stop = num_tiles*i, num_tiles*(i+1)
 
-                        out, tile_g, cycle_start, cycle_stop = wrap_cycles(tile_map_primitive)(
+                        out, tile_g, cycle_start, cycle_stop = wrap_cycles(tile_map)(
                                                 int2e_sph,
                                                 tile_floats,
                                                 tile_ints,
@@ -1392,7 +1392,7 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
                         cycles_stop.append(cycle_stop)
 
                 elements_left = input_ijkl[num_tiles*(i+1):].shape[0]
-                out, tile_g, cycle_start, cycle_stop = wrap_cycles(tile_map_primitive)(
+                out, tile_g, cycle_start, cycle_stop = wrap_cycles(tile_map)(
                                 int2e_sph,
                                 tile_floats,
                                 tile_ints,
