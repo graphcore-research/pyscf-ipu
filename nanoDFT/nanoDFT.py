@@ -258,9 +258,9 @@ def grad_nuc(charges, coords):
     all = all.at[jnp.diag_indices(natm)].set(0)                                              # (natm, natm, 3)
     return jnp.sum(all, axis=0)                                                              # (natm, natm)
 
-def grad(mol, coords, weight, mo_coeff, mo_energy): 
-    # Initialize DFT tensors on CPU using PySCF. 
-    ao = pyscf.dft.numint.NumInt().eval_ao(mol, coords, deriv=2) 
+def grad(mol, coords, weight, mo_coeff, mo_energy):
+    # Initialize DFT tensors on CPU using PySCF.
+    ao = pyscf.dft.numint.NumInt().eval_ao(mol, coords, deriv=2)
     eri = mol.intor("int2e_ip1")
     s1  = - mol.intor('int1e_ipovlp', comp=3)
     kin = - mol.intor('int1e_ipkin',  comp=3)
