@@ -1,3 +1,6 @@
+_tmp/
+*.gif
+
 datasets/
 .graph_profile/
 .poptorch_cache/
