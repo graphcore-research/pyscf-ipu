@@ -36,7 +36,7 @@ def energy(density_matrix, H_core, J, K, E_xc, E_nuc, _np=jax.numpy):
 
     return _np.array([E, E_core, E_J/2, -E_K/4, E_xc, E_nuc])   # Energy (and its terms).
 
-def nanoDFT_iteration(i, vals, args):
+def nanoDFT_iteration(i, vals, args, mol):
     """Each call updates density_matrix attempting to minimize energy(density_matrix, ... ). """
     density_matrix, V_xc, J, K, O, H_core, L_inv                    = vals[:7]                  # All (N, N) matrices
     E_nuc, occupancy, ERI, grid_weights, grid_AO, diis_history, log = vals[7:]                  # Varying types/shapes.
@@ -51,7 +51,7 @@ def nanoDFT_iteration(i, vals, args):
     # Step 3: Use result from eigenproblem to update density_matrix.
     density_matrix = (eigvects*occupancy*2) @ eigvects.T                                        # (N, N)
     E_xc, V_xc     = exchange_correlation(density_matrix, grid_AO, grid_weights)                # float (N, N)
-    J, K           = get_JK(density_matrix, ERI, args)                                          # (N, N) (N, N)
+    J, K           = get_JK(density_matrix, ERI, args, mol)                                     # (N, N) (N, N)
 
     # Log SCF matrices and energies (not used by DFT algorithm).
     log["matrices"] = log["matrices"].at[i].set(jnp.stack((density_matrix, J, K, H)))           # (iterations, 4, N, N)
@@ -71,25 +71,25 @@ def exchange_correlation(density_matrix, grid_AO, grid_weights):
 
     return E_xc, V_xc                                                                            # (float) (N, N)
 
-def get_JK(density_matrix, ERI, args):
+def get_JK(density_matrix, ERI, args, mol):
     """Computes the (N, N) matrices J and K. Density matrix is (N, N) and ERI is (N, N, N, N).  """
     if args.backend != "ipu":
         J = jnp.einsum('ijkl,ji->kl', ERI, density_matrix)                                       # (N, N)
         K = jnp.einsum('ijkl,jk->il', ERI, density_matrix)                                       # (N, N)
     else:
         # Custom einsum which utilize ERI[ijkl]=ERI[ijlk]=ERI[jikl]=ERI[jilk]=ERI[lkij]=ERI[lkji]=ERI[lkij]=ERI[lkji]
-        J, K = ipu_einsum(ERI, density_matrix, build_mol(args), args.threads, args.multv)                    # (N, N) (N, N)
+        J, K = ipu_einsum(ERI, density_matrix, mol, args.threads, args.multv)                    # (N, N) (N, N)
     return J, K * HYB_B3LYP                                                                      # (N, N) (N, N)
 
 def _nanoDFT(E_nuc, density_matrix, kinetic, nuclear, O, grid_AO, ERI, grid_weights,
-              mask, _input_floats, _input_ints, L_inv, diis_history, args):
+              mask, _input_floats, _input_ints, L_inv, diis_history, args, mol):
     # Utilize the IPUs MIMD parallism to compute the electron repulsion integrals (ERIs) in parallel.
-    if args.backend == "ipu": ERI = electron_repulsion_integrals(_input_floats, _input_ints, build_mol(args), args.threads_int, args.intv)
+    if args.backend == "ipu": ERI = electron_repulsion_integrals(_input_floats, _input_ints, mol, args.threads_int, args.intv)
     else: pass # Compute on CPU.
 
     # Precompute the remaining tensors.
     E_xc, V_xc = exchange_correlation(density_matrix, grid_AO, grid_weights) # float (N, N)
-    J, K       = get_JK(density_matrix, ERI, args)                           # (N, N) (N, N)
+    J, K       = get_JK(density_matrix, ERI, args, mol)                      # (N, N) (N, N)
     H_core     = kinetic + nuclear                                           # (N, N)
 
     # Log matrices from all DFT iterations (not used by DFT algorithm).
@@ -97,14 +97,12 @@ def _nanoDFT(E_nuc, density_matrix, kinetic, nuclear, O, grid_AO, ERI, grid_weig
     log = {"matrices": np.zeros((args.its, 4, N, N)), "E_xc": np.zeros((args.its)), "energy": np.zeros((args.its, 6))}
 
     # Perform DFT iterations.
-    log = jax.lax.fori_loop(0, args.its, partial(nanoDFT_iteration, args=args), [density_matrix, V_xc, J, K, O, H_core, L_inv,  # all (N, N) matrices
+    log = jax.lax.fori_loop(0, args.its, partial(nanoDFT_iteration, args=args, mol=mol), [density_matrix, V_xc, J, K, O, H_core, L_inv,  # all (N, N) matrices
                                                             E_nuc, mask, ERI, grid_weights, grid_AO, diis_history, log])[-1]
 
     return log["matrices"], H_core, log["energy"]
 
-def init_dft_tensors_cpu(args, DIIS_iters=9):
-    mol = pyscf.gto.mole.Mole()
-    mol.build(atom=args.mol_str, unit="Angstrom", basis=args.basis, verbose=0)
+def init_dft_tensors_cpu(mol, args, DIIS_iters=9):
     N                = mol.nao_nr()                                 # N=66 for C6H6 (number of atomic **and** molecular orbitals)
     n_electrons_half = mol.nelectron//2                             # 21 for C6H6
     E_nuc            = mol.energy_nuc()                             # float = 202.4065 [Hartree] for C6H6. TODO(): Port to jax.
@@ -139,12 +137,12 @@ def init_dft_tensors_cpu(args, DIIS_iters=9):
 
     return tensors, n_electrons_half, E_nuc, N, L_inv, grid_weights, grids.coords
 
-def nanoDFT(args):
+def nanoDFT(mol, args):
     # Init DFT tensors on CPU using PySCF.
-    tensors, n_electrons_half, E_nuc, N, L_inv, grid_weights, grid_coords = init_dft_tensors_cpu(args)
+    tensors, n_electrons_half, E_nuc, N, L_inv, grid_weights, grid_coords = init_dft_tensors_cpu(mol, args)
 
     # Run DFT algorithm (can be hardware accelerated).
-    jitted_nanoDFT = jax.jit(partial(_nanoDFT, args=args), backend=args.backend)
+    jitted_nanoDFT = jax.jit(partial(_nanoDFT, args=args, mol=mol), backend=args.backend)
     vals = jitted_nanoDFT(*tensors)
     logged_matrices, H_core, logged_energies = [np.asarray(a).astype(np.float64) for a in vals] # Ensure CPU
 
@@ -158,7 +156,7 @@ def nanoDFT(args):
     energies, logged_energies, hlgaps = [a * HARTREE_TO_EV for a in [energies, logged_energies, hlgaps]]
     mo_energy, mo_coeff = np.linalg.eigh(L_inv @ H[-1] @ L_inv.T)
     mo_coeff = L_inv.T @ mo_coeff
-    return energies, logged_energies, hlgaps, mo_energy, mo_coeff, grid_coords, grid_weights
+    return energies, (logged_energies, hlgaps, mo_energy, mo_coeff, grid_coords, grid_weights)
 
 def DIIS(i, H, density_matrix, O, diis_history, args):
     # DIIS is an optional technique which improves DFT convergence by computing:
@@ -295,12 +293,8 @@ def grad(mol, coords, weight, mo_coeff, mo_energy):
 
     return _grad_elec(weight, ao, eri, s1, h1aos, mol.natm, tuple([tuple(a) for a in aoslices.tolist()]), mask, mo_energy, mo_coeff)  + _grad_nuc(charges, coords)
 
-def pyscf_reference(args):
-    mol = pyscf.gto.mole.Mole()
-    mol.verbose = 0
-    pyscf.__config__.dft_rks_RKS_grids_level = args.level
-    mol.build(atom=args.mol_str, unit='Angstrom', basis=args.basis, spin=0)
-
+def pyscf_reference(mol_str, args):
+    mol = build_mol(mol_str, args.basis)
     mol.max_cycle = args.its
     mf = pyscf.scf.RKS(mol)
     mf.max_cycle = args.its
@@ -354,12 +348,12 @@ def print_difference(nanoDFT_E, nanoDFT_forces, nanoDFT_logged_E, nanoDFT_hlgap,
     print()
     print("np.max(|nanoDFT_F-PySCF_F|):", np.max(np.abs(nanoDFT_forces-pyscf_forces)))
 
-def build_mol(args):
+def build_mol(mol_str, basis_name):
     mol = pyscf.gto.mole.Mole()
-    mol.build(atom=args.mol_str, unit="Angstrom", basis=args.basis, spin=0, verbose=0)
+    mol.build(atom=mol_str, unit="Angstrom", basis=basis_name, spin=0, verbose=0)
     return mol
 
-def nanoDFT_parser(
+def nanoDFT_options(
         its: int = 20,
         mol_str: str = "benzene",
         float32: bool = False,
@@ -396,33 +390,35 @@ def nanoDFT_parser(
     elif mol_str == "methane":
         mol_str = "C 0 0 0; H 0 0 1; H 0 1 0; H 1 0 0; H 1 1 1;"
     args = locals()
+    mol_str = args["mol_str"]
+    del args["mol_str"]
     args = Namespace(**args)
     if not args.float32:
         jax.config.update('jax_enable_x64', not float32)
-    return args
+    return args, mol_str
 
 if __name__ == "__main__":
     # Limit PySCF threads to mitigate problem with NUMA nodes.
     import os
     os.environ['OMP_NUM_THREADS'] = "16"
     jax.config.FLAGS.jax_platform_name = 'cpu'
-    args = CLI(nanoDFT_parser)
-    assert args.xc == "b3lyp"
-    print("float32") if args.float32 else print("float64")
+    opts, mol_str = CLI(nanoDFT_options)
+    assert opts.xc == "b3lyp"
+    print("float32") if opts.float32 else print("float64")
 
-    if not args.structure_optimization:
+    if not opts.structure_optimization:
         # Test Case: Compare nanoDFT against PySCF.
-        mol = build_mol(args)
-        nanoDFT_E, nanoDFT_logged_E, nanoDFT_hlgap, mo_energy, mo_coeff, grid_coords, grid_weights = nanoDFT(args)
+        mol = build_mol(mol_str, opts.basis)
+        nanoDFT_E, (nanoDFT_logged_E, nanoDFT_hlgap, mo_energy, mo_coeff, grid_coords, grid_weights) = nanoDFT(mol, opts)
         nanoDFT_forces = grad(mol, grid_coords, grid_weights, mo_coeff, mo_energy)
-        pyscf_E, pyscf_hlgap, pyscf_forces = pyscf_reference(args)
+        pyscf_E, pyscf_hlgap, pyscf_forces = pyscf_reference(mol_str, opts)
         print_difference(nanoDFT_E, nanoDFT_forces, nanoDFT_logged_E, nanoDFT_hlgap, pyscf_E, pyscf_forces, pyscf_hlgap)
     else:
         # pip install mogli imageio[ffmpeg] matplotlib
         import mogli
         import imageio
         import matplotlib.pyplot as plt
-        args.basis = "6-31G"
+        opts.basis = "6-31G"
         p = np.array([[0,1,1], [0,2,2], [0,3,3],
                       [0,4,4], [0,5,5], [0,6,6]])
         np.random.seed(42)
@@ -433,11 +429,11 @@ if __name__ == "__main__":
         E = []
         ims = []
         for i in range(20):
-            args.mol_str = "".join([f"{A[i]} {p[i]};".replace("[", "]").replace("]", "") for i in range(natm)])
-            mol = build_mol(args)
-            nanoDFT_E, nanoDFT_logged_E, nanoDFT_hlgap, mo_energy, mo_coeff, grid_coords, grid_weights = nanoDFT(args)
+            mol_str = "".join([f"{A[i]} {p[i]};".replace("[", "]").replace("]", "") for i in range(natm)])
+            mol = build_mol(mol_str, opts.basis)
+            nanoDFT_E, (nanoDFT_logged_E, nanoDFT_hlgap, mo_energy, mo_coeff, grid_coords, grid_weights) = nanoDFT(mol, opts)
             f = open(f"_tmp/{i}.xyz", "w")
-            f.write(f"""{natm}\n{args.mol_str} {nanoDFT_E[-1, 0]}\n"""+"".join([f"{A[i]} {p[i]}\n".replace("[", "").replace("]", "") for i in range(natm)]))
+            f.write(f"""{natm}\n{mol_str} {nanoDFT_E[-1, 0]}\n"""+"".join([f"{A[i]} {p[i]}\n".replace("[", "").replace("]", "") for i in range(natm)]))
             f.close()
             molecules = mogli.read(f'_tmp/{i}.xyz')
             mogli.export(molecules[0], f'_tmp/{i}.png', width=400, height=400,
