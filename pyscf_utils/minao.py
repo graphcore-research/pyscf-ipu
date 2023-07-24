@@ -119,6 +119,6 @@ def minao(mol):
     times.append(time.time())
 
     times = np.array(times)
-    print(np.around(times[1:]-times[:-1], 2))
+    # print("MINAO timing:", np.around(times[1:]-times[:-1], 2))
 
     return dm
