@@ -11,6 +11,9 @@ natsort
 rdkit
 jsonargparse[all]
 
+mogli
+imageio[ffmpeg]
+
 # silence warnings about setuptools + numpy
 setuptools < 60.0
 
