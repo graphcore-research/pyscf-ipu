@@ -13,6 +13,7 @@ jsonargparse[all]
 
 mogli
 imageio[ffmpeg]
+py3Dmol
 
 # silence warnings about setuptools + numpy
 setuptools < 60.0
