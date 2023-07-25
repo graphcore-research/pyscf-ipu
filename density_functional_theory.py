@@ -333,7 +333,7 @@ def density_functional_theory(atom_positions, mf_diis_space=9):
 
                     if not args.nohs: b = Chem.AddHs(b, explicitOnly=False)
 
-                    embed_result = AllChem.EmbedMultipleConfs(b, numConfs=args.num_conformers, randomSeed=43)
+                    embed_result = AllChem.EmbedMultipleConfs(b, numConfs=args.num_conformers, randomSeed=args.randomSeed)
                     if embed_result == -1:
                         not_embedded += 1
                         continue
@@ -1269,6 +1269,8 @@ if __name__ == "__main__":
     parser.add_argument('-multv',    default=2, type=int, help='Which version of our einsum algorithm to use;comptues ERI@flat(v). Different versions trades-off for memory vs sequentiality. ')
     parser.add_argument('-intv',    default=1, type=int, help='Which version to use of our integral algorithm. ')
 
+    parser.add_argument('-randomSeed',       default=43, type=float,  help='Random seed for RDKit conformer generation. ')
+
     parser.add_argument('-scale_eri',       default=1, type=float,  help='Scale electron repulsion ')
     parser.add_argument('-scale_w',         default=1, type=float,  help='Scaling of weights to get numerical stability. ')
     parser.add_argument('-scale_ao',        default=1, type=float,  help='Scaling of ao to get numerical stability. ')
@@ -1375,9 +1377,9 @@ if __name__ == "__main__":
             if args.gdb == 8:  args.smiles = [a for a in open("gdb/gdb11_size08_sorted.csv", "r").read().split("\n")]
 
             # used as example data for quick testing.
-            if args.gdb == 6:  args.smiles = ["c1ccccc1"]*1000
-            if args.gdb == 5:  args.smiles = ['CCCCC']*1000
-            if args.gdb == 4:  args.smiles = ['CCCC']*1000
+            if args.gdb == 6:  args.smiles = ["c1ccccc1"]*args.num_conformers
+            if args.gdb == 5:  args.smiles = ['CCCCC']*args.num_conformers
+            if args.gdb == 4:  args.smiles = ['CCCC']*args.num_conformers
 
 
             print("DONE!", time.time()-t0)
