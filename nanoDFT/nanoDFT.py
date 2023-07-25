@@ -213,9 +213,10 @@ def linalg_eigh(x, args):
 
     return eigvals, eigvects
 
-def pinv0(a, args):  # take out first row
+def pinv0(a, opts):  # take out first row
+    # TODO: add a comment explaining the role of this constant
     cond =  9*1.1920929e-07
-    vals, vect = linalg_eigh(a, args)
+    vals, vect = linalg_eigh(a, opts)
     c = vect @ ( jnp.where( jnp.abs(vals) > cond, 1/vals, 0) * vect[0, :])
     return c
 
