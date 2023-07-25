@@ -13,15 +13,20 @@ from rdkit import RDLogger
 lg = RDLogger.logger()
 lg.setLevel(RDLogger.CRITICAL)
 
-def sort_gdb(gdb_filename: str):
+
+def sort_gdb(gdb_filename: str, keep_only_atoms_count: int = 9):
+    """Sort GDB SMILES strings by number of hydrogens, after keeping
+    only the molecules with a given count of heavy atoms.
+
+    Returns:
+        Pandas dataframe of SMILES strings.
+    """
     smiles = [a.split("\t")[0] for a in open(gdb_filename, "r").read().split("\n")]
-    # Keep onlysmiles with 9 heavy atoms
-    atoms_count = 9
     smiles_filtered = []
     num_hs = []
     for smile in tqdm(smiles):
         atoms = [a for a in list(smile.upper()) if a == "C" or a == "N" or a == "O" or a == "F"]
-        if len(atoms) != atoms_count: continue
+        if len(atoms) != keep_only_atoms_count: continue
         smiles_filtered.append(smile)
         b = Chem.MolFromSmiles(smile)
         b = Chem.AddHs(b)
