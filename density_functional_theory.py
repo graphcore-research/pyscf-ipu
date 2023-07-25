@@ -1269,7 +1269,7 @@ if __name__ == "__main__":
     parser.add_argument('-multv',    default=2, type=int, help='Which version of our einsum algorithm to use;comptues ERI@flat(v). Different versions trades-off for memory vs sequentiality. ')
     parser.add_argument('-intv',    default=1, type=int, help='Which version to use of our integral algorithm. ')
 
-    parser.add_argument('-randomSeed',       default=43, type=float,  help='Random seed for RDKit conformer generation. ')
+    parser.add_argument('-randomSeed',       default=43, type=int,  help='Random seed for RDKit conformer generation. ')
 
     parser.add_argument('-scale_eri',       default=1, type=float,  help='Scale electron repulsion ')
     parser.add_argument('-scale_w',         default=1, type=float,  help='Scaling of weights to get numerical stability. ')
