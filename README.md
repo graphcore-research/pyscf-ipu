@@ -36,7 +36,7 @@ This will configure Graphcore research experimental JAX support in your python e
 
 We recommend upgrading `pip` to the latest stable release when using the IPU 
 requirements. This may be an optional step depending on the overall configuration of
-your pythonenvironment.
+your python environment.
 
 ## Example DFT Computations
 The following commands may be useful to check the installation. Each command runs a test-case which compares PySCF against our DFT computation using different options.
