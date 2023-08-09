@@ -1,7 +1,7 @@
 # Copyright (c) 2023 Graphcore Ltd. All rights reserved.
 import os
 os.environ['OMP_NUM_THREADS'] = "8"
-
+os.environ['TF_POPLAR_FLAGS'] = """--executable_cache_path=/tmp/pyscf-ipu-cache/"""
 import jax
 import jax.numpy as jnp
 from jax.config import config
