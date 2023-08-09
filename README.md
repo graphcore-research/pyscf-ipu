@@ -29,9 +29,14 @@ pip install -r requirements.txt
 
 On IPU machines, please additionally use the IPU requirements file:
 ```bash
+pip install -U pip
 pip install -r requirements_ipu.txt
 ```
 This will configure Graphcore research experimental JAX support in your python environment.
+
+We recommend upgrading `pip` to the latest stable release when using the IPU 
+requirements. This may be an optional step depending on the overall configuration of
+your python environment.
 
 ## Example DFT Computations
 The following commands may be useful to check the installation. Each command runs a test-case which compares PySCF against our DFT computation using different options.
