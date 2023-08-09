@@ -2,7 +2,7 @@ numpy
 matplotlib
 pandas
 scipy
-pyscf
+pyscf==2.2.1
 icecream
 seaborn
 tqdm
