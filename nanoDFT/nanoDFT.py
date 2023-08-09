@@ -358,7 +358,7 @@ def nanoDFT_options(
         its: int = 20,
         mol_str: str = "benzene",
         float32: bool = False,
-        basis: str = "6-31G",
+        basis: str = "sto-3g",
         xc: str = "b3lyp",
         backend: str = "cpu",
         level: int = 1,
