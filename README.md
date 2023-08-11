@@ -4,8 +4,9 @@
 
 [**Installation guide**](#installation)
 | [**Example DFT Computations**](#example-dft-computations)
-| [**Generating new datasets**](#generating-new-datasets)
+| [**Generating data**](#generating-new-datasets)
 | [**Training SchNet**](#training-schnet-on-qm1b)
+| [**QM1B dataset**](qm1b/README.md)
 
 [![Run on Gradient](https://assets.paperspace.io/img/gradient-badge.svg)](https://ipu.dev/ipobmC)
 
@@ -34,7 +35,7 @@ pip install -r requirements_ipu.txt
 ```
 This will configure Graphcore research experimental JAX support in your python environment.
 
-We recommend upgrading `pip` to the latest stable release when using the IPU 
+We recommend upgrading `pip` to the latest stable release when using the IPU
 requirements. This may be an optional step depending on the overall configuration of
 your python environment.
 
@@ -71,9 +72,9 @@ python density_functional_theory.py -generate -save -fname dataset_name -level 0
 You can speed up the generation by using IPUs. Please try the [DFT dataset generation notebook](https://ipu.dev/YX0jlK) [![Run on Gradient](https://assets.paperspace.io/img/gradient-badge.svg)](https://ipu.dev/YX0jlK)
 
 
-## Training SchNet on QM1B
+## Training SchNet on [QM1B](qm1b/README.md)
 
-We used PySCF on IPU to generate the QM1B dataset with one billion training examples (to be released soon).
+We used PySCF on IPU to generate the [QM1B dataset](qm1b/README.md) with one billion training examples (to be released soon).
 See [Training SchNet on QM1B](./schnet_9m/README.md) for an example implementation of a neural network trained on this dataset.
 
 ## License
