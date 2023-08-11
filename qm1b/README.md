@@ -25,5 +25,5 @@ Dataset exploration can easily done using Pandas library. For instance, to load 
 import pandas as pd
 
 # 20m entries in the validation set.
-print(pd.read_parquet("qm1b_val.parquet"))
+print(pd.read_parquet("qm1b_val.parquet").head())
 ```
