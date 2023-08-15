@@ -193,7 +193,7 @@ def hlgap(L_inv, H, n_electrons_half, _np):
     return _np.abs(mo_energy[n_electrons_half] - mo_energy[n_electrons_half-1])
 
 def linalg_eigh(x, opts):
-    if opts.backend == "ipu":
+    if opts.backend == "ipu" and x.shape[0] >= 6:
         from tessellate_ipu.linalg import ipu_eigh
 
         n = x.shape[0]
