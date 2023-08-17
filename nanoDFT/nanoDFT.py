@@ -397,7 +397,7 @@ def nanoDFT_options(
     mol_str = args["mol_str"]
     del args["mol_str"]
     args = Namespace(**args)
-    args = namedtuple('immutable',vars(args).keys())(**vars(args)) # make immutable
+    args = namedtuple('DFTOptionsImmutable',vars(args).keys())(**vars(args)) # make immutable
     if not args.float32:
         jax.config.update('jax_enable_x64', not float32)
     return args, mol_str
@@ -423,6 +423,7 @@ if __name__ == "__main__":
         import mogli
         import imageio
         import matplotlib.pyplot as plt
+        opts = opts._replace(basis="6-31G")
         p = np.array([[0,1,1], [0,2,2], [0,3,3],
                       [0,4,4], [0,5,5], [0,6,6]])
         np.random.seed(42)
