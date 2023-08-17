@@ -11,6 +11,7 @@ os.environ['TF_POPLAR_FLAGS'] = """--executable_cache_path=/tmp/pyscf-ipu-cache/
 from exchange_correlation.b3lyp import b3lyp
 from electron_repulsion.direct import prepare_electron_repulsion_integrals, electron_repulsion_integrals, ipu_einsum
 from functools import partial
+from collections import namedtuple
 
 HARTREE_TO_EV = 27.2114079527
 EPSILON_B3LYP = 1e-20
@@ -396,6 +397,7 @@ def nanoDFT_options(
     mol_str = args["mol_str"]
     del args["mol_str"]
     args = Namespace(**args)
+    args = namedtuple('immutable',vars(args).keys())(**vars(args)) # make immutable
     if not args.float32:
         jax.config.update('jax_enable_x64', not float32)
     return args, mol_str
@@ -421,7 +423,6 @@ if __name__ == "__main__":
         import mogli
         import imageio
         import matplotlib.pyplot as plt
-        opts.basis = "6-31G"
         p = np.array([[0,1,1], [0,2,2], [0,3,3],
                       [0,4,4], [0,5,5], [0,6,6]])
         np.random.seed(42)
