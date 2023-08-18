@@ -989,7 +989,7 @@ def xc(density_matrix, dms, cycle, ao, electron_repulsion, weights, vj, vk, hyb,
 
 
 def _eigh(x):
-    if args.backend == "ipu":
+    if args.backend == "ipu" and x.shape[0] >= 6:
         t0 = time.time()
         print("tracing ipu eigh (%s): "%str(x.shape))
         from tessellate_ipu.linalg import ipu_eigh
