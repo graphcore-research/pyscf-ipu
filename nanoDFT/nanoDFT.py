@@ -4,8 +4,6 @@ import jax.numpy as jnp
 import numpy as np
 import pyscf
 from jsonargparse import CLI, Namespace
-import sys
-sys.path.append("../")
 
 from exchange_correlation.b3lyp import b3lyp
 from electron_repulsion.direct import prepare_electron_repulsion_integrals, electron_repulsion_integrals, ipu_einsum

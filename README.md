@@ -39,6 +39,11 @@ We recommend upgrading `pip` to the latest stable release when using the IPU
 requirements. This may be an optional step depending on the overall configuration of
 your python environment.
 
+And finally, make our sub-packages available:
+```bash
+pip install -e .
+```
+
 ## Example DFT Computations
 The following commands may be useful to check the installation. Each command runs a test-case which compares PySCF against our DFT computation using different options.
 ```

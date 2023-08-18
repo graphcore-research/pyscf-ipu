@@ -2,11 +2,8 @@
 import jax.numpy as jnp
 import jax
 
-import sys
-import pathlib
-sys.path.append( str(pathlib.Path().resolve()) + "/" )
-
 try:
+    # When do we expect these to fail?
     from exchange_correlation.lda import __lda
     from exchange_correlation.lyp import __lyp
     from exchange_correlation.b88 import __b88
