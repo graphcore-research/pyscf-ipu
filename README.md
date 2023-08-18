@@ -53,14 +53,14 @@ Please try our [NanoDFT notebook on Paperspace](https://ipu.dev/ipobmC) to easil
 
 ## Generating New Datasets
 
-This section contains an example on how to generate a DFT dataset based of GDB. This is not needed if you just want to train on the QM1B dataset (to be released soon).
+This section contains an example on how to generate a DFT dataset based on GDB. This is not needed if you just want to train on the QM1B dataset (to be released soon).
 
 Download the `gdb11.tgz` file from https://zenodo.org/record/5172018 and extract its content in `gdb/` directory:
 ```bash
 wget -p -O ./gdb/gdb11.tgz https://zenodo.org/record/5172018/files/gdb11.tgz\?download\=1
 tar -xvf ./gdb/gdb11.tgz --directory ./gdb/
 ```
-To utilize caching you need to sort the SMILES strings by the number of hydrogens RDKit adds to them. This means molecule `i` and `i+1` in most cases have the same number of hydrogens which allows our code reuse/cache the computational graph for DFT. This can be done by running the following Python script:
+To utilize caching you need to sort the SMILES strings by the number of hydrogens RDKit adds to them. This means molecule `i` and `i+1` in most cases have the same number of hydrogens which allows our code to reuse/cache the computational graph for DFT. This can be done by running the following Python script:
 ```
 python ./gdb/sortgdb.py ./gdb/gdb11_size09.smi
 ```
