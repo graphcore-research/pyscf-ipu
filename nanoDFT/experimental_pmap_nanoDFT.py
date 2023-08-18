@@ -139,11 +139,12 @@ def get_JK(density_matrix, ERI, opts, mol):
     #    J, K = ipu_einsum(ERI, density_matrix, mol, opts.threads, opts.multv)                    # (N, N) (N, N)
     return J, K * HYB_B3LYP, dJK                                                                      # (N, N) (N, N), 
 
-def _nanoDFT(E_nuc, density_matrix, kinetic, nuclear, O, grid_AO, ERI, grid_weights,
-              mask, _input_floats, _input_ints, L_inv, diis_history, sharded_grid_AO, sharded_grid_weights, opts, mol):
+def _nanoDFT(E_nuc, density_matrix, kinetic, nuclear, O, grid_AO, grid_weights,
+              mask, _input_floats, _input_ints, L_inv, diis_history, sharded_grid_AO, sharded_grid_weights, ERI, opts, mol):
     # Utilize the IPUs MIMD parallism to compute the electron repulsion integrals (ERIs) in parallel.
     #if opts.backend == "ipu": ERI = electron_repulsion_integrals(_input_floats, _input_ints, mol, opts.threads_int, opts.intv)
     #else: pass # Compute on CPU.
+
     sharded_grid_AO = jnp.transpose(sharded_grid_AO, (1,0,2)) # (padded_gsize/16, 4, N) -> (4, pgsize, N)
         
     # Precompute the remaining tensors.
@@ -202,61 +203,56 @@ def init_dft_tensors_cpu(mol, opts, DIIS_iters=9):
     DIIS_H[0,1:] = DIIS_H[1:,0] = 1
     diis_history = (np.zeros((DIIS_iters, N**2)), np.zeros((DIIS_iters, N**2)), DIIS_H)
 
-    tensors = [E_nuc, density_matrix, kinetic, nuclear, O, grid_AO, ERI,
+    tensors = [E_nuc, density_matrix, kinetic, nuclear, O, grid_AO,
                grid_weights, mask, input_floats, input_ints, L_inv, diis_history]
 
-    return tensors, n_electrons_half, E_nuc, N, L_inv, grid_weights, grids.coords
+    return tensors, ERI, n_electrons_half, E_nuc, N, L_inv, grid_weights, grids.coords
 
 def nanoDFT(mol, opts):
     # Init DFT tensors on CPU using PySCF.
-    tensors, n_electrons_half, E_nuc, N, L_inv, grid_weights, grid_coords = init_dft_tensors_cpu(mol, opts)
+    tensors, ERI, n_electrons_half, E_nuc, N, L_inv, grid_weights, grid_coords = init_dft_tensors_cpu(mol, opts)
 
     sharded_grid_AO = jnp.transpose(tensors[5], (1, 0, 2)) # (4,gsize,N) -> (gsize,4,N)
-    sharded_grid_weights = tensors[7]
+    sharded_grid_weights = tensors[6]
     gsize = sharded_grid_AO.shape[0]
 
     remainder = gsize % 16 
     if remainder != 0: 
         sharded_grid_AO = jnp.pad(sharded_grid_AO, ((0,remainder), (0,0), (0,0)) )
         sharded_grid_weights = jnp.pad(sharded_grid_weights, ((0,remainder)) )
-        tensors[7] = jnp.pad(tensors[7], ((0, remainder)))
+        tensors[6] = jnp.pad(tensors[6], ((0, remainder)))
         tensors[5] = jnp.pad(tensors[5], ((0,0), (0,remainder), (0,0)) )
     sharded_grid_AO = sharded_grid_AO.reshape(16, -1, 4, N)
     sharded_grid_weights = sharded_grid_weights.reshape(16, -1)
 
     tensors[5] = 0 
-    tensors[7] = 0 
+    tensors[6] = 0
 
     # Run DFT algorithm (can be hardware accelerated).
     # we can have "ipus" argument instead, or pod16 as backend? 
     if opts.backend == "ipu":
-        jitted_nanoDFT = jax.pmap(partial(_nanoDFT, opts=opts, mol=mol), axis_name="p", backend=opts.backend)
+        jitted_nanoDFT = jax.pmap(partial(_nanoDFT, opts=opts, mol=mol), axis_name="p", backend=opts.backend,
+        in_axes=(None, None, None, None, None, None, None, None, None, None, None, (None, None, None), 0, 0, [0, 0, 0]))
 
         def sparse_representation(ERI):
             rows, cols = np.nonzero(ERI)
             values     = ERI[rows, cols]
             return rows, cols, values 
 
-        _tensors = []
-        for i, t in enumerate(tensors[:-1]): 
-            if i == 6: 
-                ERI = t
-                sparse_ERI = sparse_representation(ERI)
-                remainder = sparse_ERI[-1].shape[0] % 16
-                if remainder != 0: 
-                    sparse_ERI = [np.pad(a, (0, -remainder+16)) for a in sparse_ERI]
-                sparse_ERI = [a.reshape(16, -1) for a in sparse_ERI]
-                _tensors.append(sparse_ERI)
-            else: _tensors.append(jnp.repeat(jnp.expand_dims(t, 0), 16, 0) )
-        _last = []
-        for t in tensors[-1]: 
-            _last.append(jnp.repeat(jnp.expand_dims(t, 0), 16, 0) )
-        _tensors.append(tuple(_last))
-        _tensors.append(sharded_grid_AO)
-        _tensors.append(sharded_grid_weights)
+        # ERI = tensors[6]  # ERI is just the 6th element in tensors
+        sparse_ERI = sparse_representation(ERI)
+        remainder = sparse_ERI[-1].shape[0] % 16
+        if remainder != 0:
+            sparse_ERI = [np.pad(a, (0, -remainder+16)) for a in sparse_ERI]
+        sparse_ERI = [a.reshape(16, -1) for a in sparse_ERI]
+        # tensors[6] = sparse_ERI
+
+        tensors.append(sharded_grid_AO)
+        tensors.append(sharded_grid_weights)
+        tensors.append(sparse_ERI)
 
 
-        vals = jitted_nanoDFT(*_tensors)
+        vals = jitted_nanoDFT(*tensors)
         logged_matrices, H_core, logged_energies = [np.asarray(a).astype(np.float64)[0] for a in vals] # Ensure CPU
     else: 
         jitted_nanoDFT = jax.jit(partial(_nanoDFT, opts=opts, mol=mol), backend=opts.backend)
