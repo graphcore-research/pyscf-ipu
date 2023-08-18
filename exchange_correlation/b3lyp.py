@@ -2,17 +2,10 @@
 import jax.numpy as jnp
 import jax
 
-try:
-    # When do we expect these to fail?
-    from exchange_correlation.lda import __lda
-    from exchange_correlation.lyp import __lyp
-    from exchange_correlation.b88 import __b88
-    from exchange_correlation.vwn import __vwn
-except:
-    from lda import __lda
-    from lyp import __lyp
-    from b88 import __b88
-    from vwn import __vwn
+from exchange_correlation.lda import __lda
+from exchange_correlation.lyp import __lyp
+from exchange_correlation.b88 import __b88
+from exchange_correlation.vwn import __vwn
 
 CLIP_RHO_MIN  = 1e-9
 CLIP_RHO_MAX  = 1e12
