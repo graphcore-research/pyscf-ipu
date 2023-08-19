@@ -4,10 +4,7 @@ import jax.numpy as jnp
 import numpy as np
 import pyscf
 from jsonargparse import CLI, Namespace
-import sys
-sys.path.append("../")
-import os 
-os.environ['TF_POPLAR_FLAGS'] = """--executable_cache_path=/tmp/pyscf-ipu-cache/"""
+
 from exchange_correlation.b3lyp import b3lyp
 from electron_repulsion.direct import prepare_electron_repulsion_integrals, electron_repulsion_integrals, ipu_einsum
 from functools import partial
