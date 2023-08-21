@@ -1208,7 +1208,7 @@ def save_plot():
         skip = 0 
         print("figure [%i / %i]"%(i+1, iterations))
         plt.cla()
-        plt.title("[Iterations %i] \n Created with 'python density_functional_theory.py -numerror"%(i+1))
+        plt.title("[Iterations %i] \n"%(i+1) + _plot_title)
         files = sorted([a for a in os.listdir("numerror/") if "[" not in a and int(a.split("_")[0]) == i and ".jpg" not in a and ".gif" not in a]  )
 
         for num, file in enumerate(files):
