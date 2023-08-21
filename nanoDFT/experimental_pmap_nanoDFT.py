@@ -491,17 +491,36 @@ def nanoDFT_options(
         threads_int (int): For -backend ipu. Number of threads for computing ERI with custom C++ (trades off speed vs memory).
     """
     if mol_str == "benzene":
-        mol_str = "C        0.0000    0.0000    0.0000; C        1.4000    0.0000    0.0000; C        2.1000    1.2124    0.0000; C        1.4000    2.4249    0.0000; C        0.0000    2.4249    0.0000; C       -0.7000    1.2124    0.0000; H       -0.5500   -0.9526    0.0000; H       -0.5500    3.3775    0.0000; H        1.9500   -0.9526    0.0000; H       -1.8000    1.2124    0.0000; H        3.2000    1.2124    0.0000; H        1.9500    3.3775    0.0000;"
+        mol_str = [
+            ["C", ( 0.0000,  0.0000, 0.0000)],
+            ["C", ( 1.4000,  0.0000, 0.0000)],
+            ["C", ( 2.1000,  1.2124, 0.0000)],
+            ["C", ( 1.4000,  2.4249, 0.0000)],
+            ["C", ( 0.0000,  2.4249, 0.0000)],
+            ["C", (-0.7000,  1.2124, 0.0000)],
+            ["H", (-0.5500, -0.9526, 0.0000)],
+            ["H", (-0.5500,  3.3775, 0.0000)],
+            ["H", ( 1.9500, -0.9526, 0.0000)], 
+            ["H", (-1.8000,  1.2124, 0.0000)],
+            ["H", ( 3.2000,  1.2124, 0.0000)],
+            ["H", ( 1.9500,  3.3775, 0.0000)]
+        ]
     elif mol_str == "methane":
-        mol_str = "C 0 0 0; H 0 0 1; H 0 1 0; H 1 0 0; H 1 1 1;"
+        mol_str = [
+            ["C", (0, 0, 0)],
+            ["H", (0, 0, 1)],
+            ["H", (0, 1, 0)],
+            ["H", (1, 0, 0)],
+            ["H", (1, 1, 1)]
+        ]
     elif mol_str == "pmap":
-        mol_str = "".join([f"H 0 0 {i};" for i in range(2)]) # N=4 
-        #mol_str = "".join([f"H 0 0 {i};" for i in range(8)]) # 
-        #mol_str = "".join([f"H 0 0 {i};" for i in range(8*2)]) # 
-        #mol_str = "".join([f"H 0 0 {i};" for i in range(32)]) #  N=64
-        #mol_str = "".join([f"H 0 0 {i};" for i in range(32+16)]) N=96
-        #mol_str = "".join([f"H 0 0 {i};" for i in range(8*2*2*2)]) # N=128
-        #mol_str = "".join([f"H 0 0 {i};" for i in range(8*2*2*2*2)]) # N=256
+        mol_str = [["H", (0, 0, n) for n in range(2)]]          # N=4 
+        # mol_str = [["H", (0, 0, n) for n in range(8)]]          # N=16
+        # mol_str = [["H", (0, 0, n) for n in range(8*2)]]        # N=32
+        # mol_str = [["H", (0, 0, n) for n in range(32)]]         # N=64
+        # mol_str = [["H", (0, 0, n) for n in range(32+16)]]      # N=96
+        # mol_str = [["H", (0, 0, n) for n in range(8*2*2*2)]]    # N=128
+        # mol_str = [["H", (0, 0, n) for n in range(8*2*2*2*2)]]  # N=256
         basis = "6-31g"
     args = locals()
     mol_str = args["mol_str"]

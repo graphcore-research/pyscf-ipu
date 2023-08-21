@@ -8,7 +8,7 @@ jax.config.update('jax_platform_name', "cpu")
 os.environ['OMP_NUM_THREADS'] = "16"
 
 # Construct molecule we can use for test case. 
-mol = pyscf.gto.Mole(atom="".join([f"C 0 0 {i}; " for i in range(16)]), basis="sto3g")
+mol = pyscf.gto.Mole(atom=[["C", (0, 0, i)] for i in range(16)], basis="sto3g")
 mol.build()
 N              = mol.nao_nr()                          # N: number of atomic orbitals (AO) 
 density_matrix = pyscf.scf.hf.init_guess_by_minao(mol) # (N, N)
