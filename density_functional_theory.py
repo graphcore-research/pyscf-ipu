@@ -128,7 +128,7 @@ def _do_compute(density_matrix, kinetic, nuclear, overlap, ao,
         if args.nan or args.forloop:
             if args.jit: _iter = jax.jit(iter, backend=args.backend)
 
-            os.makedirs("experiments/numerror/%s/"%(str(args.sk)) , exist_ok=True)
+            os.makedirs("numerror/%s/"%(str(args.sk)) , exist_ok=True)
             for n in tqdm(range(int(args.its))):
 
                 if args.jit: vals = _iter(n, vals)
@@ -140,7 +140,13 @@ def _do_compute(density_matrix, kinetic, nuclear, overlap, ao,
                             "fixed_hamiltonian", "L_inv", "weights", "hyb", "ao", "nuclear_energy", "np.zeros(num_calls)", "cholesky", "generalized_hamiltonian", "sdf", "errvec", "hamiltonian", "dms", "part_energies"]
                     for s, v  in zip(_str, vals):
 
-                        np.savez("experiments/numerror/%i_%s_%s.npz"%( n, s, args.float32), v=v)
+                        if np.prod(np.shape(v)) > 10:  # don't save numbers 
+                            np.savez("numerror/%i_%s.npz"%( n, s), v=v)
+
+
+            if args.numerror:
+                save_plot()
+                exit()
 
         elif args.its == 1:
             vals = jax.jit(iter, backend=args.backend)(0, vals)
@@ -1171,6 +1177,81 @@ def recompute(args, molecules, id, num, our_fun, str="", atom_string=""):
   plt.yscale("log")
   plt.savefig("numerror.jpg")
 
+_plot_title = f"Created with:  python {' '.join(sys.argv)}"
+def save_plot():
+    import numpy as np 
+    import matplotlib.pyplot as plt 
+    import matplotlib
+    import os 
+    matplotlib.rc('font', **{'family': 'serif', 'serif': ['Computer Modern']})
+
+    import seaborn as sns
+    sns.set_theme()
+    sns.set_style("white")
+
+    fig, ax = plt.subplots(1, 1, figsize=(6.5,14))
+    plt.title(_plot_title)
+
+    vals = []
+    xticks = []
+    xticklabels = []
+    iter_label = []
+
+    def prepare(val): 
+        val = np.abs(val[val == val])
+        val[np.logical_and(val<1e-15, val!=0)] = 2e-15 # show the ones that go out of plot 
+        val[val==0] = 1e-17 # remove zeros. 
+        return val 
+
+    for outer_num, i in enumerate([0, 7, 11]): 
+        files = sorted([a for a in os.listdir("numerror/") if "[" not in a and int(a.split("_")[0]) == i and ".jpg" not in a ]  )
+
+        for num, file in enumerate(files):
+            val= np.load("numerror/"+file)["v"]
+            shape = val.shape
+            if np.prod(shape) == 1: continue 
+            val = prepare(val)
+            val = np.sort(val)
+            num_max_dots = 500 
+
+            if val.size > num_max_dots: val = val[::int(val.size)//num_max_dots] 
+
+            xs = -(np.ones(val.shape[0])*num+outer_num*(3+len(files)))
+            ax.plot([1e-15, 1e18], [xs[0], xs[1]], 'C%i-'%(num%10), lw=10, alpha=0.2)
+            ax.plot(val, xs, 'C%io'%(num%10), ms=6, alpha=0.2)
+
+            if num == 0: 
+                iter_label.append((i, xs[0]))
+
+            xticks.append(xs[0])
+            xticklabels.append(file.replace(".npz", "").replace("%i_"%i, ""))
+
+
+    plt.plot(
+    [10**(-10), 10**(-10)], 
+    [0, xticks[-1]], 
+    'C7--', alpha=0.6)
+    plt.plot(
+    [10**(10), 10**10], 
+    [0, xticks[-1]], 
+    'C7--', alpha=0.6)
+    plt.plot(
+    [10**(0), 10**0], 
+    [0, xticks[-1]], 
+    'C7-', alpha=1)
+
+    for x, label in zip(xticks, xticklabels): 
+        plt.text(1e10, x-0.25, label, horizontalalignment='left', size='small', color='black', weight='normal')
+
+    for num , x in iter_label:
+        plt.text(1e10, x+.6, "[Iteration %i]"%(num+1), horizontalalignment='left', size='small', color='black', weight='bold')
+
+    plt.yticks([], [])
+    plt.xscale("log")
+    plt.xlim([10**(-15), 10**18])
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig("visualizing_DFT_numerics.jpg")
 
 
 mol = None
@@ -1282,7 +1363,10 @@ if __name__ == "__main__":
     parser.add_argument('-scale_vj',  default=1, type=float,  help='Scale electron repulsion ')
     parser.add_argument('-scale_errvec',  default=1, type=float,  help='Scale electron repulsion ')
 
-    parser.add_argument('-sk',  default=[-2], type=int, nargs="+", help='Used to perform a select number of operations in DFT using f32; this allows investigating the numerical errors of each individual operation, or multiple operations in combination. ')
+    parser.add_argument('-sk',  default=[-2], type=int, nargs="+", 
+        help='Used to perform a select number of operations in DFT using f32; '+
+             'this allows investigating the numerical errors of each individual operation, '+
+             'or multiple operations in combination. ')
     parser.add_argument('-debug',  action="store_true", help='Used to turn on/off the f which is used by the above -sk to investigate float{32,64}. ')
 
     parser.add_argument('-jit',  action="store_true")
@@ -1334,7 +1418,7 @@ if __name__ == "__main__":
     if args.numerror:
         args.forloop = True
         args.backend = "cpu"
-        args.its = 35
+        args.its = 20
 
     print("")
 
