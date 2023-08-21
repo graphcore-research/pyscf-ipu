@@ -1189,13 +1189,7 @@ def save_plot():
     sns.set_theme()
     sns.set_style("white")
 
-    fig, ax = plt.subplots(1, 1, figsize=(6.5,14))
-    plt.title(_plot_title)
-
     vals = []
-    xticks = []
-    xticklabels = []
-    iter_label = []
 
     def prepare(val): 
         val = np.abs(val[val == val])
@@ -1203,55 +1197,60 @@ def save_plot():
         val[val==0] = 1e-17 # remove zeros. 
         return val 
 
-    for outer_num, i in enumerate([0, 7, 11]): 
-        files = sorted([a for a in os.listdir("numerror/") if "[" not in a and int(a.split("_")[0]) == i and ".jpg" not in a ]  )
+    xticks = []
+    xticklabels = []
+
+    iterations = 20
+    fig, ax = plt.subplots(1, 1, figsize=(7,7))
+    os.makedirs("images/num_error/", exist_ok=True)
+
+    for outer_num, i in enumerate(range(iterations)):
+        skip = 0 
+        print("figure [%i / %i]"%(i+1, iterations))
+        plt.cla()
+        plt.title("[Iterations %i] \n Created with 'python density_functional_theory.py -numerror"%(i+1))
+        files = sorted([a for a in os.listdir("numerror/") if "[" not in a and int(a.split("_")[0]) == i and ".jpg" not in a and ".gif" not in a]  )
 
         for num, file in enumerate(files):
             val= np.load("numerror/"+file)["v"]
             shape = val.shape
-            if np.prod(shape) == 1: continue 
+            if np.prod(shape) <= 1: 
+                skip += 1
+                continue 
+            
             val = prepare(val)
             val = np.sort(val)
             num_max_dots = 500 
 
-            if val.size > num_max_dots: val = val[::int(val.size)//num_max_dots] 
+            if val.size > num_max_dots: val= val[::int(val.size)//num_max_dots] 
 
-            xs = -(np.ones(val.shape[0])*num+outer_num*(3+len(files)))
-            ax.plot([1e-15, 1e18], [xs[0], xs[1]], 'C%i-'%(num%10), lw=10, alpha=0.2)
-            ax.plot(val, xs, 'C%io'%(num%10), ms=6, alpha=0.2)
+            ys = -np.ones(val.shape[0])*(num - skip)
+            ax.plot([1e-15, 1e18], [ys[0], ys[1]], 'C%i-'%(num%10), lw=10, alpha=0.2)
+            ax.plot(val, ys, 'C%io'%(num%10), ms=6, alpha=0.2)
 
-            if num == 0: 
-                iter_label.append((i, xs[0]))
+            if i == 0: 
+                xticks.append(ys[0])
+                xticklabels.append(file.replace(".npz", "").replace("%i_"%i, ""))
 
-            xticks.append(xs[0])
-            xticklabels.append(file.replace(".npz", "").replace("%i_"%i, ""))
+        plt.plot( [10**(-10), 10**(-10)], [0, xticks[-1]], 'C7--', alpha=0.6)
+        plt.plot( [10**(10), 10**10], [0, xticks[-1]], 'C7--', alpha=0.6)
+        plt.plot( [10**(0), 10**0], [0, xticks[-1]], 'C7-', alpha=1)
 
+        for x, label in zip(xticks, xticklabels): 
+            ax.text(1e10, x-0.25, label, horizontalalignment='left', size='small', color='black', weight='normal')
 
-    plt.plot(
-    [10**(-10), 10**(-10)], 
-    [0, xticks[-1]], 
-    'C7--', alpha=0.6)
-    plt.plot(
-    [10**(10), 10**10], 
-    [0, xticks[-1]], 
-    'C7--', alpha=0.6)
-    plt.plot(
-    [10**(0), 10**0], 
-    [0, xticks[-1]], 
-    'C7-', alpha=1)
+        plt.yticks([], [])
+        plt.xscale("log")
+        plt.xlim([10**(-15), 10**18])
+        if i == 0: plt.tight_layout()
+        plt.savefig("images/num_error/num_error%i.jpg"%outer_num)
 
-    for x, label in zip(xticks, xticklabels): 
-        plt.text(1e10, x-0.25, label, horizontalalignment='left', size='small', color='black', weight='normal')
-
-    for num , x in iter_label:
-        plt.text(1e10, x+.6, "[Iteration %i]"%(num+1), horizontalalignment='left', size='small', color='black', weight='bold')
-
-    plt.yticks([], [])
-    plt.xscale("log")
-    plt.xlim([10**(-15), 10**18])
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig("visualizing_DFT_numerics.jpg")
+    import imageio 
+    writer = imageio.get_writer('images/visualize_DFT_numerics.gif', loop=0, duration=7)
+    for i in range(iterations): 
+        writer.append_data(imageio.v2.imread("images/num_error/num_error%i.jpg"%i))
+    writer.close()
+    
 
 
 mol = None
