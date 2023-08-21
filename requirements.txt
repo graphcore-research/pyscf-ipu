@@ -8,6 +8,7 @@ seaborn
 tqdm
 pytest
 natsort
+nbmake
 rdkit
 jsonargparse[all]
 

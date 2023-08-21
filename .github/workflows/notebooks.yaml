@@ -1,0 +1,36 @@
+name: pytest notebooks
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  pytest-container:
+    runs-on: ubuntu-latest
+    container:
+      image:  graphcore/pytorch:3.2.0-ubuntu-20.04
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name : Install package dependencies
+        run: |
+          apt update -y
+          apt install git -y
+
+      - name: Install requirements
+        run: |
+          pip install -U pip
+          pip install -r requirements_ipu.txt
+          pip install -e .
+
+      - name: Log installed environment
+        run: |
+          python3 -m pip freeze
+
+      - name: Test nanoDFT demo notebook
+        env:
+          JAX_IPU_USE_MODEL: 1
+          JAX_IPU_MODEL_NUM_TILES: 46
+        run: |
+          pytest -s --nbmake --nbmake-timeout=3000 notebooks/nanoDFT-demo.ipynb

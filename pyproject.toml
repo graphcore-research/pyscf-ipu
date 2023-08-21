@@ -2,12 +2,13 @@
 name = "pyscf_ipu"
 description = "PySCF  on the Graphcore IPU"
 version = "0.1"
-authors = [
-    { name = "Alex Mathiasen", email = "alexm@graphcore.ai" }
-]
+authors = [{ name = "Alex Mathiasen", email = "alexm@graphcore.ai" }]
 
 [tool.setuptools]
 packages = [
-   "pyscf_utils", "electron_repulsion", "exchange_correlation", "nanoDFT"
+    "pyscf_utils",
+    "electron_repulsion",
+    "exchange_correlation",
+    "nanoDFT",
+    "gdb",
 ]
-

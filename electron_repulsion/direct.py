@@ -40,7 +40,7 @@ def get_atom_string(atoms, locs):
     return atom_string, str
 
 def num_tiles():
-        return 1472
+        return int(os.getenv('JAX_IPU_MODEL_NUM_TILES', 1472))
 
 NUM_TILES = num_tiles()
 
@@ -1420,7 +1420,7 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
                 out3 = np.zeros(out.shape)
         else:
                 num_threads = int(args.threads)
-                ipu_num_tiles = 1472
+                ipu_num_tiles = NUM_TILES
                 if num_calls >= ipu_num_tiles*num_threads:
                         # If enough calls allocate all threads and all tiles.
                         tiles = [i for i in range(1, ipu_num_tiles) for _ in range(num_threads)]
