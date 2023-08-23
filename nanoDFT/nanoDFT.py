@@ -33,6 +33,7 @@ def energy(density_matrix, H_core, J, K, E_xc, E_nuc, _np=jax.numpy):
     E_K    = _np.sum(density_matrix * K)                        # float =   26.53[Ha] for C6H6.
 
     E      = E_core + E_J/2 - E_K/4 + E_xc + E_nuc              # float = -232.04[Ha] for C6H6.
+    print("&&&&&&&&&&&&&&&&&&&&&&&& energy computed: ", E, "E_core", E_core, "E_DIFF_J_K",  E_J/2 -E_K/4, "E_J/2", E_J/2, "- E_K/4 ", - E_K/4, "E_xc", E_xc, "E_nuc", E_nuc)
 
     return _np.array([E, E_core, E_J/2, -E_K/4, E_xc, E_nuc])   # Energy (and its terms).
 
@@ -40,6 +41,9 @@ def nanoDFT_iteration(i, vals, opts, mol):
     """Each call updates density_matrix attempting to minimize energy(density_matrix, ... ). """
     density_matrix, V_xc, J, K, O, H_core, L_inv                    = vals[:7]                  # All (N, N) matrices
     E_nuc, occupancy, ERI, grid_weights, grid_AO, diis_history, log = vals[7:]                  # Varying types/shapes.
+
+    print (">>> VALS up to 7: ", vals[:7])
+    print (">>> VALS from 7: ", vals[7:])
 
     # Step 1: Update Hamiltonian (optionally use DIIS to improve DFT convergence).
     H = H_core + J - K/2 + V_xc                                                                 # (N, N)
@@ -52,6 +56,7 @@ def nanoDFT_iteration(i, vals, opts, mol):
     density_matrix = (eigvects*occupancy*2) @ eigvects.T                                        # (N, N)
     E_xc, V_xc     = exchange_correlation(density_matrix, grid_AO, grid_weights)                # float (N, N)
     J, K           = get_JK(density_matrix, ERI, opts, mol)                                     # (N, N) (N, N)
+    print(">>>>>>>>>>>> E_xc, V_xc:", E_xc, V_xc)
 
     # Log SCF matrices and energies (not used by DFT algorithm).
     log["matrices"] = log["matrices"].at[i].set(jnp.stack((density_matrix, J, K, H)))           # (iterations, 4, N, N)
@@ -148,6 +153,10 @@ def nanoDFT(mol, opts):
 
     # It's cheap to compute energy/hlgap on CPU in float64 from the logged values/matrices.
     logged_E_xc = logged_energies[:, 4].copy()
+    print("E_XC", logged_energies[:, 3])
+    print("LE1", logged_energies[:, 1])
+    print("LE2", logged_energies[:, 2])
+    print("LE4", logged_energies[:, 4])
     density_matrices, Js, Ks, H = [logged_matrices[:, i] for i in range(4)]
     energies, hlgaps = np.zeros((opts.its, 6)), np.zeros(opts.its)
     for i in range(opts.its):
@@ -409,6 +418,9 @@ def nanoDFT_options(
             ["H", (1, 0, 0)],
             ["H", (1, 1, 1)]
         ]
+    elif mol_str == "pmap":
+        mol_str = "".join([f"H 0 0 {i};" for i in range(2)]) # N=4
+
     args = locals()
     mol_str = args["mol_str"]
     del args["mol_str"]
