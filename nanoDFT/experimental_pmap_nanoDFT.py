@@ -12,7 +12,7 @@ HARTREE_TO_EV = 27.2114079527
 EPSILON_B3LYP = 1e-20
 HYB_B3LYP = 0.2
 
-def energy(density_matrix, H_core, J, K, E_xc, E_nuc, _np=jax.numpy):
+def energy(density_matrix, H_core, diff_JK, E_xc, E_nuc, _np=jax.numpy):
     """Density Functional Theory (DFT) solves the optimisation problem:
 
         min_{density_matrix} energy(density_matrix, ...)
@@ -23,21 +23,19 @@ def energy(density_matrix, H_core, J, K, E_xc, E_nuc, _np=jax.numpy):
         rho(r) = sum_{ij}^N density_matrix_{ij} X_i(r) X_j(r)  where X_i(r)~exp(-|r|^2).
 
     Here N is the number of atomic orbitals (AO) **and** molecular orbitals (N=66 for C6H6).
-    All input matrices (density_matrix, H_core, J, K) are (N, N). The X_i(r) are called
-    Gaussian Type Orbitals (GTO). The inputs (J, K, E_xc) depend on density_matrix.
+    All input matrices (density_matrix, H_core, diff_JK) are (N, N). The X_i(r) are called
+    Gaussian Type Orbitals (GTO). The inputs (diff_JK, E_xc) depend on density_matrix.
     """
-    E_core = _np.sum(density_matrix * H_core)                   # float = -712.04[Ha] for C6H6.
-    E_J    = _np.sum(density_matrix * J)                        # float =  624.38[Ha] for C6H6.
-    E_K    = _np.sum(density_matrix * K)                        # float =   26.53[Ha] for C6H6.
+    E_core = _np.sum(density_matrix * H_core)             # float = -712.04[Ha] for C6H6.
+    E_J_K    = _np.sum(density_matrix * diff_JK)          # NOTE: diff_JK is already diff_JK = J - (K / 2 * HYB_B3LYP)
+    E      = E_core + E_J_K/2 + E_xc + E_nuc              # float = -232.04[Ha] for C6H6.
 
-    E      = E_core + E_J/2 - E_K/4 + E_xc + E_nuc              # float = -232.04[Ha] for C6H6.
-
-    return _np.array([E, E_core, E_J/2, -E_K/4, E_xc, E_nuc])   # Energy (and its terms).
+    return _np.array([E, E_core, E_J_K/2, E_xc, E_nuc])   # Energy (and its terms).
 
 def nanoDFT_iteration(i, vals, opts, mol):
     """Each call updates density_matrix attempting to minimize energy(density_matrix, ... ). """
-    density_matrix, V_xc, J, K, O, H_core, L_inv, dJK               = vals[:8]                  # All (N, N) matrices
-    E_nuc, occupancy, ERI, grid_weights, sharded_grid_weights, grid_AO, sharded_grid_AO, diis_history, log= vals[8:]                  # Varying types/shapes.
+    density_matrix, V_xc, O, H_core, L_inv, diff_JK               = vals[:6]                                                          # All (N, N) matrices
+    E_nuc, occupancy, ERI, grid_weights, sharded_grid_weights, grid_AO, sharded_grid_AO, diis_history, log= vals[6:]                  # Varying types/shapes.
 
     print("@@@@@@@@@@")
     mb = 0
@@ -55,7 +53,7 @@ def nanoDFT_iteration(i, vals, opts, mol):
     print("")
 
     # Step 1: Update Hamiltonian (optionally use DIIS to improve DFT convergence).
-    H = H_core + dJK + V_xc                                                                     # (N, N)
+    H = H_core + diff_JK + V_xc                                                                 # (N, N)
     if opts.diis: H, diis_history = DIIS(i, H, density_matrix, O, diis_history, opts)           # H_{i+1}=c_1H_i+...+c9H_{i-9}.
 
     # Step 2: Solve eigh (L_inv turns generalized eigh into eigh).
@@ -64,21 +62,18 @@ def nanoDFT_iteration(i, vals, opts, mol):
     # Step 3: Use result from eigenproblem to update density_matrix.
     density_matrix = (eigvects*occupancy*2) @ eigvects.T                                        # (N, N)
     E_xc, V_xc     = exchange_correlation(density_matrix, grid_AO, sharded_grid_AO, grid_weights, sharded_grid_weights)                # float (N, N)
-    J, K, dJK      = get_JK(density_matrix, ERI, opts, mol)    #(4,gsize,N)                                 # (N, N) (N, N)
+    diff_JK      = get_JK(density_matrix, ERI, opts, mol)    #(4,gsize,N)                                 # (N, N)
 
     # Log SCF matrices and energies (not used by DFT algorithm).
     #log["matrices"] = log["matrices"].at[i].set(jnp.stack((density_matrix, J, K, H)))           # (iterations, 4, N, N) ## removing this reduces memory from 50kb to 18kb
     N = density_matrix.shape[0]
-    log["matrices"] = jax.lax.dynamic_update_slice(log["matrices"], density_matrix.reshape(1, 1, N, N),   (i, 0, 0, 0))
-    log["matrices"] = jax.lax.dynamic_update_slice(log["matrices"], J.reshape(1, 1, N, N),      (i, 1, 0, 0))
-    log["matrices"] = jax.lax.dynamic_update_slice(log["matrices"], K.reshape(1, 1, N, N),      (i, 2, 0, 0))
-    log["matrices"] = jax.lax.dynamic_update_slice(log["matrices"], H.reshape(1, 1, N, N),      (i, 3, 0, 0))
+    log["matrices"] = jax.lax.dynamic_update_slice(log["matrices"], density_matrix.reshape(1, 1, N, N), (i, 0, 0, 0))
+    log["matrices"] = jax.lax.dynamic_update_slice(log["matrices"], diff_JK.reshape(1, 1, N, N), (i, 1, 0, 0))
+    log["matrices"] = jax.lax.dynamic_update_slice(log["matrices"], H.reshape(1, 1, N, N), (i, 2, 0, 0))
 
-    log["energy"] = log["energy"].at[i].set(energy(density_matrix, H_core, J, K, E_xc, E_nuc))  # (iterations, 6)
-    #log["energy"] = log["energy"].at[i].set(hlgap(L_inv, H, n_electrons_half, jnp))  # (iterations, 6)
-    #hlgaps[i]   = hlgap(L_inv, H[i], n_electrons_half, np)
+    log["energy"] = log["energy"].at[i].set(energy(density_matrix, H_core, diff_JK, E_xc, E_nuc))  # (iterations, 6)
 
-    return [density_matrix, V_xc, J, K, O, H_core, L_inv, dJK, E_nuc, occupancy, ERI, grid_weights, sharded_grid_weights, grid_AO, sharded_grid_AO, diis_history, log]
+    return [density_matrix, V_xc, O, H_core, L_inv, diff_JK, E_nuc, occupancy, ERI, grid_weights, sharded_grid_weights, grid_AO, sharded_grid_AO, diis_history, log]
 
 def exchange_correlation(density_matrix, grid_AO, sharded_grid_AO, grid_weights, sharded_grid_weights):
     """Compute exchange correlation integral using atomic orbitals (AO) evalauted on a grid. """
@@ -89,7 +84,7 @@ def exchange_correlation(density_matrix, grid_AO, sharded_grid_AO, grid_weights,
     mult = grid_AO_dm * sharded_grid_AO  
     rho = jnp.sum(mult, axis=2)                                # (4, grid_size)=(4, 45624) for C6H6.
     E_xc, vrho, vgamma = b3lyp(rho, EPSILON_B3LYP)                                               # (gridsize,) (gridsize,) (gridsize,)
-    E_xc = jnp.sum(rho[0] * sharded_grid_weights * E_xc)                                                 # float=-27.968[Ha] for C6H6 at convergence.
+    E_xc = jax.lax.psum(jnp.sum(rho[0] * sharded_grid_weights * E_xc), axis_name="p")                                                 # float=-27.968[Ha] for C6H6 at convergence.
     rho = jnp.concatenate([vrho.reshape(1, -1)/2, 4*vgamma*rho[1:4]], axis=0) * sharded_grid_weights     # (4, grid_size)=(4, 45624)
     grid_AO_T = sharded_grid_AO[0].T # (N, gsize)
     rho = jnp.expand_dims(rho, axis=2) # (4, gsize, 1)
@@ -104,9 +99,6 @@ def get_JK(density_matrix, ERI, opts, mol):
     """Computes the (N, N) matrices J and K. Density matrix is (N, N) and ERI is (N, N, N, N).  """
     N = density_matrix.shape[0]
 
-    J = jnp.zeros((N,N))
-    K = jnp.zeros((N,N))
-
     def sparse_mult(sparse, vector):
         rows, cols, values = sparse 
         in_ = vector.take(cols, axis=0) 
@@ -116,22 +108,20 @@ def get_JK(density_matrix, ERI, opts, mol):
     if opts.backend == "ipu":
         if False:
             mult = ERI.reshape(N**2//16, N**2) @ density_matrix.reshape(N**2, 1)
-            dJK  = jax.lax.all_gather(mult, axis_name="p")
+            diff_JK  = jax.lax.all_gather(mult, axis_name="p")
         else: 
             mult = sparse_mult(ERI, density_matrix.reshape(N**2, -1)) # each of these guys computes on inner product? 
-            dJK = jax.lax.psum(mult, axis_name="p")
-            dJK = dJK.reshape(N, N)
+            diff_JK = jax.lax.psum(mult, axis_name="p")
+            diff_JK = diff_JK.reshape(N, N)
 
-    else: 
+    else:
         J = jnp.einsum('ijkl,ji->kl', ERI, density_matrix)                                       # (N, N)
         K = jnp.einsum('ijkl,jk->il', ERI, density_matrix)                                       # (N, N)
-        dJK = J - K/2*HYB_B3LYP
+        diff_JK = J - (K / 2 * HYB_B3LYP)
         
-    dJK = dJK.reshape(N, N)
-    #else:
-    #    # Custom einsum which utilize ERI[ijkl]=ERI[ijlk]=ERI[jikl]=ERI[jilk]=ERI[lkij]=ERI[lkji]=ERI[lkij]=ERI[lkji]
-    #    J, K = ipu_einsum(ERI, density_matrix, mol, opts.threads, opts.multv)                    # (N, N) (N, N)
-    return J, K * HYB_B3LYP, dJK                                                                      # (N, N) (N, N), 
+    diff_JK = diff_JK.reshape(N, N)
+
+    return diff_JK                                                                      # (N, N) (N, N),
 
 def _nanoDFT(E_nuc, density_matrix, kinetic, nuclear, O, grid_AO, grid_weights,
               mask, _input_floats, _input_ints, L_inv, diis_history, sharded_grid_AO, sharded_grid_weights, ERI, opts, mol):
@@ -143,17 +133,16 @@ def _nanoDFT(E_nuc, density_matrix, kinetic, nuclear, O, grid_AO, grid_weights,
         
     # Precompute the remaining tensors.
     E_xc, V_xc = exchange_correlation(density_matrix, grid_AO, sharded_grid_AO, grid_weights, sharded_grid_weights) # float (N, N)
-    J, K, dJK  = get_JK(density_matrix, ERI, opts, mol)                      # (N, N) (N, N)
+    diff_JK  = get_JK(density_matrix, ERI, opts, mol)                      # (N, N) (N, N)
     H_core     = kinetic + nuclear                                           # (N, N)
 
     # Log matrices from all DFT iterations (not used by DFT algorithm).
     N = H_core.shape[0]
-    log = {"matrices": np.zeros((opts.its, 4, N, N)), "E_xc": np.zeros((opts.its)), "energy": np.zeros((opts.its, 6))}
+    log = {"matrices": np.zeros((opts.its, 3, N, N)), "E_xc": np.zeros((opts.its)), "energy": np.zeros((opts.its, 5))}
 
     # Perform DFT iterations.
-    log = jax.lax.fori_loop(0, opts.its, partial(nanoDFT_iteration, opts=opts, mol=mol), [density_matrix, V_xc, J, K, O, H_core, L_inv, dJK, # all (N, N) matrices
-                                                            E_nuc, mask, ERI, grid_weights, sharded_grid_weights, grid_AO, sharded_grid_AO, diis_history, log])[-1]
-
+    log = jax.lax.fori_loop(0, opts.its, partial(nanoDFT_iteration, opts=opts, mol=mol), [density_matrix, V_xc, O, H_core, L_inv, diff_JK, # all (N, N) matrices
+                                                        E_nuc, mask, ERI, grid_weights, sharded_grid_weights, grid_AO, sharded_grid_AO, diis_history, log])[-1]
     return log["matrices"], H_core, log["energy"]
 
 def init_dft_tensors_cpu(mol, opts, DIIS_iters=9):
@@ -214,13 +203,13 @@ def nanoDFT(mol, opts):
     if remainder != 0: 
         sharded_grid_AO = jnp.pad(sharded_grid_AO, ((0,remainder), (0,0), (0,0)) )
         sharded_grid_weights = jnp.pad(sharded_grid_weights, ((0,remainder)) )
-        tensors[6] = jnp.pad(tensors[6], ((0, remainder)))
-        tensors[5] = jnp.pad(tensors[5], ((0,0), (0,remainder), (0,0)) )
+        # tensors[6] = jnp.pad(tensors[6], ((0, remainder)))
+        # tensors[5] = jnp.pad(tensors[5], ((0,0), (0,remainder), (0,0)) )
     sharded_grid_AO = sharded_grid_AO.reshape(16, -1, 4, N)
     sharded_grid_weights = sharded_grid_weights.reshape(16, -1)
 
-    tensors[5] = 0 
-    tensors[6] = 0
+    # tensors[5] = 0
+    # tensors[6] = 0
 
     # Run DFT algorithm (can be hardware accelerated).
     # we can have "ipus" argument instead, or pod16 as backend? 
@@ -256,11 +245,13 @@ def nanoDFT(mol, opts):
         logged_matrices, H_core, logged_energies = [np.asarray(a).astype(np.float64) for a in vals] # Ensure CPU
 
     # It's cheap to compute energy/hlgap on CPU in float64 from the logged values/matrices.
-    logged_E_xc = logged_energies[:, 4].copy()
-    density_matrices, Js, Ks, H = [logged_matrices[:, i] for i in range(4)]
-    energies, hlgaps = np.zeros((opts.its, 6)), np.zeros(opts.its)
+    logged_E_xc = logged_energies[:, 3].copy()
+    print(logged_energies[:, 0] * HARTREE_TO_EV)
+
+    density_matrices, diff_JKs, H = [logged_matrices[:, i] for i in range(3)]
+    energies, hlgaps = np.zeros((opts.its, 5)), np.zeros(opts.its)
     for i in range(opts.its):
-        energies[i] = energy(density_matrices[i], H_core, Js[i], Ks[i], logged_E_xc[i], E_nuc, np)
+        energies[i] = energy(density_matrices[i], H_core, diff_JKs[i], logged_E_xc[i], E_nuc, np)
         hlgaps[i]   = hlgap(L_inv, H[i], n_electrons_half, np)
     energies, logged_energies, hlgaps = [a * HARTREE_TO_EV for a in [energies, logged_energies, hlgaps]]
     mo_energy, mo_coeff = np.linalg.eigh(L_inv @ H[-1] @ L_inv.T)
@@ -452,6 +443,12 @@ def print_difference(nanoDFT_E, nanoDFT_forces, nanoDFT_logged_E, nanoDFT_hlgap,
     print("%18s"%"Error Energy [eV]", "\t".join(["%10s"%str("%.2e"%f) for f in (pyscf_E[1::3] - nanoDFT_E[1::3, 0]).reshape(-1)]))
     print("%18s"%"Error HLGAP [eV]", "\t".join(["%10s"%str("%.2e"%f) for f in (pyscf_hlgap[1::3]   - nanoDFT_hlgap[1::3]).reshape(-1)]))
 
+    print()
+    print("%18s"%"E_core [eV]", "\t".join(["%10s"%str("%.5f"%f) for f in (nanoDFT_E[1::3, 1]).reshape(-1)]))
+    print("%18s"%"E_J_K [eV]", "\t".join(["%10s"%str("%.5f"%f) for f in (nanoDFT_E[1::3, 2]).reshape(-1)]))
+    print("%18s"%"E_xc [eV]", "\t".join(["%10s"%str("%.5f"%f) for f in (nanoDFT_E[1::3, 3]).reshape(-1)]))
+    print("%18s"%"E_nuc [eV]", "\t".join(["%10s"%str("%.5f"%f) for f in (nanoDFT_E[1::3, 4]).reshape(-1)]))
+
 
 def build_mol(mol_str, basis_name):
     mol = pyscf.gto.mole.Mole()
@@ -514,7 +511,8 @@ def nanoDFT_options(
             ["H", (1, 1, 1)]
         ]
     elif mol_str == "pmap":
-        mol_str = [["H", (0, 0, n) for n in range(2)]]          # N=4 
+        mol_str = "".join([f"H 0 0 {i};" for i in range(2)]) # N=4 
+        # mol_str = [["H", (0, 0, n) for n in range(2)]]          # N=4
         # mol_str = [["H", (0, 0, n) for n in range(8)]]          # N=16
         # mol_str = [["H", (0, 0, n) for n in range(8*2)]]        # N=32
         # mol_str = [["H", (0, 0, n) for n in range(32)]]         # N=64
