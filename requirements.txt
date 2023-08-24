@@ -6,9 +6,7 @@ pyscf==2.2.1
 icecream
 seaborn
 tqdm
-pytest
 natsort
-nbmake
 rdkit
 jsonargparse[all]
 
