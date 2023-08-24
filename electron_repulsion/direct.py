@@ -39,10 +39,8 @@ def get_atom_string(atoms, locs):
       str += "%s %4f %4f %4f; "%((atom,) + tuple(loc) )
     return atom_string, str
 
-def num_tiles():
-        return int(os.getenv('JAX_IPU_MODEL_NUM_TILES', 1472))
 
-NUM_TILES = num_tiles()
+NUM_TILES = jax.devices("ipu")[0].num_tiles
 
 @partial(jax.jit, backend="ipu", static_argnums=(3,))
 def single(input_floats, input_ints, input_ijkl, tiles):
