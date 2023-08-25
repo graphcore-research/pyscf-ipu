@@ -9,7 +9,7 @@
 | [**QM1B dataset**](qm1b/README.md)
 
 [![Run on Gradient](https://assets.paperspace.io/img/gradient-badge.svg)](https://ipu.dev/ipobmC)
-[![notebook-tests](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/notebooks.yaml/badge.svg)](https://github.com/graphcore-research/tessellate-ipu/actions/workflows/notebooks.yaml)
+[![notebook-tests](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/notebooks.yaml/badge.svg)](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/notebooks.yaml)
 
 **Port of PySCF to Graphcore IPU.**
 
