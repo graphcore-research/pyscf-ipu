@@ -34,4 +34,4 @@ jobs:
           JAX_IPU_USE_MODEL: 1
           JAX_IPU_MODEL_NUM_TILES: 46
         run: |
-          pytest -s --nbmake --nbmake-timeout=3000 notebooks/nanoDFT-demo.ipynb
+          pytest --nbmake --nbmake-timeout=3000 notebooks/nanoDFT-demo.ipynb
