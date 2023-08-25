@@ -39,10 +39,8 @@ def get_atom_string(atoms, locs):
       str += "%s %4f %4f %4f; "%((atom,) + tuple(loc) )
     return atom_string, str
 
-def num_tiles():
-        return 1472
 
-NUM_TILES = num_tiles()
+NUM_TILES = jax.devices("ipu")[0].num_tiles
 
 @partial(jax.jit, backend="ipu", static_argnums=(3,))
 def single(input_floats, input_ints, input_ijkl, tiles):
@@ -1420,7 +1418,7 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
                 out3 = np.zeros(out.shape)
         else:
                 num_threads = int(args.threads)
-                ipu_num_tiles = 1472
+                ipu_num_tiles = NUM_TILES
                 if num_calls >= ipu_num_tiles*num_threads:
                         # If enough calls allocate all threads and all tiles.
                         tiles = [i for i in range(1, ipu_num_tiles) for _ in range(num_threads)]
