@@ -178,6 +178,7 @@ if __name__ == "__main__":
     print("----------\n")
 
     # write code that profiles get_indices/take/segment_sum independently. 
+    # TODO: fix broken test below. add seperate test for get_indices/np.take and segment_sum, potentially with custom poplar implementations
     if args.prof: 
         symmetry = 7 
         dm_indices = get_ijkl(nonzero_indices, symmetry, mask, dm_indices_func_J)  
