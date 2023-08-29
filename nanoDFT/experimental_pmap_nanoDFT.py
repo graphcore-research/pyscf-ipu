@@ -106,14 +106,9 @@ def get_JK(density_matrix, ERI, opts, mol):
         return jax.ops.segment_sum(prod, rows, N**2) 
 
     if opts.backend == "ipu":
-        if False:
-            mult = ERI.reshape(N**2//16, N**2) @ density_matrix.reshape(N**2, 1)
-            diff_JK  = jax.lax.all_gather(mult, axis_name="p")
-        else: 
-            mult = sparse_mult(ERI, density_matrix.reshape(N**2, -1)) # each of these guys computes on inner product? 
-            diff_JK = jax.lax.psum(mult, axis_name="p")
-            diff_JK = diff_JK.reshape(N, N)
-
+        from sparse_symmetric_ERI import sparse_symmetric_einsum
+        mask = jnp.ones(1)
+        diff_JK = sparse_symmetric_einsum(ERI[0], ERI[1], density_matrix, mask, opts.backend)
     else:
         J = jnp.einsum('ijkl,ji->kl', ERI, density_matrix)                                       # (N, N)
         K = jnp.einsum('ijkl,jk->il', ERI, density_matrix)                                       # (N, N)
@@ -167,16 +162,7 @@ def init_dft_tensors_cpu(mol, opts, DIIS_iters=9):
     L_inv           = np.linalg.inv(np.linalg.cholesky(O))          # (N,N)
     #if opts.backend != "ipu": ERI = mol.intor("int2e_sph")          # (N,N,N,N)=(66,66,66,66) for C6H6.
     #else:                     ERI = None # will be computed on device
-    ERI = mol.intor("int2e_sph")
-
-    if opts.backend == "ipu": 
-        #ERI[ERI<1e-10] = 0 # warning 
-        print(np.sum(np.abs(ERI)>1e-10)/ERI.size)
-        M1 = ERI.reshape(N**2, N**2)
-        M2 = ERI.transpose(1,2,0,3).reshape(N**2, N**2)
-        ERI = M1-M2/2*HYB_B3LYP
-        print(np.sum(np.abs(ERI)>1e-10)/ERI.size)
-        #print(ERI.shape)
+    ERI = 0# todo: move ERI defined later in here. 
 
     input_floats, input_ints = 0, 0 #prepare_electron_repulsion_integrals(mol)[:2]
     mask = np.concatenate([np.ones(n_electrons_half), np.zeros(N-n_electrons_half)])
@@ -215,28 +201,43 @@ def nanoDFT(mol, opts):
     # we can have "ipus" argument instead, or pod16 as backend? 
     if opts.backend == "ipu":
         jitted_nanoDFT = jax.pmap(partial(_nanoDFT, opts=opts, mol=mol), axis_name="p", backend=opts.backend,
-        in_axes=(None, None, None, None, None, None, None, None, None, None, None, (None, None, None), 0, 0, [0, 0, 0]))
+        in_axes=(None, None, None, None, None, None, None, None, None, None, None, (None, None, None), 0, 0, [0, 0]))
 
-        def sparse_representation(ERI):
-            rows, cols = np.nonzero(ERI)
-            values     = ERI[rows, cols]
-            return rows, cols, values 
+        
+        from sparse_symmetric_ERI import vmap_num_repetitions_fast
+        import time 
+        start = time.time()
+        distinct_ERI         = mol.intor("int2e_sph", aosym="s8")
+        nonzero_indices      = np.nonzero(distinct_ERI)[0].astype(np.int32)
+        nonzero_distinct_ERI = distinct_ERI[nonzero_indices].astype(np.float32)
+        print("compute eri normalization ", time.time()-start)
+        rep = jax.jit(vmap_num_repetitions_fast, backend="cpu")(nonzero_indices)
+        print("perform normalization ", time.time()-start)
+        nonzero_distinct_ERI = nonzero_distinct_ERI / rep
 
-        # ERI = tensors[6]  # ERI is just the 6th element in tensors
-        sparse_ERI = sparse_representation(ERI)
-        remainder = sparse_ERI[-1].shape[0] % 16
+        print("pad remainder ", time.time()-start)
+        print(nonzero_distinct_ERI.shape, nonzero_indices.shape)
+        batches = 64 # perhaps make 10 batches? 
+        nipu = 16
+        remainder = nonzero_indices.shape[0] % (nipu*batches)
         if remainder != 0:
-            sparse_ERI = [np.pad(a, (0, -remainder+16)) for a in sparse_ERI]
-        sparse_ERI = [a.reshape(16, -1) for a in sparse_ERI]
-        # tensors[6] = sparse_ERI
+            nonzero_indices = np.pad(nonzero_indices, (0,nipu*batches-remainder))
+            nonzero_distinct_ERI = np.pad(nonzero_distinct_ERI, (0,nipu*batches-remainder))
+
+        print("reshape to 16 IPUs pmap", time.time()-start)
+        nonzero_indices = nonzero_indices.reshape(nipu, batches, -1)
+        nonzero_distinct_ERI = nonzero_distinct_ERI.reshape(nipu, batches, -1)
+        print(nonzero_indices.shape)
+        print(nonzero_distinct_ERI.shape)
+
+        sparse_ERI = [nonzero_distinct_ERI, nonzero_indices]
 
         tensors.append(sharded_grid_AO)
         tensors.append(sharded_grid_weights)
         tensors.append(sparse_ERI)
 
-
         vals = jitted_nanoDFT(*tensors)
-        logged_matrices, H_core, logged_energies = [np.asarray(a).astype(np.float64)[0] for a in vals] # Ensure CPU
+        logged_matrices, H_core, logged_energies = [np.asarray(a[0]).astype(np.float64) for a in vals] # Ensure CPU
     else: 
         jitted_nanoDFT = jax.jit(partial(_nanoDFT, opts=opts, mol=mol), backend=opts.backend)
         tensors = tensors + (sharded_grid_AO,)
@@ -520,6 +521,12 @@ def nanoDFT_options(
         # mol_str = [["H", (0, 0, n) for n in range(8*2*2*2)]]    # N=128
         # mol_str = [["H", (0, 0, n) for n in range(8*2*2*2*2)]]  # N=256
         basis = "6-31g"
+    elif mol_str == "cgrid": 
+        mol_str = [["C", (0, i*1.5, j*1.5)] for i in range(4) for j in range(4)]
+        #mol_str = [["C", (0, i*1.5, j*1.5)] for i in range(5) for j in range(5)]
+        #mol_str = [["C", (0, i*1.5, j*1.5)] for i in range(6) for j in range(6)]
+        #mol_str = [["C", (0, i*1.5, j*1.5)] for i in range(7) for j in range(7)] 
+    
     args = locals()
     mol_str = args["mol_str"]
     del args["mol_str"]
