@@ -121,8 +121,11 @@ def init_dft_tensors_cpu(mol, opts, DIIS_iters=9):
     nuclear         = mol.intor_symmetric('int1e_nuc')              # (N,N)
     O               = mol.intor_symmetric('int1e_ovlp')             # (N,N)
     L_inv           = np.linalg.inv(np.linalg.cholesky(O))          # (N,N)
-    if opts.backend != "ipu": ERI = mol.intor("int2e_sph")          # (N,N,N,N)=(66,66,66,66) for C6H6.
-    else:                     ERI = None # will be computed on device
+    if opts.backend != "ipu": 
+        ERI = mol.intor("int2e_sph")          # (N,N,N,N)=(66,66,66,66) for C6H6.
+        ERI[np.abs(ERI) <= opts.threshold] = 0.0
+    else:
+        ERI = None # will be computed on device
 
     input_floats, input_ints = prepare_electron_repulsion_integrals(mol)[:2]
     mask = np.concatenate([np.ones(n_electrons_half), np.zeros(N-n_electrons_half)])
@@ -349,6 +352,12 @@ def print_difference(nanoDFT_E, nanoDFT_forces, nanoDFT_logged_E, nanoDFT_hlgap,
     print()
     print("np.max(|nanoDFT_F-PySCF_F|):", np.max(np.abs(nanoDFT_forces-pyscf_forces)))
 
+    norm_X = np.linalg.norm(nanoDFT_forces, axis=1)
+    norm_Y = np.linalg.norm(pyscf_forces, axis=1)
+    dot_products = np.sum(nanoDFT_forces * pyscf_forces, axis=1)
+    cosine_similarity = dot_products / (norm_X * norm_Y)
+    print("Force cosine similarity:",cosine_similarity)
+
 def build_mol(mol_str, basis_name):
     mol = pyscf.gto.mole.Mole()
     mol.build(atom=mol_str, unit="Angstrom", basis=basis_name, spin=0, verbose=0)
@@ -368,6 +377,7 @@ def nanoDFT_options(
         threads_int: int = 1,
         diis: bool = True,
         structure_optimization: bool = False, # AKA gradient descent on energy wrt nuclei
+        threshold : float = 0.0,
 ):
     """
     nanoDFT
@@ -409,6 +419,10 @@ def nanoDFT_options(
             ["H", (1, 0, 0)],
             ["H", (1, 1, 1)]
         ]
+
+    if backend=='ipu' and threshold >0.0:
+        print("ERI threshold > 0.0 only if backend=='cpu'. Overriding...")
+        threshold = 0.0
     args = locals()
     mol_str = args["mol_str"]
     del args["mol_str"]
