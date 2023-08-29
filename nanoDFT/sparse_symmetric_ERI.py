@@ -35,8 +35,8 @@ def ipu_ijkl(nonzero_indices, symmetry, N, mask):
     mask = mask.astype(jnp.int32)
     vertex_filename  = osp.join(osp.dirname(__file__), "compute_indices.cpp")
     compute_indices= create_ipu_tile_primitive(
-            "indices",
-            "indices",
+            "SymmetryIndices",
+            "SymmetryIndices",
             inputs=["value", "symmetry", "input_N", "mask", "start", "stop"],
             outputs={"out": 0},
             gp_filename=vertex_filename,
