@@ -32,7 +32,7 @@ cpu_ijkl = jax.vmap(cpu_ijkl, in_axes=(0, None, None, None))
 
 @partial(jax.jit, backend="ipu")
 def ipu_ijkl(nonzero_indices, symmetry, N):
-    vertex_filename  = osp.join(osp.dirname(__file__), "compute_indices_clean.cpp")
+    vertex_filename  = osp.join(osp.dirname(__file__), "compute_indices.cpp")
     compute_indices= create_ipu_tile_primitive(
             "SymmetryIndices",
             "SymmetryIndices",
