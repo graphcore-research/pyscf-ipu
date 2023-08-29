@@ -45,7 +45,6 @@ public:
   InOut<Vector<int>>  value;
   Input<Vector<int>>  symmetry;
   Input<Vector<int>>  input_N;
-  Input<Vector<int>>  mask;
 
   Input<Vector<int>> start;
   Input<Vector<int>> stop; 

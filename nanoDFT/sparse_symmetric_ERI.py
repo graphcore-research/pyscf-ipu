@@ -21,8 +21,8 @@ def get_i_j(val):
     j = val - i*(i+1)//2
     return i, j
 
-def cpu_ijkl(value, symmetry, mask, f): 
-    ij = max_val(value*mask[0])
+def cpu_ijkl(value, symmetry, f): 
+    ij = max_val(value)
     kl = value - ij*(ij+1)//2
     i, j = get_i_j(ij)
     k, l = get_i_j(kl)
@@ -31,13 +31,12 @@ def cpu_ijkl(value, symmetry, mask, f):
 cpu_ijkl = jax.vmap(cpu_ijkl, in_axes=(0, None, None, None))
 
 @partial(jax.jit, backend="ipu")
-def ipu_ijkl(nonzero_indices, symmetry, N, mask):
-    mask = mask.astype(jnp.int32)
-    vertex_filename  = osp.join(osp.dirname(__file__), "compute_indices.cpp")
+def ipu_ijkl(nonzero_indices, symmetry, N):
+    vertex_filename  = osp.join(osp.dirname(__file__), "compute_indices_clean.cpp")
     compute_indices= create_ipu_tile_primitive(
             "SymmetryIndices",
             "SymmetryIndices",
-            inputs=["value", "symmetry", "input_N", "mask", "start", "stop"],
+            inputs=["value", "symmetry", "input_N", "start", "stop"],
             outputs={"out": 0},
             gp_filename=vertex_filename,
             perf_estimate=100,
@@ -54,12 +53,11 @@ def ipu_ijkl(nonzero_indices, symmetry, N, mask):
     nonzero_indices = tile_put_sharded(nonzero_indices, tiles)
     symmetry = jnp.array(symmetry, dtype=jnp.int32).reshape(1,)
     symmetry = tile_put_replicated(symmetry,   tiles) 
-    mask     = tile_put_replicated(mask,   tiles)
     N        = tile_put_replicated(N,   tiles)
     start    = tile_put_replicated(0,   tiles)
     stop     = tile_put_replicated(nonzero_indices.shape[1],   tiles)
 
-    value = tile_map(compute_indices, nonzero_indices, symmetry, N, mask, start, stop)  
+    value = tile_map(compute_indices, nonzero_indices, symmetry, N, start, stop)  
 
     return value.array.reshape(-1)[:size]
 
@@ -80,12 +78,10 @@ def num_repetitions_fast(value):
     return repetitions
 vmap_num_repetitions_fast = jax.vmap(num_repetitions_fast, in_axes=(0))
 
-def sparse_symmetric_einsum(nonzero_distinct_ERI, nonzero_indices, dm, mask, backend):
+def sparse_symmetric_einsum(nonzero_distinct_ERI, nonzero_indices, dm, backend):
     dm = dm.reshape(-1)
     diff_JK = jnp.zeros(dm.shape)
     N = int(np.sqrt(dm.shape[0]))
-
-    mask      = (mask-1)*jnp.sum(diff_JK)*jnp.sum(dm) + mask  # TODO: check if we can remove. 
     
     if backend == "cpu":
         indices_func = lambda i,j,k,l,symmetry: jnp.array([i*N+j, j*N+i, i*N+j, j*N+i, k*N+l, l*N+k, k*N+l, l*N+k,
@@ -94,34 +90,34 @@ def sparse_symmetric_einsum(nonzero_distinct_ERI, nonzero_indices, dm, mask, bac
                                                         i*N+l, j*N+l, i*N+k, j*N+k, k*N+j, l*N+j, k*N+i, l*N+i])[symmetry]
 
     def iteration(symmetry, vals): 
-        diff_JK, mask= vals 
+        diff_JK = vals 
         is_K_matrix = (symmetry >= 8)
 
         def sequentialized_iter(i, vals):
             # Generalized J/K computation: does J when symmetry is in range(0,8) and K when symmetry is in range(8,16)
             # Trade-off: Using one function leads to smaller always-live memory.
-            diff_JK, mask = vals 
+            diff_JK = vals 
 
             indices = nonzero_indices[i]
             eris    = nonzero_distinct_ERI[i]
 
-            if backend == "cpu": dm_indices = cpu_ijkl(indices, symmetry+is_K_matrix*8, mask, indices_func)  
-            else:                dm_indices = ipu_ijkl(indices, symmetry+is_K_matrix*8, N, mask)  
+            if backend == "cpu": dm_indices = cpu_ijkl(indices, symmetry+is_K_matrix*8, indices_func)  
+            else:                dm_indices = ipu_ijkl(indices, symmetry+is_K_matrix*8, N)  
             dm_values  = jnp.take(dm, dm_indices, axis=0) # causes peak 1 
             print(eris.shape, dm_values.shape, indices.shape)
-            dm_values = dm_values.at[:].mul( eris ) #* mask  # this is prod, but re-use variable for inplace update. 
-            mask       = (mask-1)*jnp.sum(dm_values) + mask 
-            if backend == "cpu": ss_indices = cpu_ijkl(indices, symmetry+8+is_K_matrix*8, mask, indices_func) 
-            else:                ss_indices = ipu_ijkl(indices, symmetry+8+is_K_matrix*8, N, mask) 
+            dm_values = dm_values.at[:].mul( eris ) # this is prod, but re-use variable for inplace update. 
+            
+            if backend == "cpu": ss_indices = cpu_ijkl(indices, symmetry+8+is_K_matrix*8, indices_func) 
+            else:                ss_indices = ipu_ijkl(indices, symmetry+8+is_K_matrix*8, N) 
             diff_JK    = diff_JK + jax.ops.segment_sum(dm_values, ss_indices, N**2) * (-HYB_B3LYP/2)**is_K_matrix # causes peak 2 
-            mask       = (mask-1)*jnp.sum(diff_JK) + mask 
-            return [diff_JK, mask]
+            
+            return diff_JK
 
         batches = nonzero_indices.shape[0] # before pmap, tensor had shape (nipus, batches, -1) so [0]=batches after pmap
-        diff_JK, mask = jax.lax.fori_loop(0, batches, sequentialized_iter, [diff_JK, mask]) 
-        return [diff_JK, mask]
+        diff_JK = jax.lax.fori_loop(0, batches, sequentialized_iter, diff_JK) 
+        return diff_JK
 
-    diff_JK, mask = jax.lax.fori_loop(0, 16, iteration, [diff_JK, mask]) 
+    diff_JK = jax.lax.fori_loop(0, 16, iteration, diff_JK) 
     return jax.lax.psum(diff_JK, axis_name="p")
 
 if __name__ == "__main__":
@@ -144,7 +140,6 @@ if __name__ == "__main__":
 
     start = time.time()
 
-    mask = jnp.ones(1, dtype=jnp.int32)
     mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*j} {1.54*i};" for i in range(natm) for j in range(natm))) 
     mol.build()
     N = mol.nao_nr()
@@ -181,7 +176,7 @@ if __name__ == "__main__":
     # TODO: fix broken test below. add seperate test for get_indices/np.take and segment_sum, potentially with custom poplar implementations
     if args.prof: 
         symmetry = 7 
-        dm_indices = get_ijkl(nonzero_indices, symmetry, mask, dm_indices_func_J)  
+        dm_indices = get_ijkl(nonzero_indices, symmetry, dm_indices_func_J)  
 
         size = nonzero_indices.shape[0]
         total_threads = (1472-1) * 6 
@@ -190,7 +185,7 @@ if __name__ == "__main__":
             nonzero_indices = np.pad(nonzero_indices, (0, total_threads-remainder))
         nonzero_indices = nonzero_indices.reshape(total_threads, -1) 
 
-        _dm_indices = np.asarray(_get_ijkl(nonzero_indices, symmetry, N, mask))[:size]
+        _dm_indices = np.asarray(_get_ijkl(nonzero_indices, symmetry, N))[:size]
         assert np.allclose(dm_indices, _dm_indices)
         exit()
 
@@ -199,7 +194,6 @@ if __name__ == "__main__":
     rep = jax.jit(vmap_num_repetitions_fast, backend="cpu")(nonzero_indices)
     print("perform normalization ", time.time()-start)
     nonzero_distinct_ERI = nonzero_distinct_ERI / rep
-    mask = np.ones(1)
     dm = dm.reshape(-1)
     diff_JK = np.zeros(dm.shape)
 
@@ -219,7 +213,7 @@ if __name__ == "__main__":
 
     print("call pmap", time.time()-start)
     print("[%i]"%mol.nao_nr())
-    diff_JK = jax.pmap( sparse_symmetric_einsum, in_axes=(0,0,None,None,None, None), static_broadcasted_argnums=(4,), backend=backend, axis_name="p") (nonzero_distinct_ERI, nonzero_indices, dm, mask, args.backend) 
+    diff_JK = jax.pmap( sparse_symmetric_einsum, in_axes=(0,0,None,None, None), static_broadcasted_argnums=(3,), backend=backend, axis_name="p") (nonzero_distinct_ERI, nonzero_indices, dm, args.backend) 
     if args.skip: 
         exit()
     diff_JK = np.array(diff_JK[0])
