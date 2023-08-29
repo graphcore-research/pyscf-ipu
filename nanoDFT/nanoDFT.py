@@ -102,6 +102,8 @@ def _nanoDFT(E_nuc, density_matrix, kinetic, nuclear, O, grid_AO, ERI, grid_weig
 
     return log["matrices"], H_core, log["energy"]
 
+from icecream import ic
+
 def init_dft_tensors_cpu(mol, opts, DIIS_iters=9):
     N                = mol.nao_nr()                                 # N=66 for C6H6 (number of atomic **and** molecular orbitals)
     n_electrons_half = mol.nelectron//2                             # 21 for C6H6
@@ -123,7 +125,9 @@ def init_dft_tensors_cpu(mol, opts, DIIS_iters=9):
     L_inv           = np.linalg.inv(np.linalg.cholesky(O))          # (N,N)
     if opts.backend != "ipu": 
         ERI = mol.intor("int2e_sph")          # (N,N,N,N)=(66,66,66,66) for C6H6.
-        ERI[np.abs(ERI) <= opts.threshold] = 0.0
+        below_thr = np.abs(ERI) <= opts.threshold
+        ERI[below_thr] = 0.0
+        ic(ERI.size, np.sum(below_thr), np.sum(below_thr)/ERI.size)
     else:
         ERI = None # will be computed on device
 
