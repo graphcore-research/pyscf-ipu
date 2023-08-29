@@ -156,7 +156,6 @@ if __name__ == "__main__":
     distinct_ERI = mol.intor("int2e_sph", aosym="s8")
     print("Minao init", time.time()-start)
     dm = pyscf.scf.hf.init_guess_by_minao(mol)         
-    HYB_B3LYP = 0.2
     scale = HYB_B3LYP/2
     if not args.skip: 
         print("einsum J", time.time()-start)
