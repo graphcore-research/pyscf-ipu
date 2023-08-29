@@ -40,7 +40,7 @@ ij_pair get_i_j(int32_t val) {
 }
 
 
-class indices : public Vertex {
+class SymmetryIndices : public Vertex {
 public:
   InOut<Vector<int>>  value;
   Input<Vector<int>>  symmetry;
