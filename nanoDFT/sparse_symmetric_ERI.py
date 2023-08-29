@@ -218,7 +218,7 @@ if __name__ == "__main__":
 
     print("call pmap", time.time()-start)
     print("[%i]"%mol.nao_nr())
-    diff_JK = jax.pmap( sparse_symmetric_einsum, in_axes=(0,0,None,None,None, None), static_broadcasted_argnums=(5,), backend=backend, axis_name="p") (nonzero_distinct_ERI, nonzero_indices, dm, mask, diff_JK, args.backend) 
+    diff_JK = jax.pmap( sparse_symmetric_einsum, in_axes=(0,0,None,None,None, None), static_broadcasted_argnums=(4,), backend=backend, axis_name="p") (nonzero_distinct_ERI, nonzero_indices, dm, mask, args.backend) 
     if args.skip: 
         exit()
     diff_JK = np.array(diff_JK[0])
