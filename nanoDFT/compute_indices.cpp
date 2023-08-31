@@ -19,20 +19,20 @@ using namespace poplar;
 #define NAMESPACE std
 #endif
 
-int max_val(int N) {
-    float x_candidate_f = (-1 + sqrt(1 + 8 * (float)N)) / 2; 
-    int x_candidate = (int) floor(x_candidate_f);
-    int x = ((x_candidate * (x_candidate + 1)) / 2 <= N) ? x_candidate : x_candidate - 1;
+int max_val(uint32_t val) {
+    float x_candidate_f = (-1 + sqrt(1 + 8 * static_cast<float>(val))) / 2; 
+    uint32_t x_candidate = static_cast<uint32_t>(floor(x_candidate_f));
+    uint32_t x = ((x_candidate * (x_candidate + 1)) / 2 <= val) ? x_candidate : x_candidate - 1;
     return x;
 }
 
 typedef struct {
-    int32_t i;
-    int32_t j;
+    uint32_t i;
+    uint32_t j;
 } ij_pair;
 
 
-ij_pair get_i_j(int32_t val) {
+ij_pair get_i_j(uint32_t val) {
     ij_pair result;
     result.i = max_val(val);
     result.j = val - result.i * (result.i + 1) / 2;
@@ -42,30 +42,33 @@ ij_pair get_i_j(int32_t val) {
 
 class SymmetryIndices : public Vertex {
 public:
-  InOut<Vector<int>>  value;
-  Input<Vector<int>>  symmetry;
-  Input<Vector<int>>  input_N;
+  InOut<Vector<uint32_t>>  value;
+  Input<Vector<uint32_t>>  symmetry;
+  Input<Vector<uint32_t>>  input_N;
 
-  Input<Vector<int>> start;
-  Input<Vector<int>> stop; 
+  Input<Vector<uint32_t>> start;
+  Input<Vector<uint32_t>> stop; 
 
-  Output<Vector<int>> out; 
+  Output<Vector<uint32_t>> out; 
 
   bool compute() {
 
-    int N = input_N.data()[0];
-
-    for (unsigned int iteration = start.data()[0]; iteration < stop.data()[0]; iteration++){
+    uint32_t N = input_N.data()[0];
+    
+    for (uint32_t iteration = start.data()[0]; iteration < stop.data()[0]; iteration++){
+      
     //for (unsigned int iteration = 0; iteration < out.size(); iteration++){
-      int ij = max_val(value.data()[iteration]);
-      int kl = value.data()[iteration] - ij*(ij+1)/2;
+      // int ij = max_val(value.data()[iteration]);
+      // int kl = value.data()[iteration] - ij*(ij+1)/2;
 
-      ij_pair pair_ij = get_i_j(ij);
-      ij_pair pair_kl = get_i_j(kl);
-      int i = pair_ij.i;
-      int j = pair_ij.j;
-      int k = pair_kl.i;
-      int l = pair_kl.j;
+      // ij_pair pair_ij = get_i_j(ij);
+      // ij_pair pair_kl = get_i_j(kl);
+      ij_pair pair_ij = get_i_j(value.data()[2*iteration+0]);
+      ij_pair pair_kl = get_i_j(value.data()[2*iteration+1]);
+      uint32_t i = pair_ij.i;
+      uint32_t j = pair_ij.j;
+      uint32_t k = pair_kl.i;
+      uint32_t l = pair_kl.j;
 
       switch (symmetry.data()[0]) {
         //dm_indices_func_J = lambda i,j,k,l,symmetry: jnp.array([i*N+j, j*N+i, i*N+j, j*N+i, k*N+l, l*N+k, k*N+l, l*N+k])[symmetry]

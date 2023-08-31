@@ -6,29 +6,41 @@ import jax.numpy as jnp
 import os.path as osp
 from tessellate_ipu import create_ipu_tile_primitive, ipu_cycle_count, tile_map, tile_put_sharded, tile_put_replicated
 from functools import partial 
+from icecream import ic
 jax.config.update('jax_platform_name', "cpu")
 jax.config.update('jax_enable_x64', False) 
 HYB_B3LYP = 0.2
 
-def max_val(N):
+def max_val(N, precision):
     x_candidate = (-1 + jnp.sqrt(1 + 8*N)) // 2 # TODO: Check when this overflows and fix problem (e.g. N=500 => N^4/8 =7.8G > 2**32 for np.uint32).
-    x_candidate = (x_candidate).astype(jnp.int32) 
+    if precision == 'x32':
+        x_candidate = (x_candidate).astype(jnp.uint32) 
+    else:
+        x_candidate = (x_candidate).astype(jnp.uint64) 
     x = jnp.where(x_candidate * (x_candidate + 1) // 2 <= N, x_candidate, x_candidate - 1)
     return x
 max_vals  = jax.vmap(max_val)
-def get_i_j(val):
-    i = max_val(val)
+def get_i_j(val, precision='x32'):
+    i = max_val(val, precision=precision)
     j = val - i*(i+1)//2
     return i, j
 
 def cpu_ijkl(value, symmetry, f): 
-    ij = max_val(value)
-    kl = value - ij*(ij+1)//2
-    i, j = get_i_j(ij)
-    k, l = get_i_j(kl)
-    v      = f(i,j,k,l,symmetry) 
+    if value.shape[0] == 1:
+        # x64
+        ij = max_val(value)
+        kl = value - ij*(ij+1)//2
+        i, j = get_i_j(ij, 'x64')
+        k, l = get_i_j(kl, 'x64')
+        v      = f(i,j,k,l,symmetry).astype(jnp.uint64)
+    else:
+        # x32
+        i, j = get_i_j(value[0], 'x32')
+        k, l = get_i_j(value[1], 'x32')
+        v      = f(i,j,k,l,symmetry).astype(jnp.uint32)
+    
     return v
-cpu_ijkl = jax.vmap(cpu_ijkl, in_axes=(0, None, None, None))
+cpu_ijkl = jax.vmap(cpu_ijkl, in_axes=(0, None, None))
 
 @partial(jax.jit, backend="ipu")
 def ipu_ijkl(nonzero_indices, symmetry, N):
@@ -42,30 +54,46 @@ def ipu_ijkl(nonzero_indices, symmetry, N):
             perf_estimate=100,
     )
 
-    size = np.prod(nonzero_indices.shape)
-    total_threads = (1472-1) * 6 
-    remainder = size % total_threads
-    if remainder != 0: 
-        nonzero_indices = jnp.pad(nonzero_indices, (0, total_threads-remainder))
-    nonzero_indices = nonzero_indices.reshape(total_threads, -1) 
+    
+    if nonzero_indices.shape[-1] == 2:
+        # x32
+        size = np.prod(nonzero_indices.shape[:-1])
+        total_threads = (1472-1) * 6 
+        remainder = size % total_threads
+        if remainder != 0: 
+            nonzero_indices = jnp.pad(nonzero_indices, ((0, total_threads-remainder), (0, 0)))
+        nonzero_indices = nonzero_indices.reshape(total_threads, -1, 2) 
+    else:
+        # x64
+        size = np.prod(nonzero_indices.shape)
+        total_threads = (1472-1) * 6 
+        remainder = size % total_threads
+        if remainder != 0: 
+            nonzero_indices = jnp.pad(nonzero_indices, (0, total_threads-remainder))
+        nonzero_indices = nonzero_indices.reshape(total_threads, -1) 
 
     tiles = tuple((np.arange(0,total_threads) % (1471) + 1).astype(np.int32).tolist())
     nonzero_indices = tile_put_sharded(nonzero_indices, tiles)
-    symmetry = jnp.array(symmetry, dtype=jnp.int32).reshape(1,)
-    symmetry = tile_put_replicated(symmetry,   tiles) 
-    N        = tile_put_replicated(N,   tiles)
-    start    = tile_put_replicated(0,   tiles)
-    stop     = tile_put_replicated(nonzero_indices.shape[1],   tiles)
+    symmetry = tile_put_replicated(jnp.array(symmetry, dtype=jnp.uint32),   tiles) 
+    N        = tile_put_replicated(jnp.array(N, dtype=jnp.uint32),   tiles)
+    start    = tile_put_replicated(jnp.array(0, dtype=jnp.uint32),   tiles)
+    stop     = tile_put_replicated(jnp.array(nonzero_indices.shape[1], dtype=jnp.uint32),   tiles)
 
     value = tile_map(compute_indices, nonzero_indices, symmetry, N, start, stop)  
 
     return value.array.reshape(-1)[:size]
 
 def num_repetitions_fast(value):
-    ij = max_val(value)
-    kl = value - ij*(ij+1)//2
-    i, j = get_i_j(ij)
-    k, l = get_i_j(kl)
+    if value.shape[0] == 1:
+        # x64
+        ij = max_val(value)
+        kl = value - ij*(ij+1)//2
+        i, j = get_i_j(ij, 'x64')
+        k, l = get_i_j(kl, 'x64')
+    else:
+        # x32
+        i, j = get_i_j(value[0], 'x32')
+        k, l = get_i_j(value[1], 'x32')
 
     # compute: repetitions = 2^((i==j) + (k==l) + (k==i and l==j or k==j and l==i))
     repetitions = 2**(
@@ -162,9 +190,10 @@ if __name__ == "__main__":
 
     print("\n----------")
     print("nonzero_indices ", time.time()-start)
-    nonzero_indices      = np.nonzero(distinct_ERI)[0].astype(np.int32)
+    nonzero_indices      = np.nonzero(distinct_ERI)[0] # int64 by default
     print("grap ERI values", time.time()-start)
     nonzero_distinct_ERI = distinct_ERI[nonzero_indices].astype(np.float32)
+    nonzero_indices = np.stack(get_i_j(nonzero_indices), axis=1).astype(np.uint32) # ijkl x64 -> ij,kl x32 -- shape=(?, 2)
     if not args.skip: 
         print("dense: ", dense_ERI.shape, dense_ERI.nbytes/10**6)
     print("sparse: ", distinct_ERI.shape, distinct_ERI.nbytes/10**6)
@@ -201,13 +230,23 @@ if __name__ == "__main__":
     print(nonzero_distinct_ERI.shape, nonzero_indices.shape)
     batches = int(args.batches) # perhaps make 10 batches? 
     remainder = nonzero_indices.shape[0] % (nipu*batches)
-    if remainder != 0:
-        nonzero_indices = np.pad(nonzero_indices, (0,nipu*batches-remainder))
-        nonzero_distinct_ERI = np.pad(nonzero_distinct_ERI, (0,nipu*batches-remainder))
-
-    print("reshape to 16 IPUs pmap", time.time()-start)
-    nonzero_indices = nonzero_indices.reshape(nipu, batches, -1)
-    nonzero_distinct_ERI = nonzero_distinct_ERI.reshape(nipu, batches, -1)
+    if len(nonzero_indices.shape) == 1:
+        # ijkl x64 format
+        if remainder != 0:
+            nonzero_indices = np.pad(nonzero_indices, (0,nipu*batches-remainder))
+            nonzero_distinct_ERI = np.pad(nonzero_distinct_ERI, (0,nipu*batches-remainder))
+        print("reshape to 16 IPUs pmap", time.time()-start)
+        nonzero_indices = nonzero_indices.reshape(nipu, batches, -1)
+        nonzero_distinct_ERI = nonzero_distinct_ERI.reshape(nipu, batches, -1)
+    else: # assuming == 2
+        # ij,kl x32 format
+        if remainder != 0:
+            nonzero_indices = np.pad(nonzero_indices, ((0,nipu*batches-remainder), (0,0)))
+            nonzero_distinct_ERI = np.pad(nonzero_distinct_ERI, (0,nipu*batches-remainder))
+        print("reshape to 16 IPUs pmap", time.time()-start)
+        nonzero_indices = nonzero_indices.reshape(nipu, batches, -1, 2)
+        nonzero_distinct_ERI = nonzero_distinct_ERI.reshape(nipu, batches, -1)
+    
     print(nonzero_indices.shape)
     print(nonzero_distinct_ERI.shape)
 
