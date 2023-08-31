@@ -28,7 +28,7 @@ def cpu_ijkl(value, symmetry, f):
     k, l = get_i_j(kl)
     v      = f(i,j,k,l,symmetry) 
     return v
-cpu_ijkl = jax.vmap(cpu_ijkl, in_axes=(0, None, None, None))
+cpu_ijkl = jax.vmap(cpu_ijkl, in_axes=(0, None, None))
 
 @partial(jax.jit, backend="ipu")
 def ipu_ijkl(nonzero_indices, symmetry, N):
