@@ -11,32 +11,23 @@ jax.config.update('jax_platform_name', "cpu")
 jax.config.update('jax_enable_x64', False) 
 HYB_B3LYP = 0.2
 
-def max_val(N, precision):
-    x_candidate = (-1 + jnp.sqrt(1 + 8*N)) // 2 # TODO: Check when this overflows and fix problem (e.g. N=500 => N^4/8 =7.8G > 2**32 for np.uint32).
-    if precision == 'x32':
-        x_candidate = (x_candidate).astype(jnp.uint32) 
-    else:
-        x_candidate = (x_candidate).astype(jnp.uint64) 
-    x = jnp.where(x_candidate * (x_candidate + 1) // 2 <= N, x_candidate, x_candidate - 1)
-    return x
-max_vals  = jax.vmap(max_val)
-def get_i_j(val, precision='x32'):
-    i = max_val(val, precision=precision)
-    j = val - i*(i+1)//2
-    return i, j
+def get_i_j(val):
+    i = jnp.floor((jnp.sqrt(1 + 8*val) - 1)/2)
+    j = val - i*(i+1) / 2
+    return i.astype(jnp.uint32), j.astype(jnp.uint32)
 
 def cpu_ijkl(value, symmetry, f): 
     if value.shape[0] == 1:
         # x64
         ij = max_val(value)
         kl = value - ij*(ij+1)//2
-        i, j = get_i_j(ij, 'x64')
-        k, l = get_i_j(kl, 'x64')
+        i, j = get_i_j(ij)
+        k, l = get_i_j(kl)
         v      = f(i,j,k,l,symmetry).astype(jnp.uint64)
     else:
         # x32
-        i, j = get_i_j(value[0], 'x32')
-        k, l = get_i_j(value[1], 'x32')
+        i, j = get_i_j(value[0])
+        k, l = get_i_j(value[1])
         v      = f(i,j,k,l,symmetry).astype(jnp.uint32)
     
     return v
@@ -88,12 +79,12 @@ def num_repetitions_fast(value):
         # x64
         ij = max_val(value)
         kl = value - ij*(ij+1)//2
-        i, j = get_i_j(ij, 'x64')
-        k, l = get_i_j(kl, 'x64')
+        i, j = get_i_j(ij)
+        k, l = get_i_j(kl)
     else:
         # x32
-        i, j = get_i_j(value[0], 'x32')
-        k, l = get_i_j(value[1], 'x32')
+        i, j = get_i_j(value[0])
+        k, l = get_i_j(value[1])
 
     # compute: repetitions = 2^((i==j) + (k==l) + (k==i and l==j or k==j and l==i))
     repetitions = 2**(
