@@ -3,8 +3,10 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pyscf
-from jsonargparse import CLI, Namespace
 
+from typing import NamedTuple
+from jaxtyping import Float, Array
+from jsonargparse import CLI, Namespace
 from exchange_correlation.b3lyp import b3lyp
 from electron_repulsion.direct import prepare_electron_repulsion_integrals, electron_repulsion_integrals, ipu_einsum
 from functools import partial
@@ -13,6 +15,58 @@ from collections import namedtuple
 HARTREE_TO_EV = 27.2114079527
 EPSILON_B3LYP = 1e-20
 HYB_B3LYP = 0.2
+
+OrbitalVector = Float[Array, "num_orbitals"]
+OrbitalMatrix = Float[Array, "num_orbitals num_orbitals"]
+TwoOrbitalMatrix = Float[Array, "num_orbitals num_orbitals num_orbitals num_orbitals"]
+Grid = Float[Array, "4 grid_size num_orbitals"]
+
+
+class IterationState(NamedTuple):
+    """Named tuple that stores tensors used during self-consistent field iterations
+
+    We use the following type annotations where the dimension N is the number
+    used in the linear combination of atomic orbitals (LCAO) basis set:
+
+        OrbitalVector [N] (float): Used to store the electron occupation mask
+        OrbitalMatrix [N, N] (float): Used for storing the one-electron integrals and density matrix.
+        TwoOrbitalMatrix [N, N, N, N] (float): 4-d matrix representing the two-electron
+            repulsion integrals.
+        Grid [4, grid_size, num_orbitals] (float): Numerical grid used to evaluate the
+            exchange-correlation energy integral.
+        
+
+    Attributes:
+        E_nuc (float): Energy of the nuclear-nuclear electrostatic interactions.
+        density_matrix (OrbitalMatrix): Electron density in the LCAO basis set.
+        kinetic (OrbitalMatrix): Kinetic energy integrals in the LCAO basis set.
+        nuclear (OrbitalMatrix): nuclear attraction integrals in the LCAO basis set.
+        O (OrbitalMatrix): Overlap integrals in the LCAO basis set.
+        grid_AO (Grid): Numerical grid used to evaluate the exchange-correlation energy integral.
+        ERI (TwoOrbitalMatrix): Two-electron repulsion integrals in the LCAO basis set.
+        grid_weights (Array): Weights associated with the grid_AO
+        mask (OrbitalVector): Orbital occupation mask.
+        input_floats (Array):
+        input_ints (Array):
+        L_inv (OrbitalMatrix):
+        diis_history (Array): 
+
+
+    """
+    E_nuc: float
+    density_matrix: OrbitalMatrix
+    kinetic: OrbitalMatrix
+    nuclear: OrbitalMatrix
+    O: OrbitalMatrix
+    grid_AO: Grid
+    ERI: TwoOrbitalMatrix
+    grid_weights: Array
+    mask: OrbitalVector
+    input_floats: Array
+    input_ints: Array
+    L_inv: OrbitalMatrix
+    diis_history: Array
+
 
 def energy(density_matrix, H_core, J, K, E_xc, E_nuc, _np=jax.numpy):
     """Density Functional Theory (DFT) solves the optimisation problem:
@@ -81,24 +135,23 @@ def get_JK(density_matrix, ERI, opts, mol):
         J, K = ipu_einsum(ERI, density_matrix, mol, opts.threads, opts.multv)                    # (N, N) (N, N)
     return J, K * HYB_B3LYP                                                                      # (N, N) (N, N)
 
-def _nanoDFT(E_nuc, density_matrix, kinetic, nuclear, O, grid_AO, ERI, grid_weights,
-              mask, _input_floats, _input_ints, L_inv, diis_history, opts, mol):
+def _nanoDFT(state, opts, mol):
     # Utilize the IPUs MIMD parallism to compute the electron repulsion integrals (ERIs) in parallel.
-    if opts.backend == "ipu": ERI = electron_repulsion_integrals(_input_floats, _input_ints, mol, opts.threads_int, opts.intv)
+    if opts.backend == "ipu": ERI = electron_repulsion_integrals(state.input_floats, state.input_ints, mol, opts.threads_int, opts.intv)
     else: pass # Compute on CPU.
 
     # Precompute the remaining tensors.
-    E_xc, V_xc = exchange_correlation(density_matrix, grid_AO, grid_weights) # float (N, N)
-    J, K       = get_JK(density_matrix, ERI, opts, mol)                      # (N, N) (N, N)
-    H_core     = kinetic + nuclear                                           # (N, N)
+    E_xc, V_xc = exchange_correlation(state.density_matrix, state.grid_AO, state.grid_weights) # float (N, N)
+    J, K       = get_JK(state.density_matrix, state.ERI, opts, mol)                      # (N, N) (N, N)
+    H_core     = state.kinetic + state.nuclear                                           # (N, N)
 
     # Log matrices from all DFT iterations (not used by DFT algorithm).
     N = H_core.shape[0]
     log = {"matrices": np.zeros((opts.its, 4, N, N)), "E_xc": np.zeros((opts.its)), "energy": np.zeros((opts.its, 6))}
 
     # Perform DFT iterations.
-    log = jax.lax.fori_loop(0, opts.its, partial(nanoDFT_iteration, opts=opts, mol=mol), [density_matrix, V_xc, J, K, O, H_core, L_inv,  # all (N, N) matrices
-                                                            E_nuc, mask, ERI, grid_weights, grid_AO, diis_history, log])[-1]
+    log = jax.lax.fori_loop(0, opts.its, partial(nanoDFT_iteration, opts=opts, mol=mol), [state.density_matrix, V_xc, J, K, state.O, H_core, state.L_inv,  # all (N, N) matrices
+                                                            state.E_nuc, state.mask, state.ERI, state.grid_weights, state.grid_AO, state.diis_history, log])[-1]
 
     return log["matrices"], H_core, log["energy"]
 
@@ -139,18 +192,18 @@ def init_dft_tensors_cpu(mol, opts, DIIS_iters=9):
     DIIS_H[0,1:] = DIIS_H[1:,0] = 1
     diis_history = (np.zeros((DIIS_iters, N**2)), np.zeros((DIIS_iters, N**2)), DIIS_H)
 
-    tensors = (E_nuc, density_matrix, kinetic, nuclear, O, grid_AO, ERI,
+    state = IterationState(E_nuc, density_matrix, kinetic, nuclear, O, grid_AO, ERI,
                grid_weights, mask, input_floats, input_ints, L_inv, diis_history)
 
-    return tensors, n_electrons_half, E_nuc, N, L_inv, grid_weights, grids.coords
+    return state, n_electrons_half, E_nuc, N, L_inv, grid_weights, grids.coords
 
 def nanoDFT(mol, opts):
     # Init DFT tensors on CPU using PySCF.
-    tensors, n_electrons_half, E_nuc, N, L_inv, grid_weights, grid_coords = init_dft_tensors_cpu(mol, opts)
+    state, n_electrons_half, E_nuc, N, L_inv, grid_weights, grid_coords = init_dft_tensors_cpu(mol, opts)
 
     # Run DFT algorithm (can be hardware accelerated).
     jitted_nanoDFT = jax.jit(partial(_nanoDFT, opts=opts, mol=mol), backend=opts.backend)
-    vals = jitted_nanoDFT(*tensors)
+    vals = jitted_nanoDFT(state)
     logged_matrices, H_core, logged_energies = [np.asarray(a).astype(np.float64) for a in vals] # Ensure CPU
 
     # It's cheap to compute energy/hlgap on CPU in float64 from the logged values/matrices.
