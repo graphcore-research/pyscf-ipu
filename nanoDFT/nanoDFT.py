@@ -3,6 +3,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pyscf
+import h5py
 from jsonargparse import CLI, Namespace
 
 from exchange_correlation.b3lyp import b3lyp
@@ -367,6 +368,47 @@ def build_mol(mol_str, basis_name):
     mol.build(atom=mol_str, unit="Angstrom", basis=basis_name, spin=0, verbose=0)
     return mol
 
+spice_amino_acids = [
+    "TRP", "LYN", "TYR", "PHE", "LEU", 
+    "ILE", "HIE", "MET", "GLN", "HID", 
+    "GLH", "VAL", "GLU", "THR", "PRO", 
+    "ASN", "ASH", "ASP", "SER", "CYS", 
+    "CYX", "ALA", "GLY"
+]
+
+def open_spice_amino_acids_hdf5():
+    """Returns a h5py File object for the solvated amino acids data set in SPICE.
+    Downloads the data set from github (1.4MB) if the file does not exist in the current directory."""
+    import os.path
+
+    spice_aa_fn = "solvated-amino-acids.hdf5"
+    spice_aa_permalink = "https://github.com/openmm/spice-dataset/raw/e4e4ca731a8094b9a448d9831dd05de29124bfd9/solvated-amino-acids/solvated-amino-acids.hdf5"
+
+    if not os.path.exists(spice_aa_fn):
+        from urllib import request
+
+        request.urlretrieve(spice_aa_permalink, spice_aa_fn)
+    
+    f_aa = h5py.File(spice_aa_fn)
+
+    return f_aa
+        
+
+def get_mol_str_spice_aa(entry: str = "TRP", conformation: int = 0):
+    """Returns the geometry for the amino acid in the 'entry' parameter.
+    The data is extracted from the solvated amino acid data set in SPICE"""
+
+    f_aa = open_spice_amino_acids_hdf5()
+
+    mol = f_aa[entry]
+    nm_to_angstrom = 10.0
+    return list(
+        zip(
+                [n for n in filter(str.isalpha, mol['smiles'][0].decode().upper())],
+                mol['conformations'][conformation]*nm_to_angstrom
+        )
+    ) 
+
 def nanoDFT_options(
         its: int = 20,
         mol_str: str = "benzene",
@@ -388,17 +430,20 @@ def nanoDFT_options(
 
     Args:
         its (int): Number of Kohn-Sham iterations.
-        mol_str (str): Molecule string, e.g., "H 0 0 0; H 0 0 1; O 1 0 0; "
+        mol_str (str): Molecule string, e.g., "H 0 0 0; H 0 0 1; O 1 0 0;" or one of:
+            'benzene', 'methane', 'TRP', 'LYN', 'TYR', 'PHE', 'LEU', 'ILE', 'HIE', 'MET', 'GLN', 'HID', 'GLH', 'VAL', 'GLU', 'THR', 'PRO', 'ASN', 'ASH', 'ASP', 'SER', 'CYS', 
+            'CYX', 'ALA', 'GLY'
         float32 (bool) : Whether to use float32 (default is float64).
         basis (str): Which Gaussian basis set to use.
         xc (str): Exchange-correlation functional. Only support B3LYP
-        backend (str): Accelerator backend to use: "-backend cpu" or "-backend ipu".
+        backend (str): Accelerator backend to use: "--backend cpu" or "--backend ipu".
         level (int): Level of grids for XC numerical integration.
         gdb (int): Which version of GDP to load {10, 11, 13, 17}.
         multv (int): Which version of our einsum algorithm to use;comptues ERI@flat(v). Different versions trades-off for memory vs sequentiality
         intv (int): Which version to use of our integral algorithm.
         threads (int): For -backend ipu. Number of threads for einsum(ERI, dm) with custom C++ (trades-off speed vs memory).
         threads_int (int): For -backend ipu. Number of threads for computing ERI with custom C++ (trades off speed vs memory).
+        threshold (float): Zero out ERIs that are below the threshold in absolute value. Not supported for '--backend ipu'. 
     """
     if mol_str == "benzene":
         mol_str = [
@@ -423,6 +468,9 @@ def nanoDFT_options(
             ["H", (1, 0, 0)],
             ["H", (1, 1, 1)]
         ]
+    elif mol_str in spice_amino_acids:
+        mol_str = get_mol_str_spice_aa(mol_str)
+
 
     if backend=='ipu' and threshold >0.0:
         print("ERI threshold > 0.0 only if backend=='cpu'. Overriding...")
