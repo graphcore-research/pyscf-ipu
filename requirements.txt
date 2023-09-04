@@ -3,6 +3,7 @@ matplotlib
 pandas
 scipy
 h5py
+pubchempy
 pyscf==2.2.1
 icecream
 seaborn

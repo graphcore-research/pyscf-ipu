@@ -1,4 +1,5 @@
 # Copyright (c) 2023 Graphcore Ltd. All rights reserved.
+import sys
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -8,6 +9,7 @@ from jsonargparse import CLI, Namespace
 
 from exchange_correlation.b3lyp import b3lyp
 from electron_repulsion.direct import prepare_electron_repulsion_integrals, electron_repulsion_integrals, ipu_einsum
+import utils
 from functools import partial
 from collections import namedtuple
 
@@ -368,47 +370,6 @@ def build_mol(mol_str, basis_name):
     mol.build(atom=mol_str, unit="Angstrom", basis=basis_name, spin=0, verbose=0)
     return mol
 
-spice_amino_acids = [
-    "TRP", "LYN", "TYR", "PHE", "LEU", 
-    "ILE", "HIE", "MET", "GLN", "HID", 
-    "GLH", "VAL", "GLU", "THR", "PRO", 
-    "ASN", "ASH", "ASP", "SER", "CYS", 
-    "CYX", "ALA", "GLY"
-]
-
-def open_spice_amino_acids_hdf5():
-    """Returns a h5py File object for the solvated amino acids data set in SPICE.
-    Downloads the data set from github (1.4MB) if the file does not exist in the current directory."""
-    import os.path
-
-    spice_aa_fn = "solvated-amino-acids.hdf5"
-    spice_aa_permalink = "https://github.com/openmm/spice-dataset/raw/e4e4ca731a8094b9a448d9831dd05de29124bfd9/solvated-amino-acids/solvated-amino-acids.hdf5"
-
-    if not os.path.exists(spice_aa_fn):
-        from urllib import request
-
-        request.urlretrieve(spice_aa_permalink, spice_aa_fn)
-    
-    f_aa = h5py.File(spice_aa_fn)
-
-    return f_aa
-        
-
-def get_mol_str_spice_aa(entry: str = "TRP", conformation: int = 0):
-    """Returns the geometry for the amino acid in the 'entry' parameter.
-    The data is extracted from the solvated amino acid data set in SPICE"""
-
-    f_aa = open_spice_amino_acids_hdf5()
-
-    mol = f_aa[entry]
-    nm_to_angstrom = 10.0
-    return list(
-        zip(
-                [n for n in filter(str.isalpha, mol['smiles'][0].decode().upper())],
-                mol['conformations'][conformation]*nm_to_angstrom
-        )
-    ) 
-
 def nanoDFT_options(
         its: int = 20,
         mol_str: str = "benzene",
@@ -445,32 +406,13 @@ def nanoDFT_options(
         threads_int (int): For -backend ipu. Number of threads for computing ERI with custom C++ (trades off speed vs memory).
         threshold (float): Zero out ERIs that are below the threshold in absolute value. Not supported for '--backend ipu'. 
     """
-    if mol_str == "benzene":
-        mol_str = [
-            ["C", ( 0.0000,  0.0000, 0.0000)],
-            ["C", ( 1.4000,  0.0000, 0.0000)],
-            ["C", ( 2.1000,  1.2124, 0.0000)],
-            ["C", ( 1.4000,  2.4249, 0.0000)],
-            ["C", ( 0.0000,  2.4249, 0.0000)],
-            ["C", (-0.7000,  1.2124, 0.0000)],
-            ["H", (-0.5500, -0.9526, 0.0000)],
-            ["H", (-0.5500,  3.3775, 0.0000)],
-            ["H", ( 1.9500, -0.9526, 0.0000)], 
-            ["H", (-1.8000,  1.2124, 0.0000)],
-            ["H", ( 3.2000,  1.2124, 0.0000)],
-            ["H", ( 1.9500,  3.3775, 0.0000)]
-        ]
-    elif mol_str == "methane":
-        mol_str = [
-            ["C", (0, 0, 0)],
-            ["H", (0, 0, 1)],
-            ["H", (0, 1, 0)],
-            ["H", (1, 0, 0)],
-            ["H", (1, 1, 1)]
-        ]
-    elif mol_str in spice_amino_acids:
-        mol_str = get_mol_str_spice_aa(mol_str)
 
+    # From a compound name or CID, get a list of its atoms and their coordinates
+    mol_str = utils.process_mol_str(mol_str)
+    if mol_str is None:
+        sys.exit(1)
+
+    print(f"Minimum interatomic distance: {utils.min_interatomic_distance(mol_str)}")
 
     if backend=='ipu' and threshold >0.0:
         print("ERI threshold > 0.0 only if backend=='cpu'. Overriding...")
@@ -491,11 +433,15 @@ if __name__ == "__main__":
     jax.config.FLAGS.jax_platform_name = 'cpu'
     opts, mol_str = CLI(nanoDFT_options)
     assert opts.xc == "b3lyp"
-    print("float32") if opts.float32 else print("float64")
+    print("Precision: float32") if opts.float32 else print("Precision: float64")
 
     if not opts.structure_optimization:
         # Test Case: Compare nanoDFT against PySCF.
         mol = build_mol(mol_str, opts.basis)
+        
+        print(f"Number of Atomic Orbitals\t{mol.nao_nr():15d}")
+        print(f"Number of electrons\t{mol.nelectron:15d}")
+
         nanoDFT_E, (nanoDFT_logged_E, nanoDFT_hlgap, mo_energy, mo_coeff, grid_coords, grid_weights) = nanoDFT(mol, opts)
         nanoDFT_forces = grad(mol, grid_coords, grid_weights, mo_coeff, mo_energy)
         pyscf_E, pyscf_hlgap, pyscf_forces = pyscf_reference(mol_str, opts)
