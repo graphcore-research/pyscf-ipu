@@ -114,7 +114,7 @@ def nanoDFT_iteration(i, vals, opts, mol):
     return [density_matrix, V_xc, J, K, O, H_core, L_inv, E_nuc, occupancy, ERI, grid_weights, grid_AO, diis_history, log]
 
 def exchange_correlation(density_matrix, grid_AO, grid_weights):
-    """Compute exchange correlation integral using atomic orbitals (AO) evalauted on a grid. """
+    """Compute exchange correlation integral using atomic orbitals (AO) evaluated on a grid. """
     rho = jnp.sum(grid_AO[:1] @ density_matrix * grid_AO, axis=2)                                # (4, grid_size)=(4, 45624) for C6H6.
     E_xc, vrho, vgamma = b3lyp(rho, EPSILON_B3LYP)                                               # (gridsize,) (gridsize,) (gridsize,)
     E_xc = jnp.sum(rho[0] * grid_weights * E_xc)                                                 # float=-27.968[Ha] for C6H6 at convergence.
