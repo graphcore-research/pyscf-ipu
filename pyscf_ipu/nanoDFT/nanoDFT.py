@@ -9,12 +9,15 @@ from jsonargparse import CLI, Namespace
 import chex
 from jaxtyping import Float, Array
 from jsonargparse import CLI, Namespace
-from exchange_correlation.b3lyp import b3lyp
-from electron_repulsion.direct import prepare_electron_repulsion_integrals, electron_repulsion_integrals, ipu_einsum
 import utils
 from functools import partial
 from collections import namedtuple
 from icecream import ic
+
+from pyscf_ipu.exchange_correlation.b3lyp import b3lyp
+from pyscf_ipu.electron_repulsion.direct  import (prepare_electron_repulsion_integrals,
+                                                  electron_repulsion_integrals,
+                                                  ipu_einsum)
 
 HARTREE_TO_EV = 27.2114079527
 EPSILON_B3LYP = 1e-20
