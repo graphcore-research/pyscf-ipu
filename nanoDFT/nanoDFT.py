@@ -7,7 +7,6 @@ import pyscf
 import h5py
 from jsonargparse import CLI, Namespace
 import chex
-
 from jaxtyping import Float, Array
 from jsonargparse import CLI, Namespace
 from exchange_correlation.b3lyp import b3lyp
@@ -15,62 +14,11 @@ from electron_repulsion.direct import prepare_electron_repulsion_integrals, elec
 import utils
 from functools import partial
 from collections import namedtuple
+from icecream import ic
 
 HARTREE_TO_EV = 27.2114079527
 EPSILON_B3LYP = 1e-20
 HYB_B3LYP = 0.2
-
-OrbitalVector = Float[Array, "num_orbitals"]
-OrbitalMatrix = Float[Array, "num_orbitals num_orbitals"]
-TwoOrbitalMatrix = Float[Array, "num_orbitals num_orbitals num_orbitals num_orbitals"]
-Grid = Float[Array, "4 grid_size num_orbitals"]
-
-@chex.dataclass
-class IterationState:
-    """State tensors used during self-consistent field iterations
-
-    We use the following type annotations where the dimension N is the number
-    used in the linear combination of atomic orbitals (LCAO) basis set:
-
-        OrbitalVector [N] (float): Used to store the electron occupation mask
-        OrbitalMatrix [N, N] (float): Used for storing the one-electron integrals and density matrix.
-        TwoOrbitalMatrix [N, N, N, N] (float): 4-d matrix representing the two-electron
-            repulsion integrals.
-        Grid [4, grid_size, num_orbitals] (float): Numerical grid used to evaluate the
-            exchange-correlation energy integral.
-        
-
-    Attributes:
-        E_nuc (float): Energy of the nuclear-nuclear electrostatic interactions.
-        density_matrix (OrbitalMatrix): Electron density in the LCAO basis set.
-        kinetic (OrbitalMatrix): Kinetic energy integrals in the LCAO basis set.
-        nuclear (OrbitalMatrix): nuclear attraction integrals in the LCAO basis set.
-        O (OrbitalMatrix): Overlap integrals in the LCAO basis set.
-        grid_AO (Grid): Numerical grid used to evaluate the exchange-correlation energy integral.
-        ERI (TwoOrbitalMatrix): Two-electron repulsion integrals in the LCAO basis set.
-        grid_weights (Array): Weights associated with the grid_AO
-        mask (OrbitalVector): Orbital occupation mask.
-        input_floats (Array):
-        input_ints (Array):
-        L_inv (OrbitalMatrix):
-        diis_history (Array): 
-
-
-    """
-    E_nuc: float
-    density_matrix: OrbitalMatrix
-    kinetic: OrbitalMatrix
-    nuclear: OrbitalMatrix
-    O: OrbitalMatrix
-    grid_AO: Grid
-    ERI: TwoOrbitalMatrix
-    grid_weights: Array
-    mask: OrbitalVector
-    input_floats: Array
-    input_ints: Array
-    L_inv: OrbitalMatrix
-    diis_history: Array
-
 
 def energy(density_matrix, H_core, J, K, E_xc, E_nuc, _np=jax.numpy):
     """Density Functional Theory (DFT) solves the optimisation problem:
@@ -159,7 +107,58 @@ def _nanoDFT(state, opts, mol):
 
     return log["matrices"], H_core, log["energy"]
 
-from icecream import ic
+
+OrbitalVector = Float[Array, "num_orbitals"]
+OrbitalMatrix = Float[Array, "num_orbitals num_orbitals"]
+TwoOrbitalMatrix = Float[Array, "num_orbitals num_orbitals num_orbitals num_orbitals"]
+Grid = Float[Array, "4 grid_size num_orbitals"]
+
+@chex.dataclass
+class IterationState:
+    """State tensors used during self-consistent field iterations
+
+    We use the following type annotations where the dimension N is the number
+    used in the linear combination of atomic orbitals (LCAO) basis set:
+
+        OrbitalVector [N] (float): Used to store the electron occupation mask
+        OrbitalMatrix [N, N] (float): Used for storing the one-electron integrals and density matrix.
+        TwoOrbitalMatrix [N, N, N, N] (float): 4-d matrix representing the two-electron
+            repulsion integrals.
+        Grid [4, grid_size, num_orbitals] (float): Numerical grid used to evaluate the
+            exchange-correlation energy integral.
+        
+
+    Attributes:
+        E_nuc (float): Energy of the nuclear-nuclear electrostatic interactions.
+        density_matrix (OrbitalMatrix): Electron density in the LCAO basis set.
+        kinetic (OrbitalMatrix): Kinetic energy integrals in the LCAO basis set.
+        nuclear (OrbitalMatrix): nuclear attraction integrals in the LCAO basis set.
+        O (OrbitalMatrix): Overlap integrals in the LCAO basis set.
+        grid_AO (Grid): Numerical grid used to evaluate the exchange-correlation energy integral.
+        ERI (TwoOrbitalMatrix): Two-electron repulsion integrals in the LCAO basis set.
+        grid_weights (Array): Weights associated with the grid_AO
+        mask (OrbitalVector): Orbital occupation mask.
+        input_floats (Array):
+        input_ints (Array):
+        L_inv (OrbitalMatrix):
+        diis_history (Array): 
+
+
+    """
+    E_nuc: float
+    density_matrix: OrbitalMatrix
+    kinetic: OrbitalMatrix
+    nuclear: OrbitalMatrix
+    O: OrbitalMatrix
+    grid_AO: Grid
+    ERI: TwoOrbitalMatrix
+    grid_weights: Array
+    mask: OrbitalVector
+    input_floats: Array
+    input_ints: Array
+    L_inv: OrbitalMatrix
+    diis_history: Array
+
 
 def init_dft_tensors_cpu(mol, opts, DIIS_iters=9):
     N                = mol.nao_nr()                                 # N=66 for C6H6 (number of atomic **and** molecular orbitals)
@@ -470,7 +469,7 @@ def nanoDFT_options(
     if mol_str is None:
         sys.exit(1)
 
-    print(f"Minimum interatomic distance: {utils.min_interatomic_distance(mol_str)}")
+    print(f"Minimum interatomic distance: {utils.min_interatomic_distance(mol_str)}") # TODO: dies for --mol_str methane
 
     if backend=='ipu' and threshold >0.0:
         print("ERI threshold > 0.0 only if backend=='cpu'. Overriding...")
@@ -551,3 +550,4 @@ if __name__ == "__main__":
             plt.savefig("_tmp/tmp.jpg")
             writer.append_data(imageio.v2.imread("_tmp/tmp.jpg"))
         writer.close()
+
