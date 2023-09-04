@@ -3,8 +3,8 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pyscf
+import chex
 
-from typing import NamedTuple
 from jaxtyping import Float, Array
 from jsonargparse import CLI, Namespace
 from exchange_correlation.b3lyp import b3lyp
@@ -21,9 +21,9 @@ OrbitalMatrix = Float[Array, "num_orbitals num_orbitals"]
 TwoOrbitalMatrix = Float[Array, "num_orbitals num_orbitals num_orbitals num_orbitals"]
 Grid = Float[Array, "4 grid_size num_orbitals"]
 
-
-class IterationState(NamedTuple):
-    """Named tuple that stores tensors used during self-consistent field iterations
+@chex.dataclass
+class IterationState:
+    """State tensors used during self-consistent field iterations
 
     We use the following type annotations where the dimension N is the number
     used in the linear combination of atomic orbitals (LCAO) basis set:
@@ -137,7 +137,7 @@ def get_JK(density_matrix, ERI, opts, mol):
 
 def _nanoDFT(state, opts, mol):
     # Utilize the IPUs MIMD parallism to compute the electron repulsion integrals (ERIs) in parallel.
-    if opts.backend == "ipu": ERI = electron_repulsion_integrals(state.input_floats, state.input_ints, mol, opts.threads_int, opts.intv)
+    if opts.backend == "ipu": state.ERI = electron_repulsion_integrals(state.input_floats, state.input_ints, mol, opts.threads_int, opts.intv)
     else: pass # Compute on CPU.
 
     # Precompute the remaining tensors.
@@ -192,8 +192,12 @@ def init_dft_tensors_cpu(mol, opts, DIIS_iters=9):
     DIIS_H[0,1:] = DIIS_H[1:,0] = 1
     diis_history = (np.zeros((DIIS_iters, N**2)), np.zeros((DIIS_iters, N**2)), DIIS_H)
 
-    state = IterationState(E_nuc, density_matrix, kinetic, nuclear, O, grid_AO, ERI,
-               grid_weights, mask, input_floats, input_ints, L_inv, diis_history)
+    state = IterationState(E_nuc=E_nuc, density_matrix=density_matrix, kinetic=kinetic,
+                           nuclear=nuclear, O=O, grid_AO=grid_AO, ERI=ERI,
+                           grid_weights=grid_weights, mask=mask,
+                           input_floats=input_floats, input_ints=input_ints,
+                           L_inv=L_inv, diis_history=diis_history)
+
 
     return state, n_electrons_half, E_nuc, N, L_inv, grid_weights, grids.coords
 
