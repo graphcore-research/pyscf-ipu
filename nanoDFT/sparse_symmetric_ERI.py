@@ -11,10 +11,16 @@ jax.config.update('jax_platform_name', "cpu")
 jax.config.update('jax_enable_x64', False) 
 HYB_B3LYP = 0.2
 
-def get_i_j(val):
-    i = jnp.floor((jnp.sqrt(1 + 8*val) - 1)/2)
-    j = val - i*(i+1) / 2
-    return i.astype(jnp.uint32), j.astype(jnp.uint32)
+def get_i_j(val, precision='x32'):
+    xnp = jnp if precision=='x32' else np
+    # we need it to work for val.dtype == uint64 when called with the main index
+    if precision == 'x32':
+        sqrt_val = xnp.round(xnp.sqrt(2)*xnp.sqrt(val.astype(xnp.float32))).astype(xnp.uint32)
+    else:
+        sqrt_val = xnp.round(xnp.sqrt(2)*xnp.sqrt(val.astype(xnp.float64))).astype(xnp.uint32) # NumPy only
+    i = sqrt_val + xnp.where(sqrt_val%2==0, val%(sqrt_val+1)==0, val%sqrt_val==0).astype(xnp.uint32) - 1
+    j = xnp.where(i%2==0, (val%(i+1)).astype(xnp.uint32), ((val-(i-1)/2-1)%(i+1)).astype(xnp.uint32))
+    return i, j
 
 def cpu_ijkl(value, symmetry, f): 
     if value.shape[0] == 1:
@@ -88,10 +94,10 @@ def num_repetitions_fast(value):
 
     # compute: repetitions = 2^((i==j) + (k==l) + (k==i and l==j or k==j and l==i))
     repetitions = 2**(
-        jnp.equal(i,j).astype(jnp.int32) + 
-        jnp.equal(k,l).astype(jnp.int32) + 
+        jnp.equal(i,j).astype(jnp.uint32) + 
+        jnp.equal(k,l).astype(jnp.uint32) + 
         (1 - ((1 - jnp.equal(k,i) * jnp.equal(l,j)) * 
-        (1- jnp.equal(k,j) * jnp.equal(l,i))).astype(jnp.int32))
+        (1- jnp.equal(k,j) * jnp.equal(l,i))).astype(jnp.uint32))
     )
 
     return repetitions
@@ -181,10 +187,18 @@ if __name__ == "__main__":
 
     print("\n----------")
     print("nonzero_indices ", time.time()-start)
-    nonzero_indices      = np.nonzero(distinct_ERI)[0] # int64 by default
+    nonzero_indices      = np.nonzero(distinct_ERI)[0].astype(np.uint64) # int64 by default, convert to uint64
     print("grap ERI values", time.time()-start)
     nonzero_distinct_ERI = distinct_ERI[nonzero_indices].astype(np.float32)
-    nonzero_indices = np.stack(get_i_j(nonzero_indices), axis=1).astype(np.uint32) # ijkl x64 -> ij,kl x32 -- shape=(?, 2)
+    nonzero_indices_x64 = nonzero_indices
+    nonzero_indices = np.stack(get_i_j(nonzero_indices, precision='x64'), axis=1) # ijkl x64 -> ij,kl x32 -- shape=(?, 2)
+    assert np.equal(nonzero_indices, nonzero_indices.astype(np.uint32)).all()
+    nonzero_indices = nonzero_indices.astype(np.uint32)
+    print(nonzero_indices.shape)
+    a = nonzero_indices_x64
+    b = (nonzero_indices[:,0].astype(np.uint64)*(nonzero_indices[:,0].astype(np.uint64)+1)/2+nonzero_indices[:,1].astype(np.uint64)).astype(np.uint64)
+    assert np.equal(a, b).all(), (a, b, np.nonzero(np.abs(a-b)))
+    print('Check: 1D (ijkl) to 2D (ij,kl) decomposition is accurate')
     if not args.skip: 
         print("dense: ", dense_ERI.shape, dense_ERI.nbytes/10**6)
     print("sparse: ", distinct_ERI.shape, distinct_ERI.nbytes/10**6)
