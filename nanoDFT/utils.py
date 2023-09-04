@@ -111,5 +111,5 @@ def process_mol_str(mol_str: str):
 def min_interatomic_distance(mol_str):
     """This computes the minimum distance between atoms."""
     coords = map(itemgetter(1), mol_str) 
-    distances = map(lambda x: np.linalg.norm(x[0] - x[1]), combinations(coords, 2))
+    distances = map(lambda x: np.linalg.norm(np.array(x[0]) - np.array(x[1])), combinations(coords, 2))
     return min(distances)
