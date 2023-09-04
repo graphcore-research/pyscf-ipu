@@ -1,14 +1,18 @@
 # Copyright (c) 2023 Graphcore Ltd. All rights reserved.
+import sys
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pyscf
+import h5py
+from jsonargparse import CLI, Namespace
 import chex
 
 from jaxtyping import Float, Array
 from jsonargparse import CLI, Namespace
 from exchange_correlation.b3lyp import b3lyp
 from electron_repulsion.direct import prepare_electron_repulsion_integrals, electron_repulsion_integrals, ipu_einsum
+import utils
 from functools import partial
 from collections import namedtuple
 
@@ -445,41 +449,28 @@ def nanoDFT_options(
 
     Args:
         its (int): Number of Kohn-Sham iterations.
-        mol_str (str): Molecule string, e.g., "H 0 0 0; H 0 0 1; O 1 0 0; "
+        mol_str (str): Molecule string, e.g., "H 0 0 0; H 0 0 1; O 1 0 0;" or one of:
+            'benzene', 'methane', 'TRP', 'LYN', 'TYR', 'PHE', 'LEU', 'ILE', 'HIE', 'MET', 'GLN', 'HID', 'GLH', 'VAL', 'GLU', 'THR', 'PRO', 'ASN', 'ASH', 'ASP', 'SER', 'CYS', 
+            'CYX', 'ALA', 'GLY'
         float32 (bool) : Whether to use float32 (default is float64).
         basis (str): Which Gaussian basis set to use.
         xc (str): Exchange-correlation functional. Only support B3LYP
-        backend (str): Accelerator backend to use: "-backend cpu" or "-backend ipu".
+        backend (str): Accelerator backend to use: "--backend cpu" or "--backend ipu".
         level (int): Level of grids for XC numerical integration.
         gdb (int): Which version of GDP to load {10, 11, 13, 17}.
         multv (int): Which version of our einsum algorithm to use;comptues ERI@flat(v). Different versions trades-off for memory vs sequentiality
         intv (int): Which version to use of our integral algorithm.
         threads (int): For -backend ipu. Number of threads for einsum(ERI, dm) with custom C++ (trades-off speed vs memory).
         threads_int (int): For -backend ipu. Number of threads for computing ERI with custom C++ (trades off speed vs memory).
+        threshold (float): Zero out ERIs that are below the threshold in absolute value. Not supported for '--backend ipu'. 
     """
-    if mol_str == "benzene":
-        mol_str = [
-            ["C", ( 0.0000,  0.0000, 0.0000)],
-            ["C", ( 1.4000,  0.0000, 0.0000)],
-            ["C", ( 2.1000,  1.2124, 0.0000)],
-            ["C", ( 1.4000,  2.4249, 0.0000)],
-            ["C", ( 0.0000,  2.4249, 0.0000)],
-            ["C", (-0.7000,  1.2124, 0.0000)],
-            ["H", (-0.5500, -0.9526, 0.0000)],
-            ["H", (-0.5500,  3.3775, 0.0000)],
-            ["H", ( 1.9500, -0.9526, 0.0000)], 
-            ["H", (-1.8000,  1.2124, 0.0000)],
-            ["H", ( 3.2000,  1.2124, 0.0000)],
-            ["H", ( 1.9500,  3.3775, 0.0000)]
-        ]
-    elif mol_str == "methane":
-        mol_str = [
-            ["C", (0, 0, 0)],
-            ["H", (0, 0, 1)],
-            ["H", (0, 1, 0)],
-            ["H", (1, 0, 0)],
-            ["H", (1, 1, 1)]
-        ]
+
+    # From a compound name or CID, get a list of its atoms and their coordinates
+    mol_str = utils.process_mol_str(mol_str)
+    if mol_str is None:
+        sys.exit(1)
+
+    print(f"Minimum interatomic distance: {utils.min_interatomic_distance(mol_str)}")
 
     if backend=='ipu' and threshold >0.0:
         print("ERI threshold > 0.0 only if backend=='cpu'. Overriding...")
@@ -500,11 +491,15 @@ if __name__ == "__main__":
     jax.config.FLAGS.jax_platform_name = 'cpu'
     opts, mol_str = CLI(nanoDFT_options)
     assert opts.xc == "b3lyp"
-    print("float32") if opts.float32 else print("float64")
+    print("Precision: float32") if opts.float32 else print("Precision: float64")
 
     if not opts.structure_optimization:
         # Test Case: Compare nanoDFT against PySCF.
         mol = build_mol(mol_str, opts.basis)
+        
+        print(f"Number of Atomic Orbitals\t{mol.nao_nr():15d}")
+        print(f"Number of electrons\t{mol.nelectron:15d}")
+
         nanoDFT_E, (nanoDFT_logged_E, nanoDFT_hlgap, mo_energy, mo_coeff, grid_coords, grid_weights) = nanoDFT(mol, opts)
         nanoDFT_forces = grad(mol, grid_coords, grid_weights, mo_coeff, mo_energy)
         pyscf_E, pyscf_hlgap, pyscf_forces = pyscf_reference(mol_str, opts)
