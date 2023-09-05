@@ -18,7 +18,6 @@ from pyscf_ipu.electron_repulsion.direct  import (prepare_electron_repulsion_int
                                                   electron_repulsion_integrals,
                                                   ipu_einsum)
 
-
 HARTREE_TO_EV = 27.2114079527
 EPSILON_B3LYP = 1e-20
 HYB_B3LYP = 0.2
