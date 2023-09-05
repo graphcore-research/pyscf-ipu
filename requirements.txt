@@ -11,8 +11,6 @@ tqdm
 natsort
 rdkit
 jsonargparse[all]
-jaxtyping==0.2.0 # TODO: fix jax.Array to use newest version 
-pubchempy
 
 mogli
 imageio[ffmpeg]
