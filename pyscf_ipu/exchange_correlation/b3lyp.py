@@ -2,10 +2,10 @@
 import jax.numpy as jnp
 import jax
 
-from exchange_correlation.lda import __lda
-from exchange_correlation.lyp import __lyp
-from exchange_correlation.b88 import __b88
-from exchange_correlation.vwn import __vwn
+from pyscf_ipu.exchange_correlation.lda import __lda
+from pyscf_ipu.exchange_correlation.lyp import __lyp
+from pyscf_ipu.exchange_correlation.b88 import __b88
+from pyscf_ipu.exchange_correlation.vwn import __vwn
 
 CLIP_RHO_MIN  = 1e-9
 CLIP_RHO_MAX  = 1e12
