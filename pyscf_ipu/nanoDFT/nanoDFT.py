@@ -117,7 +117,7 @@ Grid = Float[Array, "4 grid_size num_orbitals"]
 
 @chex.dataclass
 class IterationState:
-    """State tensors used during self-consistent field iterations
+    """State tensors used during self-consistent field (SCF) iterations
 
     We use the following type annotations where the dimension N is the number
     used in the linear combination of atomic orbitals (LCAO) basis set:
@@ -140,10 +140,13 @@ class IterationState:
         ERI (TwoOrbitalMatrix): Two-electron repulsion integrals in the LCAO basis set.
         grid_weights (Array): Weights associated with the grid_AO
         mask (OrbitalVector): Orbital occupation mask.
-        input_floats (Array):
-        input_ints (Array):
-        L_inv (OrbitalMatrix):
-        diis_history (Array): 
+        input_floats (Array): Supplementary vector of floats for ERI evaluation with libcint
+        input_ints (Array): Supplementary vector of ints for ERI evaluation with libcint
+        L_inv (OrbitalMatrix): Defined as the inverse of the Cholesky decomposition of the overlap matrix. 
+            Used to change generalised eig problem into an eigh one.
+        diis_history (Array): Direct Inversion of Iterative Subspace (DIIS) is an optional method that
+            can accelerate convergence of the SCF iterations. Maintains a history of how the Hamiltonian
+            is evolving across the SCF iterations.
 
 
     """
