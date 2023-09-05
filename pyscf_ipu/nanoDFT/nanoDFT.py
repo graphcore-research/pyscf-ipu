@@ -8,11 +8,11 @@ import h5py
 import chex
 from jaxtyping import Float, Array
 from jsonargparse import CLI, Namespace
-import utils
 from functools import partial
 from collections import namedtuple
 from icecream import ic
 
+from pyscf_ipu.nanoDFT import utils
 from pyscf_ipu.exchange_correlation.b3lyp import b3lyp
 from pyscf_ipu.electron_repulsion.direct  import (prepare_electron_repulsion_integrals,
                                                   electron_repulsion_integrals,
