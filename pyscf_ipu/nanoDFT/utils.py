@@ -100,6 +100,9 @@ def process_mol_str(mol_str: str):
             ["H", (1, 0, 0)],
             ["H", (1, 1, 1)]
         ]
+    elif mol_str.split('_')[0].lower()  == "c":
+        num_c_atoms = int(mol_str.split('_')[1])
+        mol_str = [["C", (0, 0, i)] for  i in range(num_c_atoms)]
     elif mol_str in spice_amino_acids:
         mol_str = get_mol_str_spice_aa(mol_str)
     else:
