@@ -33,6 +33,11 @@ To run the notebook on Graphcore IPU hardware on Paperspace:
 
 We also provide a lightweight implementation of the SCF algorithm, optimized for readability and hackability, in the notebook [notebooks/nanoDFT-demo](notebooks/nanoDFT-demo.ipynb) and in [nanodft](pyscf_ipu/nanoDFT/README.md)
 
+To run the notebook on Graphcore IPU hardware on Paperspace:
+
+[![Run on Gradient](https://assets.paperspace.io/img/gradient-badge.svg)](https://ipu.dev/ipobmC)
+
+
 Additional notebooks in [notebooks](notebooks) demonstrate other aspects of the computation.
 
 ## Installation
@@ -69,8 +74,6 @@ python density_functional_theory.py -methane -backend cpu -float32
 python density_functional_theory.py -methane -backend ipu -float32
 ```
 This will automatically compare our DFT against PySCF for methane `CH4` and report numerical errors.
-
-Please try our [NanoDFT notebook on Paperspace](https://ipu.dev/ipobmC) to easily run DFT computations on IPU [![Run on Gradient](https://assets.paperspace.io/img/gradient-badge.svg)](https://ipu.dev/ipobmC)
 
 
 ## Generating New Datasets
