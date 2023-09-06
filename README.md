@@ -11,7 +11,8 @@
 
 # PySCF on IPU
 
-PySCF-IPU is built on top of The [PySCF](https://github.com/pyscf) package, porting some of the PySCF algorithms to the Graphcore [IPU](https://www.graphcore.ai/products/ipu).
+PySCF-IPU is built on top of the [PySCF](https://github.com/pyscf) package, porting some of the PySCF algorithms to the Graphcore [IPU](https://www.graphcore.ai/products/ipu).
+
 
 Only a small portion of PySCF is currently ported, specifically Restricted Kohn Sham DFT (based on [RKS](https://github.com/pyscf/pyscf/blob/6c815a62bc2e5eae1488a1d0dbe84556dd54b922/pyscf/dft/rks.py#L531), [KohnShamDFT](https://github.com/pyscf/pyscf/blob/6c815a62bc2e5eae1488a1d0dbe84556dd54b922/pyscf/dft/rks.py#L280) and [hf.RHF](https://github.com/pyscf/pyscf/blob/6c815a62bc2e5eae1488a1d0dbe84556dd54b922/pyscf/scf/hf.py#L2044)).
 
