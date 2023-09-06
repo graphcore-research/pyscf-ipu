@@ -24,7 +24,8 @@ The package is under active development, to broaden its scope and applicability.
 ## QuickStart
 
 ### For ML dataset generation (SynS & ML Workshop 2023)
-To generate datasets based on the paper __Repurposing Density Functional Theory to Suit Deep Learning__ [Link](https://icml.cc/virtual/2023/workshop/21476#wse-detail-28485) [PDF](https://syns-ml.github.io/2023/assets/papers/17.pdf) presented at the [Syns & ML Workshop, ICML 2023](https://syns-ml.github.io/2023/), the entry point is the notebook [DFT Dataset Generation.ipynb](./notebooks/DFT-dataset-generation.ipynb), and the file [density_functional_theory.py](density_functional_theory.py).
+To generate datasets based on the paper __Repurposing Density Functional Theory to Suit Deep Learning__ [Link](https://icml.cc/virtual/2023/workshop/21476#wse-detail-28485) [PDF](https://syns-ml.github.io/2023/assets/papers/17.pdf) presented at the [Syns & ML Workshop, ICML 2023](https://syns-ml.github.io/2023/), the entry point is the notebook [DFT Dataset Generation](./notebooks/DFT-dataset-generation.ipynb), and the file [density_functional_theory.py](./density_functional_theory.py).
+
 
 To run the notebook on Graphcore IPU hardware on Paperspace:
 
@@ -32,7 +33,8 @@ To run the notebook on Graphcore IPU hardware on Paperspace:
 
 ### For DFT teaching and learning: nanoDFT
 
-We also provide a lightweight implementation of the SCF algorithm, optimized for readability and hackability, in the notebook [notebooks/nanoDFT-demo](notebooks/nanoDFT-demo.ipynb) and in [nanodft](pyscf_ipu/nanoDFT/README.md)
+We also provide a lightweight implementation of the SCF algorithm, optimized for readability and hackability, in the [nanoDFT demo](notebooks/nanoDFT-demo.ipynb) notebook and in [nanodft](pyscf_ipu/nanoDFT/README.md) folder.
+
 
 To run the notebook on Graphcore IPU hardware on Paperspace:
 
