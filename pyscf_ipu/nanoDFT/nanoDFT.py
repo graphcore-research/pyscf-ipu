@@ -1,14 +1,22 @@
 # Copyright (c) 2023 Graphcore Ltd. All rights reserved.
+import sys
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pyscf
+import h5py
+import chex
+from jaxtyping import Float, Array
 from jsonargparse import CLI, Namespace
-
-from exchange_correlation.b3lyp import b3lyp
-from electron_repulsion.direct import prepare_electron_repulsion_integrals, electron_repulsion_integrals, ipu_einsum
 from functools import partial
 from collections import namedtuple
+from icecream import ic
+
+from pyscf_ipu.nanoDFT import utils
+from pyscf_ipu.exchange_correlation.b3lyp import b3lyp
+from pyscf_ipu.electron_repulsion.direct  import (prepare_electron_repulsion_integrals,
+                                                  electron_repulsion_integrals,
+                                                  ipu_einsum)
 
 HARTREE_TO_EV = 27.2114079527
 EPSILON_B3LYP = 1e-20
@@ -60,7 +68,7 @@ def nanoDFT_iteration(i, vals, opts, mol):
     return [density_matrix, V_xc, J, K, O, H_core, L_inv, E_nuc, occupancy, ERI, grid_weights, grid_AO, diis_history, log]
 
 def exchange_correlation(density_matrix, grid_AO, grid_weights):
-    """Compute exchange correlation integral using atomic orbitals (AO) evalauted on a grid. """
+    """Compute exchange correlation integral using atomic orbitals (AO) evaluated on a grid. """
     rho = jnp.sum(grid_AO[:1] @ density_matrix * grid_AO, axis=2)                                # (4, grid_size)=(4, 45624) for C6H6.
     E_xc, vrho, vgamma = b3lyp(rho, EPSILON_B3LYP)                                               # (gridsize,) (gridsize,) (gridsize,)
     E_xc = jnp.sum(rho[0] * grid_weights * E_xc)                                                 # float=-27.968[Ha] for C6H6 at convergence.
@@ -81,28 +89,78 @@ def get_JK(density_matrix, ERI, opts, mol):
         J, K = ipu_einsum(ERI, density_matrix, mol, opts.threads, opts.multv)                    # (N, N) (N, N)
     return J, K * HYB_B3LYP                                                                      # (N, N) (N, N)
 
-def _nanoDFT(E_nuc, density_matrix, kinetic, nuclear, O, grid_AO, ERI, grid_weights,
-              mask, _input_floats, _input_ints, L_inv, diis_history, opts, mol):
+def _nanoDFT(state, opts, mol):
     # Utilize the IPUs MIMD parallism to compute the electron repulsion integrals (ERIs) in parallel.
-    if opts.backend == "ipu": ERI = electron_repulsion_integrals(_input_floats, _input_ints, mol, opts.threads_int, opts.intv)
+    if opts.backend == "ipu": state.ERI = electron_repulsion_integrals(state.input_floats, state.input_ints, mol, opts.threads_int, opts.intv)
     else: pass # Compute on CPU.
 
     # Precompute the remaining tensors.
-    E_xc, V_xc = exchange_correlation(density_matrix, grid_AO, grid_weights) # float (N, N)
-    J, K       = get_JK(density_matrix, ERI, opts, mol)                      # (N, N) (N, N)
-    H_core     = kinetic + nuclear                                           # (N, N)
+    E_xc, V_xc = exchange_correlation(state.density_matrix, state.grid_AO, state.grid_weights) # float (N, N)
+    J, K       = get_JK(state.density_matrix, state.ERI, opts, mol)                      # (N, N) (N, N)
+    H_core     = state.kinetic + state.nuclear                                           # (N, N)
 
     # Log matrices from all DFT iterations (not used by DFT algorithm).
     N = H_core.shape[0]
     log = {"matrices": np.zeros((opts.its, 4, N, N)), "E_xc": np.zeros((opts.its)), "energy": np.zeros((opts.its, 6))}
 
     # Perform DFT iterations.
-    log = jax.lax.fori_loop(0, opts.its, partial(nanoDFT_iteration, opts=opts, mol=mol), [density_matrix, V_xc, J, K, O, H_core, L_inv,  # all (N, N) matrices
-                                                            E_nuc, mask, ERI, grid_weights, grid_AO, diis_history, log])[-1]
+    log = jax.lax.fori_loop(0, opts.its, partial(nanoDFT_iteration, opts=opts, mol=mol), [state.density_matrix, V_xc, J, K, state.O, H_core, state.L_inv,  # all (N, N) matrices
+                                                            state.E_nuc, state.mask, state.ERI, state.grid_weights, state.grid_AO, state.diis_history, log])[-1]
 
     return log["matrices"], H_core, log["energy"]
 
-from icecream import ic
+
+OrbitalVector = Float[Array, "num_orbitals"]
+OrbitalMatrix = Float[Array, "num_orbitals num_orbitals"]
+TwoOrbitalMatrix = Float[Array, "num_orbitals num_orbitals num_orbitals num_orbitals"]
+Grid = Float[Array, "4 grid_size num_orbitals"]
+
+@chex.dataclass
+class IterationState:
+    """State tensors used during self-consistent field iterations
+
+    We use the following type annotations where the dimension N is the number
+    used in the linear combination of atomic orbitals (LCAO) basis set:
+
+        OrbitalVector [N] (float): Used to store the electron occupation mask
+        OrbitalMatrix [N, N] (float): Used for storing the one-electron integrals and density matrix.
+        TwoOrbitalMatrix [N, N, N, N] (float): 4-d matrix representing the two-electron
+            repulsion integrals.
+        Grid [4, grid_size, num_orbitals] (float): Numerical grid used to evaluate the
+            exchange-correlation energy integral.
+        
+
+    Attributes:
+        E_nuc (float): Energy of the nuclear-nuclear electrostatic interactions.
+        density_matrix (OrbitalMatrix): Electron density in the LCAO basis set.
+        kinetic (OrbitalMatrix): Kinetic energy integrals in the LCAO basis set.
+        nuclear (OrbitalMatrix): nuclear attraction integrals in the LCAO basis set.
+        O (OrbitalMatrix): Overlap integrals in the LCAO basis set.
+        grid_AO (Grid): Numerical grid used to evaluate the exchange-correlation energy integral.
+        ERI (TwoOrbitalMatrix): Two-electron repulsion integrals in the LCAO basis set.
+        grid_weights (Array): Weights associated with the grid_AO
+        mask (OrbitalVector): Orbital occupation mask.
+        input_floats (Array):
+        input_ints (Array):
+        L_inv (OrbitalMatrix):
+        diis_history (Array): 
+
+
+    """
+    E_nuc: float
+    density_matrix: OrbitalMatrix
+    kinetic: OrbitalMatrix
+    nuclear: OrbitalMatrix
+    O: OrbitalMatrix
+    grid_AO: Grid
+    ERI: TwoOrbitalMatrix
+    grid_weights: Array
+    mask: OrbitalVector
+    input_floats: Array
+    input_ints: Array
+    L_inv: OrbitalMatrix
+    diis_history: Array
+
 
 def init_dft_tensors_cpu(mol, opts, DIIS_iters=9):
     N                = mol.nao_nr()                                 # N=66 for C6H6 (number of atomic **and** molecular orbitals)
@@ -139,18 +197,22 @@ def init_dft_tensors_cpu(mol, opts, DIIS_iters=9):
     DIIS_H[0,1:] = DIIS_H[1:,0] = 1
     diis_history = (np.zeros((DIIS_iters, N**2)), np.zeros((DIIS_iters, N**2)), DIIS_H)
 
-    tensors = (E_nuc, density_matrix, kinetic, nuclear, O, grid_AO, ERI,
-               grid_weights, mask, input_floats, input_ints, L_inv, diis_history)
+    state = IterationState(E_nuc=E_nuc, density_matrix=density_matrix, kinetic=kinetic,
+                           nuclear=nuclear, O=O, grid_AO=grid_AO, ERI=ERI,
+                           grid_weights=grid_weights, mask=mask,
+                           input_floats=input_floats, input_ints=input_ints,
+                           L_inv=L_inv, diis_history=diis_history)
 
-    return tensors, n_electrons_half, E_nuc, N, L_inv, grid_weights, grids.coords
+
+    return state, n_electrons_half, E_nuc, N, L_inv, grid_weights, grids.coords
 
 def nanoDFT(mol, opts):
     # Init DFT tensors on CPU using PySCF.
-    tensors, n_electrons_half, E_nuc, N, L_inv, grid_weights, grid_coords = init_dft_tensors_cpu(mol, opts)
+    state, n_electrons_half, E_nuc, N, L_inv, grid_weights, grid_coords = init_dft_tensors_cpu(mol, opts)
 
     # Run DFT algorithm (can be hardware accelerated).
     jitted_nanoDFT = jax.jit(partial(_nanoDFT, opts=opts, mol=mol), backend=opts.backend)
-    vals = jitted_nanoDFT(*tensors)
+    vals = jitted_nanoDFT(state)
     logged_matrices, H_core, logged_energies = [np.asarray(a).astype(np.float64) for a in vals] # Ensure CPU
 
     # It's cheap to compute energy/hlgap on CPU in float64 from the logged values/matrices.
@@ -388,41 +450,28 @@ def nanoDFT_options(
 
     Args:
         its (int): Number of Kohn-Sham iterations.
-        mol_str (str): Molecule string, e.g., "H 0 0 0; H 0 0 1; O 1 0 0; "
+        mol_str (str): Molecule string, e.g., "H 0 0 0; H 0 0 1; O 1 0 0;" or one of:
+            'benzene', 'methane', 'TRP', 'LYN', 'TYR', 'PHE', 'LEU', 'ILE', 'HIE', 'MET', 'GLN', 'HID', 'GLH', 'VAL', 'GLU', 'THR', 'PRO', 'ASN', 'ASH', 'ASP', 'SER', 'CYS', 
+            'CYX', 'ALA', 'GLY'
         float32 (bool) : Whether to use float32 (default is float64).
         basis (str): Which Gaussian basis set to use.
         xc (str): Exchange-correlation functional. Only support B3LYP
-        backend (str): Accelerator backend to use: "-backend cpu" or "-backend ipu".
+        backend (str): Accelerator backend to use: "--backend cpu" or "--backend ipu".
         level (int): Level of grids for XC numerical integration.
         gdb (int): Which version of GDP to load {10, 11, 13, 17}.
         multv (int): Which version of our einsum algorithm to use;comptues ERI@flat(v). Different versions trades-off for memory vs sequentiality
         intv (int): Which version to use of our integral algorithm.
         threads (int): For -backend ipu. Number of threads for einsum(ERI, dm) with custom C++ (trades-off speed vs memory).
         threads_int (int): For -backend ipu. Number of threads for computing ERI with custom C++ (trades off speed vs memory).
+        threshold (float): Zero out ERIs that are below the threshold in absolute value. Not supported for '--backend ipu'. 
     """
-    if mol_str == "benzene":
-        mol_str = [
-            ["C", ( 0.0000,  0.0000, 0.0000)],
-            ["C", ( 1.4000,  0.0000, 0.0000)],
-            ["C", ( 2.1000,  1.2124, 0.0000)],
-            ["C", ( 1.4000,  2.4249, 0.0000)],
-            ["C", ( 0.0000,  2.4249, 0.0000)],
-            ["C", (-0.7000,  1.2124, 0.0000)],
-            ["H", (-0.5500, -0.9526, 0.0000)],
-            ["H", (-0.5500,  3.3775, 0.0000)],
-            ["H", ( 1.9500, -0.9526, 0.0000)], 
-            ["H", (-1.8000,  1.2124, 0.0000)],
-            ["H", ( 3.2000,  1.2124, 0.0000)],
-            ["H", ( 1.9500,  3.3775, 0.0000)]
-        ]
-    elif mol_str == "methane":
-        mol_str = [
-            ["C", (0, 0, 0)],
-            ["H", (0, 0, 1)],
-            ["H", (0, 1, 0)],
-            ["H", (1, 0, 0)],
-            ["H", (1, 1, 1)]
-        ]
+
+    # From a compound name or CID, get a list of its atoms and their coordinates
+    mol_str = utils.process_mol_str(mol_str)
+    if mol_str is None:
+        sys.exit(1)
+
+    print(f"Minimum interatomic distance: {utils.min_interatomic_distance(mol_str)}") # TODO: dies for --mol_str methane
 
     if backend=='ipu' and threshold >0.0:
         print("ERI threshold > 0.0 only if backend=='cpu'. Overriding...")
@@ -443,11 +492,15 @@ if __name__ == "__main__":
     jax.config.FLAGS.jax_platform_name = 'cpu'
     opts, mol_str = CLI(nanoDFT_options)
     assert opts.xc == "b3lyp"
-    print("float32") if opts.float32 else print("float64")
+    print("Precision: float32") if opts.float32 else print("Precision: float64")
 
     if not opts.structure_optimization:
         # Test Case: Compare nanoDFT against PySCF.
         mol = build_mol(mol_str, opts.basis)
+        
+        print(f"Number of Atomic Orbitals\t{mol.nao_nr():15d}")
+        print(f"Number of electrons\t{mol.nelectron:15d}")
+
         nanoDFT_E, (nanoDFT_logged_E, nanoDFT_hlgap, mo_energy, mo_coeff, grid_coords, grid_weights) = nanoDFT(mol, opts)
         nanoDFT_forces = grad(mol, grid_coords, grid_weights, mo_coeff, mo_energy)
         pyscf_E, pyscf_hlgap, pyscf_forces = pyscf_reference(mol_str, opts)
@@ -499,3 +552,4 @@ if __name__ == "__main__":
             plt.savefig("_tmp/tmp.jpg")
             writer.append_data(imageio.v2.imread("_tmp/tmp.jpg"))
         writer.close()
+
