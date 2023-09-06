@@ -7,8 +7,11 @@ A = A + A.T
 
 vals, vects = np.linalg.eigh(A)
 
+print("GROUND TRUTH SHAPE:", vals.shape, vects.shape, vals.reshape(6,1).shape)
+# exit()
+
 accum_errs = []
-for i in range(15):
+for i in range(6):
 
     us_vects, us_vals = jax.jit(ipu_eigh)(A, num_iters=i)
     err = us_vects - vects
@@ -23,8 +26,9 @@ for i in range(15):
     accum_errs.append(cumulated_abs_err)
 
 accum_errs_initialized = []
-for i in range(15):
-    us_vects, us_vals = jax.jit(ipu_eigh)(A, num_iters=i, initial_guess=vects)
+for i in range(6):
+    us_vects, us_vals = jax.jit(ipu_eigh)(A, num_iters=i, initial_guess=(vals, vects))
+    # us_vects, us_vals = jax.jit(ipu_eigh)(A, num_iters=i, initial_guess=(vals.reshape(6,1), vects))
 
     err = us_vects - vects
     cumulated_err = np.sum(err)
