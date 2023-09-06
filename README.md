@@ -31,7 +31,7 @@ To run the notebook on Graphcore IPU hardware on Paperspace:
 
 ### For DFT teaching and learning: nanoDFT
 
-We also provide a lightweight implementation of the SCF algorithm, optimized for readability and hackability, in the notebook [notebooks/nanoDFT-demo.py](notebooks/nanoDFT-demo.py) and in [nanodft](pyscf_ipu/nanoDFT/README.md)
+We also provide a lightweight implementation of the SCF algorithm, optimized for readability and hackability, in the notebook [notebooks/nanoDFT-demo](notebooks/nanoDFT-demo.ipynb) and in [nanodft](pyscf_ipu/nanoDFT/README.md)
 
 Additional notebooks in [notebooks](notebooks) demonstrate other aspects of the computation.
 
