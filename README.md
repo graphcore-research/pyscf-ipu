@@ -1,6 +1,6 @@
 :red_circle: :warning: **Experimental and non-official Graphcore product** :warning: :red_circle:
 
-# PySCF on IPU
+[![notebook-tests](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/notebooks.yaml/badge.svg)](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/notebooks.yaml)
 
 [**Installation guide**](#installation)
 | [**Example DFT Computations**](#example-dft-computations)
@@ -8,10 +8,8 @@
 | [**Training SchNet**](#training-schnet-on-qm1b)
 | [**QM1B dataset**](qm1b/README.md)
 
-[![Run on Gradient](https://assets.paperspace.io/img/gradient-badge.svg)](https://ipu.dev/ipobmC)
-[![notebook-tests](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/notebooks.yaml/badge.svg)](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/notebooks.yaml)
 
-**Port of PySCF to Graphcore IPU.**
+# PySCF on IPU
 
 PySCF-IPU is built on top of The [PySCF](https://github.com/pyscf) package, porting some of the PySCF algorithms to the Graphcore [IPU](https://www.graphcore.ai/products/ipu).
 
@@ -21,6 +19,21 @@ The package is under active development, to broaden its scope and applicability.
 - Number of atomic orbitals less than 70 `mol.nao_nr() <= 70`.
 - Larger numerical errors due to `np.float32` instead of `np.float64`.
 - Limited support for `jax.grad(.)`
+
+## QuickStart
+
+### For ML dataset generation (SynS & ML Workshop 2023)
+To generate datasets based on the paper __Repurposing Density Functional Theory to Suit Deep Learning__ [Link](https://icml.cc/virtual/2023/workshop/21476#wse-detail-28485) [PDF](https://syns-ml.github.io/2023/assets/papers/17.pdf) presented at the [Syns & ML Workshop, ICML 2023](https://syns-ml.github.io/2023/), the entry point is the notebook [DFT Dataset Generation.ipynb](./notebooks/DFT-dataset-generation.ipynb), and the file [density_functional_theory.py](density_functional_theory.py).
+
+To run the notebook on Graphcore IPU hardware on Paperspace:
+
+[![Run on Gradient](https://assets.paperspace.io/img/gradient-badge.svg)](https://ipu.dev/ipobmC)
+
+### For DFT teaching and learning: nanoDFT
+
+We also provide a lightweight implementation of the SCF algorithm, optimized for readability and hackability, in the notebook [notebooks/nanoDFT-demo.py](notebooks/nanoDFT-demo.py) and in [nanodft](pyscf_ipu/nanoDFT/README.md)
+
+Additional notebooks in [notebooks](notebooks) demonstrate other aspects of the computation.
 
 ## Installation
 
@@ -51,7 +64,6 @@ pip install -e .
 ## Example DFT Computations
 The following commands may be useful to check the installation. Each command runs a test-case which compares PySCF against our DFT computation using different options.
 ```
-# TODO convert to nanoDFT
 python density_functional_theory.py -methane -backend cpu # defaults to float64 as used in PySCF
 python density_functional_theory.py -methane -backend cpu -float32
 python density_functional_theory.py -methane -backend ipu -float32
