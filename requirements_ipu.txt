@@ -2,7 +2,7 @@
 #
 # See also:
 #    requirements.txt for core runtime configuration
-#    test_requirements.txt for test-only dependencies
+#    requirements_test.txt for test-only dependencies
 -r requirements.txt
 
 # Experimental JAX for IPU
