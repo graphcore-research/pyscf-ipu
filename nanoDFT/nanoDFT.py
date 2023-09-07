@@ -46,10 +46,11 @@ def nanoDFT_iteration(i, vals, opts, mol):
     if opts.diis: H, diis_history = DIIS(i, H, density_matrix, O, diis_history, opts)           # H_{i+1}=c_1H_i+...+c9H_{i-9}.
 
     # Step 2: Solve eigh (L_inv turns generalized eigh into eigh).
-    eigvects = L_inv.T @ linalg_eigh(L_inv @ H @ L_inv.T, opts, initial_guess = (eigvals, eigvects))[1]                              # (N, N)
+    eigvals, eigvects = linalg_eigh(L_inv @ H @ L_inv.T, opts, initial_guess = (eigvals, eigvects), it_count=i)                              # (N, N)
+    generalized_eigvects = L_inv.T @ eigvects
 
     # Step 3: Use result from eigenproblem to update density_matrix.
-    density_matrix = (eigvects*occupancy*2) @ eigvects.T                                        # (N, N)
+    density_matrix = (generalized_eigvects*occupancy*2) @ generalized_eigvects.T                                        # (N, N)
     E_xc, V_xc     = exchange_correlation(density_matrix, grid_AO, grid_weights)                # float (N, N)
     J, K           = get_JK(density_matrix, ERI, opts, mol)                                     # (N, N) (N, N)
 
@@ -212,11 +213,17 @@ def linalg_eigh(x, opts, initial_guess = None, it_count = None):
             x = jnp.pad(x, [(0, 1), (0, 1)], mode='constant')
             initial_guess = (jnp.pad(initial_guess[0], ((0, 1), ), mode='constant'), jnp.pad(initial_guess[1], [(0, 1), (0, 1)], mode='constant'))
 
-        # if it_count is None or initial_guess is None:
-        eigvects, eigvals = ipu_eigh(x, sort_eigenvalues=True, num_iters=12, initial_guess = initial_guess)
-        # else:
-        #     is_first_five_iterations = it_count < 5
-        #     eigvects, eigvals = ipu_eigh(x, sort_eigenvalues=True, num_iters=12, initial_guess = initial_guess * (1-is_first_five_iterations) + is_first_five_iterations * np.identity(initial_guess[1].shape[0]))
+        if it_count is None or initial_guess is None:
+            eigvects, eigvals = ipu_eigh(x, sort_eigenvalues=True, num_iters=12, initial_guess = initial_guess)
+        else:
+            is_first_five_iterations = it_count < 0
+            N=initial_guess[1].shape[0]
+            ig_a = initial_guess[0] * (1-is_first_five_iterations) + is_first_five_iterations * jnp.diag(x)#np.ones((N,))
+            ig_v = initial_guess[1] * (1-is_first_five_iterations) + is_first_five_iterations * np.identity(N)
+            ig = (ig_a, ig_v)
+            # ig = (np.diag(x), np.identity(N))
+            print("THAT's IG:", ig, is_first_five_iterations)
+            eigvects, eigvals = ipu_eigh(x, sort_eigenvalues=True, num_iters=12, initial_guess = ig)
 
         if pad:
             e1 = eigvects[-1:]
@@ -225,6 +232,10 @@ def linalg_eigh(x, opts, initial_guess = None, it_count = None):
             eigvects = eigvects[:, :-1]
             eigvects = jnp.roll(eigvects, -(-col))
             eigvects = eigvects[:-1]
+
+            eigvals = jnp.roll(eigvals, -col-1)
+            eigvals = eigvals[:-1]
+            eigvals = jnp.roll(eigvals, -(-col))
     else:
         eigvals, eigvects = jnp.linalg.eigh(x)
 
@@ -428,6 +439,7 @@ def nanoDFT_options(
     elif mol_str == "methane":
         mol_str = [
             ["C", (0, 0, 0)],
+            ["C", (2, 0, 0)],
             ["H", (0, 0, 1)],
             ["H", (0, 1, 0)],
             ["H", (1, 0, 0)],

@@ -173,6 +173,7 @@ def ipu_jacobi_eigh_iteration(all_AV_cols: Tuple[Array, ...], Atiles: Any, Vtile
         Vpcols, Vqcols = tile_rotate_columns(Vpcols, Vqcols, rotset)
         # Next rotation set.
         rotset = jacobi_next_rotation_set(rotset)
+        # jax.debug.print("ipu_jacobi_eigh_iteration returns: {a}, {b}, {c}, {d}", a=Apcols.array, b=Aqcols.array, c=Vpcols.array, d=Vqcols.array)
 
     return (Apcols.array, Aqcols.array, Vpcols.array, Vqcols.array)
 
@@ -197,6 +198,7 @@ def ipu_jacobi_eigh(x: Array, num_iters: int = 1, initial_guess: Tuple[Array, Ar
     # Initial "eigenvalues" matrix.
     # Apcols = jax.lax.slice_in_dim(x, 0, N, stride=2)
     # Aqcols = jax.lax.slice_in_dim(x, 1, N, stride=2)
+    # print("APQ:", Apcols, Apcols)
     # Initial eigenvectors (identity matrix).
     if initial_guess is None:
         Apcols = jax.lax.slice_in_dim(x, 0, N, stride=2)
@@ -209,14 +211,17 @@ def ipu_jacobi_eigh(x: Array, num_iters: int = 1, initial_guess: Tuple[Array, Ar
         print("DIAG ELSE:", initial_a, initial_guess[0])
         Apcols = jax.lax.slice_in_dim(initial_a, 0, N, stride=2)
         Aqcols = jax.lax.slice_in_dim(initial_a, 1, N, stride=2)
+        # Apcols = jax.lax.slice_in_dim(x, 0, N, stride=2)
+        # Aqcols = jax.lax.slice_in_dim(x, 1, N, stride=2)
         # Apcols = initial_a[:halfN]
         # Aqcols = initial_a[halfN:]
-        initial_v = initial_guess[1]
+        initial_v = initial_guess[1].T
         Vpcols = initial_v[0::2]
         Vqcols = initial_v[1::2]
         print("SHAPE ELSE:", initial_a.shape, Apcols.shape, Aqcols.shape, Vpcols.shape, Vqcols.shape)
         print(":::::::::::", N, initial_guess[0].shape, initial_guess[1].shape)
-        
+        # print("APQ ELSE:", Apcols, Apcols)
+
     print(">>>>>>>>>> HERE is ipu_jacobi_eigh called")
 
     # Set A and V tiling static.
