@@ -7,93 +7,97 @@ import os.path as osp
 from tessellate_ipu import create_ipu_tile_primitive, ipu_cycle_count, tile_map, tile_put_sharded, tile_put_replicated
 from functools import partial 
 from icecream import ic
+from jax.experimental import checkify
 jax.config.update('jax_platform_name', "cpu")
 jax.config.update('jax_enable_x64', False) 
 HYB_B3LYP = 0.2
 
 def get_i_j(val, precision='x32'):
-    xnp = jnp if precision=='x32' else np
+    '''
+    This ij->i,j implementation relies on sqrt in fp32 which limits the range of values
+    we are able to handle to val < N^2 = 3258^2 (about 2^21 from the total of 2^32 in an uint32)
+    '''
+    
     # we need it to work for val.dtype == uint64 when called with the main index
-    if precision == 'x32':
-        i = xnp.floor((xnp.sqrt(1 + 8*val.astype(xnp.float32)) - 1)/2).astype(xnp.uint32)
-    else:
-        i = xnp.floor((xnp.sqrt(1 + 8*val.astype(xnp.float64)) - 1)/2).astype(xnp.uint32) # NumPy only
-    j = (((val - i) - (i**2 - val))//2).astype(np.uint32)
+    xnp = jnp if precision=='x32' else np # for compatibility
+    sqrt_precision = xnp.float32 if precision=='x32' else xnp.float64
+    
+    i = xnp.floor((xnp.sqrt(1 + 8*val.astype(sqrt_precision)) - 1)/2).astype(xnp.uint32)
+    j = (((val - i) - (i**2 - val))//2).astype(np.uint32) # val - i*(i+1)/2
+
     return i, j
 
 def cpu_ijkl(value, symmetry, f): 
-    if value.shape == ():
+    indexdim = 'x64' if value.shape == () else 'x32'
+    if indexdim == 'x32':
+        # x32
+        i, j = get_i_j(value[0])
+        k, l = get_i_j(value[1])
+    else:
         # x64
         ij, kl = get_i_j(value)
         i, j = get_i_j(ij)
         k, l = get_i_j(kl)
-        v      = f(i,j,k,l,symmetry).astype(jnp.uint64)
-    else:
-        # x32
-        i, j = get_i_j(value[0])
-        k, l = get_i_j(value[1])
-        v      = f(i,j,k,l,symmetry).astype(jnp.uint32)
-    
-    return v
+
+    return f(i,j,k,l,symmetry)
 cpu_ijkl = jax.vmap(cpu_ijkl, in_axes=(0, None, None))
 
 @partial(jax.jit, backend="ipu")
 def ipu_ijkl(nonzero_indices, symmetry, N):
+    indexdim = 'x32' if nonzero_indices.shape[-1] == 2 else 'x64'
     vertex_filename  = osp.join(osp.dirname(__file__), "compute_indices.cpp")
     compute_indices= create_ipu_tile_primitive(
-            "SymmetryIndices",
-            "SymmetryIndices",
-            inputs=["value", "symmetry", "input_N", "start", "stop"],
+            "SymmetryIndices2D" if indexdim == 'x32' else "SymmetryIndices1D",
+            "SymmetryIndices2D" if indexdim == 'x32' else "SymmetryIndices1D",
+            inputs=["value_ij", "value_kl", "symmetry", "input_N", "start", "stop"] if indexdim == 'x32' else ["value", "symmetry", "input_N", "start", "stop"],
             outputs={"out": 0},
             gp_filename=vertex_filename,
             perf_estimate=100,
     )
 
+    size = nonzero_indices.shape[0]
+    total_threads = (1472-1) * 6 
+    remainder = size % total_threads
     
-    if nonzero_indices.shape[-1] == 2:
+    if indexdim == 'x32':
         # x32
-        ic(nonzero_indices.shape)
-        size = np.prod(nonzero_indices.shape[:-1])
-        total_threads = (1472-1) * 6 
-        remainder = size % total_threads
         if remainder != 0: 
             nonzero_indices = jnp.pad(nonzero_indices, ((0, total_threads-remainder), (0, 0)))
-        nonzero_indices = nonzero_indices.reshape(total_threads, -1)
-        stop = nonzero_indices.shape[1]//2
-        ic(nonzero_indices.shape)
+        nonzero_indices = nonzero_indices.reshape(total_threads, -1, 2)
     else:
         # x64
-        ic(nonzero_indices.shape)
-        size = np.prod(nonzero_indices.shape)
-        total_threads = (1472-1) * 6 
-        remainder = size % total_threads
         if remainder != 0: 
             nonzero_indices = jnp.pad(nonzero_indices, (0, total_threads-remainder))
         nonzero_indices = nonzero_indices.reshape(total_threads, -1) 
-        stop = nonzero_indices.shape[1]
-        ic(nonzero_indices.shape)
+    
+    stop = nonzero_indices.shape[1]
 
-    tiles = tuple((np.arange(0,total_threads) % (1471) + 1).astype(np.int32).tolist())
-    nonzero_indices = tile_put_sharded(nonzero_indices, tiles)
+    tiles = tuple((np.arange(0,total_threads) % (1471) + 1).astype(np.uint32).tolist())
     symmetry = tile_put_replicated(jnp.array(symmetry, dtype=jnp.uint32),   tiles) 
     N        = tile_put_replicated(jnp.array(N, dtype=jnp.uint32),   tiles)
     start    = tile_put_replicated(jnp.array(0, dtype=jnp.uint32),   tiles)
     stop     = tile_put_replicated(jnp.array(stop, dtype=jnp.uint32),   tiles)
-
-    value = tile_map(compute_indices, nonzero_indices, symmetry, N, start, stop)  
+    if indexdim == 'x32':
+        nonzero_indices_ij = tile_put_sharded(nonzero_indices[:, :, 0], tiles)
+        nonzero_indices_kl = tile_put_sharded(nonzero_indices[:, :, 1], tiles)
+        value = tile_map(compute_indices, nonzero_indices_ij, nonzero_indices_kl, symmetry, N, start, stop)
+    else:
+        nonzero_indices = tile_put_sharded(nonzero_indices, tiles)
+        value = tile_map(compute_indices, nonzero_indices, symmetry, N, start, stop)
 
     return value.array.reshape(-1)[:size]
 
 def num_repetitions_fast(value):
-    if value.shape == ():
+    indexdim = 'x64' if value.shape == () else 'x32'
+    if indexdim == 'x32':
+        # x32
+        i, j = get_i_j(value[0])
+        k, l = get_i_j(value[1])
+    else:
         # x64
         ij, kl = get_i_j(value)
         i, j = get_i_j(ij)
         k, l = get_i_j(kl)
-    else:
-        # x32
-        i, j = get_i_j(value[0])
-        k, l = get_i_j(value[1])
 
     # compute: repetitions = 2^((i==j) + (k==l) + (k==i and l==j or k==j and l==i))
     repetitions = 2**(
@@ -129,8 +133,6 @@ def sparse_symmetric_einsum(nonzero_distinct_ERI, nonzero_indices, dm, backend):
             indices = nonzero_indices[i]
             eris    = nonzero_distinct_ERI[i]
 
-            ic(indices)
-
             if backend == "cpu": dm_indices = cpu_ijkl(indices, symmetry+is_K_matrix*8, indices_func)  
             else:                dm_indices = ipu_ijkl(indices, symmetry+is_K_matrix*8, N)  
             dm_values  = jnp.take(dm, dm_indices, axis=0) # causes peak 1 
@@ -161,6 +163,9 @@ if __name__ == "__main__":
     parser.add_argument('-batches', default=5)
     parser.add_argument('-nipu', default=16)
     parser.add_argument('-skip', action="store_true") 
+    parser.add_argument('-indexdim', default='x32', choices=['x64', 'x32']) 
+    parser.add_argument('-indexcheck', action="store_true") 
+    
     args = parser.parse_args()
     backend = args.backend 
 
@@ -173,7 +178,7 @@ if __name__ == "__main__":
     mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*j} {1.54*i};" for i in range(natm) for j in range(natm))) 
     mol.build()
     N = mol.nao_nr()
-    print("[%i]"%mol.nao_nr())
+    print("N %i"%mol.nao_nr())
     if not args.skip: 
         print("dense_ERI", time.time()-start)
         dense_ERI = mol.intor("int2e_sph", aosym="s1")
@@ -202,21 +207,23 @@ if __name__ == "__main__":
     nonzero_indices = nonzero_indices_2d
     print(nonzero_indices.shape)
     # ------------------------------ #
-    a = nonzero_indices_x64
-    b = (nonzero_indices[:,0].astype(np.uint64)*(nonzero_indices[:,0].astype(np.uint64)+1)/2+nonzero_indices[:,1].astype(np.uint64)).astype(np.uint64)
-    assert np.equal(a, b).all(), (a, b, np.nonzero(np.abs(a-b)))
-    print('Check: 1D (ijkl) to 2D (ij,kl) decomposition is accurate')
-    nonzero_indices_4d = np.concatenate(get_i_j(nonzero_indices_2d), axis=1) # ij,kl x32 -> i,j,k,l x32 -- shape=(?, 2)
-    nonzero_indices_4d = nonzero_indices_4d.astype(np.uint32)
-    a = nonzero_indices_x64
-    b_ij = (nonzero_indices_4d[:,0].astype(np.uint64)*(nonzero_indices_4d[:,0].astype(np.uint64)+1)/2+nonzero_indices_4d[:,2].astype(np.uint64)).astype(np.uint64)
-    b_kl = (nonzero_indices_4d[:,1].astype(np.uint64)*(nonzero_indices_4d[:,1].astype(np.uint64)+1)/2+nonzero_indices_4d[:,3].astype(np.uint64)).astype(np.uint64)
-    b = (b_ij*(b_ij+1)/2+b_kl).astype(np.uint64)
-    assert np.equal(a, b).all(), (a, b, np.nonzero(np.abs(a-b)), np.nonzero(np.abs(a-b))[0].shape)
-    print('Check: 2D (ij,kl) to 4D (i,j,k,l) decomposition is accurate')
+    if args.indexcheck:
+        a = nonzero_indices_x64
+        b = (nonzero_indices[:,0].astype(np.uint64)*(nonzero_indices[:,0].astype(np.uint64)+1)/2+nonzero_indices[:,1].astype(np.uint64)).astype(np.uint64)
+        assert np.equal(a, b).all(), (a, b, np.nonzero(np.abs(a-b)))
+        print('Check: 1D (ijkl) to 2D (ij,kl) decomposition is accurate')
+        nonzero_indices_4d = np.concatenate(get_i_j(nonzero_indices_2d), axis=1) # ij,kl x32 -> i,j,k,l x32 -- shape=(?, 2)
+        nonzero_indices_4d = nonzero_indices_4d.astype(np.uint32)
+        a = nonzero_indices_x64
+        b_ij = (nonzero_indices_4d[:,0].astype(np.uint64)*(nonzero_indices_4d[:,0].astype(np.uint64)+1)/2+nonzero_indices_4d[:,2].astype(np.uint64)).astype(np.uint64)
+        b_kl = (nonzero_indices_4d[:,1].astype(np.uint64)*(nonzero_indices_4d[:,1].astype(np.uint64)+1)/2+nonzero_indices_4d[:,3].astype(np.uint64)).astype(np.uint64)
+        b = (b_ij*(b_ij+1)/2+b_kl).astype(np.uint64)
+        assert np.equal(a, b).all(), (a, b, np.nonzero(np.abs(a-b)), np.nonzero(np.abs(a-b))[0].shape)
+        print('Check: 2D (ij,kl) to 4D (i,j,k,l) decomposition is accurate')
     # ------------------------------ #
     # orig
-    # nonzero_indices = nonzero_indices_x64
+    if args.indexdim == 'x64':
+        nonzero_indices = nonzero_indices_x64
     # ------------------------------ #
     if not args.skip: 
         print("dense: ", dense_ERI.shape, dense_ERI.nbytes/10**6)
