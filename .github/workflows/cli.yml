@@ -1,0 +1,29 @@
+name: nanoDFT CLI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  nanoDFT-cli:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-python@v3
+    
+    - name: Install default requirements
+      run: |
+        pip install -U pip
+        pip install -e .
+
+    - name: Log installed environment
+      run: |
+        python3 -m pip freeze
+
+    - name: Test nanoDFT CLI on CPU
+      run: |
+        nanoDFT
+
+
+        

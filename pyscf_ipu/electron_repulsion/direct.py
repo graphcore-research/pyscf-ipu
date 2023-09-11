@@ -39,8 +39,10 @@ def get_atom_string(atoms, locs):
       str += "%s %4f %4f %4f; "%((atom,) + tuple(loc) )
     return atom_string, str
 
-
-NUM_TILES = jax.devices("ipu")[0].num_tiles
+try:
+    NUM_TILES = jax.devices("ipu")[0].num_tiles
+except:
+    NUM_TILES = 1472
 
 @partial(jax.jit, backend="ipu", static_argnums=(3,))
 def single(input_floats, input_ints, input_ijkl, tiles):
