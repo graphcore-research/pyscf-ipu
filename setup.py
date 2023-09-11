@@ -16,7 +16,8 @@ def read_requirements(file):
     return list(filter(remove_comments, txt))
 
 
-install_requires = read_requirements("requirements.txt")
+install_requires = read_requirements("requirements_core.txt")
+cpu_requires = read_requirements("requirements_cpu.txt")
 ipu_requires = read_requirements("requirements_ipu.txt")
 test_requires = read_requirements("requirements_test.txt")
 
@@ -47,7 +48,7 @@ setup(
         "Programming Language :: Python :: 3",
     ],
     install_requires=install_requires,
-    extras_require={"test": test_requires, "ipu": ipu_requires},
+    extras_require={"cpu": cpu_requires, "ipu": ipu_requires, "test": test_requires},
     python_requires=">=3.8",
     packages=["pyscf_ipu"],
     entry_points={"console_scripts": ["nanoDFT=pyscf_ipu.nanoDFT:main"]},

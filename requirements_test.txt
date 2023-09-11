@@ -1,7 +1,8 @@
 # Test dependencies for pyscf-ipu
 #
 # See also:
-#    requirements.txt for core runtime configuration
+#    requirements_core.txt for core runtime configuration
+#    requirements_cpu.txt for cpu backend configuration
 #    requirements_ipu.txt for ipu backend configuration
 pytest
 nbmake
