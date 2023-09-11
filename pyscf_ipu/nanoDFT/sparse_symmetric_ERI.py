@@ -27,8 +27,8 @@ def ipu_ijkl(nonzero_indices, symmetry, N):
     compute_indices= create_ipu_tile_primitive(
             "IndicesIJKL" ,
             "IndicesIJKL" ,
-            inputs=["i_", "j_", "k_", "l_", "symmetry", "input_N", "start", "stop"], 
-            outputs={"out": 0},
+            inputs=["i_", "j_", "k_", "l_", "sym_", "N_", "start_", "stop_"], 
+            outputs={"out_": 0},
             gp_filename=vertex_filename,
             perf_estimate=100,
     )
@@ -182,9 +182,9 @@ if __name__ == "__main__":
     kl = kl.reshape(nipu, batches, -1)
     nonzero_distinct_ERI = nonzero_distinct_ERI.reshape(nipu, batches, -1)
 
-    _i, j = get_i_j(ij.reshape(-1))
+    i, j = get_i_j(ij.reshape(-1))
     k, l  = get_i_j(kl.reshape(-1))
-    nonzero_indices = np.vstack([_i,j,k,l]).T.reshape(nipu, batches, -1, 4).astype(np.int16)
+    nonzero_indices = np.vstack([i,j,k,l]).T.reshape(nipu, batches, -1, 4).astype(np.int16)
     nonzero_indices = jax.lax.bitcast_convert_type(nonzero_indices, np.float16)
 
     diff_JK = jax.pmap(sparse_symmetric_einsum, in_axes=(0,0,None,None), static_broadcasted_argnums=(3,), backend=backend, axis_name="p")(nonzero_distinct_ERI, nonzero_indices, dm, args.backend) 
