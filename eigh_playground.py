@@ -1,6 +1,7 @@
 import numpy as np
 import jax
 from tessellate_ipu_local import ipu_eigh
+import jax.numpy as jnp
 
 ITERATIONS = 6
 
@@ -13,25 +14,29 @@ print("GROUND TRUTH SHAPE:", vals.shape, vects.shape, vals.reshape(6,1).shape)
 # exit()
 
 accum_errs = []
-# for i in range(ITERATIONS):
+for i in range(ITERATIONS):
 
-#     us_vects, us_vals = jax.jit(ipu_eigh)(A, num_iters=i)
-#     err = us_vects - vects
-#     cumulated_err = np.sum(err)
-#     abs_err = np.abs(us_vects) - np.abs(vects)
-#     cumulated_abs_err = np.sum(np.abs(abs_err))
-# # print(vects)
-# # print(us_vects)
-#     # print(err)
-#     # print(abs_err)
-#     print("iter:", i, "cumulated abs err:", cumulated_abs_err, "cumulated err:", cumulated_err)
-#     accum_errs.append(cumulated_abs_err)
+    us_vects, us_vals = jax.jit(ipu_eigh)(A, num_iters=i)
+    us_vects = np.asarray(us_vects)
+    us_vals = np.asarray(us_vals)
+    err = us_vects - vects
+    cumulated_err = np.sum(err)
+    abs_err = np.abs(us_vects) - np.abs(vects)
+    cumulated_abs_err = np.sum(np.abs(abs_err))
+# print(vects)
+# print(us_vects)
+    # print(err)
+    # print(abs_err)
+    print("iter:", i, "cumulated abs err:", cumulated_abs_err, "cumulated err:", cumulated_err)
+    accum_errs.append(cumulated_abs_err)
 
 # vects, vals = jax.jit(ipu_eigh)(A, num_iters=10)
 
 accum_errs_initialized = []
 for i in range(ITERATIONS):
-    us_vects, us_vals = jax.jit(ipu_eigh)(A, num_iters=i, initial_guess=(vals, vects))
+    us_vects, us_vals = jax.jit(ipu_eigh)(A, num_iters=i, initial_guess=(jnp.diag(vals), vects))
+    us_vects = np.asarray(us_vects)
+    us_vals = np.asarray(us_vals)
     # us_vects, us_vals = jax.jit(ipu_eigh)(A, num_iters=i, initial_guess=(vals.reshape(6,1), vects))
 
     err = us_vects - vects

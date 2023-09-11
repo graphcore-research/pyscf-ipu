@@ -41,6 +41,7 @@ def nanoDFT_iteration(i, vals, opts, mol):
     density_matrix, V_xc, J, K, O, H_core, L_inv, eigvals, eigvects          = vals[:9]                  # All (N, N) matrices
     E_nuc, occupancy, ERI, grid_weights, grid_AO, diis_history, log = vals[9:]                  # Varying types/shapes.
 
+    print("nanoDFT_iteration EIGVALS and EIGVECTS", eigvals, eigvects)
     # Step 1: Update Hamiltonian (optionally use DIIS to improve DFT convergence).
     H = H_core + J - K/2 + V_xc                                                                 # (N, N)
     if opts.diis: H, diis_history = DIIS(i, H, density_matrix, O, diis_history, opts)           # H_{i+1}=c_1H_i+...+c9H_{i-9}.
@@ -100,9 +101,13 @@ def _nanoDFT(E_nuc, density_matrix, kinetic, nuclear, O, grid_AO, ERI, grid_weig
     # Perform DFT iterations.
     eigenvals = np.ones((N,))
     eigvectors = np.eye(N) #if N%2 == 0 else np.eye(N+1)
-    log = jax.lax.fori_loop(0, opts.its, partial(nanoDFT_iteration, opts=opts, mol=mol), [density_matrix, V_xc, J, K, O, H_core, L_inv, eigenvals, eigvectors, # all (N, N) matrices || not all acutally = eigenvals are (N,)
-                                                            E_nuc, mask, ERI, grid_weights, grid_AO, diis_history, log])[-1]
-
+    # log = jax.lax.fori_loop(0, opts.its, partial(nanoDFT_iteration, opts=opts, mol=mol), [density_matrix, V_xc, J, K, O, H_core, L_inv, eigenvals, eigvectors, # all (N, N) matrices || not all acutally = eigenvals are (N,)
+    #                                                         E_nuc, mask, ERI, grid_weights, grid_AO, diis_history, log])[-1]
+    vals = [density_matrix, V_xc, J, K, O, H_core, L_inv, eigenvals, eigvectors, # all (N, N) matrices || not all acutally = eigenvals are (N,)
+            E_nuc, mask, ERI, grid_weights, grid_AO, diis_history, log]
+    for i in range(0, opts.its):
+        vals = jax.jit(partial(nanoDFT_iteration, opts=opts, mol=mol))(i, vals)
+    log = vals[-1]
     return log["matrices"], H_core, log["energy"]
 
 from icecream import ic
@@ -209,19 +214,34 @@ def linalg_eigh(x, opts, initial_guess = None, it_count = None):
             print("INITIAL GUESS SHAPES:", initial_guess[0].shape, initial_guess[1].shape)
         n = x.shape[0]
         pad = n % 2
+        # initial_guess = None
         if pad:
             x = jnp.pad(x, [(0, 1), (0, 1)], mode='constant')
             initial_guess = (jnp.pad(initial_guess[0], ((0, 1), ), mode='constant'), jnp.pad(initial_guess[1], [(0, 1), (0, 1)], mode='constant'))
 
         if it_count is None or initial_guess is None:
             eigvects, eigvals = ipu_eigh(x, sort_eigenvalues=True, num_iters=12, initial_guess = initial_guess)
+        # elif it_count == 0:
+        #     eigvects, eigvals = ipu_eigh(x, sort_eigenvalues=True, num_iters=12, initial_guess = (x, jnp.ones(N)))
         else:
-            is_first_five_iterations = it_count < 0
+            is_first_five_iterations = True #it_count < 2
             N=initial_guess[1].shape[0]
-            ig_a = initial_guess[0] * (1-is_first_five_iterations) + is_first_five_iterations * jnp.diag(x)#np.ones((N,))
-            ig_v = initial_guess[1] * (1-is_first_five_iterations) + is_first_five_iterations * np.identity(N)
+            # ig_a = initial_guess[0] * (1-is_first_five_iterations) + is_first_five_iterations * np.ones((N,)) #jnp.diag(x)#
+            # ig_v = initial_guess[1] * (1-is_first_five_iterations) + is_first_five_iterations * np.identity(N)
+            # ig_a = initial_guess[0] * (1-is_first_five_iterations)
+            # ig_v = initial_guess[1] * (1-is_first_five_iterations)
+            # ig_a = initial_guess[0]
+            ig_a = np.zeros((N,))
+            # ig_a = x * (it_count==0) + (x - jnp.diag(jnp.diag(x)) + jnp.diag(initial_guess[0])) * (1 - (it_count==0))
+            #[A1 0 0 ]
+            #[0 A2 0 ]
+            #[0 0  A3]
+            # ig_v = initial_guess[1] 
+            # ig_v = jnp.identity(N)
+            n = 10
+            ig_v = jnp.identity(N) * (it_count<=n) + initial_guess[1] * (1 - (it_count<=n))
             ig = (ig_a, ig_v)
-            # ig = (np.diag(x), np.identity(N))
+            # ig = (np.diag(x), jnp.identity(N))
             print("THAT's IG:", ig, is_first_five_iterations)
             eigvects, eigvals = ipu_eigh(x, sort_eigenvalues=True, num_iters=12, initial_guess = ig)
 

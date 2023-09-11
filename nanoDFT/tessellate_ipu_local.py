@@ -207,7 +207,7 @@ def ipu_jacobi_eigh(x: Array, num_iters: int = 1, initial_guess: Tuple[Array, Ar
         Vqcols = np.identity(N)[1::2]
         print("SHAPE DEFAULT:", x.shape, Apcols.shape, Aqcols.shape, Vpcols.shape, Vqcols.shape)
     else:
-        initial_a = jnp.diag(initial_guess[0])
+        initial_a = initial_guess[0]
         print("DIAG ELSE:", initial_a, initial_guess[0])
         Apcols = jax.lax.slice_in_dim(initial_a, 0, N, stride=2)
         Aqcols = jax.lax.slice_in_dim(initial_a, 1, N, stride=2)
@@ -215,7 +215,7 @@ def ipu_jacobi_eigh(x: Array, num_iters: int = 1, initial_guess: Tuple[Array, Ar
         # Aqcols = jax.lax.slice_in_dim(x, 1, N, stride=2)
         # Apcols = initial_a[:halfN]
         # Aqcols = initial_a[halfN:]
-        initial_v = initial_guess[1].T
+        initial_v = initial_guess[1].T ## Need to transpose the eigvecs since it is transposed before being returned from ipu_eigh
         Vpcols = initial_v[0::2]
         Vqcols = initial_v[1::2]
         print("SHAPE ELSE:", initial_a.shape, Apcols.shape, Aqcols.shape, Vpcols.shape, Vqcols.shape)
