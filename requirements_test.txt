@@ -1,0 +1,7 @@
+# Test dependencies for pyscf-ipu
+#
+# See also:
+#    requirements.txt for core runtime configuration
+#    requirements_ipu.txt for ipu backend configuration
+pytest
+nbmake

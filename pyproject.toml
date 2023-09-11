@@ -8,6 +8,6 @@ authors = [
 
 [tool.setuptools]
 packages = [
-   "pyscf_utils", "electron_repulsion", "exchange_correlation", "nanoDFT"
+   "pyscf_ipu"
 ]
 

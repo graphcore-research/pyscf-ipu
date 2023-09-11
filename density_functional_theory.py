@@ -10,36 +10,36 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 sns.set_style("darkgrid")
 from tqdm import tqdm
-import scipy
 import os
 import pyscf
-from pyscf import gto, scf
+from pyscf import scf
 from pyscf import __config__
 import argparse
 from natsort import natsorted
 import sys
-from rdkit import Chem
-from rdkit.Chem import AllChem
-import csv
 import numpy as np
 import pyscf.dft
 from pyscf.scf import hf
 from pyscf.gto.mole import Mole
 from pyscf import scf
-from pyscf import gto
 import time
 import pandas as pd
 import re
-from pyscf_utils.minao      import minao
-from pyscf_utils.build_grid import build_grid
-from pyscf_utils.build_mol  import build_mol
-from exchange_correlation.b3lyp import b3lyp
-from exchange_correlation.b3lyp import do_lda as lda
 from rdkit import Chem
 from rdkit.Chem import AllChem
 from rdkit import RDLogger
-from electron_repulsion.direct import prepare_int_floats, prepare_integrals_2_inputs
-from electron_repulsion.direct import prepare_integrals_2_inputs, compute_integrals_2, ipu_direct_mult, prepare_ipu_direct_mult_inputs
+
+from pyscf_ipu.pyscf_utils.minao            import minao
+from pyscf_ipu.pyscf_utils.build_grid       import build_grid
+from pyscf_ipu.pyscf_utils.build_mol        import build_mol
+from pyscf_ipu.exchange_correlation.b3lyp   import b3lyp
+from pyscf_ipu.exchange_correlation.b3lyp   import do_lda as lda
+from pyscf_ipu.electron_repulsion.direct    import prepare_int_floats, prepare_integrals_2_inputs
+from pyscf_ipu.electron_repulsion.direct    import (prepare_ipu_direct_mult_inputs,
+                                                    prepare_integrals_2_inputs,
+                                                    compute_integrals_2,
+                                                    ipu_direct_mult)
+
 lg = RDLogger.logger()
 lg.setLevel(RDLogger.CRITICAL)
 
@@ -88,7 +88,7 @@ def _do_compute(density_matrix, kinetic, nuclear, overlap, ao,
         allvals = np.zeros((args.its, density_matrix.shape[0]))
 
         if args.backend == "ipu" and not args.ipumult:
-            from electron_repulsion.direct import prepare_integrals_2_inputs , compute_integrals_2
+            from pyscf_ipu.electron_repulsion.direct import prepare_integrals_2_inputs , compute_integrals_2
             _, _, _tuple_ijkl, _shapes, _sizes, _counts, indxs, indxs_inv, num_calls = prepare_integrals_2_inputs(mol)
             args.indxs = indxs
             if not args.seperate:
