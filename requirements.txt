@@ -25,6 +25,5 @@ py3Dmol
 setuptools < 60.0
 
 jax==0.3.16
-jaxlib==0.3.15
 jaxtyping==0.2.8
 chex
