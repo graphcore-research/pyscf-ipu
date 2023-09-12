@@ -21,12 +21,6 @@ cpu_requires = read_requirements("requirements_cpu.txt")
 ipu_requires = read_requirements("requirements_ipu.txt")
 test_requires = read_requirements("requirements_test.txt")
 
-# url = "https://github.com/graphcore-research/jax-experimental/releases/latest/download/"
-# ipu_requires = [
-#     f"jaxlib @ {url}jaxlib-0.3.15-cp38-none-manylinux2014_x86_64.whl",
-#     f"jax @ {url}jax-0.3.16-py3-none-any.whl",
-# ]
-
 setup(
     name="pyscf-ipu",
     version=__version__,
