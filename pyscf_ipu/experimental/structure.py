@@ -61,44 +61,29 @@ def to_pyscf(
     return mol
 
 
-def water():
-    r"""Single water molecule
-    Structure of single water molecule calculated with DFT using B3LYP
-    functional and 6-31+G** basis set <https://cccbdb.nist.gov/>"""
-    return Structure(
-        atomic_number=np.array([8, 1, 1]),
-        position=np.array(
-            [
-                [0.0000, 0.0000, 0.1165],
-                [0.0000, 0.7694, -0.4661],
-                [0.0000, -0.7694, -0.4661],
-            ]
-        ),
-        is_bohr=False,
-    )
+def molecule(name: str):
+    name = name.lower()
 
+    if name == "h2":
+        return Structure(
+            atomic_number=np.array([1, 1]),
+            position=np.array([[0.0, 0.0, 0.0], [1.4, 0.0, 0.0]]),
+        )
 
-def benzene():
-    r"""Benzene ring
-    Structure of benzene ring calculated with DFT using B3LYP functional
-    and 6-31+G** basis set <https://cccbdb.nist.gov/>"""
-    return Structure(
-        atomic_number=np.array([6, 6, 6, 6, 6, 6, 1, 1, 1, 1, 1, 1]),
-        position=np.array(
-            [
-                [0.0000000, 1.3983460, 0.0000000],
-                [1.2110030, 0.6991730, 0.0000000],
-                [1.2110030, -0.6991730, 0.0000000],
-                [0.0000000, -1.3983460, 0.0000000],
-                [-1.211003, -0.699173, 0.0000000],
-                [-1.211003, 0.6991730, 0.0000000],
-                [0.0000000, 2.4847510, 0.0000000],
-                [2.1518570, 1.2423750, 0.0000000],
-                [2.1518570, -1.2423750, 0.0000000],
-                [0.0000000, -2.4847510, 0.0000000],
-                [-2.151857, -1.242375, 0.0000000],
-                [-2.151857, 1.2423750, 0.0000000],
-            ]
-        ),
-        is_bohr=False,
-    )
+    if name == "water":
+        r"""Single water molecule
+        Structure of single water molecule calculated with DFT using B3LYP
+        functional and 6-31+G** basis set <https://cccbdb.nist.gov/>"""
+        return Structure(
+            atomic_number=np.array([8, 1, 1]),
+            position=np.array(
+                [
+                    [0.0000, 0.0000, 0.1165],
+                    [0.0000, 0.7694, -0.4661],
+                    [0.0000, -0.7694, -0.4661],
+                ]
+            ),
+            is_bohr=False,
+        )
+
+    raise NotImplementedError(f"No structure registered for: {name}")
