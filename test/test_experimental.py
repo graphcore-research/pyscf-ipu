@@ -196,7 +196,16 @@ def test_eri_basis():
     assert_allclose(actual, expect, atol=1e-4)
 
 
+def is_mem_limited():
+    # Check if we are running on a limited memory host (e.g. github action)
+    import psutil
+
+    total_mem_gib = psutil.virtual_memory().total // 1024**3
+    return total_mem_gib < 10
+
+
 @pytest.mark.parametrize("sparse", [True, False])
+@pytest.mar.skipif(is_mem_limited(), reason="Not enough host memory!")
 def test_water_eri(sparse):
     basis_name = "sto-3g"
     h2o = molecule("water")
