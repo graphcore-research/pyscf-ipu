@@ -44,6 +44,9 @@ def batch_orbitals(orbitals: Tuple[Orbital]):
     primitives = tree_map(lambda *xs: jnp.stack(xs), *primitives)
     coefficients = jnp.concatenate([o.coefficients for o in orbitals])
     orbital_index = jnp.concatenate(
-        [i * jnp.ones(len(o), dtype=jnp.int32) for i, o in enumerate(orbitals)]
+        [
+            i * jnp.ones(o.num_primitives, dtype=jnp.int32)
+            for i, o in enumerate(orbitals)
+        ]
     )
     return primitives, coefficients, orbital_index
