@@ -208,7 +208,7 @@ def nanoDFT(mol, opts):
         print(distinct_ERI.size)
         indxs = np.abs(distinct_ERI)<1e-7
         distinct_ERI[indxs] = 0
-        nonzero_indices      = np.nonzero(distinct_ERI)[0].astype(np.int32)
+        nonzero_indices      = np.nonzero(distinct_ERI)[0].astype(np.uint64)
         nonzero_distinct_ERI = distinct_ERI[nonzero_indices].astype(np.float32)
 
         ij, kl               = get_i_j(nonzero_indices)
@@ -532,7 +532,31 @@ def nanoDFT_options(
         #mol_str = [["C", (0, i*1.5, j*1.5)] for i in range(5) for j in range(5)]
         #mol_str = [["C", (0, i*1.5, j*1.5)] for i in range(6) for j in range(6)]
         #mol_str = [["C", (0, i*1.5, j*1.5)] for i in range(7) for j in range(7)] 
+    elif mol_str == "c20":
+        mol_str = """C     1.56910  -0.65660  -0.93640    ;
+        C     1.76690   0.64310  -0.47200    ;
+        C     0.47050  -0.66520  -1.79270   ;
+        C     0.01160   0.64780  -1.82550  ;
+        C     0.79300   1.46730  -1.02840 ;
+        C    -0.48740  -1.48180  -1.21570;
+        C    -1.56350  -0.65720  -0.89520     ;
+        C    -1.26940   0.64900  -1.27670     ;
+        C    -0.00230  -1.96180  -0.00720    ;
+        C    -0.76980  -1.45320   1.03590   ;
+        C    -1.75760  -0.63800   0.47420  ;
+        C     1.28780  -1.45030   0.16290 ;
+        C     1.28960  -0.65950   1.30470;
+        C     0.01150  -0.64600   1.85330    ;
+        C     1.58300   0.64540   0.89840    ;
+        C     0.48480   1.43830   1.19370   ;
+        C    -0.50320   0.64690   1.77530  ;
+        C    -1.60620   0.67150   0.92310 ;
+        C    -1.29590   1.48910  -0.16550;
+        C    -0.01020   1.97270  -0.00630    ;"""
+
+
     
+
     args = locals()
     mol_str = args["mol_str"]
     del args["mol_str"]
