@@ -191,11 +191,13 @@ def init_dft_tensors_cpu(mol, opts, DIIS_iters=9):
 
     input_floats, input_ints = prepare_electron_repulsion_integrals(mol)[:2]
     mask = np.concatenate([np.ones(n_electrons_half), np.zeros(N-n_electrons_half)])
-
-    # DIIS is an optional technique to improve DFT convergence.
-    DIIS_H       = np.zeros((DIIS_iters+1, DIIS_iters+1))
-    DIIS_H[0,1:] = DIIS_H[1:,0] = 1
-    diis_history = (np.zeros((DIIS_iters, N**2)), np.zeros((DIIS_iters, N**2)), DIIS_H)
+    diis_history = None
+    
+    if opts.diis:
+        # DIIS is an optional technique to improve DFT convergence.
+        DIIS_H       = np.zeros((DIIS_iters+1, DIIS_iters+1))
+        DIIS_H[0,1:] = DIIS_H[1:,0] = 1
+        diis_history = (np.zeros((DIIS_iters, N**2)), np.zeros((DIIS_iters, N**2)), DIIS_H)
 
     state = IterationState(E_nuc=E_nuc, density_matrix=density_matrix, kinetic=kinetic,
                            nuclear=nuclear, O=O, grid_AO=grid_AO, ERI=ERI,
