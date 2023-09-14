@@ -1,3 +1,8 @@
+# Runtime dependencies for pyscf-ipu
+#
+# See also:
+#    requirements_ipu.txt for ipu backend configuration
+#    requirements_test.txt for test-only dependencies    
 numpy
 matplotlib
 pandas
@@ -22,6 +27,3 @@ setuptools < 60.0
 jax==0.3.16
 jaxlib==0.3.15
 jaxtyping==0.2.8
-
-# test notebooks with pytest --nbmake <notebook path>
-nbmake
