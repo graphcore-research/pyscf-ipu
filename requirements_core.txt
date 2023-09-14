@@ -21,6 +21,8 @@ jsonargparse[all]
 mogli
 imageio[ffmpeg]
 py3Dmol
+basis-set-exchange
+periodictable
 
 # silence warnings about setuptools + numpy
 setuptools < 60.0

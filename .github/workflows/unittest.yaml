@@ -1,0 +1,38 @@
+name: unit tests
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  pytest-container:
+    runs-on: ubuntu-latest
+    container:
+      image:  graphcore/pytorch:3.2.0-ubuntu-20.04
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name : Install package dependencies
+        run: |
+          apt update -y
+          apt install git -y
+
+      - name: Install requirements
+        run: |
+          pip install -U pip
+          pip install -r requirements_ipu.txt
+          pip install -r requirements_test.txt
+          pip install -e .
+
+      - name: Log installed environment
+        run: |
+          python3 -m pip freeze
+
+      - name: Run unit tests
+        env:
+          JAX_IPU_USE_MODEL: 1
+          JAX_IPU_MODEL_NUM_TILES: 46
+          JAX_PLATFORMS: cpu,ipu
+        run: |
+          pytest -s .
