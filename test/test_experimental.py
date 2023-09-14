@@ -6,21 +6,21 @@ from jax import tree_map, vmap
 from numpy.testing import assert_allclose
 
 from pyscf_ipu.experimental.basis import basisset
+from pyscf_ipu.experimental.device import has_ipu, ipu_func
 from pyscf_ipu.experimental.integrals import (
-    overlap_primitives,
-    nuclear_basis,
-    overlap_basis,
-    nuclear_primitives,
     eri_basis,
     eri_basis_sparse,
     eri_primitives,
-    kinetic_primitives,
     kinetic_basis,
+    kinetic_primitives,
+    nuclear_basis,
+    nuclear_primitives,
+    overlap_basis,
+    overlap_primitives,
 )
 from pyscf_ipu.experimental.mesh import electron_density, uniform_mesh
 from pyscf_ipu.experimental.primitive import Primitive
-from pyscf_ipu.experimental.structure import to_pyscf, water, Structure
-from pyscf_ipu.experimental.device import has_ipu, ipu_func
+from pyscf_ipu.experimental.structure import Structure, to_pyscf, water
 
 
 @pytest.mark.parametrize("basis_name", ["sto-3g", "6-31g**"])
