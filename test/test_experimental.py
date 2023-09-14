@@ -205,7 +205,7 @@ def is_mem_limited():
 
 
 @pytest.mark.parametrize("sparse", [True, False])
-@pytest.mar.skipif(is_mem_limited(), reason="Not enough host memory!")
+@pytest.mark.skipif(is_mem_limited(), reason="Not enough host memory!")
 def test_water_eri(sparse):
     basis_name = "sto-3g"
     h2o = molecule("water")
