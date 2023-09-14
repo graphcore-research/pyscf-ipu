@@ -174,6 +174,10 @@ def init_dft_tensors_cpu(mol, opts, DIIS_iters=9):
     grid_weights    = grids.weights                                 # (grid_size,) = (45624,) for C6H6
     coord_str       = 'GTOval_cart_deriv1' if mol.cart else 'GTOval_sph_deriv1'
     grid_AO         = mol.eval_gto(coord_str, grids.coords, 4)      # (4, grid_size, N) = (4, 45624, 9) for C6H6.
+    if opts.ao_threshold is not None:
+        grid_AO[np.abs(grid_AO)<opts.ao_threshold] = 0
+        sparsity_grid_AO = np.sum(grid_AO==0) / grid_AO.size
+        print(f"{sparsity_grid_AO=:.4f}")
     density_matrix  = pyscf.scf.hf.init_guess_by_minao(mol)         # (N,N)=(66,66) for C6H6.
 
     # TODO(): Add integral math formulas for kinetic/nuclear/O/ERI.
@@ -183,7 +187,7 @@ def init_dft_tensors_cpu(mol, opts, DIIS_iters=9):
     L_inv           = np.linalg.inv(np.linalg.cholesky(O))          # (N,N)
     if opts.backend != "ipu": 
         ERI = mol.intor("int2e_sph")          # (N,N,N,N)=(66,66,66,66) for C6H6.
-        below_thr = np.abs(ERI) <= opts.threshold
+        below_thr = np.abs(ERI) <= opts.eri_threshold
         ERI[below_thr] = 0.0
         ic(ERI.size, np.sum(below_thr), np.sum(below_thr)/ERI.size)
     else:
@@ -445,7 +449,8 @@ def nanoDFT_options(
         threads_int: int = 1,
         diis: bool = True,
         structure_optimization: bool = False, # AKA gradient descent on energy wrt nuclei
-        threshold : float = 0.0,
+        eri_threshold : float = 0.0,
+        ao_threshold: float = None
 ):
     """
     nanoDFT
@@ -465,7 +470,8 @@ def nanoDFT_options(
         intv (int): Which version to use of our integral algorithm.
         threads (int): For -backend ipu. Number of threads for einsum(ERI, dm) with custom C++ (trades-off speed vs memory).
         threads_int (int): For -backend ipu. Number of threads for computing ERI with custom C++ (trades off speed vs memory).
-        threshold (float): Zero out ERIs that are below the threshold in absolute value. Not supported for '--backend ipu'. 
+        eri_threshold (float): Zero out ERIs that are below the threshold in absolute value. Not supported for '--backend ipu'. 
+        ao_threshold (float): Zero out grid_AO that are below the threshold in absolute value.
     """
 
     # From a compound name or CID, get a list of its atoms and their coordinates
@@ -475,9 +481,9 @@ def nanoDFT_options(
 
     print(f"Minimum interatomic distance: {utils.min_interatomic_distance(mol_str)}") # TODO: dies for --mol_str methane
 
-    if backend=='ipu' and threshold >0.0:
+    if backend=='ipu' and eri_threshold >0.0:
         print("ERI threshold > 0.0 only if backend=='cpu'. Overriding...")
-        threshold = 0.0
+        eri_threshold = 0.0
     args = locals()
     mol_str = args["mol_str"]
     del args["mol_str"]
