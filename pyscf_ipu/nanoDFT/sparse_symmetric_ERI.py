@@ -16,10 +16,10 @@ def get_i_j(val):
     j = (((val - i) - (i**2 - val))//2)
     return i, j
 
-def cpu_ijkl(value, symmetry, f): 
+def cpu_ijkl(value, symmetry, N, f):
     i, j, k, l = value[0].astype(np.uint32), value[1].astype(np.uint32), value[2].astype(np.uint32), value[3].astype(np.uint32)
-    return f(i,j,k,l,symmetry)
-cpu_ijkl = jax.vmap(cpu_ijkl, in_axes=(0, None, None))
+    return f(i,j,k,l,symmetry,N)
+cpu_ijkl = jax.vmap(cpu_ijkl, in_axes=(0, None, None, None))
 
 @partial(jax.jit, backend="ipu")
 def ipu_ijkl(nonzero_indices, symmetry, N):
@@ -79,13 +79,14 @@ def num_repetitions_fast(ij, kl):
     return repetitions
 
 
-# TODO: refactor to make N an input. 
-indices_func = lambda i,j,k,l,symmetry: jnp.array([i*N+j, j*N+i, i*N+j, j*N+i, k*N+l, l*N+k, k*N+l, l*N+k,
-                                                k*N+l, k*N+l, l*N+k, l*N+k, i*N+j, i*N+j, j*N+i, j*N+i,
-                                                k*N+j, k*N+i, l*N+j, l*N+i, i*N+l, i*N+k, j*N+l, j*N+k,
-                                                i*N+l, j*N+l, i*N+k, j*N+k, k*N+j, l*N+j, k*N+i, l*N+i])[symmetry]
+indices_func = lambda i,j,k,l,symmetry,N: jnp.array([i*N+j, j*N+i, i*N+j, j*N+i, k*N+l, l*N+k, k*N+l, l*N+k,
+                                                     k*N+l, k*N+l, l*N+k, l*N+k, i*N+j, i*N+j, j*N+i, j*N+i,
+                                                     k*N+j, k*N+i, l*N+j, l*N+i, i*N+l, i*N+k, j*N+l, j*N+k,
+                                                     i*N+l, j*N+l, i*N+k, j*N+k, k*N+j, l*N+j, k*N+i, l*N+i])[symmetry]
 
 def sparse_symmetric_einsum(nonzero_distinct_ERI, nonzero_indices, dm, backend):
+
+
     dm = dm.reshape(-1)
     diff_JK = jnp.zeros(dm.shape)
     N = int(np.sqrt(dm.shape[0]))
@@ -116,7 +117,7 @@ def sparse_symmetric_einsum(nonzero_distinct_ERI, nonzero_indices, dm, backend):
             indices = jax.lax.bitcast_convert_type(indices, np.int16).astype(np.int32)
             eris    = nonzero_distinct_ERI[i]
 
-            if backend == "cpu": dm_indices = cpu_ijkl(indices, symmetry+is_K_matrix*8, indices_func)  
+            if backend == "cpu": dm_indices = cpu_ijkl(indices, symmetry+is_K_matrix*8, N, indices_func)
             else:                dm_indices = ipu_ijkl(indices, symmetry+is_K_matrix*8, N)  
             # dm_values = jnp.take(dm, indices, axis=0) # for our special case the 50 lines of code reduces to the one line below. 
             dm_values = jax.lax.gather(dm, dm_indices[..., None], dimension_numbers=dnums, slice_sizes=(1,), mode=mode=jax.lax.GatherScatterMode.FILL_OR_DROP)

@@ -1,6 +1,6 @@
 :red_circle: :warning: **Experimental and non-official Graphcore product** :warning: :red_circle:
 
-# PySCF on IPU
+[![notebook-tests](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/notebooks.yaml/badge.svg)](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/notebooks.yaml)
 
 [**Installation guide**](#installation)
 | [**Example DFT Computations**](#example-dft-computations)
@@ -8,16 +8,40 @@
 | [**Training SchNet**](#training-schnet-on-qm1b)
 | [**QM1B dataset**](qm1b/README.md)
 
-[![Run on Gradient](https://assets.paperspace.io/img/gradient-badge.svg)](https://ipu.dev/ipobmC)
-[![notebook-tests](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/notebooks.yaml/badge.svg)](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/notebooks.yaml)
 
-**Port of PySCF to Graphcore IPU.**
+# PySCF on IPU
 
-**Limitations**
-- Restricted Kohn Sham DFT (based on [RKS](https://github.com/pyscf/pyscf/blob/6c815a62bc2e5eae1488a1d0dbe84556dd54b922/pyscf/dft/rks.py#L531), [KohnShamDFT](https://github.com/pyscf/pyscf/blob/6c815a62bc2e5eae1488a1d0dbe84556dd54b922/pyscf/dft/rks.py#L280) and [hf.RHF](https://github.com/pyscf/pyscf/blob/6c815a62bc2e5eae1488a1d0dbe84556dd54b922/pyscf/scf/hf.py#L2044)).
+PySCF-IPU is built on top of the [PySCF](https://github.com/pyscf) package, porting some of the PySCF algorithms to the Graphcore [IPU](https://www.graphcore.ai/products/ipu).
+
+
+Only a small portion of PySCF is currently ported, specifically Restricted Kohn Sham DFT (based on [RKS](https://github.com/pyscf/pyscf/blob/6c815a62bc2e5eae1488a1d0dbe84556dd54b922/pyscf/dft/rks.py#L531), [KohnShamDFT](https://github.com/pyscf/pyscf/blob/6c815a62bc2e5eae1488a1d0dbe84556dd54b922/pyscf/dft/rks.py#L280) and [hf.RHF](https://github.com/pyscf/pyscf/blob/6c815a62bc2e5eae1488a1d0dbe84556dd54b922/pyscf/scf/hf.py#L2044)).
+
+The package is under active development, to broaden its scope and applicability.  Current limitations are:
 - Number of atomic orbitals less than 70 `mol.nao_nr() <= 70`.
 - Larger numerical errors due to `np.float32` instead of `np.float64`.
 - Limited support for `jax.grad(.)`
+
+## QuickStart
+
+### For ML dataset generation (SynS & ML Workshop 2023)
+To generate datasets based on the paper __Repurposing Density Functional Theory to Suit Deep Learning__ [Link](https://icml.cc/virtual/2023/workshop/21476#wse-detail-28485) [PDF](https://syns-ml.github.io/2023/assets/papers/17.pdf) presented at the [Syns & ML Workshop, ICML 2023](https://syns-ml.github.io/2023/), the entry point is the notebook [DFT Dataset Generation](./notebooks/DFT-dataset-generation.ipynb), and the file [density_functional_theory.py](./density_functional_theory.py).
+
+
+To run the notebook on Graphcore IPU hardware on Paperspace:
+
+[![Run on Gradient](https://assets.paperspace.io/img/gradient-badge.svg)](https://ipu.dev/ipobmC)
+
+### For DFT teaching and learning: nanoDFT
+
+We also provide a lightweight implementation of the SCF algorithm, optimized for readability and hackability, in the [nanoDFT demo](notebooks/nanoDFT-demo.ipynb) notebook and in [nanodft](pyscf_ipu/nanoDFT/README.md) folder.
+
+
+To run the notebook on Graphcore IPU hardware on Paperspace:
+
+[![Run on Gradient](https://assets.paperspace.io/img/gradient-badge.svg)](https://ipu.dev/ipobmC)
+
+
+Additional notebooks in [notebooks](notebooks) demonstrate other aspects of the computation.
 
 ## Installation
 
@@ -53,8 +77,6 @@ python density_functional_theory.py -methane -backend cpu -float32
 python density_functional_theory.py -methane -backend ipu -float32
 ```
 This will automatically compare our DFT against PySCF for methane `CH4` and report numerical errors.
-
-Please try our [NanoDFT notebook on Paperspace](https://ipu.dev/ipobmC) to easily run DFT computations on IPU [![Run on Gradient](https://assets.paperspace.io/img/gradient-badge.svg)](https://ipu.dev/ipobmC)
 
 
 ## Generating New Datasets

@@ -1,3 +1,8 @@
+# Runtime dependencies for pyscf-ipu with IPU backend
+#
+# See also:
+#    requirements.txt for core runtime configuration
+#    requirements_test.txt for test-only dependencies
 -r requirements.txt
 
 # Experimental JAX for IPU
