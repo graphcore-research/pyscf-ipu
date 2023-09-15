@@ -90,6 +90,18 @@ def sparse_symmetric_einsum(nonzero_distinct_ERI, nonzero_indices, dm, backend):
     diff_JK = jnp.zeros(dm.shape)
     N = int(np.sqrt(dm.shape[0]))
 
+
+    dnums = jax.lax.GatherDimensionNumbers(
+        offset_dims=(), 
+        collapsed_slice_dims=(0,),
+        start_index_map=(0,))
+    scatter_dnums = jax.lax.ScatterDimensionNumbers(
+    update_window_dims=(), 
+    inserted_window_dims=(0,),
+    scatter_dims_to_operand_dims=(0,))
+    Z = jnp.zeros((N**2,), dtype=jnp.float32)
+
+
     def iteration(symmetry, vals): 
         diff_JK = vals 
         is_K_matrix = (symmetry >= 8)
@@ -103,21 +115,25 @@ def sparse_symmetric_einsum(nonzero_distinct_ERI, nonzero_indices, dm, backend):
 
             indices = jax.lax.bitcast_convert_type(indices, np.int16).astype(np.int32)
             eris    = nonzero_distinct_ERI[i]
-            print(indices.shape)
 
             if backend == "cpu": dm_indices = cpu_ijkl(indices, symmetry+is_K_matrix*8, indices_func)  
             else:                dm_indices = ipu_ijkl(indices, symmetry+is_K_matrix*8, N)  
-            dm_values = jnp.take(dm, dm_indices, axis=0) 
+            # dm_values = jnp.take(dm, indices, axis=0) # for our special case the 50 lines of code reduces to the one line below. 
+            dm_values = jax.lax.gather(dm, dm_indices[..., None], dimension_numbers=dnums, slice_sizes=(1,), mode=mode=jax.lax.GatherScatterMode.FILL_OR_DROP)
 
             dm_values = dm_values.at[:].mul( eris ) # this is prod, but re-use variable for inplace update. 
             
             if backend == "cpu": ss_indices = cpu_ijkl(indices, symmetry+8+is_K_matrix*8, indices_func) 
-            else:                ss_indices = ipu_ijkl(indices, symmetry+8+is_K_matrix*8, N) 
-            diff_JK   = diff_JK + jax.ops.segment_sum(dm_values, ss_indices, N**2) * (-HYB_B3LYP/2)**is_K_matrix 
+            else:                ss_indices = ipu_ijkl(indices, symmetry+8+is_K_matrix*8, N).astype(np.int32).reshape(-1,1)
+            # diff_JK = diff_JK + jax.lax.segment_sum(ss_indices, ...) # for our special case the 100 lines of code reduces to the one line below. 
+            diff_JK = diff_JK + jax.lax.scatter_add(Z,
+                                            ss_indices, dm_values, 
+                                            scatter_dnums, indices_are_sorted=True, unique_indices=True, mode=jax.lax.GatherScatterMode.FILL_OR_DROP)\
+                                *(-HYB_B3LYP/2)**is_K_matrix
             
             return diff_JK
 
-        batches = nonzero_indices.shape[0] # before pmap, tensor had shape (nipus, batches, -1) so [0]=batches after pmap
+        batches = nonzero_indices.shape[0] # Before pmap, tensor had shape (nipus, batches, -1) so [0]=batches after pmap
         diff_JK = jax.lax.fori_loop(0, batches, sequentialized_iter, diff_JK) 
         return diff_JK
 
@@ -150,6 +166,8 @@ if __name__ == "__main__":
     mol.build()
     N = mol.nao_nr()
     print("N %i"%mol.nao_nr())
+    print("NxN:", (N**2, N**2))
+    print("Naive operations: ", N**4*2/10**9, "[Giga]")
     if not args.skip: dense_ERI = mol.intor("int2e_sph", aosym="s1")
     distinct_ERI = mol.intor("int2e_sph", aosym="s8")
     distinct_ERI[np.abs(distinct_ERI)<1e-9] = 0  # zero out stuff 
@@ -162,6 +180,7 @@ if __name__ == "__main__":
 
     nonzero_indices      = np.nonzero(distinct_ERI)[0].astype(np.uint64) 
     nonzero_distinct_ERI = distinct_ERI[nonzero_indices].astype(np.float32)
+    print("Nonzero Operations:", nonzero_indices.size*8*2/10**9, "[Giga]")
     ij, kl               = get_i_j(nonzero_indices)
     rep                  = num_repetitions_fast(ij, kl)
     nonzero_distinct_ERI = nonzero_distinct_ERI / rep
