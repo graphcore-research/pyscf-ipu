@@ -23,6 +23,7 @@ imageio[ffmpeg]
 py3Dmol
 basis-set-exchange
 periodictable
+sympy
 
 # silence warnings about setuptools + numpy
 setuptools < 60.0
