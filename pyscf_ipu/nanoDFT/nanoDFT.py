@@ -119,8 +119,6 @@ Grid = Float[Array, "4 grid_size num_orbitals"]
 class IterationState:
     """State tensors used during self-consistent field (SCF) iterations
 
-    We use the following type annotations where the dimension N is the number
-    used in the linear combination of atomic orbitals (LCAO) basis set:
 
         OrbitalVector [N] (float): Used to store the electron occupation mask
         OrbitalMatrix [N, N] (float): Used for storing the one-electron integrals and density matrix.
