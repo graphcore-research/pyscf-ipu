@@ -100,8 +100,6 @@ def sparse_symmetric_einsum(nonzero_distinct_ERI, nonzero_indices, dm, backend):
     update_window_dims=(), 
     inserted_window_dims=(0,),
     scatter_dims_to_operand_dims=(0,))
-    Z = jnp.zeros((N**2,), dtype=jnp.float32)
-
 
     def iteration(symmetry, vals): 
         diff_JK = vals 
@@ -117,17 +115,17 @@ def sparse_symmetric_einsum(nonzero_distinct_ERI, nonzero_indices, dm, backend):
             indices = jax.lax.bitcast_convert_type(indices, np.int16).astype(np.int32)
             eris    = nonzero_distinct_ERI[i]
 
-            if backend == "cpu": dm_indices = cpu_ijkl(indices, symmetry+is_K_matrix*8, N, indices_func)
-            else:                dm_indices = ipu_ijkl(indices, symmetry+is_K_matrix*8, N)  
+            if backend == "cpu": dm_indices = cpu_ijkl(indices, symmetry+is_K_matrix*8, N, indices_func).reshape(-1, 1)
+            else:                dm_indices = ipu_ijkl(indices, symmetry+is_K_matrix*8, N)  .reshape(-1, 1)
             # dm_values = jnp.take(dm, indices, axis=0) # for our special case the 50 lines of code reduces to the one line below. 
-            dm_values = jax.lax.gather(dm, dm_indices[..., None], dimension_numbers=dnums, slice_sizes=(1,), mode=mode=jax.lax.GatherScatterMode.FILL_OR_DROP)
+            dm_values = jax.lax.gather(dm, dm_indices, dimension_numbers=dnums, slice_sizes=(1,), mode=jax.lax.GatherScatterMode.FILL_OR_DROP)
 
             dm_values = dm_values.at[:].mul( eris ) # this is prod, but re-use variable for inplace update. 
             
-            if backend == "cpu": ss_indices = cpu_ijkl(indices, symmetry+8+is_K_matrix*8, indices_func) 
+            if backend == "cpu": ss_indices = cpu_ijkl(indices, symmetry+8+is_K_matrix*8, N, indices_func) .reshape(-1,1)
             else:                ss_indices = ipu_ijkl(indices, symmetry+8+is_K_matrix*8, N).astype(np.int32).reshape(-1,1)
-            # diff_JK = diff_JK + jax.lax.segment_sum(ss_indices, ...) # for our special case the 100 lines of code reduces to the one line below. 
-            diff_JK = diff_JK + jax.lax.scatter_add(Z,
+            # diff_JK = diff_JK + jax.lax.segment_sum( ...) # for our special case the 100 lines of code reduces to the one line below. 
+            diff_JK = diff_JK + jax.lax.scatter_add(jnp.zeros((N**2,)),
                                             ss_indices, dm_values, 
                                             scatter_dnums, indices_are_sorted=True, unique_indices=True, mode=jax.lax.GatherScatterMode.FILL_OR_DROP)\
                                 *(-HYB_B3LYP/2)**is_K_matrix
