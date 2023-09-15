@@ -38,16 +38,19 @@ def energy(density_matrix, H_core, J, K, E_xc, E_nuc, _np=jax.numpy):
 
 def nanoDFT_iteration(i, vals, opts, mol):
     """Each call updates density_matrix attempting to minimize energy(density_matrix, ... ). """
-    density_matrix, V_xc, J, K, O, H_core, L_inv, eigvals, eigvects          = vals[:9]                  # All (N, N) matrices
+    density_matrix, V_xc, J, K, O, H_core, L_inv, eigvals, unsorted_tuple          = vals[:9]                  # All (N, N) matrices
     E_nuc, occupancy, ERI, grid_weights, grid_AO, diis_history, log = vals[9:]                  # Varying types/shapes.
 
-    print("nanoDFT_iteration EIGVALS and EIGVECTS", eigvals, eigvects)
+    # jax.debug.print("nanoDFT_iteration EIGVALS \n{va}\n and EIGVECTS\n{ve}\n", va=eigvals, ve=eigvects)
+    # jax.debug.print("nanoDFT_iteration EIGVALS \n{va}\n", va=eigvals)
     # Step 1: Update Hamiltonian (optionally use DIIS to improve DFT convergence).
     H = H_core + J - K/2 + V_xc                                                                 # (N, N)
     if opts.diis: H, diis_history = DIIS(i, H, density_matrix, O, diis_history, opts)           # H_{i+1}=c_1H_i+...+c9H_{i-9}.
 
     # Step 2: Solve eigh (L_inv turns generalized eigh into eigh).
-    eigvals, eigvects = linalg_eigh(L_inv @ H @ L_inv.T, opts, initial_guess = (eigvals, eigvects), it_count=i)                              # (N, N)
+    # eigvals, eigvects = linalg_eigh(L_inv @ H @ L_inv.T, opts, initial_guess = None)              # (N, N)
+    # eigvals, eigvects, unsorted_tuple = linalg_eigh(L_inv @ H @ L_inv.T, opts, initial_guess = (eigvals, unsorted_eigvects), it_count=i)                              # (N, N)
+    eigvals, eigvects, unsorted_tuple = linalg_eigh(L_inv @ H @ L_inv.T, opts, initial_guess = unsorted_tuple, it_count=i)                              # (N, N)
     generalized_eigvects = L_inv.T @ eigvects
 
     # Step 3: Use result from eigenproblem to update density_matrix.
@@ -58,8 +61,9 @@ def nanoDFT_iteration(i, vals, opts, mol):
     # Log SCF matrices and energies (not used by DFT algorithm).
     log["matrices"] = log["matrices"].at[i].set(jnp.stack((density_matrix, J, K, H)))           # (iterations, 4, N, N)
     log["energy"] = log["energy"].at[i].set(energy(density_matrix, H_core, J, K, E_xc, E_nuc))  # (iterations, 6)
+    # jax.debug.print("RETURN nanoDFT_iteration EIGVALS \n{va}\n and EIGVECTS\n{ve}\n", va=eigvals, ve=eigvects)
 
-    return [density_matrix, V_xc, J, K, O, H_core, L_inv, eigvals, eigvects, E_nuc, occupancy, ERI, grid_weights, grid_AO, diis_history, log]
+    return [density_matrix, V_xc, J, K, O, H_core, L_inv, eigvals, unsorted_tuple, E_nuc, occupancy, ERI, grid_weights, grid_AO, diis_history, log]
 
 def exchange_correlation(density_matrix, grid_AO, grid_weights):
     """Compute exchange correlation integral using atomic orbitals (AO) evalauted on a grid. """
@@ -101,13 +105,14 @@ def _nanoDFT(E_nuc, density_matrix, kinetic, nuclear, O, grid_AO, ERI, grid_weig
     # Perform DFT iterations.
     eigenvals = np.ones((N,))
     eigvectors = np.eye(N) #if N%2 == 0 else np.eye(N+1)
-    # log = jax.lax.fori_loop(0, opts.its, partial(nanoDFT_iteration, opts=opts, mol=mol), [density_matrix, V_xc, J, K, O, H_core, L_inv, eigenvals, eigvectors, # all (N, N) matrices || not all acutally = eigenvals are (N,)
-    #                                                         E_nuc, mask, ERI, grid_weights, grid_AO, diis_history, log])[-1]
-    vals = [density_matrix, V_xc, J, K, O, H_core, L_inv, eigenvals, eigvectors, # all (N, N) matrices || not all acutally = eigenvals are (N,)
-            E_nuc, mask, ERI, grid_weights, grid_AO, diis_history, log]
-    for i in range(0, opts.its):
-        vals = jax.jit(partial(nanoDFT_iteration, opts=opts, mol=mol))(i, vals)
-    log = vals[-1]
+    log = jax.lax.fori_loop(0, opts.its, partial(nanoDFT_iteration, opts=opts, mol=mol), [density_matrix, V_xc, J, K, O, H_core, L_inv, eigenvals,(eigenvals, eigvectors), # all (N, N) matrices || not all acutally = eigenvals are (N,)
+                                                            E_nuc, mask, ERI, grid_weights, grid_AO, diis_history, log])[-1]
+    # vals = [density_matrix, V_xc, J, K, O, H_core, L_inv, eigenvals, eigvectors, # all (N, N) matrices || not all acutally = eigenvals are (N,)
+    #         E_nuc, mask, ERI, grid_weights, grid_AO, diis_history, log]
+    # for i in range(0, opts.its):
+    #     vals = jax.jit(partial(nanoDFT_iteration, opts=opts, mol=mol))(i, vals)
+    #     jax.debug.print("vals.eigvals\n{ev}\n", ev=vals[7])
+    # log = vals[-1]
     return log["matrices"], H_core, log["energy"]
 
 from icecream import ic
@@ -206,10 +211,11 @@ def hlgap(L_inv, H, n_electrons_half, _np):
     return _np.abs(mo_energy[n_electrons_half] - mo_energy[n_electrons_half-1])
 
 def linalg_eigh(x, opts, initial_guess = None, it_count = None):
+    unsorted_tuple = []
     if opts.backend == "ipu" and x.shape[0] >= 6:
         # from tessellate_ipu.linalg import ipu_eigh
         from tessellate_ipu_local import ipu_eigh
-        print("HEHEHEHERE is linald_eigh for ipu called")
+        # print("HEHEHEHERE is linald_eigh for ipu called")
         if initial_guess is not None:
             print("INITIAL GUESS SHAPES:", initial_guess[0].shape, initial_guess[1].shape)
         n = x.shape[0]
@@ -220,7 +226,7 @@ def linalg_eigh(x, opts, initial_guess = None, it_count = None):
             initial_guess = (jnp.pad(initial_guess[0], ((0, 1), ), mode='constant'), jnp.pad(initial_guess[1], [(0, 1), (0, 1)], mode='constant'))
 
         if it_count is None or initial_guess is None:
-            eigvects, eigvals = ipu_eigh(x, sort_eigenvalues=True, num_iters=12, initial_guess = initial_guess)
+            eigvects, eigvals, _ = ipu_eigh(x, sort_eigenvalues=True, num_iters=12, initial_guess = initial_guess)
         # elif it_count == 0:
         #     eigvects, eigvals = ipu_eigh(x, sort_eigenvalues=True, num_iters=12, initial_guess = (x, jnp.ones(N)))
         else:
@@ -231,19 +237,24 @@ def linalg_eigh(x, opts, initial_guess = None, it_count = None):
             # ig_a = initial_guess[0] * (1-is_first_five_iterations)
             # ig_v = initial_guess[1] * (1-is_first_five_iterations)
             # ig_a = initial_guess[0]
-            ig_a = np.zeros((N,))
-            # ig_a = x * (it_count==0) + (x - jnp.diag(jnp.diag(x)) + jnp.diag(initial_guess[0])) * (1 - (it_count==0))
+            # ig_a = np.zeros((N,))
+            n = 1
+            # ig_a = x * (it_count<=n) + (x - jnp.diag(jnp.diag(x)) + jnp.diag(initial_guess[0])) * (1 - (it_count<=n))
+            ig_a = x * (it_count<=n) + jnp.diag(initial_guess[0]) * (1 - (it_count<=n))
+            jax.debug.print(
+                "DIAG :\n{x}\nINITIAL_GUESS EIGVALS:\n{igv}\nCUMULATED ERR:\n{err}\n",
+                x = jnp.diag(x), igv = initial_guess[0], err = jnp.sum(jnp.abs(x - initial_guess[0])))
             #[A1 0 0 ]
             #[0 A2 0 ]
             #[0 0  A3]
             # ig_v = initial_guess[1] 
             # ig_v = jnp.identity(N)
-            n = 10
             ig_v = jnp.identity(N) * (it_count<=n) + initial_guess[1] * (1 - (it_count<=n))
             ig = (ig_a, ig_v)
             # ig = (np.diag(x), jnp.identity(N))
             print("THAT's IG:", ig, is_first_five_iterations)
-            eigvects, eigvals = ipu_eigh(x, sort_eigenvalues=True, num_iters=12, initial_guess = ig)
+            eigvects, eigvals, unsorted_tuple = ipu_eigh(x, sort_eigenvalues=True, num_iters=12, initial_guess = ig)
+            # jax.debug.print("RETURN ipu_eigh EIGVALS \n{va}\n and EIGVECTS\n{ve}\n", va=eigvals, ve=eigvects)
 
         if pad:
             e1 = eigvects[-1:]
@@ -259,12 +270,12 @@ def linalg_eigh(x, opts, initial_guess = None, it_count = None):
     else:
         eigvals, eigvects = jnp.linalg.eigh(x)
 
-    return eigvals, eigvects
+    return eigvals, eigvects, unsorted_tuple
 
 def pinv0(a, opts):  # take out first row
     # TODO: add a comment explaining the role of this constant
     cond =  9*1.1920929e-07
-    vals, vect = linalg_eigh(a, opts)
+    vals, vect, _ = linalg_eigh(a, opts)
     c = vect @ ( jnp.where( jnp.abs(vals) > cond, 1/vals, 0) * vect[0, :])
     return c
 

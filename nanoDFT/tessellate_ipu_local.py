@@ -128,7 +128,7 @@ def ipu_jacobi_eigh_iteration(all_AV_cols: Tuple[Array, ...], Atiles: Any, Vtile
     # Constant tensor of index to ignored at every iteration.
     rotset_index_ignored = tile_constant_sharded(np.arange(0, halfN, dtype=np.uint32), tiles=Atiles)
     rotset = jacobi_initial_rotation_set(N)
-    print("]]]]]]]]]]]]] HERE is ipu_jacobi_eigh_iteration called")
+    # print("]]]]]]]]]]]]] HERE is ipu_jacobi_eigh_iteration called")
 
     # All different size 2 partitions on columns.
     for _ in range(1, N):
@@ -173,6 +173,7 @@ def ipu_jacobi_eigh_iteration(all_AV_cols: Tuple[Array, ...], Atiles: Any, Vtile
         Vpcols, Vqcols = tile_rotate_columns(Vpcols, Vqcols, rotset)
         # Next rotation set.
         rotset = jacobi_next_rotation_set(rotset)
+        
         # jax.debug.print("ipu_jacobi_eigh_iteration returns: {a}, {b}, {c}, {d}", a=Apcols.array, b=Aqcols.array, c=Vpcols.array, d=Vqcols.array)
 
     return (Apcols.array, Aqcols.array, Vpcols.array, Vqcols.array)
@@ -207,8 +208,9 @@ def ipu_jacobi_eigh(x: Array, num_iters: int = 1, initial_guess: Tuple[Array, Ar
         Vqcols = np.identity(N)[1::2]
         print("SHAPE DEFAULT:", x.shape, Apcols.shape, Aqcols.shape, Vpcols.shape, Vqcols.shape)
     else:
+        # initial_a = jnp.diag(initial_guess[0]) # TODO: this jnp.diag shall be removed
         initial_a = initial_guess[0]
-        print("DIAG ELSE:", initial_a, initial_guess[0])
+        # print("DIAG ELSE:", initial_a, initial_guess[0])
         Apcols = jax.lax.slice_in_dim(initial_a, 0, N, stride=2)
         Aqcols = jax.lax.slice_in_dim(initial_a, 1, N, stride=2)
         # Apcols = jax.lax.slice_in_dim(x, 0, N, stride=2)
@@ -218,18 +220,21 @@ def ipu_jacobi_eigh(x: Array, num_iters: int = 1, initial_guess: Tuple[Array, Ar
         initial_v = initial_guess[1].T ## Need to transpose the eigvecs since it is transposed before being returned from ipu_eigh
         Vpcols = initial_v[0::2]
         Vqcols = initial_v[1::2]
-        print("SHAPE ELSE:", initial_a.shape, Apcols.shape, Aqcols.shape, Vpcols.shape, Vqcols.shape)
+        # jax.debug.print("initial_v\n {v}", v=initial_v)
+        # print("SHAPE ELSE:", initial_a.shape, Apcols.shape, Aqcols.shape, Vpcols.shape, Vqcols.shape)
         print(":::::::::::", N, initial_guess[0].shape, initial_guess[1].shape)
-        # print("APQ ELSE:", Apcols, Apcols)
+        # jax.debug.print("APQ ELSE Apcols\n{a} \nAqcols\n {b}\nDiff\n {d}:", a=Apcols, b=Apcols_ref, d=Apcols-Apcols_ref)
 
-    print(">>>>>>>>>> HERE is ipu_jacobi_eigh called")
+    # print(">>>>>>>>>> HERE is ipu_jacobi_eigh called")
 
     # Set A and V tiling static.
     eigh_iteration_fn = lambda _, x: ipu_jacobi_eigh_iteration(x, Atiles, Vtiles)
     # JAX fori_loop => no Python unrolling and code bloating!
+    tmpApcols = Apcols
     Apcols, Aqcols, Vpcols, Vqcols = jax.lax.fori_loop(
         0, num_iters, eigh_iteration_fn, (Apcols, Aqcols, Vpcols, Vqcols)
     )
+    # jax.debug.print("AP BEFORE AFTER Apcols_before\n{a} \nAqcols_after\n {b}\n:", a=tmpApcols, b=Apcols)
 
     # Expect the output to follow the initial rotation set columns split.
     rotset = jacobi_initial_rotation_set(N)
@@ -324,6 +329,8 @@ def ipu_eigh(
     assert not symmetrize_input
 
     A, VT = ipu_jacobi_eigh(x, num_iters=num_iters, initial_guess=initial_guess)
+    # jax.debug.print("RETURN ipu_jacobi_eigh EIGVALS \n{va}\n and EIGVECTS\n{ve}\n", va=A, ve=VT)
+    # jax.debug.print("<><><><> RETURN ipu_jacobi_eigh A matrix \n{va}\n", va=A)
     eigvalues = jnp.diag(A)
     eigvectors_tr = VT
     # Sorting eigen values.
@@ -335,4 +342,7 @@ def ipu_eigh(
     # TODO: understand memory layout bug when not forcing the data to be re-organized.
     # Is it related to host rearrangement?
     eigvectors = tile_put_sharded(eigvectors_tr.T, tiles=tuple(range(N)))
-    return eigvectors.array, eigvalues
+    jax.debug.print("actual eigcvects\n {v}", v=eigvectors.array)
+    jax.debug.print("actual eigvals\n {v}", v=eigvalues)
+
+    return eigvectors.array, eigvalues, (jnp.diag(A), VT)
