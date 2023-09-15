@@ -56,7 +56,7 @@ pip install -U pip
 This project is currently under active development. 
 For CPU simulations, we recommend installing `pyscf-ipu` from latest `main` branch as:
 ```bash
-pip install pyscf-ipu[cpu]@git+https://github.com/graphcore-research/pyscf-ipu
+pip install pyscf-ipu@git+https://github.com/graphcore-research/pyscf-ipu
 ```
 
 and on IPU equipped machines:
