@@ -21,34 +21,34 @@ using namespace poplar;
 
 class IndicesIJKL : public Vertex {
 public:
-  Input<Vector<const uint32_t>> i_;
-  Input<Vector<const uint32_t>> j_;
-  Input<Vector<const uint32_t>> k_;
-  Input<Vector<const uint32_t>> l_;
+  Input<Vector<const int32_t>> i_;
+  Input<Vector<const int32_t>> j_;
+  Input<Vector<const int32_t>> k_;
+  Input<Vector<const int32_t>> l_;
   
-  Input<Vector<const uint32_t>> sym_;
-  Input<Vector<const uint32_t>> N_;
+  Input<Vector<const int32_t>> sym_;
+  Input<Vector<const int32_t>> N_;
 
-  Input<Vector<const uint32_t>> start_;
-  Input<Vector<const uint32_t>> stop_;
+  Input<Vector<const int32_t>> start_;
+  Input<Vector<const int32_t>> stop_;
 
-  Output<Vector<uint32_t>> out_; 
+  Output<Vector<int32_t>> out_; 
 
   bool compute() {
 
-    const uint32_t& N     = N_[0];
-    const uint32_t& sym   = sym_[0];
-    const uint32_t& start = start_[0];
-    const uint32_t& stop  = stop_[0];
+    const int32_t& N     = N_[0];
+    const int32_t& sym   = sym_[0];
+    const int32_t& start = start_[0];
+    const int32_t& stop  = stop_[0];
 
-    for (uint32_t iteration = start; iteration < stop; iteration++){
+    for (int32_t iteration = start; iteration < stop; iteration++){
 
-      const uint32_t& i = i_[iteration]; 
-      const uint32_t& j = j_[iteration];
-      const uint32_t& k = k_[iteration];
-      const uint32_t& l = l_[iteration];
+      const int32_t& i = i_[iteration]; 
+      const int32_t& j = j_[iteration];
+      const int32_t& k = k_[iteration];
+      const int32_t& l = l_[iteration];
 
-      uint32_t& out = out_[iteration];
+      int32_t& out = out_[iteration];
 
       //_compute_symmetry(ij, kl, N, sym, out[iteration]);
       switch (sym) {

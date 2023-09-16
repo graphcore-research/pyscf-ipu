@@ -12,12 +12,12 @@ jax.config.update('jax_platform_name', "cpu")
 HYB_B3LYP = 0.2
 
 def get_i_j(val):
-    i = (np.sqrt(1 + 8*val.astype(np.uint64)) - 1)//2 # no need for floor, integer division acts as floor. 
+    i = (np.sqrt(1 + 8*val.astype(np.int64)) - 1)//2 # no need for floor, integer division acts as floor. 
     j = (((val - i) - (i**2 - val))//2)
     return i, j
 
 def cpu_ijkl(value, symmetry, N, f):
-    i, j, k, l = value[0].astype(np.uint32), value[1].astype(np.uint32), value[2].astype(np.uint32), value[3].astype(np.uint32)
+    i, j, k, l = value[0].astype(np.int32), value[1].astype(np.int32), value[2].astype(np.int32), value[3].astype(np.int32)
     return f(i,j,k,l,symmetry,N)
 cpu_ijkl = jax.vmap(cpu_ijkl, in_axes=(0, None, None, None))
 
@@ -36,7 +36,8 @@ def ipu_ijkl(nonzero_indices, symmetry, N):
     total_threads = (1472-1) * 6 
     remainder = size % total_threads
 
-    i, j, k, l = [nonzero_indices[:, i].astype(np.uint32) for i in range(4)] 
+    # TODO: Is this faster if we refactor into one tensor ijkl? 
+    i, j, k, l = [nonzero_indices[:, i] for i in range(4)] 
     
     if remainder != 0: 
         i = jnp.pad(i, ((0, total_threads-remainder)))
@@ -51,11 +52,11 @@ def ipu_ijkl(nonzero_indices, symmetry, N):
     
     stop = i.shape[1]
 
-    tiles = tuple((np.arange(0,total_threads) % (1471) + 1).astype(np.uint32).tolist())
-    symmetry = tile_put_replicated(jnp.array(symmetry, dtype=jnp.uint32),   tiles) 
-    N        = tile_put_replicated(jnp.array(N, dtype=jnp.uint32),   tiles)
-    start    = tile_put_replicated(jnp.array(0, dtype=jnp.uint32),   tiles)
-    stop     = tile_put_replicated(jnp.array(stop, dtype=jnp.uint32),   tiles)
+    tiles = tuple((np.arange(0,total_threads) % (1471) + 1).astype(np.int32).tolist())
+    symmetry = tile_put_replicated(jnp.array(symmetry, dtype=jnp.int32),   tiles) 
+    N        = tile_put_replicated(jnp.array(N, dtype=jnp.int32),   tiles)
+    start    = tile_put_replicated(jnp.array(0, dtype=jnp.int32),   tiles)
+    stop     = tile_put_replicated(jnp.array(stop, dtype=jnp.int32),   tiles)
 
     i = tile_put_sharded(i, tiles)
     j = tile_put_sharded(j, tiles)
@@ -71,10 +72,10 @@ def num_repetitions_fast(ij, kl):
 
     # compute: repetitions = 2^((i==j) + (k==l) + (k==i and l==j or k==j and l==i))
     repetitions = 2**(
-        np.equal(i,j).astype(np.uint64) + 
-        np.equal(k,l).astype(np.uint64) + 
+        np.equal(i,j).astype(np.int64) + 
+        np.equal(k,l).astype(np.int64) + 
         (1 - ((1 - np.equal(k,i) * np.equal(l,j)) * 
-        (1- np.equal(k,j) * np.equal(l,i))).astype(np.uint64))
+        (1- np.equal(k,j) * np.equal(l,i))).astype(np.int64))
     )
     return repetitions
 
@@ -123,8 +124,9 @@ def sparse_symmetric_einsum(nonzero_distinct_ERI, nonzero_indices, dm, backend):
             dm_values = dm_values.at[:].mul( eris ) # this is prod, but re-use variable for inplace update. 
             
             if backend == "cpu": ss_indices = cpu_ijkl(indices, symmetry+8+is_K_matrix*8, N, indices_func) .reshape(-1,1)
-            else:                ss_indices = ipu_ijkl(indices, symmetry+8+is_K_matrix*8, N).astype(np.int32).reshape(-1,1)
+            else:                ss_indices = ipu_ijkl(indices, symmetry+8+is_K_matrix*8, N).reshape(-1,1)
             # diff_JK = diff_JK + jax.lax.segment_sum( ...) # for our special case the 100 lines of code reduces to the one line below. 
+            print(dm_values.shape, ss_indices.shape)
             diff_JK = diff_JK + jax.lax.scatter_add(jnp.zeros((N**2,)),
                                             ss_indices, dm_values, 
                                             scatter_dnums, indices_are_sorted=True, unique_indices=True, mode=jax.lax.GatherScatterMode.FILL_OR_DROP)\
@@ -136,7 +138,10 @@ def sparse_symmetric_einsum(nonzero_distinct_ERI, nonzero_indices, dm, backend):
         diff_JK = jax.lax.fori_loop(0, batches, sequentialized_iter, diff_JK) 
         return diff_JK
 
+    #diff_JK = jax.lax.fori_loop(0, 16, iteration, diff_JK) 
     diff_JK = jax.lax.fori_loop(0, 16, iteration, diff_JK) 
+    #for i in range(16):
+    #    diff_JK = iteration(i, diff_JK)
     return jax.lax.psum(diff_JK, axis_name="p")
 
 if __name__ == "__main__":
@@ -177,7 +182,7 @@ if __name__ == "__main__":
         K = np.einsum("ijkl,jk->il", dense_ERI, dm)
         truth = J - K / 2 * HYB_B3LYP
 
-    nonzero_indices      = np.nonzero(distinct_ERI)[0].astype(np.uint64) 
+    nonzero_indices      = np.nonzero(distinct_ERI)[0].astype(np.int64) 
     nonzero_distinct_ERI = distinct_ERI[nonzero_indices].astype(np.float32)
     print("Nonzero Operations:", nonzero_indices.size*8*2/10**9, "[Giga]")
     ij, kl               = get_i_j(nonzero_indices)
