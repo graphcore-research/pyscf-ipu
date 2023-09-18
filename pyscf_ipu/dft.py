@@ -105,7 +105,7 @@ def _do_compute(density_matrix, kinetic, nuclear, overlap, ao,
         allvals = np.zeros((args.its, density_matrix.shape[0]))
 
         indxs = None
-        if g_ipu and not args.ipumult:
+        if args.backend == "ipu" and not args.ipumult:
             from pyscf_ipu.electron_repulsion.direct import prepare_integrals_2_inputs , compute_integrals_2
             _, _, _tuple_ijkl, _shapes, _sizes, _counts, indxs, indxs_inv, num_calls = prepare_integrals_2_inputs(mol)
             if not args.seperate:
@@ -131,16 +131,16 @@ def _do_compute(density_matrix, kinetic, nuclear, overlap, ao,
         _num_calls = np.zeros(num_calls)
         cycle = 0
         if type(electron_repulsion) == type([]):
-            if g_float32: E_xc, V_xc, E_coulomb, vj, vk = xc((args, indxs), density_matrix.astype(np.float32), dms.astype(np.float32), cycle, ao.astype(np.float32), electron_repulsion, weights.astype(np.float32), vj.astype(np.float32), vk.astype(np.float32), hyb, _num_calls)
+            if args.float32: E_xc, V_xc, E_coulomb, vj, vk = xc((args, indxs), density_matrix.astype(np.float32), dms.astype(np.float32), cycle, ao.astype(np.float32), electron_repulsion, weights.astype(np.float32), vj.astype(np.float32), vk.astype(np.float32), hyb, _num_calls)
         else:
-            if g_float32: E_xc, V_xc, E_coulomb, vj, vk = xc((args, indxs), density_matrix.astype(np.float32), dms.astype(np.float32), cycle, ao.astype(np.float32), electron_repulsion.astype(np.float32), weights.astype(np.float32), vj.astype(np.float32), vk.astype(np.float32), hyb, _num_calls)
+            if args.float32: E_xc, V_xc, E_coulomb, vj, vk = xc((args, indxs), density_matrix.astype(np.float32), dms.astype(np.float32), cycle, ao.astype(np.float32), electron_repulsion.astype(np.float32), weights.astype(np.float32), vj.astype(np.float32), vk.astype(np.float32), hyb, _num_calls)
             else: E_xc, V_xc, E_coulomb, vj, vk = xc((args, indxs), density_matrix.astype(np.float64), dms.astype(np.float64), cycle, ao.astype(np.float64), electron_repulsion.astype(np.float64), weights.astype(np.float64), vj.astype(np.float64), vk.astype(np.float64), hyb, _num_calls)
 
         vals = [mask, allvals, cs, energies, V_xc, density_matrix, _V, _H, mf_diis_H,
                     vj, vk, eigvals, eigvects, energy, overlap, electron_repulsion,
                 fixed_hamiltonian, L_inv, weights, hyb, ao, nuclear_energy, _num_calls, cholesky, generalized_hamiltonian, sdf, errvec, hamiltonian, dms, part_energies]
 
-        vals = [f(a, g_float32) for a in vals]
+        vals = [f(a, args.float32) for a in vals]
 
         if args.nan or args.forloop:
             if args.jit: _iter = jax.jit(dft_iter, backend=args.backend)
@@ -180,7 +180,7 @@ def _do_compute(density_matrix, kinetic, nuclear, overlap, ao,
         return energies, energy, eigenvalues, eigenvectors, dms, fixed_hamiltonian, part_energies, L_inv
 
 def density_functional_theory(atom_positions, args, mf_diis_space=9):
-    if g_ipu: mf_diis_space = 9
+    if args.backend == "ipu": mf_diis_space = 9
 
     if args.generate: global mol
 
@@ -192,7 +192,7 @@ def density_functional_theory(atom_positions, args, mf_diis_space=9):
 
     mask = np.ones(N)
     mask[n_electrons_half:] = 0
-    if g_float32:
+    if args.float32:
         mask = mask.astype(np.float32)
 
     # Initialize grid.
@@ -268,14 +268,14 @@ def density_functional_theory(atom_positions, args, mf_diis_space=9):
                   rng = range(len(args.smiles))
 
 
-                name = "%i_GDB%i_f32%s_grid%i_backend%s"%(len(os.listdir("data/generated/%s/"%args.fname)), int(args.gdb), g_float32, args.level, args.backend)
+                name = "%i_GDB%i_f32%s_grid%i_backend%s"%(len(os.listdir("data/generated/%s/"%args.fname)), int(args.gdb), args.float32, args.level, args.backend)
                 name += suffix
                 print(name)
                 os.makedirs("data/generated/%s/%s/"%(args.fname, name), exist_ok=True)
 
 
             else:
-                name = "%i_GDB%i_f32%s_grid%i_backend%s"%(len(os.listdir("data/generated/")), int(args.gdb), g_float32, args.level, args.backend)
+                name = "%i_GDB%i_f32%s_grid%i_backend%s"%(len(os.listdir("data/generated/")), int(args.gdb), args.float32, args.level, args.backend)
                 name += "_%i_%i"%(min(rng), max(rng))
                 print(name)
                 os.makedirs("data/generated/%s/"%name, exist_ok=True)
@@ -480,7 +480,6 @@ def density_functional_theory(atom_positions, args, mf_diis_space=9):
 
                 times.append(time.perf_counter())
 
-                energy = np.nan
                 if args.save and vals != []:
                     times.append(time.perf_counter())
                     energies_, energy, eigenvalues, eigenvectors, dms, _fixed_hamiltonian, part_energies, _L_inv_prev  = [np.asarray(a).astype(np.float64) for a in vals[-1]]
@@ -597,14 +596,14 @@ def density_functional_theory(atom_positions, args, mf_diis_space=9):
                         ax[2].set_xlabel("iterations")
                         ax[2].set_ylabel("relative |us-pyscf|/|pyscf| (energy eV)")
 
-                        if g_float32: plt.suptitle("float32")
+                        if args.float32: plt.suptitle("float32")
                         else: plt.suptitle("float64")
 
                         print("[checkc %s]"%args.backend)
 
                         plt.tight_layout()
-                        plt.savefig("experiments/checkc/%i_%i_f32_%s.jpg"%(count, conformer_num, str(g_float32)))
-                        np.savez("experiments/checkc/%i_%i_%s_%s_%s.npz"%(count, conformer_num, str(g_float32), args.backend, smile), pyscf=pyscf_energies*hartree_to_eV, us=e)
+                        plt.savefig("experiments/checkc/%i_%i_f32_%s.jpg"%(count, conformer_num, str(args.float32)))
+                        np.savez("experiments/checkc/%i_%i_%s_%s_%s.npz"%(count, conformer_num, str(args.float32), args.backend, smile), pyscf=pyscf_energies*hartree_to_eV, us=e)
 
                     if args.fname != "":
                         filename = "data/generated/%s/%s/data.csv"%(args.fname, name)
@@ -660,7 +659,7 @@ def density_functional_theory(atom_positions, args, mf_diis_space=9):
                   'sk', 'xc', 'threads', 'multv', 'debug',
                   'skipdiis', 'skipeigh', 'geneigh', 'density_mixing'
                 )
-                args.sk = tuple(args.sk)
+
                 dcargs = namedtuple('dcargs', dcargs_names)(*(args.__dict__[a] for a in dcargs_names))
                 if not args.forloop:
                     if not args.skip_minao: density_matrix  = np.array(minao(mol))
@@ -736,15 +735,15 @@ def density_functional_theory(atom_positions, args, mf_diis_space=9):
 
 # utility functions for investigating float{64,32}
 def f(x, float32):
-    if not g_float32: return x  # in float64 mode just return x
+    if not args.float32: return x  # in float64 mode just return x
 
-    if g_ipu:
+    if args.backend == "ipu":
         try:
             return x.astype(np.float32) # could (shouldn't) do a copy
         except:
             return x
 
-    if not g_float32:
+    if not args.float32:
         if type(x) == type(.1): return x
         return x.astype(np.float64)
 
@@ -789,44 +788,44 @@ def dft_iter(args_indxs, cycle, val ):
             pass
 
     # Step 1: Build Hamiltonian
-    d = True and g_float32
+    d = True and args.float32
     sdf, hamiltonian, _V, _H, mf_diis_H, fixed_hamiltonian, V_xc, overlap, density_matrix, hamiltonian = f(sdf, d), f(hamiltonian, d), f(_V, d), f(_H,d), f(mf_diis_H, d), f(fixed_hamiltonian, d), f(V_xc, d), f(overlap, d), f(density_matrix, d), f(hamiltonian, d)
     hamiltonian                    = fixed_hamiltonian + V_xc
     sdf                            = overlap @ density_matrix @ hamiltonian
     sdf, hamiltonian, _V, _H, mf_diis_H, fixed_hamiltonian, V_xc, overlap, density_matrix, hamiltonian = f(sdf, d), f(hamiltonian, d), f(_V, d), f(_H,d), f(mf_diis_H, d), f(fixed_hamiltonian, d), f(V_xc, d), f(overlap, d), f(density_matrix, d), f(hamiltonian, d)
     if not args.skipdiis:
         hamiltonian, _V, _H, mf_diis_H, errvec = DIIS(cycle, sdf, hamiltonian, _V, _H, mf_diis_H)
-    d = g_float32
+    d = args.float32
     sdf, hamiltonian, _V, _H, mf_diis_H, fixed_hamiltonian, V_xc, overlap, density_matrix, hamiltonian = f(sdf, d), f(hamiltonian, d), f(_V, d), f(_H,d), f(mf_diis_H, d), f(fixed_hamiltonian, d), f(V_xc, d), f(overlap, d), f(density_matrix, d), f(hamiltonian, d)
 
     # Step 2: Solve (generalized) eigenproblem for Hamiltonian:     generalized_hamiltonian = L_inv @ hamiltonian @ L_inv.T
-    d = True and g_float32
+    d = True and args.float32
     cholesky, hamiltonian = f(cholesky, d), f(hamiltonian, d)
     L_inv = f(L_inv, d)
 
     generalized_hamiltonian = L_inv @ hamiltonian @ L_inv.T
-    d = g_float32
+    d = args.float32
     generalized_hamiltonian, hamiltonian, cholesky = f(generalized_hamiltonian, d), f(hamiltonian,d), f(cholesky, d)
 
 
-    d = True and g_float32
+    d = True and args.float32
     generalized_hamiltonian = f(generalized_hamiltonian, d)
     if args.skipeigh: eigvals, eigvects = hamiltonian[0], hamiltonian
     else:
         eigvects = _eigh(generalized_hamiltonian )[1]
 
-    d = True and g_float32
+    d = True and args.float32
     generalized_hamiltonian, cholesky = f(generalized_hamiltonian, d), f(cholesky, d)
     eigvects          = L_inv.T @ eigvects
     if args.geneigh:
         import scipy
         _, eigvects = scipy.linalg.eigh(hamiltonian, overlap)
-    d = g_float32
+    d = args.float32
     cholesky, hamiltonian, eigvects = f(cholesky, d), f(hamiltonian, d), f(eigvects, d)
 
     # Step 3: Use result from eigenproblem to build new density matrix.
     # Use masking instead of """eigvects[:, :n_electrons_half]""" to allow changing {C,O,N,F} without changing compute graph => compiling only once.
-    d = True and g_float32
+    d = True and args.float32
     eigvects = f(eigvects, d)
     eigvects         =     eigvects * mask.reshape(1, -1)
     old_dm = density_matrix
@@ -835,14 +834,14 @@ def dft_iter(args_indxs, cycle, val ):
     if args.density_mixing:
         density_matrix = jax.lax.select(cycle<=_V.shape[0], density_matrix, (old_dm+density_matrix)/2)
 
-    d = g_float32
+    d = args.float32
     density_matrix, eigvects = f(density_matrix, d), f(eigvects, d)
 
 
     if type(electron_repulsion) == type([]):
-        if g_float32: E_xc, V_xc, E_coulomb, vj, vk = xc((args, indxs), density_matrix.astype(np.float32), dms.astype(np.float32), cycle, ao.astype(np.float32), electron_repulsion, weights.astype(np.float32), vj.astype(np.float32), vk.astype(np.float32), hyb, num_calls)
+        if args.float32: E_xc, V_xc, E_coulomb, vj, vk = xc((args, indxs), density_matrix.astype(np.float32), dms.astype(np.float32), cycle, ao.astype(np.float32), electron_repulsion, weights.astype(np.float32), vj.astype(np.float32), vk.astype(np.float32), hyb, num_calls)
     else:
-        if g_float32: E_xc, V_xc, E_coulomb, vj, vk = xc((args, indxs), density_matrix.astype(np.float32), dms.astype(np.float32), cycle, ao.astype(np.float32), electron_repulsion.astype(np.float32), weights.astype(np.float32), vj.astype(np.float32), vk.astype(np.float32), hyb, num_calls)
+        if args.float32: E_xc, V_xc, E_coulomb, vj, vk = xc((args, indxs), density_matrix.astype(np.float32), dms.astype(np.float32), cycle, ao.astype(np.float32), electron_repulsion.astype(np.float32), weights.astype(np.float32), vj.astype(np.float32), vk.astype(np.float32), hyb, num_calls)
         else: E_xc, V_xc, E_coulomb, vj, vk = xc((args, indxs), density_matrix.astype(np.float64), dms.astype(np.float64), cycle, ao.astype(np.float64), electron_repulsion.astype(np.float64), weights.astype(np.float64), vj.astype(np.float64), vk.astype(np.float64), hyb, num_calls)
 
     if type(part_energies) == type(jnp.array(1)): part_energies = part_energies.at[cycle].set(  E_xc )
@@ -864,7 +863,7 @@ def dft_iter(args_indxs, cycle, val ):
     ret = [mask, allvals, cs, energies, V_xc, density_matrix, _V, _H, mf_diis_H, vj, vk, eigvals, eigvects, energy, overlap, electron_repulsion, fixed_hamiltonian, L_inv, weights, hyb, ao, nuclear_energy, num_calls, cholesky, generalized_hamiltonian, sdf, errvec, hamiltonian, dms, part_energies]
 
     split = 100
-    ret = [f(a, g_float32) for a in ret[:split]] + [f(a, False) for a in ret[split:]]
+    ret = [f(a, args.float32) for a in ret[:split]] + [f(a, False) for a in ret[split:]]
 
     return ret
 
@@ -889,11 +888,11 @@ def xc(args_indxs, density_matrix, dms, cycle, ao, electron_repulsion, weights, 
 
     n = density_matrix.shape[0]
 
-    switch = g_float32
+    switch = args.float32
 
     d = 0 in args.sk
     density_matrix, ao = f(density_matrix, d), f(ao, d)
-    if g_float32 and not g_ipu:
+    if args.float32 and not args.backend == "ipu":
         ao0dm = kahan_sum_sort(ao[0].reshape(-1, n, 1) * density_matrix.reshape(1, n, n) ) # this increases memory n**3
     else:
         print("Matmul")
@@ -961,7 +960,7 @@ def xc(args_indxs, density_matrix, dms, cycle, ao, electron_repulsion, weights, 
         d = num_calls.size
         c = 1
 
-        if g_ipu and not args.ipumult or args.seperate:
+        if args.backend == "ipu" and not args.ipumult or args.seperate:
             _tuple_indices, _tuple_do_lists, _N = prepare_ipu_direct_mult_inputs(num_calls.size , mol)
 
             ipu_vj, ipu_vk = jax.jit(ipu_direct_mult, backend="ipu", static_argnums=(2,3,4,5,6,7,8,9))(
@@ -1013,7 +1012,7 @@ def xc(args_indxs, density_matrix, dms, cycle, ao, electron_repulsion, weights, 
 
     d = 14 in args.sk
     density_matrix, E_xc, vk = f(density_matrix, d), f(E_xc, d), f(vk, d)
-    if g_float32 and not g_ipu: E_xc      = E_xc - kahan_dot(density_matrix.reshape(-1) , vk.T.reshape(-1)) *( .5 * .5)
+    if args.float32 and not args.backend == "ipu": E_xc      = E_xc - kahan_dot(density_matrix.reshape(-1) , vk.T.reshape(-1)) *( .5 * .5)
     else: E_xc      -= jnp.sum(density_matrix * vk.T) * .5 * .5
     d = switch
     density_matrix, E_xc, vk = f(density_matrix, d), f(E_xc, d), f(vk, d)
@@ -1024,7 +1023,7 @@ def xc(args_indxs, density_matrix, dms, cycle, ao, electron_repulsion, weights, 
 
 
 def _eigh(x):
-    if g_ipu and x.shape[0] >= 6:
+    if args.backend == "ipu" and x.shape[0] >= 6:
         t0 = time.time()
         print("tracing ipu eigh (%s): "%str(x.shape))
         from tessellate_ipu.linalg import ipu_eigh
@@ -1044,7 +1043,7 @@ def _eigh(x):
             eigvects = jnp.roll(eigvects, -(-col))
             eigvects = eigvects[:-1]
     else:
-        eigvals, eigvects = jnp.linalg.eigh(f(x, g_float32))
+        eigvals, eigvects = jnp.linalg.eigh(f(x, args.float32))
 
     return eigvals, eigvects
 
@@ -1080,12 +1079,12 @@ def DIIS(cycle, sdf, hamiltonian, _V, _H, mf_diis_H):
     mask_            = jnp.concatenate([jnp.ones(1, dtype=mask.dtype), mask])
     masked_mf_diis_H = mf_diis_H[:nd+1, :nd+1] * mask_.reshape(-1, 1) * mask_.reshape(1, -1)
 
-    if g_ipu:
+    if args.backend == "ipu":
         #c               = pinv( masked_mf_diis_H )[0, :]
         c               = pinv0( masked_mf_diis_H )
         #c               = jnp.linalg.pinv( masked_mf_diis_H )[0, :]
     else:
-        c = jnp.linalg.pinv(f(masked_mf_diis_H, g_float32))[0, :]
+        c = jnp.linalg.pinv(f(masked_mf_diis_H, args.float32))[0, :]
 
 
     scaled_H         = _H[:nd] * c[1:].reshape(nd, 1)
@@ -1343,7 +1342,7 @@ def get_args(argv=None):
     parser.add_argument('-density_mixing',       action="store_true", help='Compute dm=(dm_old+dm)/2')
     parser.add_argument('-skip_minao',       action="store_true", help='In generation mode re-uses minao init across conformers.')
     parser.add_argument('-num',       default=10,          type=int,   help='Run the first "num" test molecules. ')
-    parser.add_argument('-id',        default=0,           type=int,   help='Run only test molecule "id". ')
+    parser.add_argument('-id',        default=126,          type=int,   help='Run only test molecule "id". ')
     parser.add_argument('-its',       default=20,          type=int,   help='Number of Kohn-Sham iterations. ')
     parser.add_argument('-step',      default=1,           type=int,   help='If running 1000s of test cases, do molecules[args.skip::args.step]]')
     parser.add_argument('-spin',      default=0,           type=int,   help='Even or odd number of electrons? Currently only support spin=0')
@@ -1357,7 +1356,7 @@ def get_args(argv=None):
     parser.add_argument('-basis',     default="STO-3G",    help='Which basis set to use. ')
     parser.add_argument('-xc',        default="b3lyp",     help='Only support B3LYP. ')
     parser.add_argument('-skip',      default=0,           help='Skip the first "skip" testcases. ', type=int)
-    parser.add_argument('-backend',   default="ipu",       help='Which backend to use, e.g., -backend cpu or -backend ipu')
+    parser.add_argument('-backend',   default="cpu",       help='Which backend to use, e.g., -backend cpu or -backend ipu')
 
     parser.add_argument('-benchmark', action="store_true", help='Print benchmark info inside our DFT computation. ')
     parser.add_argument('-nan',       action="store_true", help='Whether to throw assertion on operation causing NaN, useful for debugging NaN arrising from jax.grad. ')
@@ -1417,8 +1416,9 @@ def get_args(argv=None):
 def process_args(args):
 
     print("[BASIS]", args.basis)
+    args.sk = tuple(args.sk)
 
-    if -1 in args.sk: args.sk = list(range(20))
+    if -1 in args.sk: args.sk = tuple(range(20))
 
     if args.checkc:
         args.pyscf = True
@@ -1430,7 +1430,7 @@ def process_args(args):
         # currently tensor scaling is turned off by default.
         args.scale_w = 1
         args.scale_ao = 1
-        if g_float32: args.scale_eri = 1
+        if args.float32: args.scale_eri = 1
         args.scale_eri = 1
         args.scale_cholesky= 1
         args.scale_ghamil = 1
@@ -1443,12 +1443,12 @@ def process_args(args):
 
     g_ipu = (args.backend == "ipu")
 
-    if not g_ipu:
+    if not args.backend == "ipu":
         args.seperate = False
 
-    if g_ipu:  # allows use of cpu float64 in jnp while using float32 on ipu
+    if args.backend == "ipu":  # allows use of cpu float64 in jnp while using float32 on ipu
         args.ipu = True
-        args.sk = list(range(20))
+        args.sk = tuple(range(20))
         args.debug = True
 
     return args
