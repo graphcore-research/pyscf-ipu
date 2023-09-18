@@ -6,7 +6,7 @@ import numpy as np
 import pyscf
 import h5py
 import chex
-from jaxtyping import Float, Array
+from jaxtyping import Float, Array, Int
 from jsonargparse import CLI, Namespace
 from functools import partial
 from collections import namedtuple
@@ -110,56 +110,57 @@ def _nanoDFT(state, opts, mol):
     return log["matrices"], H_core, log["energy"]
 
 
-OrbitalVector = Float[Array, "num_orbitals"]
-OrbitalMatrix = Float[Array, "num_orbitals num_orbitals"]
-TwoOrbitalMatrix = Float[Array, "num_orbitals num_orbitals num_orbitals num_orbitals"]
-Grid = Float[Array, "4 grid_size num_orbitals"]
+FloatN = Float[Array, "N"]
+FloatNxN = Float[Array, "N N"]
+FloatNxNxNxN = Float[Array, "N N N N"]
+Grid = Float[Array, "4 grid_size N"]
+FloatArray = Float[Array, "..."]
+IntArray = Int[Array, "..."]
 
 @chex.dataclass
 class IterationState:
-    """State tensors used during self-consistent field iterations
+    """State tensors used during self-consistent field (SCF) iterations
 
-    We use the following type annotations where the dimension N is the number
-    used in the linear combination of atomic orbitals (LCAO) basis set:
-
-        OrbitalVector [N] (float): Used to store the electron occupation mask
-        OrbitalMatrix [N, N] (float): Used for storing the one-electron integrals and density matrix.
-        TwoOrbitalMatrix [N, N, N, N] (float): 4-d matrix representing the two-electron
-            repulsion integrals.
-        Grid [4, grid_size, num_orbitals] (float): Numerical grid used to evaluate the
+        FloatN: Vector used to store the electron occupation mask.
+        FloatNxN: Square matrix used for storing the one-electron integrals and density matrix.
+        FloatNxNxNxN: 4-d matrix representing the two-electron repulsion integrals.
+        Grid [4, grid_size, N] (float): Numerical grid used to evaluate the
             exchange-correlation energy integral.
         
 
     Attributes:
         E_nuc (float): Energy of the nuclear-nuclear electrostatic interactions.
-        density_matrix (OrbitalMatrix): Electron density in the LCAO basis set.
-        kinetic (OrbitalMatrix): Kinetic energy integrals in the LCAO basis set.
-        nuclear (OrbitalMatrix): nuclear attraction integrals in the LCAO basis set.
-        O (OrbitalMatrix): Overlap integrals in the LCAO basis set.
+        density_matrix (FloatNxN): Electron density in the LCAO basis set.
+        kinetic (FloatNxN): Kinetic energy integrals in the LCAO basis set.
+        nuclear (FloatNxN): nuclear attraction integrals in the LCAO basis set.
+        O (FloatNxN): Overlap integrals in the LCAO basis set.
         grid_AO (Grid): Numerical grid used to evaluate the exchange-correlation energy integral.
-        ERI (TwoOrbitalMatrix): Two-electron repulsion integrals in the LCAO basis set.
-        grid_weights (Array): Weights associated with the grid_AO
-        mask (OrbitalVector): Orbital occupation mask.
-        input_floats (Array):
-        input_ints (Array):
-        L_inv (OrbitalMatrix):
-        diis_history (Array): 
+        ERI (FloatNxNxNxN): Two-electron repulsion integrals in the LCAO basis set.
+        grid_weights (FloatArray): Weights associated with the grid_AO
+        mask (FloatN): Orbital occupation mask.
+        input_floats (FloatArray): Supplementary vector of floats for ERI evaluation with libcint
+        input_ints (IntArray): Supplementary vector of ints for ERI evaluation with libcint
+        L_inv (FloatNxN): Defined as the inverse of the Cholesky decomposition of the overlap matrix. 
+            Used to change generalised eig problem into an eigh one.
+        diis_history (FloatArray): Direct Inversion of Iterative Subspace (DIIS) is an optional method that
+            can accelerate convergence of the SCF iterations. Maintains a history of how the Hamiltonian
+            is evolving across the SCF iterations.
 
 
     """
     E_nuc: float
-    density_matrix: OrbitalMatrix
-    kinetic: OrbitalMatrix
-    nuclear: OrbitalMatrix
-    O: OrbitalMatrix
+    density_matrix: FloatNxN
+    kinetic: FloatNxN
+    nuclear: FloatNxN
+    O: FloatNxN
     grid_AO: Grid
-    ERI: TwoOrbitalMatrix
-    grid_weights: Array
-    mask: OrbitalVector
-    input_floats: Array
-    input_ints: Array
-    L_inv: OrbitalMatrix
-    diis_history: Array
+    ERI: FloatNxNxNxN
+    grid_weights: FloatArray
+    mask: FloatN
+    input_floats: FloatArray
+    input_ints: IntArray
+    L_inv: FloatNxN
+    diis_history: FloatArray
 
 
 def init_dft_tensors_cpu(mol, opts, DIIS_iters=9):
