@@ -1,3 +1,4 @@
+# Copyright (c) 2023 Graphcore Ltd. All rights reserved.
 import numpy as np 
 import jax.numpy as jnp
 import os 
