@@ -15,6 +15,8 @@ from .orbital import batch_orbitals
 from .primitive import Primitive, product
 from .types import IntN, FloatN, FloatNxN, Float3, FloatNx3
 
+# Maximum value an individual component of the angular momentum lmn can take
+# Used for static ahead-of-time compilation of functions involving lmn.
 LMAX = 4
 
 """
@@ -291,10 +293,6 @@ def gen_ijkl(n: int):
     """
     adapted from four-index transformations by S Wilson pg 257
     """
-
-    def lmax(i: int, j: int, k: int):
-        return j if i == k else k
-
     for idx in range(n):
         for jdx in range(idx + 1):
             for kdx in range(idx + 1):
