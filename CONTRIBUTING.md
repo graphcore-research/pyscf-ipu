@@ -21,13 +21,22 @@ installer:
    conda create -n pyscf-ipu python=3.8.10
    ```
 
-2. Activate the environment and store a persistent environment variable for the
+2. Confirm that you have the Poplar SDK installed on your machine and store the location
+   in an environment variable.  The following will test that the SDK is found and
+   configured correctly:
+   ```bash
+   export POPLAR_SDK=/path/to/sdk
+   source $POPLAR_SDK/enable
+   gc-monitor
+   ```
+
+3.  Activate the environment and store a persistent environment variable for the
    location of the downloaded Poplar SDK. This assumes that
    you have already downloaded the Poplar SDK.  The following example uses an
    environment variable `$POPLAR_SDK` to store the root folder for the SDK.
    ```bash
    conda activate pyscf-ipu
-   conda env config vars set POPLAR_SDK=/path/to/poplar/sdk
+   conda env config vars set POPLAR_SDK=$POPLAR_SDK
    ```
 
 3. You have to reactivate the conda environment to use the `$POPLAR_SDK`
