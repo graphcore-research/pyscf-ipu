@@ -39,10 +39,8 @@ def get_atom_string(atoms, locs):
       str += "%s %4f %4f %4f; "%((atom,) + tuple(loc) )
     return atom_string, str
 
-try:
-    NUM_TILES = jax.devices("ipu")[0].num_tiles
-except:
-    NUM_TILES = 1472
+def num_ipu_tiles() -> int:
+        return jax.devices("ipu")[0].num_tiles
 
 @partial(jax.jit, backend="ipu", static_argnums=(3,))
 def single(input_floats, input_ints, input_ijkl, tiles):
@@ -89,7 +87,7 @@ def ipu_direct_mult_v0(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, i
 
         #print(threads)
         num_threads = threads
-        num_tiles = NUM_TILES-1
+        num_tiles = num_ipu_tiles()-1
 
         tiles = tuple((np.arange(num_tiles*num_threads)%num_tiles+1).tolist())
         dm    = tile_put_replicated(    dm,             tiles=tiles)
@@ -178,7 +176,7 @@ def ipu_direct_mult_v1(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, i
 
         #print(threads)
         num_threads = threads
-        num_tiles = NUM_TILES-1
+        num_tiles = num_ipu_tiles()-1
 
         tiles = tuple((np.arange(num_tiles*num_threads)%num_tiles+1).tolist())
 
@@ -313,7 +311,7 @@ def ipu_direct_mult_v2(__out3, dm, indices, do_lists, N, num_tiles, indxs_inv, i
 
         #print(threads)
         num_threads = threads
-        num_tiles = NUM_TILES-1
+        num_tiles = num_ipu_tiles()-1
 
         tiles = tuple((np.arange(num_tiles*num_threads)%num_tiles+1).tolist())
 
@@ -534,7 +532,7 @@ def integrals_v0(input_floats, input_ints, input_ijkl, shapes, sizes, counts, in
         np.random.seed(42) #
 
 
-        num_tiles = NUM_TILES-1
+        num_tiles = num_ipu_tiles()-1
 
         num_calls = len(indxs_inv)
         #print(num_calls)
@@ -609,7 +607,7 @@ def integrals_v1(input_floats, input_ints, input_ijkl, shapes, sizes, counts, in
         start, stop = 0, 0
         np.random.seed(42)
 
-        num_tiles = NUM_TILES-1
+        num_tiles = num_ipu_tiles()-1
 
         num_calls = len(indxs_inv)
         #print(num_calls)
@@ -1420,7 +1418,7 @@ def compute_eri(mol, atom_str, eri_them, eri_them_s8):
                 out3 = np.zeros(out.shape)
         else:
                 num_threads = int(args.threads)
-                ipu_num_tiles = NUM_TILES
+                ipu_num_tiles = num_ipu_tiles()
                 if num_calls >= ipu_num_tiles*num_threads:
                         # If enough calls allocate all threads and all tiles.
                         tiles = [i for i in range(1, ipu_num_tiles) for _ in range(num_threads)]
