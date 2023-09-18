@@ -164,8 +164,10 @@ def compute_eri(mol):
     num_calls = len(indxs_inv)
     #print(num_calls)
 
-    if num_calls < num_tiles*num_threads:  tiles       = tuple((np.arange(num_calls)+1).tolist())
-    else:                                  tiles       = tuple((np.arange(num_tiles*num_threads)%(num_tiles)+1).tolist())
+    if num_calls < num_tiles:  tiles       = tuple((np.arange(num_calls)+1).tolist())
+    else:                      tiles       = tuple((np.arange(num_tiles*num_threads)%(num_tiles)+1).tolist())
+
+    print('-> TILES:', tiles)
 
     tile_floats = tile_put_replicated(input_floats, tiles)
     tile_ints   = tile_put_replicated(input_ints,   tiles)
@@ -283,14 +285,14 @@ if __name__ == "__main__":
     if not args.skip: dense_ERI = mol.intor("int2e_sph", aosym="s1")
     distinct_ERI = mol.intor("int2e_sph", aosym="s8")
 
+    print('distinct_ERI.shape', distinct_ERI.shape)
+    if not args.skip:
+        print('dense_ERI', dense_ERI.astype(np.float32).nbytes/10**6, "MB  ", np.prod(dense_ERI.shape), dense_ERI.shape)
+    print('distinct_ERI', distinct_ERI.astype(np.float32).nbytes/10**6, "MB  ", np.prod(distinct_ERI.shape), distinct_ERI.shape)
+    print("")
+
     # ---------------------------------------- #
     if backend == 'ipu':
-        print('distinct_ERI.shape', distinct_ERI.shape)
-        if not args.skip:
-            print('dense_ERI', dense_ERI.astype(np.float32).nbytes/10**6, "MB  ", np.prod(dense_ERI.shape), dense_ERI.shape)
-        print('distinct_ERI', distinct_ERI.astype(np.float32).nbytes/10**6, "MB  ", np.prod(distinct_ERI.shape), distinct_ERI.shape)
-        print("")
-
         all_eris, all_indices, ao_loc = jax.jit(compute_eri, backend=backend, static_argnames=['mol'])(mol)
         all_eris = [np.array(x) for x in all_eris]
         all_indices = [np.array(x) for x in all_indices]
@@ -309,10 +311,19 @@ if __name__ == "__main__":
                 dj = ao_loc[j+1] - ao_loc[j]
                 dk = ao_loc[k+1] - ao_loc[k]
                 dl = ao_loc[l+1] - ao_loc[l]
-                real_ERI = dense_ERI[i:i+di, j:j+dj, k:k+dk, l:l+dl].reshape(-1)
-                comp_ERI = eri[ind, :di*dj*dk*dl]
-                print(i, j, k, l, 'd', di, dj, dk, dl, '->', real_ERI, comp_ERI)
-                assert np.allclose(real_ERI, comp_ERI)
+                
+                i0 = ao_loc[i] - ao_loc[0]
+                j0 = ao_loc[j] - ao_loc[0]
+                k0 = ao_loc[k] - ao_loc[0]
+                l0 = ao_loc[l] - ao_loc[0]
+                # assert i==i0 and j==j0 and k==k0 and l==l0
+                real_ERI = dense_ERI[i0:i0+di, j0:j0+dj, k0:k0+dk, l0:l0+dl]
+                comp_ERI = eri[ind, :di*dj*dk*dl].reshape(dl,dk,dj,di)
+                comp_ERI = np.transpose( comp_ERI, (3,2,1,0) )
+                # print(i0, j0, k0, l0, 'd', di, dj, dk, dl)
+                # print('real', real_ERI)
+                # print('comp', comp_ERI)
+                assert np.allclose(real_ERI, comp_ERI, atol=1e-6)
         print('PASSED dense_ERI allequal!')
         
         exit()
