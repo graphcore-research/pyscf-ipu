@@ -1,0 +1,9 @@
+# Runtime dependencies for pyscf-ipu with CPU backend
+#
+# See also:
+#    requirements_core.txt for core configuration
+#    requirements_ipu.txt for ipu backend configuration
+#    requirements_test.txt for test-only dependencies    
+
+jax==0.3.16
+jaxlib==0.3.15

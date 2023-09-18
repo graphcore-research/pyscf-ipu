@@ -1,6 +1,7 @@
-# Runtime dependencies for pyscf-ipu
+# Core dependencies for pyscf-ipu
 #
 # See also:
+#    requirements_cpu.txt for cpu backend configuration
 #    requirements_ipu.txt for ipu backend configuration
 #    requirements_test.txt for test-only dependencies    
 numpy
@@ -24,6 +25,5 @@ py3Dmol
 # silence warnings about setuptools + numpy
 setuptools < 60.0
 
-jax==0.3.16
-jaxlib==0.3.15
 jaxtyping==0.2.8
+chex

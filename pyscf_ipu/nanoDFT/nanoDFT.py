@@ -493,7 +493,7 @@ def nanoDFT_options(
         jax.config.update('jax_enable_x64', not float32)
     return args, mol_str
 
-if __name__ == "__main__":
+def main():
     # Limit PySCF threads to mitigate problem with NUMA nodes.
     import os
     os.environ['OMP_NUM_THREADS'] = "16"
@@ -561,3 +561,5 @@ if __name__ == "__main__":
             writer.append_data(imageio.v2.imread("_tmp/tmp.jpg"))
         writer.close()
 
+if __name__ == "__main__":
+    main()

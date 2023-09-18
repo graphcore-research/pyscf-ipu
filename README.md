@@ -1,6 +1,7 @@
 :red_circle: :warning: **Experimental and non-official Graphcore product** :warning: :red_circle:
 
 [![notebook-tests](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/notebooks.yaml/badge.svg)](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/notebooks.yaml)
+[![nanoDFT CLI](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/cli.yaml/badge.svg)](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/cli.yaml)
 
 [**Installation guide**](#installation)
 | [**Example DFT Computations**](#example-dft-computations)
@@ -47,26 +48,20 @@ Additional notebooks in [notebooks](notebooks) demonstrate other aspects of the 
 
 PySCF on IPU requires Python 3.8, [JAX IPU experimental](https://github.com/graphcore-research/jax-experimental), [TessellateIPU library](https://github.com/graphcore-research/tessellate-ipu) and [Graphcore Poplar SDK 3.2](https://www.graphcore.ai/downloads).
 
-To run this package on a standard CPU machine (laptop or server),
-install the base Python requirements:
-```bash
-pip install -r requirements.txt
-```
-
-On IPU machines, please additionally use the IPU requirements file:
+We recommend upgrading `pip` to the latest stable release to prepare your enviroment.
 ```bash
 pip install -U pip
-pip install -r requirements_ipu.txt
 ```
-This will configure Graphcore research experimental JAX support in your python environment.
 
-We recommend upgrading `pip` to the latest stable release when using the IPU
-requirements. This may be an optional step depending on the overall configuration of
-your python environment.
-
-And finally, make our sub-packages available:
+This project is currently under active development. 
+For CPU simulations, we recommend installing `pyscf-ipu` from latest `main` branch as:
 ```bash
-pip install -e .
+pip install pyscf-ipu@git+https://github.com/graphcore-research/pyscf-ipu
+```
+
+and on IPU equipped machines:
+```bash
+pip install pyscf-ipu[ipu]@git+https://github.com/graphcore-research/pyscf-ipu
 ```
 
 ## Example DFT Computations
