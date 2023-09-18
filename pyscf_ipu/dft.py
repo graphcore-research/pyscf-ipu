@@ -735,15 +735,15 @@ def density_functional_theory(atom_positions, args, mf_diis_space=9):
 
 # utility functions for investigating float{64,32}
 def f(x, float32):
-    if not args.float32: return x  # in float64 mode just return x
+    if not g_float32: return x  # in float64 mode just return x
 
-    if args.backend == "ipu":
+    if g_ipu:
         try:
             return x.astype(np.float32) # could (shouldn't) do a copy
         except:
             return x
 
-    if not args.float32:
+    if not g_float32:
         if type(x) == type(.1): return x
         return x.astype(np.float64)
 
@@ -794,7 +794,7 @@ def dft_iter(args_indxs, cycle, val ):
     sdf                            = overlap @ density_matrix @ hamiltonian
     sdf, hamiltonian, _V, _H, mf_diis_H, fixed_hamiltonian, V_xc, overlap, density_matrix, hamiltonian = f(sdf, d), f(hamiltonian, d), f(_V, d), f(_H,d), f(mf_diis_H, d), f(fixed_hamiltonian, d), f(V_xc, d), f(overlap, d), f(density_matrix, d), f(hamiltonian, d)
     if not args.skipdiis:
-        hamiltonian, _V, _H, mf_diis_H, errvec = DIIS(cycle, sdf, hamiltonian, _V, _H, mf_diis_H)
+        hamiltonian, _V, _H, mf_diis_H, errvec = DIIS(cycle, sdf, hamiltonian, _V, _H, mf_diis_H, args.backend == "ipu", args.float32)
     d = args.float32
     sdf, hamiltonian, _V, _H, mf_diis_H, fixed_hamiltonian, V_xc, overlap, density_matrix, hamiltonian = f(sdf, d), f(hamiltonian, d), f(_V, d), f(_H,d), f(mf_diis_H, d), f(fixed_hamiltonian, d), f(V_xc, d), f(overlap, d), f(density_matrix, d), f(hamiltonian, d)
 
@@ -1023,7 +1023,7 @@ def xc(args_indxs, density_matrix, dms, cycle, ao, electron_repulsion, weights, 
 
 
 def _eigh(x):
-    if args.backend == "ipu" and x.shape[0] >= 6:
+    if g_ipu and x.shape[0] >= 6:
         t0 = time.time()
         print("tracing ipu eigh (%s): "%str(x.shape))
         from tessellate_ipu.linalg import ipu_eigh
@@ -1043,11 +1043,11 @@ def _eigh(x):
             eigvects = jnp.roll(eigvects, -(-col))
             eigvects = eigvects[:-1]
     else:
-        eigvals, eigvects = jnp.linalg.eigh(f(x, args.float32))
+        eigvals, eigvects = jnp.linalg.eigh(f(x, g_float32))
 
     return eigvals, eigvects
 
-def DIIS(cycle, sdf, hamiltonian, _V, _H, mf_diis_H):
+def DIIS(cycle, sdf, hamiltonian, _V, _H, mf_diis_H, use_ipu, use_float32):
     # Update hamiltonian as linear combination of previous iterations
     mf_diis_head      = cycle % _V.shape[0]
     nd, d             = _V.shape
@@ -1079,12 +1079,12 @@ def DIIS(cycle, sdf, hamiltonian, _V, _H, mf_diis_H):
     mask_            = jnp.concatenate([jnp.ones(1, dtype=mask.dtype), mask])
     masked_mf_diis_H = mf_diis_H[:nd+1, :nd+1] * mask_.reshape(-1, 1) * mask_.reshape(1, -1)
 
-    if args.backend == "ipu":
+    if use_ipu:
         #c               = pinv( masked_mf_diis_H )[0, :]
         c               = pinv0( masked_mf_diis_H )
         #c               = jnp.linalg.pinv( masked_mf_diis_H )[0, :]
     else:
-        c = jnp.linalg.pinv(f(masked_mf_diis_H, args.float32))[0, :]
+        c = jnp.linalg.pinv(f(masked_mf_diis_H, use_float32))[0, :]
 
 
     scaled_H         = _H[:nd] * c[1:].reshape(nd, 1)
@@ -1124,7 +1124,7 @@ def recompute(args, molecules, id, num, our_fun, str="", atom_string=""):
 
   mol.build(atom=str, unit="Bohr", basis=args.basis, spin=args.spin, verbose=0)
 
-  print("\t", atom_string, end="")
+  print("recompute:", atom_string, end="")
 
   if not args.skipus:
     energies, our_energy, our_hlgap, t_us, t_main_loop, us_hlgap = our_fun(str, args)
@@ -1184,15 +1184,16 @@ def recompute(args, molecules, id, num, our_fun, str="", atom_string=""):
   if molecules is not None: pcq_hlgap = molecules["hlgap"][id]
   else: pcq_hlgap = -1
 
+  chemAcc = 0.043
   print("UNITS IS [eV]!")
   print("pyscf:\t\t%15f"%pyscf_energy)
   print("us:\t\t%15f"%our_energy)
   print("mus:\t\t%15f"%np.mean(energies[-10:]))
   print("diff:\t\t%15f"%np.abs(pyscf_energy-our_energy))
   print("mdiff:\t\t%15f"%np.abs(pyscf_energy-np.mean(energies[-10:])), np.std(energies[-10:]))
-  print("chemAcc: \t%15f"%0.043)
-  print("chemAcc/diff: \t%15f"%(0.043/np.abs(pyscf_energy-our_energy)))
-  print("chemAcc/mdiff: \t%15f"%(0.043/np.abs(pyscf_energy-np.mean(energies[-10:]))))
+  print("chemAcc: \t%15f"%chemAcc)
+  print("chemAcc/diff: \t%15f"%(chemAcc/np.abs(pyscf_energy-our_energy)))
+  print("chemAcc/mdiff: \t%15f"%(chemAcc/np.abs(pyscf_energy-np.mean(energies[-10:]))))
   print("> diffs:")
   print(np.abs(energies.reshape(-1)[-5:] - pyscf_energy))
   print("mean+-var: %f +- %f"%( np.mean(np.abs(energies.reshape(-1)[-5:] - pyscf_energy)), np.var(np.abs(energies.reshape(-1)[-5:] - pyscf_energy))))
@@ -1451,18 +1452,6 @@ def process_args(args):
         args.sk = tuple(range(20))
         args.debug = True
 
-    return args
-
-def main():
-    args = get_args()
-
-    print(sys.argv)
-    print(natsorted(vars(args).items()) )
-
-    sys.argv = sys.argv[:1]
-
-    print("")
-
     if args.float32 or args.float16:
         if args.enable64: config.update('jax_enable_x64', True) 
 
@@ -1471,6 +1460,20 @@ def main():
 
     if args.nan:
         config.update("jax_debug_nans", True)
+
+    return args
+
+def main():
+    args = get_args()
+
+    args = process_args(args)
+
+    print(sys.argv)
+    print(natsorted(vars(args).items()) )
+
+    sys.argv = sys.argv[:1]
+
+    print("")
 
     backend = args.backend
     eigh = _eigh
