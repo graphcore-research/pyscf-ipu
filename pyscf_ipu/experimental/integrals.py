@@ -298,7 +298,8 @@ def gen_ijkl(n: int):
     for idx in range(n):
         for jdx in range(idx + 1):
             for kdx in range(idx + 1):
-                for ldx in range(lmax(idx, jdx, kdx) + 1):
+                lmax = jdx if idx == kdx else kdx
+                for ldx in range(lmax + 1):
                     yield idx, jdx, kdx, ldx
 
 
