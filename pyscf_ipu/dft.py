@@ -45,10 +45,17 @@ from pyscf_ipu.electron_repulsion.direct    import (prepare_ipu_direct_mult_inpu
 lg = RDLogger.logger()
 lg.setLevel(RDLogger.CRITICAL)
 
-g_float32 = False
-g_ipu = False
+# Constants
 angstrom_to_bohr = 1.88973
 hartree_to_eV    = 27.2114
+
+# Global variables, set from args
+g_float32 = False
+g_ipu = False
+EPSILON_B3LYP  = 1e-20
+CLIP_RHO_MIN   = 1e-9
+CLIP_RHO_MAX   = 1e12
+
 
 def get_atom_string(atoms, locs):
     atom_string = atoms
@@ -1446,70 +1453,63 @@ def process_args(args):
 
     return args
 
-
-if __name__ == "__main__":
-    main_args = get_args()
+def main():
+    args = get_args()
 
     print(sys.argv)
-    print(natsorted(vars(main_args).items()) )
+    print(natsorted(vars(args).items()) )
 
     sys.argv = sys.argv[:1]
 
     print("")
 
-    if main_args.float32 or main_args.float16:
-        if main_args.enable64: config.update('jax_enable_x64', True) #
-        EPSILON_B3LYP  = 1e-20
-        CLIP_RHO_MIN   = 1e-9
-        CLIP_RHO_MAX   = 1e12
+    if args.float32 or args.float16:
+        if args.enable64: config.update('jax_enable_x64', True) 
 
     else:  # float64
         config.update('jax_enable_x64', True)
-        EPSILON_B3LYP  = 1e-20
-        CLIP_RHO_MIN   = 1e-9
-        CLIP_RHO_MAX   = 1e12
 
-    if main_args.nan:
+    if args.nan:
         config.update("jax_debug_nans", True)
 
-    backend = main_args.backend
+    backend = args.backend
     eigh = _eigh
 
-    if main_args.str != "":
-        recompute(main_args, None, 0, 0, our_fun=jax_dft, str=main_args.str)
+    if args.str != "":
+        recompute(args, None, 0, 0, our_fun=jax_dft, str=args.str)
 
-    elif main_args.gdb > 0:
+    elif args.gdb > 0:
 
-        if main_args.gdb != 20 or True:
+        if args.gdb != 20 or True:
             t0 = time.time()
             print("loading gdb data")
 
-            if main_args.gdb == 10: main_args.smiles = [a for a in open("gdb/gdb11_size10_sorted.csv", "r").read().split("\n")]
-            if main_args.gdb == 9:  main_args.smiles = [a for a in open("gdb/gdb11_size09_sorted.csv", "r").read().split("\n")]
-            if main_args.gdb == 7:  main_args.smiles = [a for a in open("gdb/gdb11_size07_sorted.csv", "r").read().split("\n")]
-            if main_args.gdb == 8:  main_args.smiles = [a for a in open("gdb/gdb11_size08_sorted.csv", "r").read().split("\n")]
+            if args.gdb == 10: args.smiles = [a for a in open("gdb/gdb11_size10_sorted.csv", "r").read().split("\n")]
+            if args.gdb == 9:  args.smiles = [a for a in open("gdb/gdb11_size09_sorted.csv", "r").read().split("\n")]
+            if args.gdb == 7:  args.smiles = [a for a in open("gdb/gdb11_size07_sorted.csv", "r").read().split("\n")]
+            if args.gdb == 8:  args.smiles = [a for a in open("gdb/gdb11_size08_sorted.csv", "r").read().split("\n")]
 
             # used as example data for quick testing.
-            if main_args.gdb == 6:  main_args.smiles = ["c1ccccc1"]*main_args.num_conformers
-            if main_args.gdb == 5:  main_args.smiles = ['CCCCC']*main_args.num_conformers
-            if main_args.gdb == 4:  main_args.smiles = ['CCCC']*main_args.num_conformers
+            if args.gdb == 6:  args.smiles = ["c1ccccc1"]*args.num_conformers
+            if args.gdb == 5:  args.smiles = ['CCCCC']*args.num_conformers
+            if args.gdb == 4:  args.smiles = ['CCCC']*args.num_conformers
 
 
             print("DONE!", time.time()-t0)
 
-            print("Length GDB: ", len(main_args.smiles))
+            print("Length GDB: ", len(args.smiles))
 
-            if main_args.limit != -1:
-                main_args.smiles = main_args.smiles[:main_args.limit]
+            if args.limit != -1:
+                args.smiles = args.smiles[:args.limit]
 
-            for i in range(int(main_args.id), int(main_args.id)+1000):
-                smile = main_args.smiles[i]
+            for i in range(int(args.id), int(args.id)+1000):
+                smile = args.smiles[i]
                 smile = smile
 
                 print(smile)
 
                 b = Chem.MolFromSmiles(smile)
-                if not main_args.nohs: b = Chem.AddHs(b, explicitOnly=False)
+                if not args.nohs: b = Chem.AddHs(b, explicitOnly=False)
                 atoms = [atom.GetSymbol() for atom in b.GetAtoms()]
 
                 e = AllChem.EmbedMolecule(b)
@@ -1521,9 +1521,9 @@ if __name__ == "__main__":
                 print(string)
                 break
 
-            recompute(main_args, None, 0, 0, our_fun=jax_dft, str=string)
+            recompute(args, None, 0, 0, our_fun=jax_dft, str=string)
 
-    elif main_args.C > 0:
+    elif args.C > 0:
         _str = [
             ["C", ( 1.56910, -0.65660, -0.93640)],
             ["C", ( 1.76690,  0.64310, -0.47200)],
@@ -1545,16 +1545,19 @@ if __name__ == "__main__":
             ["C", (-1.60620,  0.67150,  0.92310)],
             ["C", (-1.29590,  1.48910, -0.16550)],
             ["C", (-0.01020,  1.97270, -0.00630)]
-        ][:main_args.C]
+        ][:args.C]
 
         print(_str)
-        recompute(main_args, None, 0, 0, our_fun=jax_dft, str=_str)
+        recompute(args, None, 0, 0, our_fun=jax_dft, str=_str)
 
-    elif main_args.H: recompute(main_args, None, 0, 0, our_fun=jax_dft, str=[["H", (0, 0, 0)],
+    elif args.H: recompute(args, None, 0, 0, our_fun=jax_dft, str=[["H", (0, 0, 0)],
                                                                    ["H", (1, 1, 1)]])
         
-    elif main_args.methane: recompute(main_args, None, 0, 0, our_fun=jax_dft, str=[["C", (0, 0, 0)],
+    elif args.methane: recompute(args, None, 0, 0, our_fun=jax_dft, str=[["C", (0, 0, 0)],
                                                                          ["H", (0, 0, 1)],
                                                                          ["H", (1, 0, 0)],
                                                                          ["H", (0, 1, 0)],
                                                                          ["H", (1, 1, 0)]])
+
+if __name__ == "__main__":
+    main()
