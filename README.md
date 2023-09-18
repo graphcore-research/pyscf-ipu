@@ -3,6 +3,7 @@
 [![notebook-tests](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/notebooks.yaml/badge.svg)](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/notebooks.yaml)
 [![nanoDFT CLI](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/cli.yaml/badge.svg)](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/cli.yaml)
 [![unit tests](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/unittest.yaml/badge.svg)](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/unittest.yaml)
+[![pre-commit checks](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/pre-commit.yaml/badge.svg)](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/pre-commit.yaml)
 
 [**Installation guide**](#installation)
 | [**Example DFT Computations**](#example-dft-computations)
