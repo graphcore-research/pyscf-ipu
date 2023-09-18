@@ -1,5 +1,9 @@
 # Contributing to pyscf-ipu
 
+This project is still evolving but at the moment is focused around a high-performance and easily hackable implementation of Gaussian basis set DFT.
+We hope this is useful for the generation of large-scale datasets needed
+for training machine-learning models. We are interested in hearing any and
+all feedback so feel free to raise any questions, bugs encountered, or enhancement requests as [Issues](https://github.com/graphcore-research/pyscf-ipu/issues).
 
 ## Setting up a development environment
 We recommend using the conda package manager as this can automatically enable
@@ -30,7 +34,7 @@ installer:
    gc-monitor
    ```
 
-3.  Activate the environment and store a persistent environment variable for the
+3. Activate the environment and store a persistent environment variable for the
    location of the downloaded Poplar SDK. This assumes that
    you have already downloaded the Poplar SDK.  The following example uses an
    environment variable `$POPLAR_SDK` to store the root folder for the SDK.
@@ -39,21 +43,21 @@ installer:
    conda env config vars set POPLAR_SDK=$POPLAR_SDK
    ```
 
-3. You have to reactivate the conda environment to use the `$POPLAR_SDK`
+4. You have to reactivate the conda environment to use the `$POPLAR_SDK`
    variable the environment.
    ```bash
    conda deactivate
    conda activate pyscf-ipu
    ```
 
-4. Setup the conda environment to automatically enable the Poplar SDK whenever
+5. Setup the conda environment to automatically enable the Poplar SDK whenever
    the environment is activated.
    ```bash
    mkdir -p $CONDA_PREFIX/etc/conda/activate.d
    echo "source $POPLAR_SDK/enable" > $CONDA_PREFIX/etc/conda/activate.d/enable.sh
    ```
 
-5. Check that everything is working by once again reactivating the pyscf-ipu
+6. Check that everything is working by once again reactivating the pyscf-ipu
    environment and calling `gc-monitor`:
    ```bash
    conda deactivate
@@ -61,17 +65,17 @@ installer:
    gc-monitor
    ```
 
-5. Install all required packages for developing JAX DFT:
+7. Install all required packages for developing JAX DFT:
    ```bash
    pip install -e ".[ipu,test]"
    ```
 
-6. Install the pre-commit hooks
+8. Install the pre-commit hooks
    ```bash
    pre-commit install
    ```
 
-7. Create a feature branch, make changes, and when you commit them the
+9. Create a feature branch, make changes, and when you commit them the
    pre-commit hooks will run.
    ```bash
    git checkout -b feature
@@ -86,5 +90,7 @@ Run all the tests using `pytest`
 ```bash
 pytest
 ```
-
-## Profiling
+We also use the nbmake package to check our notebooks work in the `IpuModel` environment.  These checks can also be run on IPU hardware equiped machines e.g.:
+```bash
+pytest --nbmake --nbmake-timeout=3000 notebooks/nanoDFT-demo.ipynb
+```
