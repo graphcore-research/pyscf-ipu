@@ -1,4 +1,5 @@
 # Copyright (c) 2023 Graphcore Ltd. All rights reserved.
+import colored_traceback.always
 import os
 os.environ['OMP_NUM_THREADS'] = "8"
 os.environ['TF_POPLAR_FLAGS'] = """--executable_cache_path=/tmp/pyscf-ipu-cache/"""
@@ -72,6 +73,7 @@ def _do_compute(density_matrix, kinetic, nuclear, overlap, ao,
                 _input_ints, 
                 args,
                 L_inv=None):
+        print('_do_compute')
         # --- INITIALIZE MATRICES USED FOR DIIS --- #
         mf_diis_H       = np.zeros((mf_diis_space+1, mf_diis_space+1))
         mf_diis_H[0,1:] = mf_diis_H[1:,0] = 1
@@ -780,9 +782,9 @@ def dft_iter(args_indxs, cycle, val ):
     for i, a in enumerate(val):
         try:
             if type(a) == type([]):
-                print([(b.shape, b.nbytes/10**6) for b in a])
+                print('dft_iter:', [(b.shape, b.nbytes/10**6) for b in a])
             else:
-                if a.nbytes>1000000: print(a.nbytes/10**6, a.shape, i)
+                if a.nbytes>1000000: print('dft_iter:', a.nbytes/10**6, a.shape, i)
         except:
             pass
 
