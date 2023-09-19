@@ -40,7 +40,7 @@ We also provide a lightweight implementation of the SCF algorithm, optimized for
 
 To run the notebook on Graphcore IPU hardware on Paperspace:
 
-[![Run on Gradient](https://assets.paperspace.io/img/gradient-badge.svg)](https://ipu.dev/ipobmC)
+[![Run on Gradient](https://assets.paperspace.io/img/gradient-badge.svg)](https://console.paperspace.com/github/graphcore-research/pyscf-ipu?container=graphcore%2Fpytorch-jupyter%3A3.2.0-ubuntu-20.04&machine=Free-IPU-POD4&file=%2Fnotebooks%2FDFT-dataset-generation.ipynb)
 
 
 Additional notebooks in [notebooks](notebooks) demonstrate other aspects of the computation.
