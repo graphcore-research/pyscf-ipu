@@ -19,7 +19,7 @@ installer:
 * [miniforge installation](https://github.com/conda-forge/miniforge#install)
 * [conda installation documentation](https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html).
 
-1. Create a new conda environment with the same python version as your OS.
+1. Create a new conda environment with the same python version as required by the Poplar SDK.
    For example, on ubuntu 20 use `python=3.8.10`
    ```bash
    conda create -n pyscf-ipu python=3.8.10
