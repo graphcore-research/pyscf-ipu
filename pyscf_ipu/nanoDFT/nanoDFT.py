@@ -255,11 +255,9 @@ def nanoDFT(mol, opts):
         ERI[below_thr] = 0.0
         ic(ERI.size, np.sum(below_thr), np.sum(below_thr)/ERI.size)
     else: 
-        from sparse_symmetric_ERI import num_repetitions_fast, get_i_j
+        from pyscf_ipu.nanoDFT.sparse_symmetric_ERI import sparse_symmetric_einsum
         distinct_ERI         = mol.intor("int2e_sph", aosym="s8")
         print(distinct_ERI.size)
-        #indxs = np.abs(distinct_ERI)<1e-7
-        #distinct_ERI[indxs] = 0
         below_thr = np.abs(distinct_ERI) <= opts.eri_threshold
         distinct_ERI[below_thr] = 0.0
         ic(distinct_ERI.size, np.sum(below_thr), np.sum(below_thr)/distinct_ERI.size)
@@ -376,46 +374,6 @@ def pinv0(a, opts):  # take out first row
     return c
 
 
-import numpy
-import ctypes
-from pyscf import gto
-from pyscf import lib
-from pyscf.lib import logger
-from pyscf.scf import hf, _vhf
-from pyscf.gto.mole import is_au
-def get_jk(mol, dm):
-    '''J = ((-nabla i) j| kl) D_lk
-    K = ((-nabla i) j| kl) D_jk
-    '''
-    vhfopt = _vhf.VHFOpt(mol, 'int2e_ip1ip2', 'CVHFgrad_jk_prescreen',
-                         'CVHFgrad_jk_direct_scf')
-    dm = numpy.asarray(dm, order='C')
-    if dm.ndim == 3:
-        n_dm = dm.shape[0]
-    else:
-        n_dm = 1
-    ao_loc = mol.ao_loc_nr()
-    fsetdm = getattr(_vhf.libcvhf, 'CVHFgrad_jk_direct_scf_dm')
-    fsetdm(vhfopt._this,
-           dm.ctypes.data_as(ctypes.c_void_p), ctypes.c_int(n_dm),
-           ao_loc.ctypes.data_as(ctypes.c_void_p),
-           mol._atm.ctypes.data_as(ctypes.c_void_p), mol.natm,
-           mol._bas.ctypes.data_as(ctypes.c_void_p), mol.nbas,
-           mol._env.ctypes.data_as(ctypes.c_void_p))
-
-    # Update the vhfopt's attributes intor.  Function direct_mapdm needs
-    # vhfopt._intor and vhfopt._cintopt to compute J/K.  intor was initialized
-    # as int2e_ip1ip2. It should be int2e_ip1
-    vhfopt._intor = intor = mol._add_suffix('int2e_ip1')
-    vhfopt._cintopt = None
-
-    vj, vk = _vhf.direct_mapdm(intor,  # (nabla i,j|k,l)
-                               's2kl', # ip1_sph has k>=l,
-                               ('lk->s1ij', 'jk->s1il'),
-                               dm, 3, # xyz, 3 components
-                               mol._atm, mol._bas, mol._env, vhfopt=vhfopt)
-    return -vj, -vk
-
 def grad_elec(weight, grid_AO, eri, s1, h1aos, natm, aoslices, mask, mo_energy, mo_coeff, mol):
     # Electronic part of RHF/RKS gradients
     dm0  = 2 * (mo_coeff*mask) @ mo_coeff.T                                 # (N, N) = (66, 66) for C6H6.
@@ -430,9 +388,8 @@ def grad_elec(weight, grid_AO, eri, s1, h1aos, natm, aoslices, mask, mo_energy, 
     aos = jnp.concatenate([jnp.expand_dims(grid_AO[np.array([1,4,5,6])], 0), jnp.expand_dims(grid_AO[np.array([2,5,7,8])], 0), jnp.expand_dims(grid_AO[np.array([3,6,8,9])], 0)], axis=0) # (3, N, N)
     V_xc = - vmat - jnp.transpose(jnp.einsum("snpi,np->spi", aos, weight*V_xc), axes=(0,2,1)) @ grid_AO[0]  # (3, 4, grid_size, N)
 
-    vj, vk = get_jk(mol, dm0)
-    #vj = - jnp.einsum('sijkl,lk->sij', eri, dm0) # (3, N, N)
-    #vk = - jnp.einsum('sijkl,jk->sil', eri, dm0) # (3, N, N)
+    vj = - jnp.einsum('sijkl,lk->sij', eri, dm0) # (3, N, N)
+    vk = - jnp.einsum('sijkl,jk->sil', eri, dm0) # (3, N, N)
     vhf = V_xc + vj - vk * .5 * HYB_B3LYP        # (3, N, N)
 
     de = jnp.einsum('lxij,ij->lx', h1aos, dm0)   # (natm, 3)
@@ -618,7 +575,6 @@ def nanoDFT_options(
     mol_str = args["mol_str"]
     del args["mol_str"]
     args = Namespace(**args)
-    if args.backend == "cpu": args.dense_ERI = True
     args = namedtuple('DFTOptionsImmutable',vars(args).keys())(**vars(args)) # make immutable
     if not args.float32:
         jax.config.update('jax_enable_x64', not float32)
