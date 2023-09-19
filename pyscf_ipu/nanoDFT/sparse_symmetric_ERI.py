@@ -4,7 +4,6 @@ import numpy as np
 import jax 
 import jax.numpy as jnp 
 import os.path as osp
-from tessellate_ipu import create_ipu_tile_primitive, ipu_cycle_count, tile_map, tile_put_sharded, tile_put_replicated
 from functools import partial 
 from icecream import ic
 jax.config.update('jax_platform_name', "cpu")
@@ -23,6 +22,7 @@ cpu_ijkl = jax.vmap(cpu_ijkl, in_axes=(0, None, None, None))
 
 @partial(jax.jit, backend="ipu")
 def ipu_ijkl(nonzero_indices, symmetry, N):
+    from tessellate_ipu import create_ipu_tile_primitive, ipu_cycle_count, tile_map, tile_put_sharded, tile_put_replicated
     vertex_filename  = osp.join(osp.dirname(__file__), "compute_indices.cpp")
     compute_indices= create_ipu_tile_primitive(
             "IndicesIJKL" ,
@@ -78,19 +78,15 @@ def num_repetitions_fast(ij, kl):
     )
     return repetitions
 
-
 indices_func = lambda i,j,k,l,symmetry,N: jnp.array([i*N+j, j*N+i, i*N+j, j*N+i, k*N+l, l*N+k, k*N+l, l*N+k,
                                                      k*N+l, k*N+l, l*N+k, l*N+k, i*N+j, i*N+j, j*N+i, j*N+i,
                                                      k*N+j, k*N+i, l*N+j, l*N+i, i*N+l, i*N+k, j*N+l, j*N+k,
                                                      i*N+l, j*N+l, i*N+k, j*N+k, k*N+j, l*N+j, k*N+i, l*N+i])[symmetry]
 
 def sparse_symmetric_einsum(nonzero_distinct_ERI, nonzero_indices, dm, backend):
-
-
     dm = dm.reshape(-1)
     diff_JK = jnp.zeros(dm.shape)
     N = int(np.sqrt(dm.shape[0]))
-
 
     dnums = jax.lax.GatherDimensionNumbers(
         offset_dims=(), 
@@ -111,6 +107,7 @@ def sparse_symmetric_einsum(nonzero_distinct_ERI, nonzero_indices, dm, backend):
             diff_JK = vals 
 
             indices = nonzero_indices[i]
+            print(nonzero_indices.shape, indices.shape)
 
             indices = jax.lax.bitcast_convert_type(indices, np.int16).astype(np.int32)
             eris    = nonzero_distinct_ERI[i]
