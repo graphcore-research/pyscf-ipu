@@ -1,6 +1,5 @@
 # Copyright (c) 2023 Graphcore Ltd. All rights reserved.
 import jax
-jax.config.FLAGS.jax_platform_name = 'cpu'
 import jax.numpy as jnp
 import numpy as np
 import pyscf
@@ -582,6 +581,7 @@ def nanoDFT_options(
 
 def main():
     # Limit PySCF threads to mitigate problem with NUMA nodes.
+    jax.config.FLAGS.jax_platform_name = 'cpu'
     import os
     opts, mol_str = CLI(nanoDFT_options)
     assert opts.xc == "b3lyp"
