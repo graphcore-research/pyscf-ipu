@@ -255,7 +255,7 @@ def nanoDFT(mol, opts):
         ERI[below_thr] = 0.0
         ic(ERI.size, np.sum(below_thr), np.sum(below_thr)/ERI.size)
     else: 
-        from sparse_symmetric_ERI import num_repetitions_fast, get_i_j
+        from pyscf_ipu.nanoDFT.sparse_symmetric_ERI import sparse_symmetric_einsum
         distinct_ERI         = mol.intor("int2e_sph", aosym="s8")
         print(distinct_ERI.size)
         #indxs = np.abs(distinct_ERI)<1e-7
