@@ -72,11 +72,10 @@ def nanoDFT_iteration(i, vals, opts, mol):
     # Step 3: Use result from eigenproblem to update density_matrix.
     density_matrix = (eigvects*occupancy*2) @ eigvects.T                                        # (N, N)
     E_xc, V_xc     = exchange_correlation(density_matrix, grid_AO, grid_weights)                # float (N, N)
-    diff_JK        = get_JK(density_matrix, ERI, opts.dense_ERI, opts.backend)                                     # (N, N) (N, N)
+    diff_JK        = get_JK(density_matrix, ERI, opts.dense_ERI, opts.backend)                  # (N, N) (N, N)
 
     # Log SCF matrices and energies (not used by DFT algorithm).
     #log["matrices"] = log["matrices"].at[i].set(jnp.stack((density_matrix, J, K, H)))           # (iterations, 4, N, N)
-
     N = density_matrix.shape[0]
     log["matrices"] = jax.lax.dynamic_update_slice(log["matrices"], density_matrix.reshape(1, 1, N, N), (i, 0, 0, 0))
     log["matrices"] = jax.lax.dynamic_update_slice(log["matrices"], diff_JK.       reshape(1, 1, N, N), (i, 1, 0, 0))
@@ -213,7 +212,7 @@ def init_dft_tensors_cpu(mol, opts, DIIS_iters=9):
     O               = mol.intor_symmetric('int1e_ovlp')             # (N,N)
     L_inv           = np.linalg.inv(np.linalg.cholesky(O))          # (N,N)
 
-    input_floats, input_ints = prepare_electron_repulsion_integrals(mol)[:2]
+    input_floats, input_ints = 0,0#prepare_electron_repulsion_integrals(mol)[:2]
     mask = np.concatenate([np.ones(n_electrons_half), np.zeros(N-n_electrons_half)])
     diis_history = None
     
@@ -581,7 +580,7 @@ def nanoDFT_options(
         jax.config.update('jax_enable_x64', not float32)
     return args, mol_str
 
-if __name__ == "__main__":
+def main():
     # Limit PySCF threads to mitigate problem with NUMA nodes.
     import os
     opts, mol_str = CLI(nanoDFT_options)
@@ -646,3 +645,6 @@ if __name__ == "__main__":
             plt.savefig("_tmp/tmp.jpg")
             writer.append_data(imageio.v2.imread("_tmp/tmp.jpg"))
         writer.close()
+
+if __name__ == "__main__":
+    main()
