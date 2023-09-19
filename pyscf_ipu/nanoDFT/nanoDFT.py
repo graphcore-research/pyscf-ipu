@@ -113,7 +113,7 @@ def get_JK(density_matrix, ERI, dense_ERI, backend):
         K = jnp.einsum('ijkl,jk->il', ERI, density_matrix)                                       # (N, N)
         diff_JK = J - (K / 2 * HYB_B3LYP)
     else:
-        from sparse_symmetric_ERI import sparse_symmetric_einsum
+        from pyscf_ipu.nanoDFT.sparse_symmetric_ERI import sparse_symmetric_einsum
         diff_JK = sparse_symmetric_einsum(ERI[0], ERI[1], density_matrix, backend)
         
     diff_JK = diff_JK.reshape(N, N)
