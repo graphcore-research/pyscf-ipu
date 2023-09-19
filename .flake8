@@ -1,0 +1,4 @@
+[flake8]
+
+copyright-check = True
+copyright-author = Graphcore Ltd
