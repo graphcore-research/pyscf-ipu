@@ -32,10 +32,13 @@ class Orbital:
         return out
 
     @staticmethod
-    def from_bse(center, alphas, lmn, coefficients):
+    def from_bse(center, alphas, lmn, coefficients, atom_index):
         coefficients = coefficients.reshape(-1)
         assert len(coefficients) == len(alphas), "Expecting same size vectors!"
-        p = [Primitive(center=center, alpha=a, lmn=lmn) for a in alphas]
+        p = [
+            Primitive(center=center, alpha=a, lmn=lmn, atom_index=atom_index)
+            for a in alphas
+        ]
         return Orbital(primitives=p, coefficients=coefficients)
 
 

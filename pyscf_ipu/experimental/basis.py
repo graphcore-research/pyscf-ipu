@@ -64,6 +64,7 @@ def basisset(structure: Structure, basis_name: str = "sto-3g"):
                     alphas=jnp.array(s["exponents"], dtype=float),
                     lmn=jnp.array(lmn, dtype=jnp.int32),
                     coefficients=jnp.array(s["coefficients"], dtype=float),
+                    atom_index=a,
                 )
                 orbitals.append(ao)
 

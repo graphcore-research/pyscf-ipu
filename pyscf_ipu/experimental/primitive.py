@@ -1,4 +1,5 @@
 # Copyright (c) 2023 Graphcore Ltd. All rights reserved.
+from copy import deepcopy
 from typing import Optional
 
 import chex
@@ -14,6 +15,7 @@ class Primitive:
     alpha: float = 1.0
     lmn: Int3 = jnp.zeros(3, dtype=jnp.int32)
     norm: Optional[float] = None
+    atom_index: Optional[int] = None
 
     def __post_init__(self):
         if self.norm is None:
@@ -25,6 +27,11 @@ class Primitive:
 
     def __call__(self, pos: FloatNx3) -> FloatN:
         return eval_primitive(self, pos)
+
+    def offset_lmn(self, axis: int, offset: int) -> "Primitive":
+        out = deepcopy(self)
+        out.lmn = self.lmn.at[axis].add(offset)
+        return out
 
 
 def normalize(lmn: Int3, alpha: float) -> float:
