@@ -273,7 +273,9 @@ def compute_diff_jk(mol, dm, backend):
     S = S*(S+1)//2
     DISTINCT_ERI_SIZE = S
 
-    comp_distinct_ERI_list = [None]*DISTINCT_ERI_SIZE
+    overlap_bookkeeping = {}
+    comp_distinct_ERI_list = [] #[None]*DISTINCT_ERI_SIZE
+    comp_distinct_idx_list = [] #[None]*DISTINCT_ERI_SIZE
 
     all_eris, all_indices, ao_loc = compute_eri(mol)
 
@@ -314,17 +316,20 @@ def compute_diff_jk(mol, dm, backend):
                     for ck, _k in enumerate(range(k0, k0+dk)):
                         for cl, _l in enumerate(range(l0, l0+dl)):
                             c = ijkl2c(_i, _j, _k, _l)
-                            comp_distinct_ERI_list[c] = comp_ERI[ci, cj, ck, cl]
+                            if c in overlap_bookkeeping:
+                                continue
+                            overlap_bookkeeping[c] = True
+                            # comp_distinct_ERI_list[c] = comp_ERI[ci, cj, ck, cl]
+                            # comp_distinct_idx_list[c] = jnp.array([_i, _j, _k, _l]).astype(jnp.int16)
+                            comp_distinct_ERI_list.append(comp_ERI[ci, cj, ck, cl])
+                            comp_distinct_idx_list.append(jnp.array([_i, _j, _k, _l]).astype(jnp.int16))
             
     comp_distinct_ERI = jnp.stack(comp_distinct_ERI_list).reshape(1, -1)
+    comp_distinct_idx = jnp.stack(comp_distinct_idx_list).reshape(1, -1, 4)
 
-    print('c() comp_distinct_ERI.shape', comp_distinct_ERI.shape)
+    print('comp_distinct_ERI.shape', comp_distinct_ERI.shape)
+    print('comp_distinct_idx.shape', comp_distinct_idx.shape)
 
-    comp_distinct_idx = jnp.arange((comp_distinct_ERI.shape[1]))
-    ij, kl = get_i_j(comp_distinct_idx, xnp=jnp, dtype=jnp.uint32)
-    i, j = get_i_j(ij, xnp=jnp, dtype=jnp.uint32)
-    k, l = get_i_j(kl, xnp=jnp, dtype=jnp.uint32)
-    comp_distinct_idx = jnp.vstack([i,j,k,l]).T.reshape(1, -1, 4).astype(jnp.int16)
     comp_distinct_idx = jax.lax.bitcast_convert_type(comp_distinct_idx, jnp.float16)
     
     drep                      = num_repetitions_fast_4d(comp_distinct_idx[:, :, 0], comp_distinct_idx[:, :, 1], comp_distinct_idx[:, :, 2], comp_distinct_idx[:, :, 3], xnp=jnp, dtype=jnp.uint32)
