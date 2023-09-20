@@ -264,94 +264,75 @@ def compute_eri(mol):
 
     return all_outputs, all_indices, ao_loc
 
-def compute_diff_jk(distinct_ERI, distinct_idx, mol, dm, backend):
+def compute_diff_jk(mol, dm, backend):
     dm = dm.reshape(-1)
     diff_JK = jnp.zeros(dm.shape)
-    N = int(np.sqrt(dm.shape[0]))
+    N = int(np.sqrt(dm.shape[0])) 
 
-    # XN = N*(N+1)//2
-    # XN = XN*(XN+1)//2
+    S = N*(N+1)//2
+    S = S*(S+1)//2
+    DISTINCT_ERI_SIZE = S
 
-    # comp_distinct_ERI = jnp.zeros((XN))
+    comp_distinct_ERI_list = [None]*DISTINCT_ERI_SIZE
 
-    # all_eris, all_indices, ao_loc = compute_eri(mol)
+    all_eris, all_indices, ao_loc = compute_eri(mol)
 
-    # print('[a.shape for a in all_eris]', [a.shape for a in all_eris])
-    # print('[a.shape for a in all_indices]', [a.shape for a in all_indices])
+    print('[a.shape for a in all_eris]', [a.shape for a in all_eris])
+    print('[a.shape for a in all_indices]', [a.shape for a in all_indices])
 
-    # for eri, idx in zip(all_eris, all_indices):
-    #     print(eri.shape)
-    #     for ind in range(eri.shape[0]):
-    #         i = idx[ind, 0]
-    #         j = idx[ind, 1]
-    #         k = idx[ind, 2]
-    #         l = idx[ind, 3]
-    #         di = ao_loc[i+1] - ao_loc[i]
-    #         dj = ao_loc[j+1] - ao_loc[j]
-    #         dk = ao_loc[k+1] - ao_loc[k]
-    #         dl = ao_loc[l+1] - ao_loc[l]
+    for eri, idx in zip(all_eris, all_indices):
+        print(eri.shape)
+        for ind in range(eri.shape[0]):
+            i = idx[ind, 0]
+            j = idx[ind, 1]
+            k = idx[ind, 2]
+            l = idx[ind, 3]
+            di = ao_loc[i+1] - ao_loc[i]
+            dj = ao_loc[j+1] - ao_loc[j]
+            dk = ao_loc[k+1] - ao_loc[k]
+            dl = ao_loc[l+1] - ao_loc[l]
             
-    #         i0 = ao_loc[i] - ao_loc[0]
-    #         j0 = ao_loc[j] - ao_loc[0]
-    #         k0 = ao_loc[k] - ao_loc[0]
-    #         l0 = ao_loc[l] - ao_loc[0]
+            i0 = ao_loc[i] - ao_loc[0]
+            j0 = ao_loc[j] - ao_loc[0]
+            k0 = ao_loc[k] - ao_loc[0]
+            l0 = ao_loc[l] - ao_loc[0]
             
-    #         comp_ERI = eri[ind, :di*dj*dk*dl].reshape(dl,dk,dj,di)
-    #         comp_ERI = np.transpose( comp_ERI, (3,2,1,0) )
+            comp_ERI = eri[ind, :di*dj*dk*dl].reshape(dl,dk,dj,di)
+            comp_ERI = np.transpose( comp_ERI, (3,2,1,0) )
 
-    #         overlap_ERI[i0:i0+di, j0:j0+dj, k0:k0+dk, l0:l0+dl] += 1
-    #         patches_ERI[i0:i0+di, j0:j0+dj, k0:k0+dk, l0:l0+dl] = np.random.randint(0, 100)
+            def ijkl2c(i, j, k, l):
+                if i<j: i,j = j,i
+                if k<l: k,l = l,k
+                ij = i*(i+1)//2 + j
+                kl = k*(k+1)//2 + l
+                if ij < kl: ij,kl = kl,ij
+                c = ij*(ij+1)//2 + kl
+                return c
 
-    #         # assert np.allclose(real_ERI, comp_ERI, atol=1e-6)
+            for ci, _i in enumerate(range(i0, i0+di)):
+                for cj, _j in enumerate(range(j0, j0+dj)):
+                    for ck, _k in enumerate(range(k0, k0+dk)):
+                        for cl, _l in enumerate(range(l0, l0+dl)):
+                            c = ijkl2c(_i, _j, _k, _l)
+                            comp_distinct_ERI_list[c] = comp_ERI[ci, cj, ck, cl]
+            
+    comp_distinct_ERI = jnp.stack(comp_distinct_ERI_list).reshape(1, -1)
 
-    #         def ijkl2c(i, j, k, l):
-    #             if i<j: i,j = j,i
-    #             if k<l: k,l = l,k
-    #             ij = i*(i+1)//2 + j
-    #             kl = k*(k+1)//2 + l
-    #             if ij < kl: ij,kl = kl,ij
-    #             c = ij*(ij+1)//2 + kl
-    #             return c
+    print('c() comp_distinct_ERI.shape', comp_distinct_ERI.shape)
 
-    #         for ci, _i in enumerate(range(i0, i0+di)):
-    #             for cj, _j in enumerate(range(j0, j0+dj)):
-    #                 for ck, _k in enumerate(range(k0, k0+dk)):
-    #                     for cl, _l in enumerate(range(l0, l0+dl)):
-    #                         c = ijkl2c(_i, _j, _k, _l)
-    #                         comp_distinct_ERI.at[c].set(comp_ERI[ci, cj, ck, cl])
-    
-    print('c() distinct_ERI.shape', distinct_ERI.shape)
-
-    comp_distinct_idx = jnp.arange((distinct_ERI.shape[1]))
+    comp_distinct_idx = jnp.arange((comp_distinct_ERI.shape[1]))
     ij, kl = get_i_j(comp_distinct_idx, xnp=jnp, dtype=jnp.uint32)
     i, j = get_i_j(ij, xnp=jnp, dtype=jnp.uint32)
     k, l = get_i_j(kl, xnp=jnp, dtype=jnp.uint32)
     comp_distinct_idx = jnp.vstack([i,j,k,l]).T.reshape(1, -1, 4).astype(jnp.int16)
     comp_distinct_idx = jax.lax.bitcast_convert_type(comp_distinct_idx, jnp.float16)
     
+    drep                      = num_repetitions_fast_4d(comp_distinct_idx[:, :, 0], comp_distinct_idx[:, :, 1], comp_distinct_idx[:, :, 2], comp_distinct_idx[:, :, 3], xnp=jnp, dtype=jnp.uint32)
+    comp_distinct_ERI         = comp_distinct_ERI / drep
 
-    print('c() distinct_idx.shape', distinct_idx.shape)
+    diff_JK = diff_JK + sparse_symmetric_einsum(comp_distinct_ERI, comp_distinct_idx, dm, backend) # batches x erivals // batches x ? x 4
 
-    # distinct_ERI = distinct_ERI.astype(jnp.float32)
-    drep                 = num_repetitions_fast_4d(comp_distinct_idx[:, :, 0], comp_distinct_idx[:, :, 1], comp_distinct_idx[:, :, 2], comp_distinct_idx[:, :, 3], xnp=jnp, dtype=jnp.uint32)
-    # drep                 = num_repetitions_fast_4d(distinct_idx[:, :, 0], distinct_idx[:, :, 1], distinct_idx[:, :, 2], distinct_idx[:, :, 3], xnp=jnp, dtype=jnp.uint32)
-    distinct_ERI         = distinct_ERI / drep
-
-    # print('distinct_ERI', distinct_ERI)
-    # print('nonzero_distinct_ERI', nonzero_distinct_ERI)
-
-    # print('distinct_idx', distinct_idx.reshape(-1, 4))
-    # print('nonzero_indices', nonzero_indices_bk.reshape(-1, 4))
-
-    print('c() distinct_ERI.shape', distinct_ERI.shape)
-
-    
-
-    print('c() comp_distinct_idx.shape', comp_distinct_idx.shape)
-    
-    diff_JK = diff_JK + sparse_symmetric_einsum(distinct_ERI, distinct_idx, dm, backend) # batches x erivals // batches x ? x 4
-
-    return diff_JK, comp_distinct_idx
+    return diff_JK
 
 if __name__ == "__main__":
     import time 
@@ -592,10 +573,8 @@ if __name__ == "__main__":
     print('distinct_ERI.shape', distinct_ERI.shape)
     print('distinct_idx.shape', distinct_idx.shape)
 
-    diff_JK, comp_distinct_idx = jax.jit(compute_diff_jk, backend=backend, static_argnames=['mol', 'backend'])(distinct_ERI, distinct_idx, mol, dm, args.backend)
+    diff_JK = jax.jit(compute_diff_jk, backend=backend, static_argnames=['mol', 'backend'])(mol, dm, args.backend)
     # diff_JK = jax.jit(compute_diff_jk, backend=backend, static_argnames=['mol', 'backend'])(nonzero_distinct_ERI.reshape(1, -1), nonzero_indices.reshape(1, -1, 4), mol, dm, args.backend)
-
-    print(comp_distinct_idx)    
 
     # exit()
     # ------------------------------------ #
