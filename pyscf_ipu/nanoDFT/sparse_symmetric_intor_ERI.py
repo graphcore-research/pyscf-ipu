@@ -12,8 +12,8 @@ jax.config.update('jax_platform_name', "cpu")
 #jax.config.update('jax_enable_x64', True) 
 HYB_B3LYP = 0.2
 
-def get_i_j(val):
-    i = (np.sqrt(1 + 8*val.astype(np.uint64)) - 1)//2 # no need for floor, integer division acts as floor. 
+def get_i_j(val, xnp=np, dtype=np.uint64):
+    i = (xnp.sqrt(1 + 8*val.astype(dtype)) - 1)//2 # no need for floor, integer division acts as floor. 
     j = (((val - i) - (i**2 - val))//2)
     return i, j
 
@@ -66,13 +66,13 @@ def ipu_ijkl(nonzero_indices, symmetry, N):
 
     return value.array.reshape(-1)[:size]
 
-def num_repetitions_fast_4d(i, j, k, l):
+def num_repetitions_fast_4d(i, j, k, l, xnp=np, dtype=np.uint64):
     # compute: repetitions = 2^((i==j) + (k==l) + (k==i and l==j or k==j and l==i))
     repetitions = 2**(
-        np.equal(i,j).astype(np.uint64) + 
-        np.equal(k,l).astype(np.uint64) + 
-        (1 - ((1 - np.equal(k,i) * np.equal(l,j)) * 
-        (1- np.equal(k,j) * np.equal(l,i))).astype(np.uint64))
+        xnp.equal(i,j).astype(dtype) + 
+        xnp.equal(k,l).astype(dtype) + 
+        (1 - ((1 - xnp.equal(k,i) * xnp.equal(l,j)) * 
+        (1- xnp.equal(k,j) * xnp.equal(l,i))).astype(dtype))
     )
     return repetitions
 
@@ -320,21 +320,22 @@ def compute_diff_jk(distinct_ERI, distinct_idx, mol, dm, backend):
     #                         c = ijkl2c(_i, _j, _k, _l)
     #                         comp_distinct_ERI.at[c].set(comp_ERI[ci, cj, ck, cl])
     
-    # distinct_idx = np.zeros((distinct_ERI.shape[0], 4))
-    # for c in range(distinct_ERI.shape[0]):
-    #     c = np.array(c).astype(np.int32)
-    #     ij, kl = get_i_j(c)
-    #     i, j = get_i_j(ij)
-    #     k, l = get_i_j(kl)
-    #     distinct_idx[c, 0] = i
-    #     distinct_idx[c, 1] = j
-    #     distinct_idx[c, 2] = k
-    #     distinct_idx[c, 3] = l
-    # distinct_idx = distinct_idx.reshape(1, -1, 4).astype(np.uint64)
+    print('c() distinct_ERI.shape', distinct_ERI.shape)
 
-    # distinct_ERI = distinct_ERI.astype(np.float32)
-    # drep                 = num_repetitions_fast_4d(distinct_idx[:, :, 0], distinct_idx[:, :, 1], distinct_idx[:, :, 2], distinct_idx[:, :, 3])
-    # distinct_ERI         = distinct_ERI / drep
+    comp_distinct_idx = jnp.arange((distinct_ERI.shape[1]))
+    ij, kl = get_i_j(comp_distinct_idx, xnp=jnp, dtype=jnp.uint32)
+    i, j = get_i_j(ij, xnp=jnp, dtype=jnp.uint32)
+    k, l = get_i_j(kl, xnp=jnp, dtype=jnp.uint32)
+    comp_distinct_idx = jnp.vstack([i,j,k,l]).T.reshape(1, -1, 4).astype(jnp.int16)
+    comp_distinct_idx = jax.lax.bitcast_convert_type(comp_distinct_idx, jnp.float16)
+    
+
+    print('c() distinct_idx.shape', distinct_idx.shape)
+
+    # distinct_ERI = distinct_ERI.astype(jnp.float32)
+    drep                 = num_repetitions_fast_4d(comp_distinct_idx[:, :, 0], comp_distinct_idx[:, :, 1], comp_distinct_idx[:, :, 2], comp_distinct_idx[:, :, 3], xnp=jnp, dtype=jnp.uint32)
+    # drep                 = num_repetitions_fast_4d(distinct_idx[:, :, 0], distinct_idx[:, :, 1], distinct_idx[:, :, 2], distinct_idx[:, :, 3], xnp=jnp, dtype=jnp.uint32)
+    distinct_ERI         = distinct_ERI / drep
 
     # print('distinct_ERI', distinct_ERI)
     # print('nonzero_distinct_ERI', nonzero_distinct_ERI)
@@ -342,11 +343,15 @@ def compute_diff_jk(distinct_ERI, distinct_idx, mol, dm, backend):
     # print('distinct_idx', distinct_idx.reshape(-1, 4))
     # print('nonzero_indices', nonzero_indices_bk.reshape(-1, 4))
 
-    # distinct_idx = jax.lax.bitcast_convert_type(distinct_idx.astype(np.int16), np.float16)
+    print('c() distinct_ERI.shape', distinct_ERI.shape)
+
+    
+
+    print('c() comp_distinct_idx.shape', comp_distinct_idx.shape)
     
     diff_JK = diff_JK + sparse_symmetric_einsum(distinct_ERI, distinct_idx, dm, backend) # batches x erivals // batches x ? x 4
 
-    return diff_JK
+    return diff_JK, comp_distinct_idx
 
 if __name__ == "__main__":
     import time 
@@ -572,8 +577,9 @@ if __name__ == "__main__":
     distinct_idx = distinct_idx.reshape(1, -1, 4).astype(np.uint64)
 
     distinct_ERI = distinct_ERI.astype(np.float32)
-    drep                 = num_repetitions_fast_4d(distinct_idx[:, :, 0], distinct_idx[:, :, 1], distinct_idx[:, :, 2], distinct_idx[:, :, 3])
-    distinct_ERI         = distinct_ERI / drep
+    # drep                 = num_repetitions_fast_4d(distinct_idx[:, :, 0], distinct_idx[:, :, 1], distinct_idx[:, :, 2], distinct_idx[:, :, 3])
+    # distinct_ERI         = distinct_ERI / drep
+    distinct_ERI = distinct_ERI.reshape(1, -1)
 
     # print('distinct_ERI', distinct_ERI)
     # print('nonzero_distinct_ERI', nonzero_distinct_ERI)
@@ -583,9 +589,13 @@ if __name__ == "__main__":
 
     distinct_idx = jax.lax.bitcast_convert_type(distinct_idx.astype(np.int16), np.float16)
 
-    diff_JK = jax.jit(compute_diff_jk, backend=backend, static_argnames=['mol', 'backend'])(distinct_ERI, distinct_idx, mol, dm, args.backend)
+    print('distinct_ERI.shape', distinct_ERI.shape)
+    print('distinct_idx.shape', distinct_idx.shape)
+
+    diff_JK, comp_distinct_idx = jax.jit(compute_diff_jk, backend=backend, static_argnames=['mol', 'backend'])(distinct_ERI, distinct_idx, mol, dm, args.backend)
     # diff_JK = jax.jit(compute_diff_jk, backend=backend, static_argnames=['mol', 'backend'])(nonzero_distinct_ERI.reshape(1, -1), nonzero_indices.reshape(1, -1, 4), mol, dm, args.backend)
-    
+
+    print(comp_distinct_idx)    
 
     # exit()
     # ------------------------------------ #
