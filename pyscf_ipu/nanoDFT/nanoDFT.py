@@ -577,7 +577,7 @@ def nanoDFT_options(
 
     from pyscf_ipu.experimental.device import has_ipu
     import os 
-    if pyscf_ipu.experimental.device.has_ipu() and "JAX_IPU_USE_MODEL" in os.environ:
+    if has_ipu() and "JAX_IPU_USE_MODEL" in os.environ:
         args.dense_ERI = True
     args = namedtuple('DFTOptionsImmutable',vars(args).keys())(**vars(args)) # make immutable
     if not args.float32:
