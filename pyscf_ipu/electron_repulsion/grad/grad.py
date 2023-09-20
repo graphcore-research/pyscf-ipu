@@ -4,7 +4,8 @@ import ctypes
 import ctypes
 import numpy
 from pyscf import lib
-libcgto = lib.load_library('libcgto')
+
+libcgto = numpy.ctypeslib.load_library("grad.so", "") 
 
 ANG_OF     = 1
 NPRIM_OF   = 2
@@ -15,7 +16,6 @@ PTR_COEFF  = 6
 BAS_SLOTS  = 8
 NGRIDS     = 11
 PTR_GRIDS  = 12
-
 
 def make_loc(bas, key):
     if 'cart' in key:
