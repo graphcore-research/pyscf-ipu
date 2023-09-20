@@ -269,15 +269,19 @@ def compute_diff_jk(mol, dm, backend):
     diff_JK = jnp.zeros(dm.shape)
     N = int(np.sqrt(dm.shape[0])) 
 
+    all_eris, all_indices, ao_loc = compute_eri(mol)
+
     S = N*(N+1)//2
     S = S*(S+1)//2
     DISTINCT_ERI_SIZE = S
 
-    overlap_bookkeeping = {}
-    comp_distinct_ERI_list = [] #[None]*DISTINCT_ERI_SIZE
-    comp_distinct_idx_list = [] #[None]*DISTINCT_ERI_SIZE
+    BLOCK_ERI_SIZE = np.sum(np.array([eri.shape[0] for eri in all_eris]))
 
-    all_eris, all_indices, ao_loc = compute_eri(mol)
+    overlap_bookkeeping = {}
+    comp_distinct_ERI_list = [None]*BLOCK_ERI_SIZE
+    comp_distinct_idx_list = [None]*BLOCK_ERI_SIZE
+    comp_do_list = [None]*BLOCK_ERI_SIZE
+    comp_list_index = 0
 
     print('[a.shape for a in all_eris]', [a.shape for a in all_eris])
     print('[a.shape for a in all_indices]', [a.shape for a in all_indices])
@@ -311,21 +315,39 @@ def compute_diff_jk(mol, dm, backend):
                 c = ij*(ij+1)//2 + kl
                 return c
 
+            block_idx = np.zeros((di, dj, dk, dl, 4)).astype(np.int16)
+            block_do = np.zeros((di, dj, dk, dl))
+
             for ci, _i in enumerate(range(i0, i0+di)):
                 for cj, _j in enumerate(range(j0, j0+dj)):
                     for ck, _k in enumerate(range(k0, k0+dk)):
                         for cl, _l in enumerate(range(l0, l0+dl)):
                             c = ijkl2c(_i, _j, _k, _l)
+                            
+                            block_idx[ci, cj, ck, cl, :] = [_i, _j, _k, _l]
+                            block_do[ci, cj, ck, cl] = 1
                             if c in overlap_bookkeeping:
-                                continue
+                                block_do[ci, cj, ck, cl] = 0
                             overlap_bookkeeping[c] = True
-                            # comp_distinct_ERI_list[c] = comp_ERI[ci, cj, ck, cl]
-                            # comp_distinct_idx_list[c] = jnp.array([_i, _j, _k, _l]).astype(jnp.int16)
-                            comp_distinct_ERI_list.append(comp_ERI[ci, cj, ck, cl])
-                            comp_distinct_idx_list.append(jnp.array([_i, _j, _k, _l]).astype(jnp.int16))
             
-    comp_distinct_ERI = jnp.stack(comp_distinct_ERI_list).reshape(1, -1)
-    comp_distinct_idx = jnp.stack(comp_distinct_idx_list).reshape(1, -1, 4)
+            comp_distinct_ERI_list[comp_list_index] = comp_ERI.reshape(-1)
+            comp_distinct_idx_list[comp_list_index] = block_idx.reshape(-1, 4)
+            comp_do_list[comp_list_index] = block_do.reshape(-1)
+            comp_list_index += 1
+            # dijkl = jnp.arange(di*dj*dk*dl)
+            # dij, dkl = get_i_j(dijkl, xnp=jnp, dtype=jnp.int16)
+            # _di, _dj = get_i_j(dij, xnp=jnp, dtype=jnp.int16)
+            # _dk, _dl = get_i_j(dkl, xnp=jnp, dtype=jnp.int16)
+            # ijkl = np.vstack([i0+_di,j0+_dj,k0+_dk,l0+_dl]).T.reshape(1, -1, 4)
+            
+    # comp_distinct_ERI = jnp.stack(comp_distinct_ERI_list).reshape(1, -1)
+    comp_distinct_ERI = jnp.concatenate(comp_distinct_ERI_list).reshape(1, -1)
+    # comp_distinct_idx = jnp.stack(comp_distinct_idx_list).reshape(1, -1, 4)
+    comp_distinct_idx = jnp.concatenate(comp_distinct_idx_list).reshape(1, -1, 4)
+    # comp_do = jnp.stack(comp_do_list).reshape(1, -1)
+    comp_do = jnp.concatenate(comp_do_list).reshape(1, -1)
+
+    comp_distinct_ERI *= comp_do
 
     print('comp_distinct_ERI.shape', comp_distinct_ERI.shape)
     print('comp_distinct_idx.shape', comp_distinct_idx.shape)
