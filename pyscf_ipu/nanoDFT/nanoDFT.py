@@ -574,6 +574,8 @@ def nanoDFT_options(
     mol_str = args["mol_str"]
     del args["mol_str"]
     args = Namespace(**args)
+    if pyscf_ipu.experimental.device.has_ipu() and "JAX_IPU_USE_MODEL" in os.environ:
+        args.dense_ERI = True
     args = namedtuple('DFTOptionsImmutable',vars(args).keys())(**vars(args)) # make immutable
     if not args.float32:
         jax.config.update('jax_enable_x64', not float32)
