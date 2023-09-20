@@ -271,10 +271,6 @@ def compute_diff_jk(mol, dm, backend):
 
     all_eris, all_indices, ao_loc = compute_eri(mol)
 
-    S = N*(N+1)//2
-    S = S*(S+1)//2
-    DISTINCT_ERI_SIZE = S
-
     BLOCK_ERI_SIZE = np.sum(np.array([eri.shape[0] for eri in all_eris]))
 
     overlap_bookkeeping = {}
@@ -304,7 +300,6 @@ def compute_diff_jk(mol, dm, backend):
             l0 = ao_loc[l] - ao_loc[0]
             
             comp_ERI = eri[ind, :di*dj*dk*dl].reshape(dl,dk,dj,di)
-            comp_ERI = np.transpose( comp_ERI, (3,2,1,0) )
 
             def ijkl2c(i, j, k, l):
                 if i<j: i,j = j,i
@@ -315,36 +310,29 @@ def compute_diff_jk(mol, dm, backend):
                 c = ij*(ij+1)//2 + kl
                 return c
 
-            block_idx = np.zeros((di, dj, dk, dl, 4)).astype(np.int16)
-            block_do = np.zeros((di, dj, dk, dl))
-
-            for ci, _i in enumerate(range(i0, i0+di)):
-                for cj, _j in enumerate(range(j0, j0+dj)):
-                    for ck, _k in enumerate(range(k0, k0+dk)):
-                        for cl, _l in enumerate(range(l0, l0+dl)):
+            block_idx = np.zeros((dl, dk, dj, di, 4)).astype(np.int16)
+            block_do = np.zeros((dl, dk, dj, di))
+                    
+            for cl, _l in enumerate(range(l0, l0+dl)):
+                for ck, _k in enumerate(range(k0, k0+dk)):
+                    for cj, _j in enumerate(range(j0, j0+dj)):
+                        for ci, _i in enumerate(range(i0, i0+di)):
                             c = ijkl2c(_i, _j, _k, _l)
                             
-                            block_idx[ci, cj, ck, cl, :] = [_i, _j, _k, _l]
-                            block_do[ci, cj, ck, cl] = 1
+                            block_idx[cl, ck, cj, ci, :] = [_i, _j, _k, _l]
+                            block_do[cl, ck, cj, ci] = 1
                             if c in overlap_bookkeeping:
-                                block_do[ci, cj, ck, cl] = 0
+                                block_do[cl, ck, cj, ci] = 0
                             overlap_bookkeeping[c] = True
             
             comp_distinct_ERI_list[comp_list_index] = comp_ERI.reshape(-1)
             comp_distinct_idx_list[comp_list_index] = block_idx.reshape(-1, 4)
             comp_do_list[comp_list_index] = block_do.reshape(-1)
             comp_list_index += 1
-            # dijkl = jnp.arange(di*dj*dk*dl)
-            # dij, dkl = get_i_j(dijkl, xnp=jnp, dtype=jnp.int16)
-            # _di, _dj = get_i_j(dij, xnp=jnp, dtype=jnp.int16)
-            # _dk, _dl = get_i_j(dkl, xnp=jnp, dtype=jnp.int16)
-            # ijkl = np.vstack([i0+_di,j0+_dj,k0+_dk,l0+_dl]).T.reshape(1, -1, 4)
             
-    # comp_distinct_ERI = jnp.stack(comp_distinct_ERI_list).reshape(1, -1)
+            
     comp_distinct_ERI = jnp.concatenate(comp_distinct_ERI_list).reshape(1, -1)
-    # comp_distinct_idx = jnp.stack(comp_distinct_idx_list).reshape(1, -1, 4)
     comp_distinct_idx = jnp.concatenate(comp_distinct_idx_list).reshape(1, -1, 4)
-    # comp_do = jnp.stack(comp_do_list).reshape(1, -1)
     comp_do = jnp.concatenate(comp_do_list).reshape(1, -1)
 
     comp_distinct_ERI *= comp_do
