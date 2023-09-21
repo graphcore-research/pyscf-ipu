@@ -8,7 +8,7 @@ from .basis import Basis
 from .integrals import _overlap_primitives
 from .orbital import batch_orbitals
 from .primitive import Primitive
-from .types import Float3
+from .types import Float3, Float3xNxN
 
 
 def grad_overlap_primitives(i: int, a: Primitive, b: Primitive) -> Float3:
@@ -24,8 +24,7 @@ def grad_overlap_primitives(i: int, a: Primitive, b: Primitive) -> Float3:
     return jnp.where(a.atom_index == i, grad_out, jnp.zeros_like(grad_out))
 
 
-# output is [3, N, N]
-def grad_overlap_basis(b: Basis):
+def grad_overlap_basis(b: Basis) -> Float3xNxN:
     def take_primitives(indices):
         p = tree_map(lambda x: jnp.take(x, indices, axis=0), primitives)
         c = jnp.take(coefficients, indices)
