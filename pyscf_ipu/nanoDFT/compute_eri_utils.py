@@ -204,4 +204,4 @@ def prepare_integrals_2_inputs(mol):
 
     indxs_inv = inverse_permutation(indxs)
 
-    return input_floats, input_ints, tuple_ijkl, tuple(shapes), tuple(sizes.tolist()), tuple(counts.tolist()), indxs, tuple(indxs_inv.tolist()), ao_loc
+    return input_floats, input_ints, tuple_ijkl, tuple(shapes), tuple(sizes.tolist()), tuple(counts.tolist()), indxs, indxs_inv, ao_loc

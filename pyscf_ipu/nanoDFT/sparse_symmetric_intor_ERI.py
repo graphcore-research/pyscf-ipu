@@ -206,7 +206,7 @@ def compute_eri(mol):
                 indices = np.array(input_ijkl[i][start:stop])
                 _indices.append(indices.reshape(indices.shape[0], 1, indices.shape[1]))
             _indices = np.concatenate(_indices, axis=1)
-            _indices = tile_put_sharded(_indices, tiles)
+            tile_indices = tile_put_sharded(_indices, tiles)
 
             chunks = tile_put_replicated( jnp.zeros(count//chunk_size), tiles)
             integral_size = tile_put_replicated( jnp.zeros(size), tiles)
@@ -214,7 +214,7 @@ def compute_eri(mol):
             batched_out , _, _, _= tile_map(int2e_sph_forloop,
                                             tile_floats,
                                             tile_ints,
-                                            _indices,
+                                            tile_indices,
                                             output,
                                             tile_g,
                                             tile_idx,
@@ -223,8 +223,9 @@ def compute_eri(mol):
                                             integral_size
                                             )
             batched_out = jnp.transpose(batched_out.array, (1, 0, 2)).reshape(-1, size)
+            print('batched mode!')
 
-        # do last iteration normally.
+        # do last iteration normally. -- assuming only one iteration for indices to be correct
         for j in range(count // chunk_size, count // (chunk_size) + 1):
             start, stop = j*chunk_size, (j+1)*chunk_size
             indices = np.array(input_ijkl[i][start:stop])
@@ -246,7 +247,7 @@ def compute_eri(mol):
                 tile_idx[:len(tiles)],
                 tile_buf[:len(tiles)]
             )
-            # print('???', j)
+            print('???', j)
         
         if count//chunk_size>0:
             print(batched_out.shape)
@@ -256,9 +257,10 @@ def compute_eri(mol):
 
         if count//chunk_size>0:
             all_outputs.append(jnp.concatenate([batched_out, _output.array]))
+            all_indices.append(np.concatenate([np.transpose(_indices, (1, 0, 2)).reshape(-1, 4), indices]))
         else:
             all_outputs.append(_output.array)
-        all_indices.append(indices)
+            all_indices.append(indices)
 
         start = stop
 
@@ -435,9 +437,9 @@ if __name__ == "__main__":
                     comp_dense_ERI[ l0:l0+dl, k0:k0+dk, i0:i0+di, j0:j0+dj ] = np.transpose(comp_ERI, (3,2,0,1)) #lkij
                     comp_dense_ERI[ l0:l0+dl, k0:k0+dk, j0:j0+dj, i0:i0+di ] = np.transpose(comp_ERI, (3,2,1,0)) #lkji
 
-                    # print(i0, j0, k0, l0, 'd', di, dj, dk, dl)
-                    # print('real', real_ERI)
-                    # print('comp', comp_ERI)
+                    print(i0, j0, k0, l0, 'd', di, dj, dk, dl)
+                    print('real', real_ERI)
+                    print('comp', comp_ERI)
                     assert np.allclose(real_ERI, comp_ERI, atol=1e-6)
             print('PASSED dense_ERI allequal!')
 
@@ -460,59 +462,60 @@ if __name__ == "__main__":
 
         # ------------------------------------- #
 
-        comp_distinct_ERI = np.zeros(distinct_ERI.shape)
+        if True:
+            comp_distinct_ERI = np.zeros(distinct_ERI.shape)
 
-        for eri, idx in zip(all_eris, all_indices):
-            print(eri.shape)
-            for ind in range(eri.shape[0]):
-                i = idx[ind, 0]
-                j = idx[ind, 1]
-                k = idx[ind, 2]
-                l = idx[ind, 3]
-                di = ao_loc[i+1] - ao_loc[i]
-                dj = ao_loc[j+1] - ao_loc[j]
-                dk = ao_loc[k+1] - ao_loc[k]
-                dl = ao_loc[l+1] - ao_loc[l]
-                
-                i0 = ao_loc[i] - ao_loc[0]
-                j0 = ao_loc[j] - ao_loc[0]
-                k0 = ao_loc[k] - ao_loc[0]
-                l0 = ao_loc[l] - ao_loc[0]
-                # assert i==i0 and j==j0 and k==k0 and l==l0
-                real_ERI = dense_ERI[i0:i0+di, j0:j0+dj, k0:k0+dk, l0:l0+dl]
-                comp_ERI = eri[ind, :di*dj*dk*dl].reshape(dl,dk,dj,di)
-                comp_ERI = np.transpose( comp_ERI, (3,2,1,0) )
+            for eri, idx in zip(all_eris, all_indices):
+                print(eri.shape)
+                for ind in range(eri.shape[0]):
+                    i = idx[ind, 0]
+                    j = idx[ind, 1]
+                    k = idx[ind, 2]
+                    l = idx[ind, 3]
+                    di = ao_loc[i+1] - ao_loc[i]
+                    dj = ao_loc[j+1] - ao_loc[j]
+                    dk = ao_loc[k+1] - ao_loc[k]
+                    dl = ao_loc[l+1] - ao_loc[l]
+                    
+                    i0 = ao_loc[i] - ao_loc[0]
+                    j0 = ao_loc[j] - ao_loc[0]
+                    k0 = ao_loc[k] - ao_loc[0]
+                    l0 = ao_loc[l] - ao_loc[0]
+                    # assert i==i0 and j==j0 and k==k0 and l==l0
+                    real_ERI = dense_ERI[i0:i0+di, j0:j0+dj, k0:k0+dk, l0:l0+dl]
+                    comp_ERI = eri[ind, :di*dj*dk*dl].reshape(dl,dk,dj,di)
+                    comp_ERI = np.transpose( comp_ERI, (3,2,1,0) )
 
-                overlap_ERI[i0:i0+di, j0:j0+dj, k0:k0+dk, l0:l0+dl] += 1
-                patches_ERI[i0:i0+di, j0:j0+dj, k0:k0+dk, l0:l0+dl] = np.random.randint(0, 100)
+                    overlap_ERI[i0:i0+di, j0:j0+dj, k0:k0+dk, l0:l0+dl] += 1
+                    patches_ERI[i0:i0+di, j0:j0+dj, k0:k0+dk, l0:l0+dl] = np.random.randint(0, 100)
 
-                # ------ #
-                # build dense_ERI here
-                comp_dense_ERI[ i0:i0+di, j0:j0+dj, k0:k0+dk, l0:l0+dl ] = comp_ERI
+                    # ------ #
+                    # build dense_ERI here
+                    comp_dense_ERI[ i0:i0+di, j0:j0+dj, k0:k0+dk, l0:l0+dl ] = comp_ERI
+                    # print('ijkl', i0, j0, k0, l0, 'd', di, dj, dk, dl, '->', comp_ERI, real_ERI)
+                    assert np.allclose(real_ERI, comp_ERI, atol=1e-6)
 
-                assert np.allclose(real_ERI, comp_ERI, atol=1e-6)
+                    def ijkl2c(i, j, k, l):
+                        if i<j: i,j = j,i
+                        if k<l: k,l = l,k
+                        ij = i*(i+1)//2 + j
+                        kl = k*(k+1)//2 + l
+                        if ij < kl: ij,kl = kl,ij
+                        c = ij*(ij+1)//2 + kl
+                        return c
 
-                def ijkl2c(i, j, k, l):
-                    if i<j: i,j = j,i
-                    if k<l: k,l = l,k
-                    ij = i*(i+1)//2 + j
-                    kl = k*(k+1)//2 + l
-                    if ij < kl: ij,kl = kl,ij
-                    c = ij*(ij+1)//2 + kl
-                    return c
+                    for ci, _i in enumerate(range(i0, i0+di)):
+                        for cj, _j in enumerate(range(j0, j0+dj)):
+                            for ck, _k in enumerate(range(k0, k0+dk)):
+                                for cl, _l in enumerate(range(l0, l0+dl)):
+                                    c = ijkl2c(_i, _j, _k, _l)
 
-                for ci, _i in enumerate(range(i0, i0+di)):
-                    for cj, _j in enumerate(range(j0, j0+dj)):
-                        for ck, _k in enumerate(range(k0, k0+dk)):
-                            for cl, _l in enumerate(range(l0, l0+dl)):
-                                c = ijkl2c(_i, _j, _k, _l)
+                                    comp_distinct_ERI[c] = comp_dense_ERI[_i, _j, _k, _l]
+                                    # print('ijkl', _i, _j, _k, _l, 'c', c, '--', comp_distinct_ERI[c], distinct_ERI[c])
+                                    assert np.allclose(comp_distinct_ERI[c], distinct_ERI[c], atol=1e-6)
 
-                                comp_distinct_ERI[c] = comp_dense_ERI[_i, _j, _k, _l]
-                                # print('ijkl', _i, _j, _k, _l, 'c', c, '--', comp_distinct_ERI[c], distinct_ERI[c])
-                                assert np.allclose(comp_distinct_ERI[c], distinct_ERI[c], atol=1e-6)
-
-        assert np.allclose(comp_distinct_ERI, distinct_ERI, atol=1e-6)
-        print('PASSED distinct == comp_distinct')
+            assert np.allclose(comp_distinct_ERI, distinct_ERI, atol=1e-6)
+            print('PASSED distinct == comp_distinct')
 
         
         # exit()
