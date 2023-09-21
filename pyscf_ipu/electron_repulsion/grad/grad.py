@@ -59,6 +59,9 @@ def getints4c(intor_name, atm, bas, env, N, shls_slice=None, comp=1,
         env.ctypes.data_as(ctypes.c_void_p))
     return out
 
+
+
+
 mol = pyscf.gto.Mole(atom="C 0 0 0; C 0 0 1;", basis="sto3g")
 mol.build()
 
@@ -69,3 +72,28 @@ print(np.max(np.abs(truth-us)))
 assert np.allclose(truth, us )
 print("PASSED")
 
+input()
+
+from functools import partial
+import os.path as osp
+import jax 
+import jax.numpy as jnp 
+@partial(jax.jit, backend="ipu")
+def grad(a):
+    from tessellate_ipu import create_ipu_tile_primitive, ipu_cycle_count, tile_map, tile_put_sharded, tile_put_replicated
+    vertex_filename  = osp.join(osp.dirname(__file__), "grad.cpp")
+    grad = create_ipu_tile_primitive(
+            "Grad" ,
+            "Grad" ,
+            inputs=["n"], 
+            outputs={"out": 0},
+            gp_filename=vertex_filename,
+            perf_estimate=100,
+    )
+    a= tile_put_replicated(jnp.array(a, dtype=jnp.float32),   (1,3,7)) 
+
+    value = tile_map(grad, a)
+
+    return value.array
+
+print(grad(123.7))
