@@ -302,19 +302,6 @@ def compute_diff_jk(mol, dm, backend):
         l0 = ao_loc[l] - ao_loc[0]
 
         for ind in range(eri.shape[0]):
-            # i = idx[ind, 0]
-            # j = idx[ind, 1]
-            # k = idx[ind, 2]
-            # l = idx[ind, 3]
-            # di = ao_loc[i+1] - ao_loc[i]
-            # dj = ao_loc[j+1] - ao_loc[j]
-            # dk = ao_loc[k+1] - ao_loc[k]
-            # dl = ao_loc[l+1] - ao_loc[l]
-            
-            # i0 = ao_loc[i] - ao_loc[0]
-            # j0 = ao_loc[j] - ao_loc[0]
-            # k0 = ao_loc[k] - ao_loc[0]
-            # l0 = ao_loc[l] - ao_loc[0]
 
             _di = di[ind]
             _dj = dj[ind]
@@ -326,8 +313,6 @@ def compute_diff_jk(mol, dm, backend):
             _k0 = k0[ind]
             _l0 = l0[ind]
             
-            # comp_ERI = eri[ind, :_di*_dj*_dk*_dl].reshape(_dl,_dk,_dj,_di)
-
             def ijkl2c(i, j, k, l):
                 if i<j: i,j = j,i
                 if k<l: k,l = l,k
@@ -337,24 +322,20 @@ def compute_diff_jk(mol, dm, backend):
                 c = ij*(ij+1)//2 + kl
                 return c
 
-            block_idx = np.zeros((_dl, _dk, _dj, _di, 4)).astype(np.int16)
-            block_do = np.zeros((_dl, _dk, _dj, _di))
-                    
-            for cl, _l in enumerate(range(_l0, _l0+_dl)):
-                for ck, _k in enumerate(range(_k0, _k0+_dk)):
-                    for cj, _j in enumerate(range(_j0, _j0+_dj)):
-                        for ci, _i in enumerate(range(_i0, _i0+_di)):
-                            c = ijkl2c(_i, _j, _k, _l)
+            block_idx = np.mgrid[
+                _i0:(_i0+_di),
+                _j0:(_j0+_dj),
+                _k0:(_k0+_dk),
+                _l0:(_l0+_dl)].transpose(4, 3, 2, 1, 0).astype(np.int16)
+
+            block_c = [ijkl2c(ijkl[0],ijkl[1], ijkl[2], ijkl[3]) for ijkl in block_idx.reshape(-1, 4)]
+            block_do = np.zeros((_dl*_dk*_dj*_di))
+            for ci, c in enumerate(block_c):
+                block_do[ci] = int(c not in overlap_bookkeeping)
+                overlap_bookkeeping[c] = True
                             
-                            block_idx[cl, ck, cj, ci, :] = [_i, _j, _k, _l]
-                            block_do[cl, ck, cj, ci] = 1
-                            if c in overlap_bookkeeping:
-                                block_do[cl, ck, cj, ci] = 0
-                            overlap_bookkeeping[c] = True
-            
-            # comp_distinct_ERI_list[comp_list_index] = comp_ERI.reshape(-1)
             comp_distinct_idx_list[comp_list_index] = block_idx.reshape(-1, 4)
-            comp_do_list[comp_list_index] = block_do.reshape(-1)
+            comp_do_list[comp_list_index] = block_do
             comp_list_index += 1
             
             
@@ -412,7 +393,7 @@ if __name__ == "__main__":
     print("")
 
     # ---------------------------------------- #
-    if backend == 'ipu':
+    if backend == 'ipu' and False:
         patches_ERI = np.zeros((N, N, N, N)).astype(np.int32)
         overlap_ERI = np.zeros((N, N, N, N)).astype(np.int32)
 
@@ -487,7 +468,7 @@ if __name__ == "__main__":
 
         # ------------------------------------- #
 
-        if True:
+        if False:
             comp_distinct_ERI = np.zeros(distinct_ERI.shape)
 
             for eri, idx in zip(all_eris, all_indices):
@@ -628,6 +609,8 @@ if __name__ == "__main__":
         exit()
     if args.nipu > 1:
         diff_JK = np.array(diff_JK[0])
+    else:
+        diff_JK = np.array(diff_JK) # avoid multiple profiles
 
     diff_JK = diff_JK.reshape(N, N)
     print(diff_JK.reshape(-1)[::51])
