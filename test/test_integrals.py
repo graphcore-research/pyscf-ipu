@@ -19,7 +19,10 @@ from pyscf_ipu.experimental.integrals import (
     overlap_primitives,
 )
 from pyscf_ipu.experimental.interop import to_pyscf
-from pyscf_ipu.experimental.mesh import electron_density, uniform_mesh
+from pyscf_ipu.experimental.nuclear_gradients import (
+    grad_kinetic_basis,
+    grad_overlap_basis,
+)
 from pyscf_ipu.experimental.primitive import Primitive
 from pyscf_ipu.experimental.structure import molecule
 
@@ -259,8 +262,13 @@ def test_ipu_eri():
 @pytest.mark.parametrize("basis_name", ["sto-3g", "6-31+g"])
 def test_nuclear_gradients(basis_name):
     h2 = molecule("h2")
-    expect = to_pyscf(h2, basis_name).intor("int1e_ipovlp_cart", comp=3)
+    scfmol = to_pyscf(h2, basis_name)
     basis = basisset(h2, basis_name)
-    actual = grad_overlap_basis(basis)
 
+    actual = grad_overlap_basis(basis)
+    expect = scfmol.intor("int1e_ipovlp_cart", comp=3)
+    assert_allclose(actual, expect, atol=1e-6)
+
+    actual = grad_kinetic_basis(basis)
+    expect = scfmol.intor("int1e_ipkin_cart", comp=3)
     assert_allclose(actual, expect, atol=1e-6)
