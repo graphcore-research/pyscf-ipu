@@ -286,22 +286,47 @@ def compute_diff_jk(mol, dm, backend):
 
     for eri, idx in zip(all_eris, all_indices):
         print(eri.shape)
+        i = idx[:, 0]
+        j = idx[:, 1]
+        k = idx[:, 2]
+        l = idx[:, 3]
+
+        di = ao_loc[i+1] - ao_loc[i]
+        dj = ao_loc[j+1] - ao_loc[j]
+        dk = ao_loc[k+1] - ao_loc[k]
+        dl = ao_loc[l+1] - ao_loc[l]
+
+        i0 = ao_loc[i] - ao_loc[0]
+        j0 = ao_loc[j] - ao_loc[0]
+        k0 = ao_loc[k] - ao_loc[0]
+        l0 = ao_loc[l] - ao_loc[0]
+
         for ind in range(eri.shape[0]):
-            i = idx[ind, 0]
-            j = idx[ind, 1]
-            k = idx[ind, 2]
-            l = idx[ind, 3]
-            di = ao_loc[i+1] - ao_loc[i]
-            dj = ao_loc[j+1] - ao_loc[j]
-            dk = ao_loc[k+1] - ao_loc[k]
-            dl = ao_loc[l+1] - ao_loc[l]
+            # i = idx[ind, 0]
+            # j = idx[ind, 1]
+            # k = idx[ind, 2]
+            # l = idx[ind, 3]
+            # di = ao_loc[i+1] - ao_loc[i]
+            # dj = ao_loc[j+1] - ao_loc[j]
+            # dk = ao_loc[k+1] - ao_loc[k]
+            # dl = ao_loc[l+1] - ao_loc[l]
             
-            i0 = ao_loc[i] - ao_loc[0]
-            j0 = ao_loc[j] - ao_loc[0]
-            k0 = ao_loc[k] - ao_loc[0]
-            l0 = ao_loc[l] - ao_loc[0]
+            # i0 = ao_loc[i] - ao_loc[0]
+            # j0 = ao_loc[j] - ao_loc[0]
+            # k0 = ao_loc[k] - ao_loc[0]
+            # l0 = ao_loc[l] - ao_loc[0]
+
+            _di = di[ind]
+            _dj = dj[ind]
+            _dk = dk[ind]
+            _dl = dl[ind]
+
+            _i0 = i0[ind]
+            _j0 = j0[ind]
+            _k0 = k0[ind]
+            _l0 = l0[ind]
             
-            comp_ERI = eri[ind, :di*dj*dk*dl].reshape(dl,dk,dj,di)
+            # comp_ERI = eri[ind, :_di*_dj*_dk*_dl].reshape(_dl,_dk,_dj,_di)
 
             def ijkl2c(i, j, k, l):
                 if i<j: i,j = j,i
@@ -312,13 +337,13 @@ def compute_diff_jk(mol, dm, backend):
                 c = ij*(ij+1)//2 + kl
                 return c
 
-            block_idx = np.zeros((dl, dk, dj, di, 4)).astype(np.int16)
-            block_do = np.zeros((dl, dk, dj, di))
+            block_idx = np.zeros((_dl, _dk, _dj, _di, 4)).astype(np.int16)
+            block_do = np.zeros((_dl, _dk, _dj, _di))
                     
-            for cl, _l in enumerate(range(l0, l0+dl)):
-                for ck, _k in enumerate(range(k0, k0+dk)):
-                    for cj, _j in enumerate(range(j0, j0+dj)):
-                        for ci, _i in enumerate(range(i0, i0+di)):
+            for cl, _l in enumerate(range(_l0, _l0+_dl)):
+                for ck, _k in enumerate(range(_k0, _k0+_dk)):
+                    for cj, _j in enumerate(range(_j0, _j0+_dj)):
+                        for ci, _i in enumerate(range(_i0, _i0+_di)):
                             c = ijkl2c(_i, _j, _k, _l)
                             
                             block_idx[cl, ck, cj, ci, :] = [_i, _j, _k, _l]
@@ -327,15 +352,15 @@ def compute_diff_jk(mol, dm, backend):
                                 block_do[cl, ck, cj, ci] = 0
                             overlap_bookkeeping[c] = True
             
-            comp_distinct_ERI_list[comp_list_index] = comp_ERI.reshape(-1)
+            # comp_distinct_ERI_list[comp_list_index] = comp_ERI.reshape(-1)
             comp_distinct_idx_list[comp_list_index] = block_idx.reshape(-1, 4)
             comp_do_list[comp_list_index] = block_do.reshape(-1)
             comp_list_index += 1
             
             
-    comp_distinct_ERI = jnp.concatenate(comp_distinct_ERI_list).reshape(1, -1)
-    comp_distinct_idx = jnp.concatenate(comp_distinct_idx_list).reshape(1, -1, 4)
-    comp_do = jnp.concatenate(comp_do_list).reshape(1, -1)
+    comp_distinct_ERI = jnp.concatenate([eri.reshape(-1) for eri in all_eris]).reshape(1, -1)
+    comp_distinct_idx = np.concatenate(comp_distinct_idx_list).reshape(1, -1, 4)
+    comp_do = np.concatenate(comp_do_list).reshape(1, -1)
 
     comp_distinct_ERI *= comp_do
 
