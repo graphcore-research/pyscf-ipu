@@ -31,18 +31,16 @@ def grad_overlap_basis(b: Basis):
         c = jnp.take(coefficients, indices)
         return p, c
 
-    # atom_indices = jnp.arange(b.structure.num_atoms)
     primitives, coefficients, orbital_index = batch_orbitals(b.orbitals)
     ii, jj = jnp.meshgrid(*[jnp.arange(b.num_primitives)] * 2, indexing="ij")
     lhs, cl = take_primitives(ii.reshape(-1))
     rhs, cr = take_primitives(jj.reshape(-1))
 
-    op = jit(vmap(grad_overlap_primitives, (None, 0, 0)))
-
-    out = op(0, lhs, rhs)
-
-    for i in range(1, b.structure.num_atoms):
-        out += op(i, lhs, rhs)
+    op = vmap(grad_overlap_primitives, (None, 0, 0))
+    op = jit(vmap(op, (0, None, None)))
+    atom_indices = jnp.arange(b.structure.num_atoms)
+    out = op(atom_indices, lhs, rhs)
+    out = jnp.sum(out, axis=0)
 
     out = cl * cr * out.T
     out = out.reshape(3, b.num_primitives, b.num_primitives)
