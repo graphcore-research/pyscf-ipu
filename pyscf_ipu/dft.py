@@ -1,5 +1,4 @@
 # Copyright (c) 2023 Graphcore Ltd. All rights reserved.
-import colored_traceback.always
 import os
 os.environ['OMP_NUM_THREADS'] = "8"
 os.environ['TF_POPLAR_FLAGS'] = """--executable_cache_path=/tmp/pyscf-ipu-cache/"""
@@ -65,15 +64,24 @@ def get_atom_string(atoms, locs):
       str += "%s %4f %4f %4f; "%((atom,) + tuple(loc) )
     return atom_string, str
 
+# Explicit list of arguments used in do_compute and callees
+do_compute_args_names = (
+  'its', 'backend', 'ipumult', 'seperate','threads_int',
+  'intv', 'skiperi', 'randeri', 'float16', 'float32', 'nan', 'forloop',
+  'sk', 'xc', 'threads', 'multv', 'debug',
+  'skipdiis', 'skipeigh', 'geneigh', 'density_mixing'
+)
+dcargs_t = namedtuple('dcargs', do_compute_args_names)
+
 _do_compute_static_argnums = (10,11,16)
-def _do_compute(density_matrix, kinetic, nuclear, overlap, ao,
-                electron_repulsion, weights, coords, 
-                nuclear_energy, disable_cache, 
-                mf_diis_space, N, hyb, mask, _input_floats,
-                _input_ints, 
-                args,
+def _do_compute(density_matrix, kinetic, nuclear, overlap, ao, # 0-4
+                electron_repulsion, weights, coords,  # 5-7
+                nuclear_energy, disable_cache,  # 8-9
+                mf_diis_space, N, hyb, mask, _input_floats, # 10,11,12-14
+                _input_ints,  # 15
+                args, # 16
                 L_inv=None):
-        print('_do_compute')
+
         # --- INITIALIZE MATRICES USED FOR DIIS --- #
         mf_diis_H       = np.zeros((mf_diis_space+1, mf_diis_space+1))
         mf_diis_H[0,1:] = mf_diis_H[1:,0] = 1
@@ -180,6 +188,12 @@ def _do_compute(density_matrix, kinetic, nuclear, overlap, ao,
 
         return energies, energy, eigenvalues, eigenvectors, dms, fixed_hamiltonian, part_energies, L_inv
 
+do_compute_jit = None
+def compile_do_compute(device_1):
+    global do_compute_jit
+    do_compute_jit = jax.jit(_do_compute, device=device_1, static_argnums=_do_compute_static_argnums)
+
+
 def density_functional_theory(atom_positions, args, mf_diis_space=9):
     if args.backend == "ipu": mf_diis_space = 9
 
@@ -284,8 +298,6 @@ def density_functional_theory(atom_positions, args, mf_diis_space=9):
         assert args.plevel == args.level
         initialized = False
 
-        device_1 = jax.devices(args.backend)[0]
-        do_compute_jit = jax.jit(_do_compute, device=device_1, static_argnums=_do_compute_static_argnums)
         if args.seperate:
             device_2 = jax.devices("ipu")[1]
             print(device_2)
@@ -661,7 +673,8 @@ def density_functional_theory(atom_positions, args, mf_diis_space=9):
                   'skipdiis', 'skipeigh', 'geneigh', 'density_mixing'
                 )
 
-                dcargs = namedtuple('dcargs', dcargs_names)(*(args.__dict__[a] for a in dcargs_names))
+                dcargs = dcargs_t(*(args.__dict__[a] for a in do_compute_args_names))
+
                 if not args.forloop:
                     if not args.skip_minao: density_matrix  = np.array(minao(mol))
                     vals.append( do_compute_jit( density_matrix, kinetic, nuclear, overlap, ao, electron_repulsion, weights, coords, nuclear_energy, 0, mf_diis_space, N, hyb , mask, _input_floats, _input_ints, dcargs, L_inv)  )
@@ -1462,6 +1475,8 @@ def process_args(args):
     if args.nan:
         config.update("jax_debug_nans", True)
 
+    compile_do_compute(jax.devices(args.backend)[0])
+
     return args
 
 def main():
@@ -1488,10 +1503,10 @@ def main():
             t0 = time.time()
             print("loading gdb data")
 
-            if args.gdb == 10: args.smiles = [a for a in open("gdb/gdb11_size10_sorted.csv", "r").read().split("\n")]
-            if args.gdb == 9:  args.smiles = [a for a in open("gdb/gdb11_size09_sorted.csv", "r").read().split("\n")]
-            if args.gdb == 7:  args.smiles = [a for a in open("gdb/gdb11_size07_sorted.csv", "r").read().split("\n")]
-            if args.gdb == 8:  args.smiles = [a for a in open("gdb/gdb11_size08_sorted.csv", "r").read().split("\n")]
+            if args.gdb == 10: args.smiles = [a for a in open("data/gdb11_size10_sorted.csv", "r").read().split("\n")]
+            if args.gdb == 9:  args.smiles = [a for a in open("data/gdb11_size09_sorted.csv", "r").read().split("\n")]
+            if args.gdb == 7:  args.smiles = [a for a in open("data/gdb11_size07_sorted.csv", "r").read().split("\n")]
+            if args.gdb == 8:  args.smiles = [a for a in open("data/gdb11_size08_sorted.csv", "r").read().split("\n")]
 
             # used as example data for quick testing.
             if args.gdb == 6:  args.smiles = ["c1ccccc1"]*args.num_conformers
