@@ -1,5 +1,6 @@
 # Copyright (c) 2023 Graphcore Ltd. All rights reserved.
 from typing import Callable
+from functools import partial
 import jax.numpy as jnp
 from jax import jit, tree_map, vmap
 from jax.ops import segment_sum
@@ -53,40 +54,9 @@ def grad_integrate(b: Basis, primitive_op: Callable) -> Float3xNxN:
     return jnp.rollaxis(out, -1)
 
 
-def grad_overlap_primitives(i: int, a: Primitive, b: Primitive) -> Float3:
-    return grad_primitive_integral(_overlap_primitives, i, a, b)
+grad_overlap_primitives = partial(grad_primitive_integral, _overlap_primitives)
+grad_kinetic_primitives = partial(grad_primitive_integral, _kinetic_primitives)
 
 
-def grad_kinetic_primitives(i: int, a: Primitive, b: Primitive) -> Float3:
-    return grad_primitive_integral(_kinetic_primitives, i, a, b)
-
-
-def grad_overlap_basis(b: Basis) -> Float3xNxN:
-    return grad_integrate(b, grad_overlap_primitives)
-
-
-def grad_kinetic_basis(b: Basis) -> Float3xNxN:
-    return grad_integrate(b, grad_kinetic_primitives)
-
-    def take_primitives(indices):
-        p = tree_map(lambda x: jnp.take(x, indices, axis=0), primitives)
-        c = jnp.take(coefficients, indices)
-        return p, c
-
-    primitives, coefficients, orbital_index = batch_orbitals(b.orbitals)
-    ii, jj = jnp.meshgrid(*[jnp.arange(b.num_primitives)] * 2, indexing="ij")
-    lhs, cl = take_primitives(ii.reshape(-1))
-    rhs, cr = take_primitives(jj.reshape(-1))
-
-    op = vmap(grad_kinetic_primitives, (None, 0, 0))
-    op = jit(vmap(op, (0, None, None)))
-    atom_indices = jnp.arange(b.structure.num_atoms)
-    out = op(atom_indices, lhs, rhs)
-    out = jnp.sum(out, axis=0)
-
-    out = cl * cr * out.T
-    out = out.reshape(3, b.num_primitives, b.num_primitives)
-    out = segment_sum(jnp.rollaxis(out, 1), orbital_index)
-    out = segment_sum(jnp.rollaxis(out, -1), orbital_index)
-
-    return jnp.rollaxis(out, -1)
+grad_overlap_basis = partial(grad_integrate, primitive_op=grad_overlap_primitives)
+grad_kinetic_basis = partial(grad_integrate, primitive_op=grad_kinetic_primitives)
