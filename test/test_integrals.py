@@ -254,3 +254,13 @@ def test_ipu_eri():
     a, b, c, d = [Primitive()] * 4
     actual = ipu_func(_eri_primitives)(a, b, c, d)
     assert_allclose(actual, 1.128379, atol=1e-5)
+
+
+@pytest.mark.parametrize("basis_name", ["sto-3g", "6-31+g"])
+def test_nuclear_gradients(basis_name):
+    h2 = molecule("h2")
+    expect = to_pyscf(h2, basis_name).intor("int1e_ipovlp_cart", comp=3)
+    basis = basisset(h2, basis_name)
+    actual = grad_overlap_basis(basis)
+
+    assert_allclose(actual, expect, atol=1e-6)
