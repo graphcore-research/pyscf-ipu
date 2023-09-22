@@ -1,28 +1,19 @@
-// cint1e.c
-/*
- * Copyright (C) 2013-  Qiming Sun <osirpt.sun@gmail.com>
- *
- * basic cGTO integrals
- */
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 
 #include <stdlib.h>
 #include <math.h>
-/*
- * Copyright (C) 2013  Qiming Sun <osirpt.sun@gmail.com>
- *
- * basic cGTO function
- */
 
-/*
- * Copyright (C) 2013-  Qiming Sun <osirpt.sun@gmail.com>
- *
- * Parameters and function signature for libcint.
- */
+
+
 
 #define CINT_VERSION            6.0.0
 #define CINT_SOVERSION          @cint_SOVERSION
 
-/* #undef I8 */
+
 #ifdef I8
 #include <stdint.h>
 #define FINT int64_t
@@ -30,7 +21,7 @@
 #define FINT int
 #endif
 
-/* #undef CACHE_SIZE_I8 */
+
 #ifdef CACHE_SIZE_I8
 #include <stdint.h>
 #define CACHE_SIZE_T int64_t
@@ -38,28 +29,28 @@
 #define CACHE_SIZE_T FINT
 #endif
 
-// global parameters in env
-// Overall cutoff for integral prescreening, value needs to be ~ln(threshold)
+
+
 #define PTR_EXPCUTOFF           0
-// R_C of (r-R_C) in dipole, GIAO operators
+
 #define PTR_COMMON_ORIG         1
-// R_O in 1/|r-R_O|
+
 #define PTR_RINV_ORIG           4
-// ZETA parameter for Gaussian charge distribution (Gaussian nuclear model)
+
 #define PTR_RINV_ZETA           7
-// omega parameter in range-separated coulomb operator
-// LR interaction: erf(omega*r12)/r12 if omega > 0
-// SR interaction: erfc(omega*r12)/r12 if omega < 0
+
+
+
 #define PTR_RANGE_OMEGA         8
-// Yukawa potential and Slater-type geminal e^{-zeta r}
+
 #define PTR_F12_ZETA            9
-// Gaussian type geminal e^{-zeta r^2}
+
 #define PTR_GTG_ZETA            10
 #define NGRIDS                  11
 #define PTR_GRIDS               12
 #define PTR_ENV_START           20
 
-// slots of atm
+
 #define CHARGE_OF       0
 #define PTR_COORD       1
 #define NUC_MOD_OF      2
@@ -68,7 +59,7 @@
 #define RESERVE_ATMSLOT 5
 #define ATM_SLOTS       6
 
-// slots of bas
+
 #define ATOM_OF         0
 #define ANG_OF          1
 #define NPRIM_OF        2
@@ -79,28 +70,28 @@
 #define RESERVE_BASLOT  7
 #define BAS_SLOTS       8
 
-// slots of gout
+
 #define POSX            0
 #define POSY            1
 #define POSZ            2
 #define POS1            3
-// For 2-electron integral with two spin operators
-// SIGMA1X * SIGMA2X     0
-// SIGMA1Y * SIGMA2X     1
-// SIGMA1Z * SIGMA2X     2
-// I1_2x2  * SIGMA2X     3
-// SIGMA1X * SIGMA2Y     4
-// SIGMA1Y * SIGMA2Y     5
-// SIGMA1Z * SIGMA2Y     6
-// I1_2x2  * SIGMA2Y     7
-// SIGMA1X * SIGMA2Z     8
-// SIGMA1Y * SIGMA2Z     9
-// SIGMA1Z * SIGMA2Z     10
-// I1_2x2  * SIGMA2Z     11
-// SIGMA1X * I2_2x2      12
-// SIGMA1Y * I2_2x2      13
-// SIGMA1Z * I2_2x2      14
-// I1_2x2  * I2_2x2      15
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 #define POSXX           0
 #define POSYX           1
 #define POSZX           2
@@ -118,7 +109,7 @@
 #define POSZ1           14
 #define POS11           15
 
-// tensor
+
 #define TSRX        0
 #define TSRY        1
 #define TSRZ        2
@@ -132,11 +123,11 @@
 #define TSRZY       7
 #define TSRZZ       8
 
-// other boundaries
-#define MXRYSROOTS      32 // > ANG_MAX*2+1 for 4c2e
-#define ANG_MAX         15 // l = 0..15
-#define LMAX1           16 // > ANG_MAX
-#define CART_MAX        136 // > (ANG_MAX*(ANG_MAX+1)/2)
+
+#define MXRYSROOTS      32 
+#define ANG_MAX         15 
+#define LMAX1           16 
+#define CART_MAX        136 
 #define SHLS_MAX        1048576
 #define NPRIM_MAX       64
 #define NCTR_MAX        64
@@ -156,15 +147,15 @@ typedef struct {
     double cceij;
 } PairData;
 typedef struct {
-    FINT **index_xyz_array; // LMAX1**4 pointers to index_xyz
+    FINT **index_xyz_array; 
     FINT **non0ctr;
     FINT **sortedidx;
     FINT nbas;
     double **log_max_coeff;
-    PairData **pairdata;  // NULL indicates not-initialized, NO_VALUE can be skipped
+    PairData **pairdata;  
 } CINTOpt;
 
-// Add this macro def to make pyscf compatible with both v4 and v5
+
 #define HAVE_DEFINED_CINTENVVARS_H
 typedef struct {
         FINT *atm;
@@ -178,37 +169,37 @@ typedef struct {
         FINT j_l;
         FINT k_l;
         FINT l_l;
-        FINT nfi;  // number of cartesian components
+        FINT nfi;  
         FINT nfj;
-        // in int1e_grids, the grids_offset and the number of grids
+        
         union {FINT nfk; FINT grids_offset;};
         union {FINT nfl; FINT ngrids;};
-        FINT nf;  // = nfi*nfj*nfk*nfl;
-        FINT rys_order; // = nrys_roots for regular ERIs. can be nrys_roots/2 for SR ERIs
+        FINT nf;  
+        FINT rys_order; 
         FINT x_ctr[4];
 
         FINT gbits;
-        FINT ncomp_e1; // = 1 if spin free, = 4 when spin included, it
-        FINT ncomp_e2; // corresponds to POSX,POSY,POSZ,POS1, see cint.h
-        FINT ncomp_tensor; // e.g. = 3 for gradients
+        FINT ncomp_e1; 
+        FINT ncomp_e2; 
+        FINT ncomp_tensor; 
 
-        /* values may diff based on the g0_2d4d algorithm */
-        FINT li_ceil; // power of x, == i_l if nabla is involved, otherwise == i_l
+        
+        FINT li_ceil; 
         FINT lj_ceil;
         FINT lk_ceil;
         FINT ll_ceil;
-        FINT g_stride_i; // nrys_roots * shift of (i++,k,l,j)
-        FINT g_stride_k; // nrys_roots * shift of (i,k++,l,j)
-        FINT g_stride_l; // nrys_roots * shift of (i,k,l++,j)
-        FINT g_stride_j; // nrys_roots * shift of (i,k,l,j++)
+        FINT g_stride_i; 
+        FINT g_stride_k; 
+        FINT g_stride_l; 
+        FINT g_stride_j; 
         FINT nrys_roots;
-        FINT g_size;  // ref to cint2e.c g = malloc(sizeof(double)*g_size)
+        FINT g_size;  
 
         FINT g2d_ijmax;
         FINT g2d_klmax;
         double common_factor;
         double expcutoff;
-        double rirj[3]; // diff by sign in different g0_2d4d algorithm
+        double rirj[3]; 
         double rkrl[3];
         double *rx_in_rijrx;
         double *rx_in_rklrx;
@@ -216,16 +207,25 @@ typedef struct {
         double *ri;
         double *rj;
         double *rk;
-        // in int2e or int3c2e, the coordinates of the fourth shell
-        // in int1e_grids, the pointer for the grids coordinates
+        
+        
         union {double *rl; double *grids;};
 
+        #ifdef __cplusplus
+        FINT (*f_g0_2e)(...);
+        void (*f_g0_2d4d)(...);
+        void (*f_gout)(...);
+        #else 
         FINT (*f_g0_2e)();
         void (*f_g0_2d4d)();
         void (*f_gout)();
+        #endif 
+
+
+
         CINTOpt *opt;
 
-        /* values are assigned during calculation */
+        
         int *idx;
         double ai[1];
         double aj[1];
@@ -265,7 +265,7 @@ double *CINTc2s_ket_sph1(double *sph, double *cart, FINT lds, FINT ldc, FINT l);
 double CINTgto_norm(FINT n, double a);
 
 void CINTinit_2e_optimizer(CINTOpt **opt, FINT *atm, FINT natm,
-                           FINT *bas, FINT nbas, double *env);
+                           FINT *bas, FINT nbas, double *env){};
 void CINTinit_optimizer(CINTOpt **opt, FINT *atm, FINT natm,
                         FINT *bas, FINT nbas, double *env);
 void CINTdel_2e_optimizer(CINTOpt **opt);
@@ -288,32 +288,32 @@ void cint2e_optimizer(CINTOpt **opt, FINT *atm, FINT natm,
                       FINT *bas, FINT nbas, double *env);
 
 #ifndef __cplusplus
-#include <complex.h>
+//#include <complex.h>
 
-void CINTc2s_ket_spinor_sf1(double complex *gspa, double complex *gspb, double *gcart,
+void CINTc2s_ket_spinor_sf1(double *gspa, double *gspb, double *gcart,
                             FINT lds, FINT ldc, FINT nctr, FINT l, FINT kappa);
-void CINTc2s_iket_spinor_sf1(double complex *gspa, double complex *gspb, double *gcart,
+void CINTc2s_iket_spinor_sf1(double *gspa, double *gspb, double *gcart,
                              FINT lds, FINT ldc, FINT nctr, FINT l, FINT kappa);
-void CINTc2s_ket_spinor_si1(double complex *gspa, double complex *gspb, double *gcart,
+void CINTc2s_ket_spinor_si1(double *gspa, double *gspb, double *gcart,
                             FINT lds, FINT ldc, FINT nctr, FINT l, FINT kappa);
-void CINTc2s_iket_spinor_si1(double complex *gspa, double complex *gspb, double *gcart,
+void CINTc2s_iket_spinor_si1(double *gspa, double *gspb, double *gcart,
                              FINT lds, FINT ldc, FINT nctr, FINT l, FINT kappa);
 #endif
 
 #define HAVE_EXPL
 #define HAVE_SQRTL
-/* #undef HAVE_FABSL */
+
 
 #define HAVE_QUADMATH_H
 
-/* #undef WITH_RANGE_COULOMB */
+
 
 #ifndef M_PI
 #define M_PI            3.1415926535897932384626433832795028
 #endif
 #define SQRTPI          1.7724538509055160272981674833411451
 
-// ng[*]
+
 #define IINC            0
 #define JINC            1
 #define KINC            2
@@ -326,7 +326,7 @@ void CINTc2s_iket_spinor_si1(double complex *gspa, double complex *gspb, double 
 
 #define EXPCUTOFF       60
 #ifndef MIN_EXPCUTOFF
-// ~ 1e-15
+
 #define MIN_EXPCUTOFF   40
 #endif
 
@@ -357,9 +357,7 @@ void CINTshells_spinor_offset(FINT ao_loc[], const FINT *bas, const FINT nbas);
 
 void CINTcart_comp(FINT *nx, FINT *ny, FINT *nz, const FINT lmax);
 
-/*
- * Copyright (C) 2013  Qiming Sun <osirpt.sun@gmail.com>
- */
+
 
 #define NOVALUE                 ((void *)0xffffffffffffffffuL)
 #define MAX_PGTO_FOR_PAIRDATA   2048
@@ -371,6 +369,7 @@ void CINTinit_optimizer(CINTOpt **opt, FINT *atm, FINT natm,
 void CINTdel_2e_optimizer(CINTOpt **opt);
 void CINTdel_optimizer(CINTOpt **opt);
 void CINTdel_pairdata_optimizer(CINTOpt *cintopt);
+void CINTOpt_log_max_pgto_coeff(double *log_maxc, double *coeff, FINT nprim, FINT nctr);
 void CINTOpt_log_max_pgto_coeff(double *log_maxc, double *coeff, FINT nprim, FINT nctr);
 void CINTOpt_set_log_maxc(CINTOpt *opt, FINT *atm, FINT natm,
                           FINT *bas, FINT nbas, double *env);
@@ -394,21 +393,21 @@ void CINTOpt_2cindex_xyz(CINTOpt *opt, FINT *ng,
 void CINTOpt_3c1eindex_xyz(CINTOpt *opt, FINT *ng,
                            FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env);
 
-// optimizer examples
+
 void CINTno_optimizer(CINTOpt **opt, FINT *atm, FINT natm,
                       FINT *bas, FINT nbas, double *env);
 void CINTall_1e_optimizer(CINTOpt **opt, FINT *ng,
-                          FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env);
+                          FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env){}
 void CINTall_2e_optimizer(CINTOpt **opt, FINT *ng,
-                          FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env);
+                          FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env){}
 void CINTall_3c2e_optimizer(CINTOpt **opt, FINT *ng,
-                            FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env);
+                            FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env){}
 void CINTall_2c2e_optimizer(CINTOpt **opt, FINT *ng,
-                            FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env);
+                            FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env){}
 void CINTall_3c1e_optimizer(CINTOpt **opt, FINT *ng,
-                            FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env);
+                            FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env){}
 void CINTall_1e_grids_optimizer(CINTOpt **opt, FINT *ng,
-                                FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env);
+                                FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env){}
 
 #ifdef WITH_F12
 void CINTall_2e_stg_optimizer(CINTOpt **opt, FINT *ng,
@@ -418,28 +417,25 @@ void CINTall_2e_stg_optimizer(CINTOpt **opt, FINT *ng,
 #ifndef HAVE_DEFINED_APPROX_LOG
 #define HAVE_DEFINED_APPROX_LOG
 #ifdef __X86__
-//// little endian on x86
-//typedef union {
-//    double d;
-//    unsigned short s[4];
-//} type_IEEE754;
-//// ~4 times faster than built-in log
-//static inline double approx_log(double x)
-//{
-//        type_IEEE754 y;
-//        y.d = x;
-//        return ((y.s[3] >> 4) - 1023 + 1) * 0.693145751953125;
-//}
+
+
+
+
+
+
+
+
+
+
+
+
 #define approx_log      log
 #else
 #define approx_log      log
 #endif
 #endif
 
-/*
- * Copyright (C) 2013-  Qiming Sun <osirpt.sun@gmail.com>
- *
- */
+
 
 void CINTinit_int1e_EnvVars(CINTEnvVars *envs, FINT *ng, FINT *shls,
                             FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env);
@@ -484,78 +480,72 @@ void CINTprim_to_ctr_1(double *gc, double *gp, double *coeff, size_t nf,
 #define G1E_D_I(f, g, li, lj, lk)   CINTnabla1i_1e(f, g, li, lj, lk, envs)
 #define G1E_D_J(f, g, li, lj, lk)   CINTnabla1j_1e(f, g, li, lj, lk, envs)
 #define G1E_D_K(f, g, li, lj, lk)   CINTnabla1k_1e(f, g, li, lj, lk, envs)
-/* r-R_0, R_0 is (0,0,0) */
+
 #define G1E_R0I(f, g, li, lj, lk)   CINTx1i_1e(f, g, envs->ri, li, lj, lk, envs)
 #define G1E_R0J(f, g, li, lj, lk)   CINTx1j_1e(f, g, envs->rj, li, lj, lk, envs)
 #define G1E_R0K(f, g, li, lj, lk)   CINTx1k_1e(f, g, envs->rk, li, lj, lk, envs)
-/* r-R_C, R_C is common origin */
+
 #define G1E_RCI(f, g, li, lj, lk)   CINTx1i_1e(f, g, dri, li, lj, lk, envs)
 #define G1E_RCJ(f, g, li, lj, lk)   CINTx1j_1e(f, g, drj, li, lj, lk, envs)
 #define G1E_RCK(f, g, li, lj, lk)   CINTx1k_1e(f, g, drk, li, lj, lk, envs)
-/* origin from center of each basis
- * x1[ij]_1e(f, g, ng, li, lj, 0d0) */
+
 #define G1E_R_I(f, g, li, lj, lk)   f = g + envs->g_stride_i
 #define G1E_R_J(f, g, li, lj, lk)   f = g + envs->g_stride_j
 #define G1E_R_K(f, g, li, lj, lk)   f = g + envs->g_stride_k
 
-/*
- * Copyright (C) 2013  Qiming Sun <osirpt.sun@gmail.com>
- *
- */
 
-#include <complex.h>
+
+//#include <complex.h>
 
 FINT CINT1e_loop(double *gctr, CINTEnvVars *envs, double *cache, FINT int1e_type);
 
-CACHE_SIZE_T CINT1e_drv(double *out, FINT *dims, CINTEnvVars *envs,
-               double *cache, void (*f_c2s)(), FINT int1e_type);
+CACHE_SIZE_T CINT1e_drv(double *out, FINT *dims, CINTEnvVars *envs, double *cache, void (*f_c2s)(double *opij, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache), FINT int1e_type);
 
-CACHE_SIZE_T CINT1e_spinor_drv(double complex *out, FINT *dims, CINTEnvVars *envs,
-                       double *cache, void (*f_c2s)(), FINT int1e_type);
+CACHE_SIZE_T CINT1e_spinor_drv(double *out, FINT *dims, CINTEnvVars *envs,
+                       double *cache, void (*f_c2s)(double *opij, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache), FINT int1e_type);
 
 double CINTnuc_mod(double aij, FINT nuc_id, FINT *atm, double *env);
 
 CACHE_SIZE_T int1e_cache_size(CINTEnvVars *envs);
 
+#ifdef __cplusplus
+CACHE_SIZE_T CINT3c1e_drv(double *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt,
+                         double *cache, void (*f_e1_c2s)(...), FINT int_type, FINT is_ssc);
+CACHE_SIZE_T CINT3c1e_spinor_drv(double *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt,
+                        double *cache, void (*f_e1_c2s)(...), FINT int_type, FINT is_ssc);
+#else
 CACHE_SIZE_T CINT3c1e_drv(double *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt,
                          double *cache, void (*f_e1_c2s)(), FINT int_type, FINT is_ssc);
-CACHE_SIZE_T CINT3c1e_spinor_drv(double complex *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt,
+CACHE_SIZE_T CINT3c1e_spinor_drv(double *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt,
                         double *cache, void (*f_e1_c2s)(), FINT int_type, FINT is_ssc);
+#endif
 
 #define INT1E_TYPE_OVLP 0
 #define INT1E_TYPE_RINV 1
 #define INT1E_TYPE_NUC  2
 
-CACHE_SIZE_T CINT1e_grids_spinor_drv(double complex *out, FINT *dims, CINTEnvVars *envs,
-                             double *cache, void (*f_c2s)());
+CACHE_SIZE_T CINT1e_grids_spinor_drv(double *out, FINT *dims, CINTEnvVars *envs,
+                             double *cache, void (*f_c2s)(double *opij, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache));
 CACHE_SIZE_T CINT1e_grids_drv(double *out, FINT *dims, CINTEnvVars *envs,
-                      double *cache, void (*f_c2s)());
+                      double *cache, void (*f_c2s)(double *opij, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache));
 
-/*
- * Copyright (C) 2013  Qiming Sun <osirpt.sun@gmail.com>
- *
- * basic functions
- */
+
 
 #include <stdint.h>
 
-/*
- * Copyright (C) 2013  Qiming Sun <osirpt.sun@gmail.com>
- *
- * blas interface and blas-like functions
- */
+
 
 #if defined __cplusplus
 extern "C" {
 #endif
-#include <complex.h>
+//#include <complex.h>
 
 void CINTdset0(FINT n, double *x);
 void CINTdaxpy2v(const FINT n, double a, double *x, double *y, double *v);
 void CINTdmat_transpose(double *a_t, double *a, FINT m, FINT n);
 void CINTdplus_transpose(double *a_t, double *a, FINT m, FINT n);
-void CINTzmat_transpose(double complex *a_t, double complex *a, FINT m, FINT n);
-void CINTzmat_dagger(double complex *a_c, double complex *a, FINT m, FINT n);
+void CINTzmat_transpose(double *a_t, double *a, FINT m, FINT n);
+void CINTzmat_dagger(double *a_c, double *a, FINT m, FINT n);
 
 void CINTdgemm_NN(FINT m, FINT n, FINT k,
                   double *a, double *b, double *c);
@@ -566,31 +556,56 @@ void CINTdgemm_TN(FINT m, FINT n, FINT k,
 void CINTdgemm_NT(FINT m, FINT n, FINT k,
                   double *a, double *b, double *c);
 #if defined __cplusplus
-} // end extern "C"
+} 
 #endif
 
 #define MIN(X,Y) ((X)<(Y)?(X):(Y))
 #define MAX(X,Y) ((X)>(Y)?(X):(Y))
 #define SQUARE(r)       ((r)[0]*(r)[0] + (r)[1]*(r)[1] + (r)[2]*(r)[2])
 
-void CINTdcmplx_re(const FINT n, double complex *z, const double *re);
-void CINTdcmplx_im(const FINT n, double complex *z, const double *im);
-void CINTdcmplx_pp(const FINT n, double complex *z, const double *re, const double *im);
-void CINTdcmplx_pn(const FINT n, double complex *z, const double *re, const double *im);
-void CINTdcmplx_np(const FINT n, double complex *z, const double *re, const double *im);
-void CINTdcmplx_nn(const FINT n, double complex *z, const double *re, const double *im);
+void CINTdcmplx_re(const FINT n, double *z, const double *re);
+void CINTdcmplx_im(const FINT n, double *z, const double *im);
+void CINTdcmplx_pp(const FINT n, double *z, const double *re, const double *im);
+void CINTdcmplx_pn(const FINT n, double *z, const double *re, const double *im);
+void CINTdcmplx_np(const FINT n, double *z, const double *re, const double *im);
+void CINTdcmplx_nn(const FINT n, double *z, const double *re, const double *im);
 
 double CINTsquare_dist(const double *r1, const double *r2);
 
 double CINTgto_norm(FINT n, double a);
 
+
+#ifdef __cplusplus 
+#define MALLOC_INSTACK(var, n) \
+        var = reinterpret_cast<decltype(var)>(new char[(n) * sizeof(*var)]);
+
+#else
 #define MALLOC_INSTACK(var, n) \
         var = (void *)(((uintptr_t)cache + 7) & (-(uintptr_t)8)); \
         cache = (double *)(var + (n));
+#endif 
 
+/*#ifdef __cplusplus 
+#define //var = reinterpret_cast<decltype(var)>(new char[(n) * sizeof(*var)]);
+        var = reinterpret_cast<decltype(var)>(new char[(1024) * sizeof(*var)]);
+        //var = reinterpret_cast<decltype(var)>(new char[(n) * sizeof(*var)]);
+
+#else
+#define MALLOC_INSTACK(var, n) \
+        var = (void *)(((uintptr_t)cache + 7) & (-(uintptr_t)8)); \
+        cache = (double *)(var + (n));
+#endif */
+
+#ifdef __cplusplus 
+#define MALLOC_ALIGN8_INSTACK(var, n) \
+        var = reinterpret_cast<decltype(var)>(new char[(n) * sizeof(*var)]);
+        //var = reinterpret_cast<decltype(var)>(new char[(n) * sizeof(*var)]);
+        //var = reinterpret_cast<decltype(var)>(new char[(n) * sizeof(*var)]);
+#else
 #define MALLOC_ALIGN8_INSTACK(var, n) \
         var = (void *)(((uintptr_t)cache + 63) & (-(uintptr_t)64)); \
         cache = (double *)(var + (n));
+#endif
 
 #ifdef WITH_CINT2_INTERFACE
 #define ALL_CINT(NAME) \
@@ -612,7 +627,7 @@ void c##NAME##_sph_optimizer(CINTOpt **opt, FINT *atm, FINT natm, \
 } \
 FINT c##NAME(double *out, FINT *shls, FINT *atm, FINT natm, \
             FINT *bas, FINT nbas, double *env, CINTOpt *opt) { \
-        return NAME##_spinor((double complex *)out, NULL, shls, \
+        return NAME##_spinor((double *)out, NULL, shls, \
                              atm, natm, bas, nbas, env, opt, NULL); \
 } \
 void c##NAME##_optimizer(CINTOpt **opt, FINT *atm, FINT natm, \
@@ -631,7 +646,7 @@ FINT c##NAME##_sph(double *out, FINT *shls, FINT *atm, FINT natm, \
 } \
 FINT c##NAME(double *out, FINT *shls, FINT *atm, FINT natm, \
             FINT *bas, FINT nbas, double *env) { \
-        return NAME##_spinor((double complex *)out, NULL, shls, \
+        return NAME##_spinor((double *)out, NULL, shls, \
                              atm, natm, bas, nbas, env, NULL, NULL); \
 }
 
@@ -640,20 +655,12 @@ FINT c##NAME(double *out, FINT *shls, FINT *atm, FINT natm, \
 #define ALL_CINT(NAME)
 #define ALL_CINT1E(NAME)
 
-#endif  // WITH_CINT2_INTERFACE
+#endif  
 
-/*
- * Copyright (C) 2013-  Qiming Sun <osirpt.sun@gmail.com>
- *
- * Cartisen GTO to spheric or spinor GTO transformation
- */
 
-/*************************************************
- *
- * transform matrix
- *
- *************************************************/
-#include <complex.h>
+
+
+//#include <complex.h>
 
 void c2s_sph_1e(double *opij, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
 void c2s_sph_2e1(double *fijkl, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
@@ -663,64 +670,57 @@ void c2s_cart_1e(double *opij, double *gctr, FINT *dims, CINTEnvVars *envs, doub
 void c2s_cart_2e1(double *fijkl, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
 void c2s_cart_2e2();
 
-void c2s_sf_1e(double complex *opij, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
-void c2s_sf_1ei(double complex *opij, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
+void c2s_sf_1e(double *opij, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
+void c2s_sf_1ei(double *opij, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
 
-void c2s_si_1e(double complex *opij, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
-void c2s_si_1ei(double complex *opij, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
+void c2s_si_1e(double *opij, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
+void c2s_si_1ei(double *opij, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
 
 void c2s_sph_1e_grids(double *out, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
 void c2s_cart_1e_grids(double *out, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
 
-void c2s_sf_1e_grids(double complex *out, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
-void c2s_sf_1e_gridsi(double complex *out, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
-void c2s_si_1e_grids(double complex *out, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
-void c2s_si_1e_gridsi(double complex *out, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
+void c2s_sf_1e_grids(double *out, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
+void c2s_sf_1e_gridsi(double *out, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
+void c2s_si_1e_grids(double *out, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
+void c2s_si_1e_gridsi(double *out, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
 
 void c2s_sf_2e1(double *opij, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
 void c2s_sf_2e1i(double *opij, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
 
-void c2s_sf_2e2(double complex *fijkl, double *opij, FINT *dims, CINTEnvVars *envs, double *cache);
-void c2s_sf_2e2i(double complex *fijkl, double *opij, FINT *dims, CINTEnvVars *envs, double *cache);
+void c2s_sf_2e2(double *fijkl, double *opij, FINT *dims, CINTEnvVars *envs, double *cache);
+void c2s_sf_2e2i(double *fijkl, double *opij, FINT *dims, CINTEnvVars *envs, double *cache);
 
 void c2s_si_2e1(double *opij, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
 void c2s_si_2e1i(double *opij, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
 
-void c2s_si_2e2(double complex *fijkl, double *opij, FINT *dims, CINTEnvVars *envs, double *cache);
-void c2s_si_2e2i(double complex *fijkl, double *opij, FINT *dims, CINTEnvVars *envs, double *cache);
+void c2s_si_2e2(double *fijkl, double *opij, FINT *dims, CINTEnvVars *envs, double *cache);
+void c2s_si_2e2i(double *fijkl, double *opij, FINT *dims, CINTEnvVars *envs, double *cache);
 
 void c2s_sph_3c2e1(double *fijkl, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
 void c2s_cart_3c2e1(double *fijkl, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
 void c2s_sph_3c2e1_ssc(double *fijkl, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
 
-void c2s_sf_3c2e1(double complex *opijk, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
-void c2s_sf_3c2e1i(double complex *opijk, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
-void c2s_si_3c2e1(double complex *opijk, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
-void c2s_si_3c2e1i(double complex *opijk, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
-void c2s_sf_3c2e1_ssc(double complex *opijk, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
-void c2s_sf_3c2e1i_ssc(double complex *opijk, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
-void c2s_si_3c2e1_ssc(double complex *opijk, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
-void c2s_si_3c2e1i_ssc(double complex *opijk, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
+void c2s_sf_3c2e1(double *opijk, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
+void c2s_sf_3c2e1i(double *opijk, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
+void c2s_si_3c2e1(double *opijk, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
+void c2s_si_3c2e1i(double *opijk, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
+void c2s_sf_3c2e1_ssc(double *opijk, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
+void c2s_sf_3c2e1i_ssc(double *opijk, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
+void c2s_si_3c2e1_ssc(double *opijk, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
+void c2s_si_3c2e1i_ssc(double *opijk, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
 
 void c2s_sph_3c1e(double *fijkl, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
 void c2s_cart_3c1e(double *fijkl, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache);
 
 void c2s_dset0(double *out, FINT *dims, FINT *counts);
-void c2s_zset0(double complex *out, FINT *dims, FINT *counts);
+void c2s_zset0(double *out, FINT *dims, FINT *counts);
 void c2s_grids_dset0(double *out, FINT *dims, FINT *counts);
-void c2s_grids_zset0(double complex *out, FINT *dims, FINT *counts);
+void c2s_grids_zset0(double *out, FINT *dims, FINT *counts);
 
-/*************************************************
- *
- * transform vectors
- *
- *************************************************/
+
 void c2s_sph_vec(double *sph, double *cart, FINT l, FINT nvec);
 
-/*
- * Copyright (C) 2013  Qiming Sun <osirpt.sun@gmail.com>
- *
- */
+
 
 #ifdef WITH_FORTRAN
 
@@ -749,7 +749,7 @@ void c##NAME##_cart_optimizer_(CINTOpt **opt, FINT *atm, FINT *natm, \
 FINT c##NAME##_(double *out, FINT *shls, FINT *atm, FINT *natm, \
                 FINT *bas, FINT *nbas, double *env, size_t optptr_as_integer8) { \
         CINTOpt **opt = (CINTOpt **)optptr_as_integer8; \
-        return NAME##_spinor((double complex *)out, NULL, shls, \
+        return NAME##_spinor((double *)out, NULL, shls, \
                              atm, *natm, bas, *nbas, env, *opt, NULL); \
 } \
 void c##NAME##_optimizer_(size_t optptr_as_integer8, FINT *atm, FINT *natm, \
@@ -770,7 +770,7 @@ FINT c##NAME##_cart_(double *out, FINT *shls, FINT *atm, FINT *natm, \
 } \
 FINT c##NAME##_(double *out, FINT *shls, FINT *atm, FINT *natm, \
                 FINT *bas, FINT *nbas, double *env) { \
-        return NAME##_spinor((double complex *)out, NULL, shls, \
+        return NAME##_spinor((double *)out, NULL, shls, \
                              atm, *natm, bas, *nbas, env, NULL, NULL); \
 }
 
@@ -800,9 +800,7 @@ FINT c##NAME##_(double *out, FINT *shls, FINT *atm, FINT *natm, \
 static void make_g1e_gout(double *gout, double *g, FINT *idx,
                           CINTEnvVars *envs, FINT empty, FINT int1e_type);
 
-/*
- * 1e GTO integral basic loop for < i|j>, no 1/r
- */
+
 FINT CINT1e_loop(double *gctr, CINTEnvVars *envs, double *cache, FINT int1e_type)
 {
         FINT *shls = envs->shls;
@@ -855,14 +853,14 @@ FINT CINT1e_loop(double *gctr, CINTEnvVars *envs, double *cache, FINT int1e_type
         CINTOpt_non0coeff_byshell(non0idxj, non0ctrj, cj, j_prim, j_ctr);
 
         const FINT nc = i_ctr * j_ctr;
-        // (irys,i,j,k,l,coord,0:1); +1 for nabla-r12
+        
         const FINT leng = envs->g_size * 3 * ((1<<envs->gbits)+1);
-        const FINT lenj = envs->nf * nc * n_comp; // gctrj
-        const FINT leni = envs->nf * i_ctr * n_comp; // gctri
-        const FINT len0 = envs->nf * n_comp; // gout
+        const FINT lenj = envs->nf * nc * n_comp; 
+        const FINT leni = envs->nf * i_ctr * n_comp; 
+        const FINT len0 = envs->nf * n_comp; 
         const FINT len = leng + lenj + leni + len0;
         double *g, *gout, *gctri, *gctrj;
-        MALLOC_INSTACK(g, len);  // must be allocated last in this function
+        MALLOC_INSTACK(g, len);  
         double *g1 = g + leng;
         if (n_comp == 1) {
                 gctrj = gctr;
@@ -948,11 +946,9 @@ CACHE_SIZE_T int1e_cache_size(CINTEnvVars *envs)
         return cache_size;
 }
 
-/*
- * 1e integrals <i|O|j> without 1/r
- */
+
 CACHE_SIZE_T CINT1e_drv(double *out, FINT *dims, CINTEnvVars *envs,
-               double *cache, void (*f_c2s)(), FINT int1e_type)
+               double *cache, void (*f_c2s)(double *opij, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache), FINT int1e_type)
 {
         if (out == NULL) {
                 return int1e_cache_size(envs);
@@ -963,7 +959,11 @@ CACHE_SIZE_T CINT1e_drv(double *out, FINT *dims, CINTEnvVars *envs,
         double *stack = NULL;
         if (cache == NULL) {
                 size_t cache_size = int1e_cache_size(envs);
+                #ifdef __cplusplus
+                stack = new double[10000];
+                #else
                 stack = malloc(sizeof(double)*cache_size);
+                #endif
                 cache = stack;
         }
         double *gctr;
@@ -997,13 +997,14 @@ CACHE_SIZE_T CINT1e_drv(double *out, FINT *dims, CINTEnvVars *envs,
         }
 
         if (stack != NULL) {
-                free(stack);
+                 
+                //free(stack);
         }
         return has_value;
 }
 
-CACHE_SIZE_T CINT1e_spinor_drv(double complex *out, FINT *dims, CINTEnvVars *envs,
-                       double *cache, void (*f_c2s)(), FINT int1e_type)
+CACHE_SIZE_T CINT1e_spinor_drv(double *out, FINT *dims, CINTEnvVars *envs,
+                       double *cache, void (*f_c2s)(double *opij, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache), FINT int1e_type)
 {
         if (out == NULL) {
                 return int1e_cache_size(envs);
@@ -1013,7 +1014,11 @@ CACHE_SIZE_T CINT1e_spinor_drv(double complex *out, FINT *dims, CINTEnvVars *env
         double *stack = NULL;
         if (cache == NULL) {
                 size_t cache_size = int1e_cache_size(envs);
+                #ifdef __cplusplus
+                stack = new double[10000];
+                #else
                 stack = malloc(sizeof(double)*cache_size);
+                #endif
                 cache = stack;
         }
         double *gctr;
@@ -1042,7 +1047,7 @@ CACHE_SIZE_T CINT1e_spinor_drv(double complex *out, FINT *dims, CINTEnvVars *env
         }
 
         if (stack != NULL) {
-                free(stack);
+                //free(stack);
         }
         return has_value;
 }
@@ -1129,7 +1134,11 @@ CACHE_SIZE_T int1e_ovlp_sph(double *out, FINT *dims, FINT *shls, FINT *atm, FINT
         FINT ng[] = {0, 0, 0, 0, 0, 1, 1, 1};
         CINTEnvVars envs;
         CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
+        #ifdef __cplusplus 
+        envs.f_gout = (void (*)(...))&CINTgout1e;
+        #else
         envs.f_gout = &CINTgout1e;
+        #endif 
         return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 0);
 }
 
@@ -1139,17 +1148,25 @@ CACHE_SIZE_T int1e_ovlp_cart(double *out, FINT *dims, FINT *shls, FINT *atm, FIN
         FINT ng[] = {0, 0, 0, 0, 0, 1, 1, 1};
         CINTEnvVars envs;
         CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
+        #ifdef __cplusplus
+        envs.f_gout = (void (*)(...))&CINTgout1e;
+        #else
         envs.f_gout = &CINTgout1e;
+        #endif
         return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 0);
 }
 
-CACHE_SIZE_T int1e_ovlp_spinor(double complex *out, FINT *dims, FINT *shls, FINT *atm, FINT natm,
+CACHE_SIZE_T int1e_ovlp_spinor(double *out, FINT *dims, FINT *shls, FINT *atm, FINT natm,
                      FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache)
 {
         FINT ng[] = {0, 0, 0, 0, 0, 1, 1, 1};
         CINTEnvVars envs;
         CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
+        #ifdef __cplusplus
+        envs.f_gout = (void (*)(...))&CINTgout1e;
+        #else
         envs.f_gout = &CINTgout1e;
+        #endif
         return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 0);
 }
 
@@ -1165,7 +1182,11 @@ CACHE_SIZE_T int1e_nuc_sph(double *out, FINT *dims, FINT *shls, FINT *atm, FINT 
         FINT ng[] = {0, 0, 0, 0, 0, 1, 0, 1};
         CINTEnvVars envs;
         CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
+        #ifdef __cplusplus
+        envs.f_gout = (void (*)(...))&CINTgout1e_nuc;
+        #else
         envs.f_gout = &CINTgout1e_nuc;
+        #endif
         return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 2);
 }
 
@@ -1175,17 +1196,25 @@ CACHE_SIZE_T int1e_nuc_cart(double *out, FINT *dims, FINT *shls, FINT *atm, FINT
         FINT ng[] = {0, 0, 0, 0, 0, 1, 0, 1};
         CINTEnvVars envs;
         CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
+        #ifdef __cplusplus
+        envs.f_gout = (void (*)(...))&CINTgout1e_nuc;
+        #else
         envs.f_gout = &CINTgout1e_nuc;
+        #endif
         return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 2);
 }
 
-CACHE_SIZE_T int1e_nuc_spinor(double complex *out, FINT *dims, FINT *shls, FINT *atm, FINT natm,
+CACHE_SIZE_T int1e_nuc_spinor(double *out, FINT *dims, FINT *shls, FINT *atm, FINT natm,
                      FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache)
 {
         FINT ng[] = {0, 0, 0, 0, 0, 1, 0, 1};
         CINTEnvVars envs;
         CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
+        #ifdef __cplusplus
+        envs.f_gout = (void (*)(...))&CINTgout1e_nuc;
+        #else
         envs.f_gout = &CINTgout1e_nuc;
+        #endif
         return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 2);
 }
 
@@ -1200,14 +1229,11 @@ ALL_CINT(int1e_nuc);
 ALL_CINT_FORTRAN_(int1e_ovlp);
 ALL_CINT_FORTRAN_(int1e_nuc);
 
-// intor1.c
 
-/*
- * Copyright (C) 2013-  Qiming Sun <osirpt.sun@gmail.com>
- * Description: code generated by  gen-code.cl
- */
+
+
 #include <stdlib.h>
-#include <stdio.h>
+//#include <stdio.h>
 
 void CINTinit_int1e_grids_EnvVars(CINTEnvVars *envs, FINT *ng, FINT *shls,
                                   FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env);
@@ -1232,21 +1258,17 @@ void CINTx1j_grids(double *f, double *g, double *rj,
 
 #define G1E_GRIDS_D_I(f, g, li, lj)   CINTnabla1i_grids(f, g, li, lj, envs)
 #define G1E_GRIDS_D_J(f, g, li, lj)   CINTnabla1j_grids(f, g, li, lj, envs)
-/* r-R_0, R_0 is (0,0,0) */
+
 #define G1E_GRIDS_R0I(f, g, li, lj)   CINTx1i_grids(f, g, ri, li, lj, envs)
 #define G1E_GRIDS_R0J(f, g, li, lj)   CINTx1j_grids(f, g, rj, li, lj, envs)
-/* r-R_C, R_C is common origin */
+
 #define G1E_GRIDS_RCI(f, g, li, lj)   CINTx1i_grids(f, g, dri, li, lj, envs)
 #define G1E_GRIDS_RCJ(f, g, li, lj)   CINTx1j_grids(f, g, drj, li, lj, envs)
-/* origin from center of each basis */
+
 #define G1E_GRIDS_R_I(f, g, li, lj)   f = g + envs->g_stride_i
 #define G1E_GRIDS_R_J(f, g, li, lj)   f = g + envs->g_stride_j
 
-/*
- * Copyright (C) 2013-  Qiming Sun <osirpt.sun@gmail.com>
- *
- * Provide the intermediate variable g(nroots,i,j,k,l,[xyz])
- */
+
 
 #ifndef HAVE_RYS2E
 #define HAVE_RYS2E
@@ -1327,50 +1349,61 @@ void CINTinit_int2e_yp_EnvVars(CINTEnvVars *envs, FINT *ng, FINT *shls,
 #define G2E_D_J(f, g, li, lj, lk, ll)   CINTnabla1j_2e(f, g, li, lj, lk, ll, envs)
 #define G2E_D_K(f, g, li, lj, lk, ll)   CINTnabla1k_2e(f, g, li, lj, lk, ll, envs)
 #define G2E_D_L(f, g, li, lj, lk, ll)   CINTnabla1l_2e(f, g, li, lj, lk, ll, envs)
-/* r-R_0, R_0 is (0,0,0) */
+
 #define G2E_R0I(f, g, li, lj, lk, ll)   CINTx1i_2e(f, g, envs->ri, li, lj, lk, ll, envs)
 #define G2E_R0J(f, g, li, lj, lk, ll)   CINTx1j_2e(f, g, envs->rj, li, lj, lk, ll, envs)
 #define G2E_R0K(f, g, li, lj, lk, ll)   CINTx1k_2e(f, g, envs->rk, li, lj, lk, ll, envs)
 #define G2E_R0L(f, g, li, lj, lk, ll)   CINTx1l_2e(f, g, envs->rl, li, lj, lk, ll, envs)
-/* r-R_C, R_C is common origin */
+
 #define G2E_RCI(f, g, li, lj, lk, ll)   CINTx1i_2e(f, g, dri, li, lj, lk, ll, envs)
 #define G2E_RCJ(f, g, li, lj, lk, ll)   CINTx1j_2e(f, g, drj, li, lj, lk, ll, envs)
 #define G2E_RCK(f, g, li, lj, lk, ll)   CINTx1k_2e(f, g, drk, li, lj, lk, ll, envs)
 #define G2E_RCL(f, g, li, lj, lk, ll)   CINTx1l_2e(f, g, drl, li, lj, lk, ll, envs)
-/* origin from center of each basis
- * x1[ijkl]_2e(f, g, ng, li, lj, lk, ll, 0d0) */
+
 #define G2E_R_I(f, g, li, lj, lk, ll)   f = g + envs->g_stride_i
 #define G2E_R_K(f, g, li, lj, lk, ll)   f = g + envs->g_stride_k
 #define G2E_R_L(f, g, li, lj, lk, ll)   f = g + envs->g_stride_l
 #define G2E_R_J(f, g, li, lj, lk, ll)   f = g + envs->g_stride_j
 
-/*
- * Copyright (C) 2013-  Qiming Sun <osirpt.sun@gmail.com>
- *
- */
 
-#include <complex.h>
 
-void CINTgout2e(double *g, double *gout, FINT *idx,
-                CINTEnvVars *envs, FINT gout_empty);
+//#include <complex.h>
+
+void CINTgout2e(double *g, double *gout, FINT *idx, CINTEnvVars *envs, FINT gout_empty);
 
 FINT CINT2e_loop(double *gctr, CINTEnvVars *envs, double *cache, FINT *empty);
 
 CACHE_SIZE_T CINT2e_drv(double *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt,
-                    double *cache, void (*f_c2s)());
-CACHE_SIZE_T CINT2e_spinor_drv(double complex *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt,
+                    double *cache, void (*f_c2s)(double *opij, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache));
+#ifdef __cplusplus 
+CACHE_SIZE_T CINT2e_spinor_drv(double *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt,
+                      double *cache, void (*f_e1_c2s)(...), void (*f_e2_c2s)(...));
+CACHE_SIZE_T CINT3c2e_drv(double *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt,
+                         double *cache, void (*f_e1_c2s)(...), FINT is_ssc);
+CACHE_SIZE_T CINT3c2e_spinor_drv(double *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt,
+                        double *cache, void (*f_e1_c2s)(...), FINT is_ssc);
+#else
+CACHE_SIZE_T CINT2e_spinor_drv(double *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt,
                       double *cache, void (*f_e1_c2s)(), void (*f_e2_c2s)());
-
 CACHE_SIZE_T CINT3c2e_drv(double *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt,
                          double *cache, void (*f_e1_c2s)(), FINT is_ssc);
-CACHE_SIZE_T CINT3c2e_spinor_drv(double complex *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt,
+CACHE_SIZE_T CINT3c2e_spinor_drv(double *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt,
                         double *cache, void (*f_e1_c2s)(), FINT is_ssc);
+#endif 
 CACHE_SIZE_T CINT2c2e_drv(double *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt,
-                      double *cache, void (*f_c2s)());
-CACHE_SIZE_T CINT2c2e_spinor_drv(double complex *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt,
-                        double *cache, void (*f_e1_c2s)());
+                      double *cache, void (*f_c2s)(double *opij, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache));
 
-/* <i|OVLP |P DOT P j> */
+
+
+#ifdef __cplusplus 
+CACHE_SIZE_T CINT2c2e_spinor_drv(double *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt,
+                        double *cache, void (*f_e1_c2s)(...));
+#else
+CACHE_SIZE_T CINT2c2e_spinor_drv(double *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt,
+                        double *cache, void (*f_e1_c2s)());
+#endif
+
+
 void CINTgout1e_int1e_kin(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT ix, iy, iz, n;
@@ -1409,31 +1442,43 @@ FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *c
 FINT ng[] = {0, 2, 0, 0, 2, 1, 1, 1};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
+#ifdef __cplusplus
+envs.f_gout = (void (*)(...))&CINTgout1e_int1e_kin;
+#else
 envs.f_gout = &CINTgout1e_int1e_kin;
+#endif
 envs.common_factor *= 0.5;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 0);
-} // int1e_kin_cart
+} 
 CACHE_SIZE_T int1e_kin_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 2, 0, 0, 2, 1, 1, 1};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
+#ifdef __cplusplus
+envs.f_gout = (void (*)(...))&CINTgout1e_int1e_kin;
+#else
 envs.f_gout = &CINTgout1e_int1e_kin;
+#endif
 envs.common_factor *= 0.5;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 0);
-} // int1e_kin_sph
-CACHE_SIZE_T int1e_kin_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_kin_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 2, 0, 0, 2, 1, 1, 1};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
+#ifdef __cplusplus
+envs.f_gout = (void (*)(...))&CINTgout1e_int1e_kin;
+#else
 envs.f_gout = &CINTgout1e_int1e_kin;
+#endif
 envs.common_factor *= 0.5;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 0);
-} // int1e_kin_spinor
+} 
 ALL_CINT1E(int1e_kin)
 ALL_CINT1E_FORTRAN_(int1e_kin)
-/* <i|NABLA-RINV |CROSS P j> */
+
 void CINTgout1e_int1e_ia01p(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT nrys_roots = envs->nrys_roots;
@@ -1482,28 +1527,36 @@ FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *c
 FINT ng[] = {1, 2, 0, 0, 2, 1, 0, 3};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
-envs.f_gout = &CINTgout1e_int1e_ia01p;
+#ifdef __cplusplus
+envs.f_gout = (void (*)(...))&CINTgout1e_int1e_ia01p;
+#else
+#endif
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 1);
-} // int1e_ia01p_cart
+} 
 CACHE_SIZE_T int1e_ia01p_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 2, 0, 0, 2, 1, 0, 3};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
+#ifdef __cplusplus 
+envs.f_gout = (void (*)(...))&CINTgout1e_int1e_ia01p;
+#else
 envs.f_gout = &CINTgout1e_int1e_ia01p;
+#endif
+
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 1);
-} // int1e_ia01p_sph
-CACHE_SIZE_T int1e_ia01p_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+/*CACHE_SIZE_T int1e_ia01p_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 2, 0, 0, 2, 1, 0, 3};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_ia01p;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 1);
-} // int1e_ia01p_spinor
+} 
 ALL_CINT1E(int1e_ia01p)
 ALL_CINT1E_FORTRAN_(int1e_ia01p)
-/* <i|OVLP |R CROSS P j> */
+
 void CINTgout1e_int1e_giao_irjxp(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT ix, iy, iz, n;
@@ -1548,7 +1601,7 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_giao_irjxp;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 0);
-} // int1e_giao_irjxp_cart
+} 
 CACHE_SIZE_T int1e_giao_irjxp_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 2, 0, 0, 2, 1, 1, 3};
@@ -1556,18 +1609,18 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_giao_irjxp;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 0);
-} // int1e_giao_irjxp_sph
-CACHE_SIZE_T int1e_giao_irjxp_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_giao_irjxp_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 2, 0, 0, 2, 1, 1, 3};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_giao_irjxp;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 0);
-} // int1e_giao_irjxp_spinor
+} 
 ALL_CINT1E(int1e_giao_irjxp)
 ALL_CINT1E_FORTRAN_(int1e_giao_irjxp)
-/* <i|OVLP |RC CROSS P j> */
+
 void CINTgout1e_int1e_cg_irxp(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT ix, iy, iz, n;
@@ -1616,7 +1669,7 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_cg_irxp;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 0);
-} // int1e_cg_irxp_cart
+} 
 CACHE_SIZE_T int1e_cg_irxp_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 2, 0, 0, 2, 1, 1, 3};
@@ -1624,18 +1677,18 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_cg_irxp;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 0);
-} // int1e_cg_irxp_sph
-CACHE_SIZE_T int1e_cg_irxp_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_cg_irxp_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 2, 0, 0, 2, 1, 1, 3};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_cg_irxp;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 0);
-} // int1e_cg_irxp_spinor
+} */
 ALL_CINT1E(int1e_cg_irxp)
 ALL_CINT1E_FORTRAN_(int1e_cg_irxp)
-/* <i|NABLA-RINV |R j> */
+
 void CINTgout1e_int1e_giao_a11part(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT nrys_roots = envs->nrys_roots;
@@ -1696,31 +1749,43 @@ FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *c
 FINT ng[] = {1, 2, 0, 0, 2, 1, 0, 9};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
+#ifdef __cplusplus
+envs.f_gout = (void (*)(...))&CINTgout1e_int1e_giao_a11part;
+#else
 envs.f_gout = &CINTgout1e_int1e_giao_a11part;
+#endif
 envs.common_factor *= -0.5;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 1);
-} // int1e_giao_a11part_cart
+} 
 CACHE_SIZE_T int1e_giao_a11part_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 2, 0, 0, 2, 1, 0, 9};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
+#ifdef __cplusplus
+envs.f_gout = (void (*)(...))&CINTgout1e_int1e_giao_a11part;
+#else
 envs.f_gout = &CINTgout1e_int1e_giao_a11part;
+#endif
 envs.common_factor *= -0.5;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 1);
-} // int1e_giao_a11part_sph
-CACHE_SIZE_T int1e_giao_a11part_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_giao_a11part_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 2, 0, 0, 2, 1, 0, 9};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
+#ifdef __cplusplus
+envs.f_gout = (void (*)(...))&CINTgout1e_int1e_giao_a11part;
+#else
 envs.f_gout = &CINTgout1e_int1e_giao_a11part;
+#endif
 envs.common_factor *= -0.5;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 1);
-} // int1e_giao_a11part_spinor
+} 
 ALL_CINT1E(int1e_giao_a11part)
 ALL_CINT1E_FORTRAN_(int1e_giao_a11part)
-/* <i|NABLA-RINV |RC j> */
+
 void CINTgout1e_int1e_cg_a11part(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT nrys_roots = envs->nrys_roots;
@@ -1785,31 +1850,43 @@ FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *c
 FINT ng[] = {1, 2, 0, 0, 2, 1, 0, 9};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
+#ifdef __cplusplus
+envs.f_gout = (void (*)(...))&CINTgout1e_int1e_cg_a11part;
+#else
 envs.f_gout = &CINTgout1e_int1e_cg_a11part;
+#endif
 envs.common_factor *= -0.5;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 1);
-} // int1e_cg_a11part_cart
+} 
 CACHE_SIZE_T int1e_cg_a11part_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 2, 0, 0, 2, 1, 0, 9};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
+#ifdef __cplusplus
+envs.f_gout = (void (*)(...))&CINTgout1e_int1e_cg_a11part;
+#else
 envs.f_gout = &CINTgout1e_int1e_cg_a11part;
+#endif
 envs.common_factor *= -0.5;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 1);
-} // int1e_cg_a11part_sph
-CACHE_SIZE_T int1e_cg_a11part_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_cg_a11part_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 2, 0, 0, 2, 1, 0, 9};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
+#ifdef __cplusplus
+envs.f_gout = (void (*)(...))&CINTgout1e_int1e_cg_a11part;
+#else
 envs.f_gout = &CINTgout1e_int1e_cg_a11part;
+#endif
 envs.common_factor *= -0.5;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 1);
-} // int1e_cg_a11part_spinor
+} 
 ALL_CINT1E(int1e_cg_a11part)
 ALL_CINT1E_FORTRAN_(int1e_cg_a11part)
-/* <G i|NABLA-RINV CROSS P |j> */
+
 void CINTgout1e_int1e_a01gp(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT nrys_roots = envs->nrys_roots;
@@ -1903,7 +1980,11 @@ FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *c
 FINT ng[] = {2, 2, 0, 0, 3, 1, 0, 9};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
+#ifdef __cplusplus
+envs.f_gout = (void (*)(...))&CINTgout1e_int1e_a01gp;
+#else
 envs.f_gout = &CINTgout1e_int1e_a01gp;
+#endif
 envs.common_factor *= 0.5;
 if (out != NULL && envs.shls[0] == envs.shls[1]) {
 FINT i, nout;
@@ -1918,13 +1999,17 @@ for (i = 0; i < envs.ncomp_e1 * envs.ncomp_tensor; i++) {
 c2s_dset0(out+nout*i, dims, counts); }
 return 0; }
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 1);
-} // int1e_a01gp_cart
+} 
 CACHE_SIZE_T int1e_a01gp_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {2, 2, 0, 0, 3, 1, 0, 9};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
+#ifdef __cplusplus
+envs.f_gout = (void (*)(...))&CINTgout1e_int1e_a01gp;
+#else
 envs.f_gout = &CINTgout1e_int1e_a01gp;
+#endif
 envs.common_factor *= 0.5;
 if (out != NULL && envs.shls[0] == envs.shls[1]) {
 FINT i, nout;
@@ -1939,13 +2024,17 @@ for (i = 0; i < envs.ncomp_e1 * envs.ncomp_tensor; i++) {
 c2s_dset0(out+nout*i, dims, counts); }
 return 0; }
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 1);
-} // int1e_a01gp_sph
-CACHE_SIZE_T int1e_a01gp_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_a01gp_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {2, 2, 0, 0, 3, 1, 0, 9};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
+#ifdef __cplusplus
+envs.f_gout = (void (*)(...))&CINTgout1e_int1e_a01gp;
+#else
 envs.f_gout = &CINTgout1e_int1e_a01gp;
+#endif
 envs.common_factor *= 0.5;
 if (out != NULL && envs.shls[0] == envs.shls[1]) {
 FINT i, nout;
@@ -1960,10 +2049,10 @@ for (i = 0; i < envs.ncomp_tensor; i++) {
 c2s_zset0(out+nout*i, dims, counts); }
 return 0; }
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 1);
-} // int1e_a01gp_spinor
+} 
 ALL_CINT1E(int1e_a01gp)
 ALL_CINT1E_FORTRAN_(int1e_a01gp)
-/* <G i|OVLP |P DOT P j> */
+
 void CINTgout1e_int1e_igkin(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT ix, iy, iz, n;
@@ -2034,6 +2123,7 @@ void int1e_igkin_optimizer(CINTOpt **opt, FINT *atm, FINT natm, FINT *bas, FINT 
 FINT ng[] = {1, 2, 0, 0, 3, 1, 1, 3};
 CINTall_1e_optimizer(opt, ng, atm, natm, bas, nbas, env);
 }
+/*
 CACHE_SIZE_T int1e_igkin_cart(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 2, 0, 0, 3, 1, 1, 3};
@@ -2054,7 +2144,7 @@ for (i = 0; i < envs.ncomp_e1 * envs.ncomp_tensor; i++) {
 c2s_dset0(out+nout*i, dims, counts); }
 return 0; }
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 0);
-} // int1e_igkin_cart
+} 
 CACHE_SIZE_T int1e_igkin_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 2, 0, 0, 3, 1, 1, 3};
@@ -2075,8 +2165,8 @@ for (i = 0; i < envs.ncomp_e1 * envs.ncomp_tensor; i++) {
 c2s_dset0(out+nout*i, dims, counts); }
 return 0; }
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 0);
-} // int1e_igkin_sph
-CACHE_SIZE_T int1e_igkin_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_igkin_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 2, 0, 0, 3, 1, 1, 3};
 CINTEnvVars envs;
@@ -2096,10 +2186,10 @@ for (i = 0; i < envs.ncomp_tensor; i++) {
 c2s_zset0(out+nout*i, dims, counts); }
 return 0; }
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 0);
-} // int1e_igkin_spinor
+} 
 ALL_CINT1E(int1e_igkin)
 ALL_CINT1E_FORTRAN_(int1e_igkin)
-/* <G i|OVLP |j> */
+
 void CINTgout1e_int1e_igovlp(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT ix, iy, iz, n;
@@ -2154,7 +2244,7 @@ for (i = 0; i < envs.ncomp_e1 * envs.ncomp_tensor; i++) {
 c2s_dset0(out+nout*i, dims, counts); }
 return 0; }
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 0);
-} // int1e_igovlp_cart
+} 
 CACHE_SIZE_T int1e_igovlp_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 0, 0, 0, 1, 1, 1, 3};
@@ -2175,8 +2265,8 @@ for (i = 0; i < envs.ncomp_e1 * envs.ncomp_tensor; i++) {
 c2s_dset0(out+nout*i, dims, counts); }
 return 0; }
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 0);
-} // int1e_igovlp_sph
-CACHE_SIZE_T int1e_igovlp_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_igovlp_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 0, 0, 0, 1, 1, 1, 3};
 CINTEnvVars envs;
@@ -2196,10 +2286,10 @@ for (i = 0; i < envs.ncomp_tensor; i++) {
 c2s_zset0(out+nout*i, dims, counts); }
 return 0; }
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 0);
-} // int1e_igovlp_spinor
+} 
 ALL_CINT1E(int1e_igovlp)
 ALL_CINT1E_FORTRAN_(int1e_igovlp)
-/* <G i|NUC |j> */
+
 void CINTgout1e_int1e_ignuc(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT nrys_roots = envs->nrys_roots;
@@ -2258,7 +2348,7 @@ for (i = 0; i < envs.ncomp_e1 * envs.ncomp_tensor; i++) {
 c2s_dset0(out+nout*i, dims, counts); }
 return 0; }
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 2);
-} // int1e_ignuc_cart
+} 
 CACHE_SIZE_T int1e_ignuc_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 0, 0, 0, 1, 1, 0, 3};
@@ -2279,8 +2369,8 @@ for (i = 0; i < envs.ncomp_e1 * envs.ncomp_tensor; i++) {
 c2s_dset0(out+nout*i, dims, counts); }
 return 0; }
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 2);
-} // int1e_ignuc_sph
-CACHE_SIZE_T int1e_ignuc_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_ignuc_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 0, 0, 0, 1, 1, 0, 3};
 CINTEnvVars envs;
@@ -2300,10 +2390,10 @@ for (i = 0; i < envs.ncomp_tensor; i++) {
 c2s_zset0(out+nout*i, dims, counts); }
 return 0; }
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 2);
-} // int1e_ignuc_spinor
+} 
 ALL_CINT1E(int1e_ignuc)
 ALL_CINT1E_FORTRAN_(int1e_ignuc)
-/* <P* i|NUC DOT P |j> */
+
 void CINTgout1e_int1e_pnucp(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT nrys_roots = envs->nrys_roots;
@@ -2348,7 +2438,7 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_pnucp;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 2);
-} // int1e_pnucp_cart
+} 
 CACHE_SIZE_T int1e_pnucp_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 1, 0, 0, 2, 1, 0, 1};
@@ -2356,18 +2446,18 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_pnucp;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 2);
-} // int1e_pnucp_sph
-CACHE_SIZE_T int1e_pnucp_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_pnucp_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 1, 0, 0, 2, 1, 0, 1};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_pnucp;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 2);
-} // int1e_pnucp_spinor
+} 
 ALL_CINT1E(int1e_pnucp)
 ALL_CINT1E_FORTRAN_(int1e_pnucp)
-/* <i|ZC |j> */
+
 void CINTgout1e_int1e_z(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT ix, iy, iz, n;
@@ -2402,7 +2492,7 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_z;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 0);
-} // int1e_z_cart
+} 
 CACHE_SIZE_T int1e_z_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 1, 0, 0, 1, 1, 1, 1};
@@ -2410,18 +2500,18 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_z;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 0);
-} // int1e_z_sph
-CACHE_SIZE_T int1e_z_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_z_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 1, 0, 0, 1, 1, 1, 1};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_z;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 0);
-} // int1e_z_spinor
+} 
 ALL_CINT1E(int1e_z)
 ALL_CINT1E_FORTRAN_(int1e_z)
-/* <i|ZC ZC |j> */
+
 void CINTgout1e_int1e_zz(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT ix, iy, iz, n;
@@ -2466,7 +2556,7 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_zz;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 0);
-} // int1e_zz_cart
+} 
 CACHE_SIZE_T int1e_zz_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 2, 0, 0, 2, 1, 1, 1};
@@ -2474,18 +2564,18 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_zz;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 0);
-} // int1e_zz_sph
-CACHE_SIZE_T int1e_zz_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_zz_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 2, 0, 0, 2, 1, 1, 1};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_zz;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 0);
-} // int1e_zz_spinor
+} 
 ALL_CINT1E(int1e_zz)
 ALL_CINT1E_FORTRAN_(int1e_zz)
-/* <i|RC |j> */
+
 void CINTgout1e_int1e_r(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT ix, iy, iz, n;
@@ -2524,7 +2614,7 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_r;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 0);
-} // int1e_r_cart
+} 
 CACHE_SIZE_T int1e_r_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 1, 0, 0, 1, 1, 1, 3};
@@ -2532,18 +2622,18 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_r;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 0);
-} // int1e_r_sph
-CACHE_SIZE_T int1e_r_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_r_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 1, 0, 0, 1, 1, 1, 3};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_r;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 0);
-} // int1e_r_spinor
+} 
 ALL_CINT1E(int1e_r)
 ALL_CINT1E_FORTRAN_(int1e_r)
-/* <i|RC DOT RC |j> */
+
 void CINTgout1e_int1e_r2(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT ix, iy, iz, n;
@@ -2588,7 +2678,7 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_r2;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 0);
-} // int1e_r2_cart
+} 
 CACHE_SIZE_T int1e_r2_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 2, 0, 0, 2, 1, 1, 1};
@@ -2596,18 +2686,18 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_r2;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 0);
-} // int1e_r2_sph
-CACHE_SIZE_T int1e_r2_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_r2_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 2, 0, 0, 2, 1, 1, 1};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_r2;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 0);
-} // int1e_r2_spinor
+} 
 ALL_CINT1E(int1e_r2)
 ALL_CINT1E_FORTRAN_(int1e_r2)
-/* <i|RC DOT RC RC DOT RC |j> */
+
 void CINTgout1e_int1e_r4(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT ix, iy, iz, n;
@@ -2748,7 +2838,7 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_r4;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 0);
-} // int1e_r4_cart
+} 
 CACHE_SIZE_T int1e_r4_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 4, 0, 0, 4, 1, 1, 1};
@@ -2756,18 +2846,18 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_r4;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 0);
-} // int1e_r4_sph
-CACHE_SIZE_T int1e_r4_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_r4_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 4, 0, 0, 4, 1, 1, 1};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_r4;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 0);
-} // int1e_r4_spinor
+} 
 ALL_CINT1E(int1e_r4)
 ALL_CINT1E_FORTRAN_(int1e_r4)
-/* <i|RC RC |j> */
+
 void CINTgout1e_int1e_rr(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT ix, iy, iz, n;
@@ -2828,7 +2918,7 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_rr;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 0);
-} // int1e_rr_cart
+} 
 CACHE_SIZE_T int1e_rr_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 2, 0, 0, 2, 1, 1, 9};
@@ -2836,18 +2926,18 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_rr;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 0);
-} // int1e_rr_sph
-CACHE_SIZE_T int1e_rr_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_rr_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 2, 0, 0, 2, 1, 1, 9};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_rr;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 0);
-} // int1e_rr_spinor
+} 
 ALL_CINT1E(int1e_rr)
 ALL_CINT1E_FORTRAN_(int1e_rr)
-/* <i|RC RC RC |j> */
+
 void CINTgout1e_int1e_rrr(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT ix, iy, iz, n;
@@ -2970,7 +3060,7 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_rrr;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 0);
-} // int1e_rrr_cart
+} 
 CACHE_SIZE_T int1e_rrr_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 3, 0, 0, 3, 1, 1, 27};
@@ -2978,18 +3068,18 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_rrr;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 0);
-} // int1e_rrr_sph
-CACHE_SIZE_T int1e_rrr_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_rrr_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 3, 0, 0, 3, 1, 1, 27};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_rrr;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 0);
-} // int1e_rrr_spinor
+} 
 ALL_CINT1E(int1e_rrr)
 ALL_CINT1E_FORTRAN_(int1e_rrr)
-/* <i|RC RC RC RC |j> */
+
 void CINTgout1e_int1e_rrrr(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT ix, iy, iz, n;
@@ -3290,7 +3380,7 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_rrrr;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 0);
-} // int1e_rrrr_cart
+} 
 CACHE_SIZE_T int1e_rrrr_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 4, 0, 0, 4, 1, 1, 81};
@@ -3298,18 +3388,18 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_rrrr;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 0);
-} // int1e_rrrr_sph
-CACHE_SIZE_T int1e_rrrr_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_rrrr_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 4, 0, 0, 4, 1, 1, 81};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_rrrr;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 0);
-} // int1e_rrrr_spinor
+} 
 ALL_CINT1E(int1e_rrrr)
 ALL_CINT1E_FORTRAN_(int1e_rrrr)
-/* <i|Z |j> */
+
 void CINTgout1e_int1e_z_origj(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT ix, iy, iz, n;
@@ -3340,7 +3430,7 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_z_origj;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 0);
-} // int1e_z_origj_cart
+} 
 CACHE_SIZE_T int1e_z_origj_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 1, 0, 0, 1, 1, 1, 1};
@@ -3348,18 +3438,18 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_z_origj;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 0);
-} // int1e_z_origj_sph
-CACHE_SIZE_T int1e_z_origj_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_z_origj_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 1, 0, 0, 1, 1, 1, 1};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_z_origj;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 0);
-} // int1e_z_origj_spinor
+} 
 ALL_CINT1E(int1e_z_origj)
 ALL_CINT1E_FORTRAN_(int1e_z_origj)
-/* <i|Z Z |j> */
+
 void CINTgout1e_int1e_zz_origj(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT ix, iy, iz, n;
@@ -3400,7 +3490,7 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_zz_origj;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 0);
-} // int1e_zz_origj_cart
+} 
 CACHE_SIZE_T int1e_zz_origj_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 2, 0, 0, 2, 1, 1, 1};
@@ -3408,18 +3498,18 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_zz_origj;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 0);
-} // int1e_zz_origj_sph
-CACHE_SIZE_T int1e_zz_origj_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_zz_origj_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 2, 0, 0, 2, 1, 1, 1};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_zz_origj;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 0);
-} // int1e_zz_origj_spinor
+} 
 ALL_CINT1E(int1e_zz_origj)
 ALL_CINT1E_FORTRAN_(int1e_zz_origj)
-/* <i|R |j> */
+
 void CINTgout1e_int1e_r_origj(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT ix, iy, iz, n;
@@ -3454,7 +3544,7 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_r_origj;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 0);
-} // int1e_r_origj_cart
+} 
 CACHE_SIZE_T int1e_r_origj_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 1, 0, 0, 1, 1, 1, 3};
@@ -3462,18 +3552,18 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_r_origj;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 0);
-} // int1e_r_origj_sph
-CACHE_SIZE_T int1e_r_origj_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_r_origj_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 1, 0, 0, 1, 1, 1, 3};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_r_origj;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 0);
-} // int1e_r_origj_spinor
+} 
 ALL_CINT1E(int1e_r_origj)
 ALL_CINT1E_FORTRAN_(int1e_r_origj)
-/* <i|R R |j> */
+
 void CINTgout1e_int1e_rr_origj(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT ix, iy, iz, n;
@@ -3530,7 +3620,7 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_rr_origj;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 0);
-} // int1e_rr_origj_cart
+} 
 CACHE_SIZE_T int1e_rr_origj_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 2, 0, 0, 2, 1, 1, 9};
@@ -3538,18 +3628,18 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_rr_origj;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 0);
-} // int1e_rr_origj_sph
-CACHE_SIZE_T int1e_rr_origj_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_rr_origj_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 2, 0, 0, 2, 1, 1, 9};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_rr_origj;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 0);
-} // int1e_rr_origj_spinor
+} 
 ALL_CINT1E(int1e_rr_origj)
 ALL_CINT1E_FORTRAN_(int1e_rr_origj)
-/* <i|R DOT R |j> */
+
 void CINTgout1e_int1e_r2_origj(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT ix, iy, iz, n;
@@ -3590,7 +3680,7 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_r2_origj;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 0);
-} // int1e_r2_origj_cart
+} 
 CACHE_SIZE_T int1e_r2_origj_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 2, 0, 0, 2, 1, 1, 1};
@@ -3598,18 +3688,18 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_r2_origj;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 0);
-} // int1e_r2_origj_sph
-CACHE_SIZE_T int1e_r2_origj_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_r2_origj_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 2, 0, 0, 2, 1, 1, 1};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_r2_origj;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 0);
-} // int1e_r2_origj_spinor
+} 
 ALL_CINT1E(int1e_r2_origj)
 ALL_CINT1E_FORTRAN_(int1e_r2_origj)
-/* <i|OVLP |R DOT R R DOT R j> */
+
 void CINTgout1e_int1e_r4_origj(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT ix, iy, iz, n;
@@ -3746,7 +3836,7 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_r4_origj;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 0);
-} // int1e_r4_origj_cart
+} 
 CACHE_SIZE_T int1e_r4_origj_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 4, 0, 0, 4, 1, 1, 1};
@@ -3754,18 +3844,18 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_r4_origj;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 0);
-} // int1e_r4_origj_sph
-CACHE_SIZE_T int1e_r4_origj_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_r4_origj_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 4, 0, 0, 4, 1, 1, 1};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_r4_origj;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 0);
-} // int1e_r4_origj_spinor
+} 
 ALL_CINT1E(int1e_r4_origj)
 ALL_CINT1E_FORTRAN_(int1e_r4_origj)
-/* <P DOT P i|OVLP |P DOT P j> */
+
 void CINTgout1e_int1e_p4(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT ix, iy, iz, n;
@@ -3902,7 +3992,7 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_p4;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 0);
-} // int1e_p4_cart
+} 
 CACHE_SIZE_T int1e_p4_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {2, 2, 0, 0, 4, 1, 1, 1};
@@ -3910,18 +4000,18 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_p4;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 0);
-} // int1e_p4_sph
-CACHE_SIZE_T int1e_p4_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_p4_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {2, 2, 0, 0, 4, 1, 1, 1};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_p4;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 0);
-} // int1e_p4_spinor
+} 
 ALL_CINT1E(int1e_p4)
 ALL_CINT1E_FORTRAN_(int1e_p4)
-/* <P* i|RINV DOT P |j> */
+
 void CINTgout1e_int1e_prinvp(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT nrys_roots = envs->nrys_roots;
@@ -3966,7 +4056,7 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_prinvp;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 1);
-} // int1e_prinvp_cart
+} 
 CACHE_SIZE_T int1e_prinvp_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 1, 0, 0, 2, 1, 0, 1};
@@ -3974,18 +4064,18 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_prinvp;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 1);
-} // int1e_prinvp_sph
-CACHE_SIZE_T int1e_prinvp_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_prinvp_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 1, 0, 0, 2, 1, 0, 1};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_prinvp;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 1);
-} // int1e_prinvp_spinor
+} 
 ALL_CINT1E(int1e_prinvp)
 ALL_CINT1E_FORTRAN_(int1e_prinvp)
-/* <P* i|RINV CROSS P |j> */
+
 void CINTgout1e_int1e_prinvxp(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT nrys_roots = envs->nrys_roots;
@@ -4034,7 +4124,7 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_prinvxp;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 1);
-} // int1e_prinvxp_cart
+}
 CACHE_SIZE_T int1e_prinvxp_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 1, 0, 0, 2, 1, 0, 3};
@@ -4042,18 +4132,18 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_prinvxp;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 1);
-} // int1e_prinvxp_sph
-CACHE_SIZE_T int1e_prinvxp_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_prinvxp_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 1, 0, 0, 2, 1, 0, 3};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_prinvxp;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 1);
-} // int1e_prinvxp_spinor
+} 
 ALL_CINT1E(int1e_prinvxp)
 ALL_CINT1E_FORTRAN_(int1e_prinvxp)
-/* <P* i|NUC CROSS P |j> */
+
 void CINTgout1e_int1e_pnucxp(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT nrys_roots = envs->nrys_roots;
@@ -4102,7 +4192,7 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_pnucxp;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 2);
-} // int1e_pnucxp_cart
+} 
 CACHE_SIZE_T int1e_pnucxp_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 1, 0, 0, 2, 1, 0, 3};
@@ -4110,18 +4200,18 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_pnucxp;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 2);
-} // int1e_pnucxp_sph
-CACHE_SIZE_T int1e_pnucxp_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_pnucxp_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 1, 0, 0, 2, 1, 0, 3};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_pnucxp;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 2);
-} // int1e_pnucxp_spinor
+} 
 ALL_CINT1E(int1e_pnucxp)
 ALL_CINT1E_FORTRAN_(int1e_pnucxp)
-/* <i|RC NABLA |j> */
+
 void CINTgout1e_int1e_irp(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT ix, iy, iz, n;
@@ -4182,7 +4272,7 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_irp;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 0);
-} // int1e_irp_cart
+} 
 CACHE_SIZE_T int1e_irp_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 2, 0, 0, 2, 1, 1, 9};
@@ -4190,18 +4280,18 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_irp;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 0);
-} // int1e_irp_sph
-CACHE_SIZE_T int1e_irp_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_irp_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 2, 0, 0, 2, 1, 1, 9};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_irp;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 0);
-} // int1e_irp_spinor
+} 
 ALL_CINT1E(int1e_irp)
 ALL_CINT1E_FORTRAN_(int1e_irp)
-/* <i|RC RC NABLA |j> */
+
 void CINTgout1e_int1e_irrp(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT ix, iy, iz, n;
@@ -4324,7 +4414,7 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_irrp;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 0);
-} // int1e_irrp_cart
+} 
 CACHE_SIZE_T int1e_irrp_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 3, 0, 0, 3, 1, 1, 27};
@@ -4332,18 +4422,18 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_irrp;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 0);
-} // int1e_irrp_sph
-CACHE_SIZE_T int1e_irrp_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_irrp_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 3, 0, 0, 3, 1, 1, 27};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_irrp;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 0);
-} // int1e_irrp_spinor
+} 
 ALL_CINT1E(int1e_irrp)
 ALL_CINT1E_FORTRAN_(int1e_irrp)
-/* <i|RC NABLA RC |j> */
+
 void CINTgout1e_int1e_irpr(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT ix, iy, iz, n;
@@ -4466,7 +4556,7 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_irpr;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 0);
-} // int1e_irpr_cart
+} 
 CACHE_SIZE_T int1e_irpr_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 3, 0, 0, 3, 1, 1, 27};
@@ -4474,18 +4564,18 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_irpr;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 0);
-} // int1e_irpr_sph
-CACHE_SIZE_T int1e_irpr_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_irpr_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 3, 0, 0, 3, 1, 1, 27};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_irpr;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 0);
-} // int1e_irpr_spinor
+} 
 ALL_CINT1E(int1e_irpr)
 ALL_CINT1E_FORTRAN_(int1e_irpr)
-/* <i|G G |j> */
+
 void CINTgout1e_int1e_ggovlp(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT ix, iy, iz, n;
@@ -4556,7 +4646,7 @@ CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_ggovlp;
 envs.common_factor *= 0.25;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 0);
-} // int1e_ggovlp_cart
+} 
 CACHE_SIZE_T int1e_ggovlp_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 2, 0, 0, 2, 1, 1, 9};
@@ -4565,8 +4655,8 @@ CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_ggovlp;
 envs.common_factor *= 0.25;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 0);
-} // int1e_ggovlp_sph
-CACHE_SIZE_T int1e_ggovlp_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_ggovlp_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 2, 0, 0, 2, 1, 1, 9};
 CINTEnvVars envs;
@@ -4574,10 +4664,10 @@ CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_ggovlp;
 envs.common_factor *= 0.25;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 0);
-} // int1e_ggovlp_spinor
+} 
 ALL_CINT1E(int1e_ggovlp)
 ALL_CINT1E_FORTRAN_(int1e_ggovlp)
-/* <i|G G P DOT P |j> */
+
 void CINTgout1e_int1e_ggkin(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT ix, iy, iz, n;
@@ -4744,7 +4834,7 @@ CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_ggkin;
 envs.common_factor *= 0.125;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 0);
-} // int1e_ggkin_cart
+} 
 CACHE_SIZE_T int1e_ggkin_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 4, 0, 0, 4, 1, 1, 9};
@@ -4753,8 +4843,8 @@ CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_ggkin;
 envs.common_factor *= 0.125;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 0);
-} // int1e_ggkin_sph
-CACHE_SIZE_T int1e_ggkin_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_ggkin_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 4, 0, 0, 4, 1, 1, 9};
 CINTEnvVars envs;
@@ -4762,10 +4852,10 @@ CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_ggkin;
 envs.common_factor *= 0.125;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 0);
-} // int1e_ggkin_spinor
+} 
 ALL_CINT1E(int1e_ggkin)
 ALL_CINT1E_FORTRAN_(int1e_ggkin)
-/* <i|G G NUC |j> */
+
 void CINTgout1e_int1e_ggnuc(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT nrys_roots = envs->nrys_roots;
@@ -4840,7 +4930,7 @@ CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_ggnuc;
 envs.common_factor *= 0.25;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 2);
-} // int1e_ggnuc_cart
+} 
 CACHE_SIZE_T int1e_ggnuc_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 2, 0, 0, 2, 1, 0, 9};
@@ -4849,8 +4939,8 @@ CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_ggnuc;
 envs.common_factor *= 0.25;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 2);
-} // int1e_ggnuc_sph
-CACHE_SIZE_T int1e_ggnuc_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_ggnuc_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 2, 0, 0, 2, 1, 0, 9};
 CINTEnvVars envs;
@@ -4858,10 +4948,10 @@ CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_ggnuc;
 envs.common_factor *= 0.25;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 2);
-} // int1e_ggnuc_spinor
+} 
 ALL_CINT1E(int1e_ggnuc)
 ALL_CINT1E_FORTRAN_(int1e_ggnuc)
-/* <i|G R CROSS P |j> */
+
 void CINTgout1e_int1e_grjxp(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT ix, iy, iz, n;
@@ -4952,7 +5042,7 @@ CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_grjxp;
 envs.common_factor *= 0.5;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 0);
-} // int1e_grjxp_cart
+} 
 CACHE_SIZE_T int1e_grjxp_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 3, 0, 0, 3, 1, 1, 9};
@@ -4961,8 +5051,8 @@ CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_grjxp;
 envs.common_factor *= 0.5;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 0);
-} // int1e_grjxp_sph
-CACHE_SIZE_T int1e_grjxp_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_grjxp_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 3, 0, 0, 3, 1, 1, 9};
 CINTEnvVars envs;
@@ -4970,10 +5060,10 @@ CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_grjxp;
 envs.common_factor *= 0.5;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 0);
-} // int1e_grjxp_spinor
+} 
 ALL_CINT1E(int1e_grjxp)
 ALL_CINT1E_FORTRAN_(int1e_grjxp)
-/* <i|RINV |j> */
+
 void CINTgout1e_int1e_rinv(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT nrys_roots = envs->nrys_roots;
@@ -5004,7 +5094,7 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_rinv;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 1);
-} // int1e_rinv_cart
+} 
 CACHE_SIZE_T int1e_rinv_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 0, 0, 0, 0, 1, 0, 1};
@@ -5012,18 +5102,18 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_rinv;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 1);
-} // int1e_rinv_sph
-CACHE_SIZE_T int1e_rinv_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_rinv_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 0, 0, 0, 0, 1, 0, 1};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_rinv;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 1);
-} // int1e_rinv_spinor
+} 
 ALL_CINT1E(int1e_rinv)
 ALL_CINT1E_FORTRAN_(int1e_rinv)
-/* <i|NABLA-RINV |j> */
+
 void CINTgout1e_int1e_drinv(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT nrys_roots = envs->nrys_roots;
@@ -5065,7 +5155,7 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_drinv;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 1);
-} // int1e_drinv_cart
+} 
 CACHE_SIZE_T int1e_drinv_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 1, 0, 0, 1, 1, 0, 3};
@@ -5073,29 +5163,26 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_drinv;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 1);
-} // int1e_drinv_sph
-CACHE_SIZE_T int1e_drinv_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_drinv_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 1, 0, 0, 1, 1, 0, 3};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_drinv;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 1);
-} // int1e_drinv_spinor
+} 
 ALL_CINT1E(int1e_drinv)
 ALL_CINT1E_FORTRAN_(int1e_drinv)
 
-// grad1.c 
 
-/*
- * Copyright (C) 2013-  Qiming Sun <osirpt.sun@gmail.com>
- * Description: code generated by  gen-code.cl
- */
+
+
 #include <stdlib.h>
-#include <stdio.h>
+//#include <stdio.h>
 
-/* <NABLA i|OVLP |j> */
-void CINTgout1e_int1e_ipovlp(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
+
+*/void CINTgout1e_int1e_ipovlp(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT ix, iy, iz, n;
 double *g0 = g;
@@ -5118,7 +5205,7 @@ gout[n*3+0] += + s[0];
 gout[n*3+1] += + s[1];
 gout[n*3+2] += + s[2];
 }}}
-void int1e_ipovlp_optimizer(CINTOpt **opt, FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env) {
+/*void int1e_ipovlp_optimizer(CINTOpt **opt, FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env) {
 FINT ng[] = {1, 0, 0, 0, 1, 1, 1, 3};
 CINTall_1e_optimizer(opt, ng, atm, natm, bas, nbas, env);
 }
@@ -5129,26 +5216,31 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_ipovlp;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 0);
-} // int1e_ipovlp_cart
+} 
+*/
 CACHE_SIZE_T int1e_ipovlp_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 0, 0, 0, 1, 1, 1, 3};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
+#ifdef __cplusplus
+envs.f_gout = (void (*)(...))&CINTgout1e_int1e_ipovlp;
+#else
 envs.f_gout = &CINTgout1e_int1e_ipovlp;
+#endif
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 0);
-} // int1e_ipovlp_sph
-CACHE_SIZE_T int1e_ipovlp_spinor(double complex *out, FINT *dims, FINT *shls,
+} /*
+CACHE_SIZE_T int1e_ipovlp_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 0, 0, 0, 1, 1, 1, 3};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_ipovlp;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 0);
-} // int1e_ipovlp_spinor
+} 
 ALL_CINT1E(int1e_ipovlp)
 ALL_CINT1E_FORTRAN_(int1e_ipovlp)
-/* <i|OVLP |NABLA j> */
+
 void CINTgout1e_int1e_ovlpip(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT ix, iy, iz, n;
@@ -5183,7 +5275,7 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_ovlpip;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 0);
-} // int1e_ovlpip_cart
+} 
 CACHE_SIZE_T int1e_ovlpip_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 1, 0, 0, 1, 1, 1, 3};
@@ -5191,19 +5283,19 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_ovlpip;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 0);
-} // int1e_ovlpip_sph
-CACHE_SIZE_T int1e_ovlpip_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_ovlpip_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 1, 0, 0, 1, 1, 1, 3};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_ovlpip;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 0);
-} // int1e_ovlpip_spinor
+} 
 ALL_CINT1E(int1e_ovlpip)
 ALL_CINT1E_FORTRAN_(int1e_ovlpip)
-/* <NABLA i|OVLP |P DOT P j> */
-void CINTgout1e_int1e_ipkin(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
+
+*/void CINTgout1e_int1e_ipkin(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT ix, iy, iz, n;
 double *g0 = g;
@@ -5261,7 +5353,7 @@ gout[n*3+2] = - s[18] - s[22] - s[26];
 gout[n*3+0] += - s[0] - s[4] - s[8];
 gout[n*3+1] += - s[9] - s[13] - s[17];
 gout[n*3+2] += - s[18] - s[22] - s[26];
-}}}
+}}}/*
 void int1e_ipkin_optimizer(CINTOpt **opt, FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env) {
 FINT ng[] = {1, 2, 0, 0, 3, 1, 1, 3};
 CINTall_1e_optimizer(opt, ng, atm, natm, bas, nbas, env);
@@ -5274,17 +5366,22 @@ CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_ipkin;
 envs.common_factor *= 0.5;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 0);
-} // int1e_ipkin_cart
-CACHE_SIZE_T int1e_ipkin_sph(double *out, FINT *dims, FINT *shls,
+} 
+*/CACHE_SIZE_T int1e_ipkin_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 2, 0, 0, 3, 1, 1, 3};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
+CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
+#ifdef __cplusplus
+envs.f_gout = (void (*)(...))&CINTgout1e_int1e_ipkin;
+#else
 envs.f_gout = &CINTgout1e_int1e_ipkin;
+#endif
 envs.common_factor *= 0.5;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 0);
-} // int1e_ipkin_sph
-CACHE_SIZE_T int1e_ipkin_spinor(double complex *out, FINT *dims, FINT *shls,
+} /*
+CACHE_SIZE_T int1e_ipkin_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 2, 0, 0, 3, 1, 1, 3};
 CINTEnvVars envs;
@@ -5292,10 +5389,10 @@ CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_ipkin;
 envs.common_factor *= 0.5;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 0);
-} // int1e_ipkin_spinor
+} 
 ALL_CINT1E(int1e_ipkin)
 ALL_CINT1E_FORTRAN_(int1e_ipkin)
-/* <i|OVLP |P DOT P NABLA j> */
+
 void CINTgout1e_int1e_kinip(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT ix, iy, iz, n;
@@ -5367,7 +5464,7 @@ CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_kinip;
 envs.common_factor *= 0.5;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 0);
-} // int1e_kinip_cart
+} 
 CACHE_SIZE_T int1e_kinip_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 3, 0, 0, 3, 1, 1, 3};
@@ -5376,8 +5473,8 @@ CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_kinip;
 envs.common_factor *= 0.5;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 0);
-} // int1e_kinip_sph
-CACHE_SIZE_T int1e_kinip_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_kinip_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 3, 0, 0, 3, 1, 1, 3};
 CINTEnvVars envs;
@@ -5385,11 +5482,11 @@ CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_kinip;
 envs.common_factor *= 0.5;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 0);
-} // int1e_kinip_spinor
+} 
 ALL_CINT1E(int1e_kinip)
 ALL_CINT1E_FORTRAN_(int1e_kinip)
-/* <NABLA i|NUC |j> */
-void CINTgout1e_int1e_ipnuc(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
+
+*/void CINTgout1e_int1e_ipnuc(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT nrys_roots = envs->nrys_roots;
 FINT ix, iy, iz, n, i;
@@ -5415,7 +5512,7 @@ gout[n*3+2] = + s[2];
 gout[n*3+0] += + s[0];
 gout[n*3+1] += + s[1];
 gout[n*3+2] += + s[2];
-}}}
+}}}/*
 void int1e_ipnuc_optimizer(CINTOpt **opt, FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env) {
 FINT ng[] = {1, 0, 0, 0, 1, 1, 0, 3};
 CINTall_1e_optimizer(opt, ng, atm, natm, bas, nbas, env);
@@ -5427,27 +5524,31 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_ipnuc;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 2);
-} // int1e_ipnuc_cart
-CACHE_SIZE_T int1e_ipnuc_sph(double *out, FINT *dims, FINT *shls,
+} 
+*/CACHE_SIZE_T int1e_ipnuc_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 0, 0, 0, 1, 1, 0, 3};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
+#ifdef __cplusplus
+envs.f_gout = (void (*)(...))&CINTgout1e_int1e_ipnuc;
+#else
 envs.f_gout = &CINTgout1e_int1e_ipnuc;
+#endif
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 2);
-} // int1e_ipnuc_sph
-CACHE_SIZE_T int1e_ipnuc_spinor(double complex *out, FINT *dims, FINT *shls,
+}/*
+CACHE_SIZE_T int1e_ipnuc_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 0, 0, 0, 1, 1, 0, 3};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_ipnuc;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 2);
-} // int1e_ipnuc_spinor
+} 
 ALL_CINT1E(int1e_ipnuc)
 ALL_CINT1E_FORTRAN_(int1e_ipnuc)
-/* <NABLA i|RINV |j> */
-void CINTgout1e_int1e_iprinv(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
+
+*/void CINTgout1e_int1e_iprinv(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT nrys_roots = envs->nrys_roots;
 FINT ix, iy, iz, n, i;
@@ -5473,7 +5574,7 @@ gout[n*3+2] = + s[2];
 gout[n*3+0] += + s[0];
 gout[n*3+1] += + s[1];
 gout[n*3+2] += + s[2];
-}}}
+}}}/*
 void int1e_iprinv_optimizer(CINTOpt **opt, FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env) {
 FINT ng[] = {1, 0, 0, 0, 1, 1, 0, 3};
 CINTall_1e_optimizer(opt, ng, atm, natm, bas, nbas, env);
@@ -5485,26 +5586,30 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_iprinv;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 1);
-} // int1e_iprinv_cart
-CACHE_SIZE_T int1e_iprinv_sph(double *out, FINT *dims, FINT *shls,
+} 
+*/CACHE_SIZE_T int1e_iprinv_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 0, 0, 0, 1, 1, 0, 3};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
+#ifdef __cplusplus
+envs.f_gout = (void (*)(...))&CINTgout1e_int1e_iprinv;
+#else
 envs.f_gout = &CINTgout1e_int1e_iprinv;
+#endif
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 1);
-} // int1e_iprinv_sph
-CACHE_SIZE_T int1e_iprinv_spinor(double complex *out, FINT *dims, FINT *shls,
+}/*
+CACHE_SIZE_T int1e_iprinv_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 0, 0, 0, 1, 1, 0, 3};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_iprinv;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 1);
-} // int1e_iprinv_spinor
+} 
 ALL_CINT1E(int1e_iprinv)
 ALL_CINT1E_FORTRAN_(int1e_iprinv)
-/* <NABLA SIGMA DOT P i|NUC |SIGMA DOT P j> */
+
 void CINTgout1e_int1e_ipspnucsp(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT nrys_roots = envs->nrys_roots;
@@ -5597,7 +5702,7 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_ipspnucsp;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 2);
-} // int1e_ipspnucsp_cart
+} 
 CACHE_SIZE_T int1e_ipspnucsp_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {2, 1, 0, 0, 3, 4, 0, 3};
@@ -5605,18 +5710,18 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_ipspnucsp;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 2);
-} // int1e_ipspnucsp_sph
-CACHE_SIZE_T int1e_ipspnucsp_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_ipspnucsp_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {2, 1, 0, 0, 3, 4, 0, 3};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_ipspnucsp;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_si_1e, 2);
-} // int1e_ipspnucsp_spinor
+} 
 ALL_CINT1E(int1e_ipspnucsp)
 ALL_CINT1E_FORTRAN_(int1e_ipspnucsp)
-/* <NABLA SIGMA DOT P i|RINV |SIGMA DOT P j> */
+
 void CINTgout1e_int1e_ipsprinvsp(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT nrys_roots = envs->nrys_roots;
@@ -5709,7 +5814,7 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_ipsprinvsp;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 1);
-} // int1e_ipsprinvsp_cart
+} 
 CACHE_SIZE_T int1e_ipsprinvsp_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {2, 1, 0, 0, 3, 4, 0, 3};
@@ -5717,18 +5822,18 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_ipsprinvsp;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 1);
-} // int1e_ipsprinvsp_sph
-CACHE_SIZE_T int1e_ipsprinvsp_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_ipsprinvsp_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {2, 1, 0, 0, 3, 4, 0, 3};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_ipsprinvsp;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_si_1e, 1);
-} // int1e_ipsprinvsp_spinor
+} 
 ALL_CINT1E(int1e_ipsprinvsp)
 ALL_CINT1E_FORTRAN_(int1e_ipsprinvsp)
-/* <P* NABLA i|NUC DOT P |j> */
+
 void CINTgout1e_int1e_ippnucp(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT nrys_roots = envs->nrys_roots;
@@ -5803,7 +5908,7 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_ippnucp;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 2);
-} // int1e_ippnucp_cart
+} 
 CACHE_SIZE_T int1e_ippnucp_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {2, 1, 0, 0, 3, 1, 0, 3};
@@ -5811,18 +5916,18 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_ippnucp;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 2);
-} // int1e_ippnucp_sph
-CACHE_SIZE_T int1e_ippnucp_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_ippnucp_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {2, 1, 0, 0, 3, 1, 0, 3};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_ippnucp;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 2);
-} // int1e_ippnucp_spinor
+} 
 ALL_CINT1E(int1e_ippnucp)
 ALL_CINT1E_FORTRAN_(int1e_ippnucp)
-/* <P* NABLA i|RINV DOT P |j> */
+
 void CINTgout1e_int1e_ipprinvp(double *gout, double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
 FINT nrys_roots = envs->nrys_roots;
@@ -5897,7 +6002,7 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_ipprinvp;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 1);
-} // int1e_ipprinvp_cart
+} 
 CACHE_SIZE_T int1e_ipprinvp_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {2, 1, 0, 0, 3, 1, 0, 3};
@@ -5905,29 +6010,25 @@ CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_ipprinvp;
 return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 1);
-} // int1e_ipprinvp_sph
-CACHE_SIZE_T int1e_ipprinvp_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int1e_ipprinvp_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {2, 1, 0, 0, 3, 1, 0, 3};
 CINTEnvVars envs;
 CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout1e_int1e_ipprinvp;
 return CINT1e_spinor_drv(out, dims, &envs, cache, &c2s_sf_1e, 1);
-} // int1e_ipprinvp_spinor
+} */
 ALL_CINT1E(int1e_ipprinvp)
 ALL_CINT1E_FORTRAN_(int1e_ipprinvp)
 
-// grad2.c 
 
-/*
- * Copyright (C) 2013-  Qiming Sun <osirpt.sun@gmail.com>
- * Description: code generated by  gen-code.cl
- */
+
+
 #include <stdlib.h>
-#include <stdio.h>
+//#include <stdio.h>
 
-/* <k NABLA i|R12 |j l> : i,j \in electron 1; k,l \in electron 2
- * = (NABLA i j|R12 |k l) */
+
 void CINTgout2e_int2e_ip1(double *gout,
 double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
@@ -5987,29 +6088,40 @@ FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *c
 FINT ng[] = {1, 0, 0, 0, 1, 1, 1, 3};
 CINTEnvVars envs;
 CINTinit_int2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
+#ifdef __cplusplus
+envs.f_gout = (void (*)(...))&CINTgout2e_int2e_ip1;
+#else
 envs.f_gout = &CINTgout2e_int2e_ip1;
+#endif
 return CINT2e_drv(out, dims, &envs, opt, cache, &c2s_cart_2e1);
-} // int2e_ip1_cart
+} 
 CACHE_SIZE_T int2e_ip1_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 0, 0, 0, 1, 1, 1, 3};
 CINTEnvVars envs;
 CINTinit_int2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
+#ifdef __cplusplus
+envs.f_gout = (void (*)(...))&CINTgout2e_int2e_ip1;
+#else
 envs.f_gout = &CINTgout2e_int2e_ip1;
+#endif
 return CINT2e_drv(out, dims, &envs, opt, cache, &c2s_sph_2e1);
-} // int2e_ip1_sph
-CACHE_SIZE_T int2e_ip1_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+/*CACHE_SIZE_T int2e_ip1_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 0, 0, 0, 1, 1, 1, 3};
 CINTEnvVars envs;
 CINTinit_int2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
+#ifdef __cplusplus
+envs.f_gout = (void (*)(...))&CINTgout2e_int2e_ip1;
+#else
 envs.f_gout = &CINTgout2e_int2e_ip1;
+#endif
 return CINT2e_spinor_drv(out, dims, &envs, opt, cache, &c2s_sf_2e1, &c2s_sf_2e2);
-} // int2e_ip1_spinor
+}*/ 
 ALL_CINT(int2e_ip1)
 ALL_CINT_FORTRAN_(int2e_ip1)
-/* <NABLA k i|R12 |j l> : i,j \in electron 1; k,l \in electron 2
- * = (i j|R12 |NABLA k l) */
+
 void CINTgout2e_int2e_ip2(double *gout,
 double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
@@ -6064,14 +6176,14 @@ void int2e_ip2_optimizer(CINTOpt **opt, FINT *atm, FINT natm, FINT *bas, FINT nb
 FINT ng[] = {0, 0, 1, 0, 1, 1, 1, 3};
 CINTall_2e_optimizer(opt, ng, atm, natm, bas, nbas, env);
 }
-CACHE_SIZE_T int2e_ip2_cart(double *out, FINT *dims, FINT *shls,
+/*CACHE_SIZE_T int2e_ip2_cart(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 0, 1, 0, 1, 1, 1, 3};
 CINTEnvVars envs;
 CINTinit_int2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout2e_int2e_ip2;
 return CINT2e_drv(out, dims, &envs, opt, cache, &c2s_cart_2e1);
-} // int2e_ip2_cart
+} 
 CACHE_SIZE_T int2e_ip2_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 0, 1, 0, 1, 1, 1, 3};
@@ -6079,19 +6191,18 @@ CINTEnvVars envs;
 CINTinit_int2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout2e_int2e_ip2;
 return CINT2e_drv(out, dims, &envs, opt, cache, &c2s_sph_2e1);
-} // int2e_ip2_sph
-CACHE_SIZE_T int2e_ip2_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int2e_ip2_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {0, 0, 1, 0, 1, 1, 1, 3};
 CINTEnvVars envs;
 CINTinit_int2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout2e_int2e_ip2;
 return CINT2e_spinor_drv(out, dims, &envs, opt, cache, &c2s_sf_2e1, &c2s_sf_2e2);
-} // int2e_ip2_spinor
+} 
 ALL_CINT(int2e_ip2)
 ALL_CINT_FORTRAN_(int2e_ip2)
-/* <k NABLA SIGMA DOT P i|R12 |SIGMA DOT P j l> : i,j \in electron 1; k,l \in electron 2
- * = (NABLA SIGMA DOT P i SIGMA DOT P j|R12 |k l) */
+
 void CINTgout2e_int2e_ipspsp1(double *gout,
 double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
@@ -6185,7 +6296,7 @@ CINTEnvVars envs;
 CINTinit_int2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout2e_int2e_ipspsp1;
 return CINT2e_drv(out, dims, &envs, opt, cache, &c2s_cart_2e1);
-} // int2e_ipspsp1_cart
+} 
 CACHE_SIZE_T int2e_ipspsp1_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {2, 1, 0, 0, 3, 4, 1, 3};
@@ -6193,19 +6304,18 @@ CINTEnvVars envs;
 CINTinit_int2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout2e_int2e_ipspsp1;
 return CINT2e_drv(out, dims, &envs, opt, cache, &c2s_sph_2e1);
-} // int2e_ipspsp1_sph
-CACHE_SIZE_T int2e_ipspsp1_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int2e_ipspsp1_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {2, 1, 0, 0, 3, 4, 1, 3};
 CINTEnvVars envs;
 CINTinit_int2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout2e_int2e_ipspsp1;
 return CINT2e_spinor_drv(out, dims, &envs, opt, cache, &c2s_si_2e1, &c2s_sf_2e2);
-} // int2e_ipspsp1_spinor
+} 
 ALL_CINT(int2e_ipspsp1)
 ALL_CINT_FORTRAN_(int2e_ipspsp1)
-/* <SIGMA DOT P k NABLA i|R12 |j SIGMA DOT P l> : i,j \in electron 1; k,l \in electron 2
- * = (NABLA i j|R12 |SIGMA DOT P k SIGMA DOT P l) */
+
 void CINTgout2e_int2e_ip1spsp2(double *gout,
 double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
@@ -6299,7 +6409,7 @@ CINTEnvVars envs;
 CINTinit_int2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout2e_int2e_ip1spsp2;
 return CINT2e_drv(out, dims, &envs, opt, cache, &c2s_cart_2e1);
-} // int2e_ip1spsp2_cart
+} 
 CACHE_SIZE_T int2e_ip1spsp2_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 0, 1, 1, 3, 1, 4, 3};
@@ -6307,19 +6417,18 @@ CINTEnvVars envs;
 CINTinit_int2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout2e_int2e_ip1spsp2;
 return CINT2e_drv(out, dims, &envs, opt, cache, &c2s_sph_2e1);
-} // int2e_ip1spsp2_sph
-CACHE_SIZE_T int2e_ip1spsp2_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int2e_ip1spsp2_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 0, 1, 1, 3, 1, 4, 3};
 CINTEnvVars envs;
 CINTinit_int2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout2e_int2e_ip1spsp2;
 return CINT2e_spinor_drv(out, dims, &envs, opt, cache, &c2s_sf_2e1, &c2s_si_2e2);
-} // int2e_ip1spsp2_spinor
+} 
 ALL_CINT(int2e_ip1spsp2)
 ALL_CINT_FORTRAN_(int2e_ip1spsp2)
-/* <SIGMA DOT P k NABLA SIGMA DOT P i|R12 |SIGMA DOT P j SIGMA DOT P l> : i,j \in electron 1; k,l \in electron 2
- * = (NABLA SIGMA DOT P i SIGMA DOT P j|R12 |SIGMA DOT P k SIGMA DOT P l) */
+
 void CINTgout2e_int2e_ipspsp1spsp2(double *gout,
 double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
@@ -6749,7 +6858,7 @@ CINTEnvVars envs;
 CINTinit_int2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout2e_int2e_ipspsp1spsp2;
 return CINT2e_drv(out, dims, &envs, opt, cache, &c2s_cart_2e1);
-} // int2e_ipspsp1spsp2_cart
+} 
 CACHE_SIZE_T int2e_ipspsp1spsp2_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {2, 1, 1, 1, 5, 4, 4, 3};
@@ -6757,19 +6866,18 @@ CINTEnvVars envs;
 CINTinit_int2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout2e_int2e_ipspsp1spsp2;
 return CINT2e_drv(out, dims, &envs, opt, cache, &c2s_sph_2e1);
-} // int2e_ipspsp1spsp2_sph
-CACHE_SIZE_T int2e_ipspsp1spsp2_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int2e_ipspsp1spsp2_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {2, 1, 1, 1, 5, 4, 4, 3};
 CINTEnvVars envs;
 CINTinit_int2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout2e_int2e_ipspsp1spsp2;
 return CINT2e_spinor_drv(out, dims, &envs, opt, cache, &c2s_si_2e1, &c2s_si_2e2);
-} // int2e_ipspsp1spsp2_spinor
+} 
 ALL_CINT(int2e_ipspsp1spsp2)
 ALL_CINT_FORTRAN_(int2e_ipspsp1spsp2)
-/* <k NABLA SIGMA DOT R i|R12 |SIGMA DOT R j l> : i,j \in electron 1; k,l \in electron 2
- * = (NABLA SIGMA DOT R i SIGMA DOT R j|R12 |k l) */
+
 void CINTgout2e_int2e_ipsrsr1(double *gout,
 double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
@@ -6863,7 +6971,7 @@ CINTEnvVars envs;
 CINTinit_int2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout2e_int2e_ipsrsr1;
 return CINT2e_drv(out, dims, &envs, opt, cache, &c2s_cart_2e1);
-} // int2e_ipsrsr1_cart
+} 
 CACHE_SIZE_T int2e_ipsrsr1_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {2, 1, 0, 0, 3, 4, 1, 3};
@@ -6871,19 +6979,18 @@ CINTEnvVars envs;
 CINTinit_int2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout2e_int2e_ipsrsr1;
 return CINT2e_drv(out, dims, &envs, opt, cache, &c2s_sph_2e1);
-} // int2e_ipsrsr1_sph
-CACHE_SIZE_T int2e_ipsrsr1_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int2e_ipsrsr1_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {2, 1, 0, 0, 3, 4, 1, 3};
 CINTEnvVars envs;
 CINTinit_int2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout2e_int2e_ipsrsr1;
 return CINT2e_spinor_drv(out, dims, &envs, opt, cache, &c2s_si_2e1, &c2s_sf_2e2);
-} // int2e_ipsrsr1_spinor
+} 
 ALL_CINT(int2e_ipsrsr1)
 ALL_CINT_FORTRAN_(int2e_ipsrsr1)
-/* <SIGMA DOT R k NABLA i|R12 |j SIGMA DOT R l> : i,j \in electron 1; k,l \in electron 2
- * = (NABLA i j|R12 |SIGMA DOT R k SIGMA DOT R l) */
+
 void CINTgout2e_int2e_ip1srsr2(double *gout,
 double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
@@ -6977,7 +7084,7 @@ CINTEnvVars envs;
 CINTinit_int2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout2e_int2e_ip1srsr2;
 return CINT2e_drv(out, dims, &envs, opt, cache, &c2s_cart_2e1);
-} // int2e_ip1srsr2_cart
+} 
 CACHE_SIZE_T int2e_ip1srsr2_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 0, 1, 1, 3, 1, 4, 3};
@@ -6985,19 +7092,18 @@ CINTEnvVars envs;
 CINTinit_int2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout2e_int2e_ip1srsr2;
 return CINT2e_drv(out, dims, &envs, opt, cache, &c2s_sph_2e1);
-} // int2e_ip1srsr2_sph
-CACHE_SIZE_T int2e_ip1srsr2_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int2e_ip1srsr2_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {1, 0, 1, 1, 3, 1, 4, 3};
 CINTEnvVars envs;
 CINTinit_int2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout2e_int2e_ip1srsr2;
 return CINT2e_spinor_drv(out, dims, &envs, opt, cache, &c2s_sf_2e1, &c2s_si_2e2);
-} // int2e_ip1srsr2_spinor
+} 
 ALL_CINT(int2e_ip1srsr2)
 ALL_CINT_FORTRAN_(int2e_ip1srsr2)
-/* <SIGMA DOT R k NABLA SIGMA DOT R i|R12 |SIGMA DOT R j SIGMA DOT R l> : i,j \in electron 1; k,l \in electron 2
- * = (NABLA SIGMA DOT R i SIGMA DOT R j|R12 |SIGMA DOT R k SIGMA DOT R l) */
+
 void CINTgout2e_int2e_ipsrsr1srsr2(double *gout,
 double *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
 FINT nf = envs->nf;
@@ -7427,7 +7533,7 @@ CINTEnvVars envs;
 CINTinit_int2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout2e_int2e_ipsrsr1srsr2;
 return CINT2e_drv(out, dims, &envs, opt, cache, &c2s_cart_2e1);
-} // int2e_ipsrsr1srsr2_cart
+} 
 CACHE_SIZE_T int2e_ipsrsr1srsr2_sph(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {2, 1, 1, 1, 5, 4, 4, 3};
@@ -7435,25 +7541,19 @@ CINTEnvVars envs;
 CINTinit_int2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout2e_int2e_ipsrsr1srsr2;
 return CINT2e_drv(out, dims, &envs, opt, cache, &c2s_sph_2e1);
-} // int2e_ipsrsr1srsr2_sph
-CACHE_SIZE_T int2e_ipsrsr1srsr2_spinor(double complex *out, FINT *dims, FINT *shls,
+} 
+CACHE_SIZE_T int2e_ipsrsr1srsr2_spinor(double *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache) {
 FINT ng[] = {2, 1, 1, 1, 5, 4, 4, 3};
 CINTEnvVars envs;
 CINTinit_int2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
 envs.f_gout = &CINTgout2e_int2e_ipsrsr1srsr2;
 return CINT2e_spinor_drv(out, dims, &envs, opt, cache, &c2s_si_2e1, &c2s_si_2e2);
-} // int2e_ipsrsr1srsr2_spinor
+} */
 ALL_CINT(int2e_ipsrsr1srsr2)
-ALL_CINT_FORTRAN_(int2e_ipsrsr1srsr2)/*
- * Copyright (C) 2013  Qiming Sun <osirpt.sun@gmail.com>
- *
- * basic cGTO function
- */
+ALL_CINT_FORTRAN_(int2e_ipsrsr1srsr2)
 
-/*
- * No. components of a Cartesian GTO, = (l+1)*(l+2)/2
- */
+
 FINT CINTlen_cart(const FINT l)
 {
         return (l + 1) * (l + 2) / 2;
@@ -7470,9 +7570,7 @@ FINT CINTlen_spinor(const FINT bas_id, const FINT *bas)
         }
 }
 
-/* 
- * Num. of contracted cartesian GTO = 2j+1 * n_contraction
- */
+
 FINT CINTcgtos_cart(const FINT bas_id, const FINT *bas)
 {
         FINT l = bas(ANG_OF, bas_id);
@@ -7484,9 +7582,7 @@ FINT CINTcgto_cart(const FINT bas_id, const FINT *bas)
         return (l+1)*(l+2)/2 * bas(NCTR_OF, bas_id);
 }
 
-/* 
- * Num. of contracted spheric GTO = 2j+1 * n_contraction
- */
+
 FINT CINTcgtos_spheric(const FINT bas_id, const FINT *bas)
 {
         return (bas(ANG_OF, bas_id) * 2 + 1) * bas(NCTR_OF, bas_id);
@@ -7496,9 +7592,7 @@ FINT CINTcgto_spheric(const FINT bas_id, const FINT *bas)
         return (bas(ANG_OF, bas_id) * 2 + 1) * bas(NCTR_OF, bas_id);
 }
 
-/* 
- * Num. of contracted spinor GTO
- */
+
 FINT CINTcgtos_spinor(const FINT bas_id, const FINT *bas)
 {
         return CINTlen_spinor(bas_id, bas) * bas(NCTR_OF, bas_id);
@@ -7508,9 +7602,7 @@ FINT CINTcgto_spinor(const FINT bas_id, const FINT *bas)
         return CINTlen_spinor(bas_id, bas) * bas(NCTR_OF, bas_id);
 }
 
-/*
- * tot. primitive atomic spheric GTOs in a shell
- */
+
 FINT CINTtot_pgto_spheric(const FINT *bas, const FINT nbas)
 {
         FINT i;
@@ -7523,9 +7615,7 @@ FINT CINTtot_pgto_spheric(const FINT *bas, const FINT nbas)
         return s;
 }
 
-/*
- * tot. primitive atomic spinors in a shell
- */
+
 FINT CINTtot_pgto_spinor(const FINT *bas, const FINT nbas)
 {
         FINT i;
@@ -7537,7 +7627,12 @@ FINT CINTtot_pgto_spinor(const FINT *bas, const FINT nbas)
         return s;
 }
 
+#ifdef __cplusplus
+static FINT tot_cgto_accum(FINT (*f)(...), const FINT *bas, const FINT nbas)
+#else
 static FINT tot_cgto_accum(FINT (*f)(), const FINT *bas, const FINT nbas)
+#endif
+
 {
         FINT i;
         FINT s = 0;
@@ -7547,32 +7642,29 @@ static FINT tot_cgto_accum(FINT (*f)(), const FINT *bas, const FINT nbas)
         }
         return s;
 }
-/*
- * tot. contracted atomic spheric GTOs in a shell
- */
-FINT CINTtot_cgto_spheric(const FINT *bas, const FINT nbas)
+
+/*FINT CINTtot_cgto_spheric(const FINT *bas, const FINT nbas)
 {
         return tot_cgto_accum(&CINTcgto_spheric, bas, nbas);
 }
 
-/*
- * tot. contracted atomic spinors in a shell
- */
+
 FINT CINTtot_cgto_spinor(const FINT *bas, const FINT nbas)
 {
         return tot_cgto_accum(&CINTcgto_spinor, bas, nbas);
 }
 
-/*
- * tot. contracted atomic spinors in a shell
- */
+
 FINT CINTtot_cgto_cart(const FINT *bas, const FINT nbas)
 {
         return tot_cgto_accum(&CINTcgto_cart, bas, nbas);
-}
+}*/
 
-static void shells_cgto_offset(FINT (*f)(), FINT ao_loc[],
-                               const FINT *bas, const FINT nbas)
+#ifdef __cplusplus
+static void shells_cgto_offset(FINT (*f)(...), FINT ao_loc[], const FINT *bas, const FINT nbas)
+#else
+static void shells_cgto_offset(FINT (*f)(), FINT ao_loc[], const FINT *bas, const FINT nbas)
+#endif
 {
         FINT i;
         ao_loc[0] = 0;
@@ -7580,33 +7672,25 @@ static void shells_cgto_offset(FINT (*f)(), FINT ao_loc[],
                 ao_loc[i] = ao_loc[i-1] + (*f)(i-1, bas);
         }
 }
-/*
- * offset of each shell for real spheric GTOs
- */
-void CINTshells_cart_offset(FINT ao_loc[], const FINT *bas, const FINT nbas)
+
+/*void CINTshells_cart_offset(FINT ao_loc[], const FINT *bas, const FINT nbas)
 {
         shells_cgto_offset(&CINTcgto_cart, ao_loc, bas, nbas);
 }
 
-/*
- * offset of each shell for real spheric GTOs
- */
+
 void CINTshells_spheric_offset(FINT ao_loc[], const FINT *bas, const FINT nbas)
 {
         shells_cgto_offset(&CINTcgto_spheric, ao_loc, bas, nbas);
 }
 
-/*
- * offset of each shell for AO spinors
- */
+
 void CINTshells_spinor_offset(FINT ao_loc[], const FINT *bas, const FINT nbas)
 {
         shells_cgto_offset(&CINTcgto_spinor, ao_loc, bas, nbas);
-}
+}*/
 
-/*
- * GTO = x^{nx}y^{ny}z^{nz}e^{-ar^2}
- */
+
 void CINTcart_comp(FINT *nx, FINT *ny, FINT *nz, const FINT lmax)
 {
         FINT inc = 0;
@@ -7623,12 +7707,7 @@ void CINTcart_comp(FINT *nx, FINT *ny, FINT *nz, const FINT lmax)
         }
 }
 
-/*
- * Copyright (C) 2013  Qiming Sun <osirpt.sun@gmail.com>
- *
- * optimizer for 2e integrals.  Note if CINT2e_drv is only called a few
- * hundred times, this optimizer cannot really speed up the integration. 
- */
+
 
 #include <stdlib.h>
 #include <math.h>
@@ -7669,24 +7748,27 @@ void CINTx1k_3c1e(double *f, const double *g, const double *rk,
 #define G3C1E_D_I(f, g, li, lj, lk)   CINTnabla1i_3c1e(f, g, li, lj, lk, envs)
 #define G3C1E_D_J(f, g, li, lj, lk)   CINTnabla1j_3c1e(f, g, li, lj, lk, envs)
 #define G3C1E_D_K(f, g, li, lj, lk)   CINTnabla1k_3c1e(f, g, li, lj, lk, envs)
-/* r-R_0, R_0 is (0,0,0) */
+
 #define G3C1E_R0I(f, g, li, lj, lk)   CINTx1i_3c1e(f, g, ri, li, lj, lk, envs)
 #define G3C1E_R0J(f, g, li, lj, lk)   CINTx1j_3c1e(f, g, rj, li, lj, lk, envs)
 #define G3C1E_R0K(f, g, li, lj, lk)   CINTx1k_3c1e(f, g, rk, li, lj, lk, envs)
-/* r-R_C, R_C is common origin */
+
 #define G3C1E_RCI(f, g, li, lj, lk)   CINTx1i_3c1e(f, g, dri, li, lj, lk, envs)
 #define G3C1E_RCJ(f, g, li, lj, lk)   CINTx1j_3c1e(f, g, drj, li, lj, lk, envs)
 #define G3C1E_RCK(f, g, li, lj, lk)   CINTx1k_3c1e(f, g, drk, li, lj, lk, envs)
-/* origin from center of each basis */
+
 #define G3C1E_R_I(f, g, li, lj, lk)   f = g + envs->g_stride_i
 #define G3C1E_R_J(f, g, li, lj, lk)   f = g + envs->g_stride_j
 #define G3C1E_R_K(f, g, li, lj, lk)   f = g + envs->g_stride_k
 
-// generate caller to CINTinit_2e_optimizer for each type of function
-void CINTinit_2e_optimizer(CINTOpt **opt, FINT *atm, FINT natm,
+
+/*void CINTinit_2e_optimizer(CINTOpt **opt, FINT *atm, FINT natm,
                            FINT *bas, FINT nbas, double *env)
 {
+
+
         CINTOpt *opt0 = (CINTOpt *)malloc(sizeof(CINTOpt));
+
         opt0->index_xyz_array = NULL;
         opt0->non0ctr = NULL;
         opt0->sortedidx = NULL;
@@ -7694,7 +7776,7 @@ void CINTinit_2e_optimizer(CINTOpt **opt, FINT *atm, FINT natm,
         opt0->log_max_coeff = NULL;
         opt0->pairdata = NULL;
         *opt = opt0;
-}
+}*/
 void CINTinit_optimizer(CINTOpt **opt, FINT *atm, FINT natm,
                         FINT *bas, FINT nbas, double *env)
 {
@@ -7704,30 +7786,30 @@ void CINTinit_optimizer(CINTOpt **opt, FINT *atm, FINT natm,
 void CINTdel_2e_optimizer(CINTOpt **opt)
 {
         CINTOpt *opt0 = *opt;
-        if (opt0 == NULL) { // when opt is created by CINTno_optimizer
+        if (opt0 == NULL) { 
                 return;
         }
 
         if (opt0->index_xyz_array != NULL) {
-                free(opt0->index_xyz_array[0]);
-                free(opt0->index_xyz_array);
+                //free(opt0->index_xyz_array[0]);
+                //free(opt0->index_xyz_array);
         }
 
         if (opt0->non0ctr != NULL) {
-                free(opt0->sortedidx[0]);
-                free(opt0->sortedidx);
-                free(opt0->non0ctr[0]);
-                free(opt0->non0ctr);
+                //free(opt0->sortedidx[0]);
+                //free(opt0->sortedidx);
+                //free(opt0->non0ctr[0]);
+                //free(opt0->non0ctr);
         }
 
         if (opt0->log_max_coeff != NULL) {
-                free(opt0->log_max_coeff[0]);
-                free(opt0->log_max_coeff);
+                //free(opt0->log_max_coeff[0]);
+                //free(opt0->log_max_coeff);
         }
 
         CINTdel_pairdata_optimizer(opt0);
 
-        free(opt0);
+        //free(opt0);
         *opt = NULL;
 }
 void CINTdel_optimizer(CINTOpt **opt)
@@ -7753,8 +7835,8 @@ static FINT _make_fakebas(FINT *fakebas, FINT *bas, FINT nbas, double *env)
         for (i = 0; i < BAS_SLOTS*fakenbas; i++) {
                 fakebas[i] = 0;
         }
-        // fakebas only initializes ANG_OF, since the others does not
-        // affect index_xyz
+        
+        
         for (i = 0; i <= max_l; i++) {
                 fakebas[BAS_SLOTS*i+ANG_OF] = i;
         }
@@ -7770,8 +7852,14 @@ static FINT *_allocate_index_xyz(CINTOpt *opt, FINT max_l, FINT l_allow, FINT or
                 ll *= LMAX1;
                 cc *= cumcart;
         }
+        #ifdef __cplusplus
+        FINT *buf = new FINT[1000]; 
+        FINT **ppbuf = new FINT*[ll]{new FINT[1000]};
+        #else
         FINT *buf = malloc(sizeof(FINT) * cc * 3);
         FINT **ppbuf = malloc(sizeof(FINT*) * ll);
+        #endif
+
         ppbuf[0] = buf;
         for (i = 1; i < ll; i++) {
                 ppbuf[i] = NULL;
@@ -7779,15 +7867,19 @@ static FINT *_allocate_index_xyz(CINTOpt *opt, FINT max_l, FINT l_allow, FINT or
         opt->index_xyz_array = ppbuf;
         return buf;
 }
+#ifdef __cplusplus
+static void gen_idx(CINTOpt *opt, void (*finit)(...), void (*findex_xyz)(...),
+                    FINT order, FINT l_allow, FINT *ng, FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env)
+#else
 static void gen_idx(CINTOpt *opt, void (*finit)(), void (*findex_xyz)(),
-                    FINT order, FINT l_allow, FINT *ng,
-                    FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env)
+                    FINT order, FINT l_allow, FINT *ng, FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env)
+#endif
 {
         FINT i, j, k, l, ptr;
         FINT fakebas[BAS_SLOTS*LMAX1];
         FINT max_l = _make_fakebas(fakebas, bas, nbas, env);
         FINT fakenbas = max_l+1;
-        // index_xyz bufsize may blow up for large max_l
+        
         l_allow = MIN(max_l, l_allow);
         FINT *buf = _allocate_index_xyz(opt, max_l, l_allow, order);
 
@@ -7834,7 +7926,7 @@ static void gen_idx(CINTOpt *opt, void (*finit)(), void (*findex_xyz)(),
         }
 }
 
-void CINTall_1e_optimizer(CINTOpt **opt, FINT *ng,
+/*void CINTall_1e_optimizer(CINTOpt **opt, FINT *ng,
                           FINT *atm, FINT natm, FINT *bas, FINT nbas, double *env)
 {
         CINTinit_2e_optimizer(opt, atm, natm, bas, nbas, env);
@@ -7893,7 +7985,7 @@ void CINTall_1e_grids_optimizer(CINTOpt **opt, FINT *ng,
         CINTOpt_set_non0coeff(*opt, atm, natm, bas, nbas, env);
         gen_idx(*opt, &CINTinit_int1e_grids_EnvVars, &CINTg1e_index_xyz,
                 2, ANG_MAX, ng, atm, natm, bas, nbas, env);
-}
+}*/
 
 #ifdef WITH_F12
 void CINTinit_int2e_stg_EnvVars(CINTEnvVars *envs, FINT *ng, FINT *shls,
@@ -7935,8 +8027,14 @@ void CINTOpt_set_log_maxc(CINTOpt *opt, FINT *atm, FINT natm,
                 return;
         }
 
+        #ifdef __cplusplus 
+        opt->log_max_coeff = new double*[1024]; 
+        double *plog_maxc = new double[1024]; 
+        #else
         opt->log_max_coeff = malloc(sizeof(double *) * MAX(nbas, 1));
         double *plog_maxc = malloc(sizeof(double) * tot_prim);
+        #endif
+
         opt->log_max_coeff[0] = plog_maxc;
         for (i = 0; i < nbas; i++) {
                 iprim = bas(NPRIM_OF, i);
@@ -7955,12 +8053,12 @@ FINT CINTset_pairdata(PairData *pairdata, double *ai, double *aj, double *ri, do
 {
         FINT ip, jp, n;
         double aij, eij, cceij, wj;
-        // Normally
-        //    (aj*d/sqrt(aij)+1)^li * (ai*d/sqrt(aij)+1)^lj
-        //    * pi^1.5/aij^{(li+lj+3)/2} * exp(-ai*aj/aij*rr_ij)
-        // is a good approximation for overlap integrals.
-        //    <~ (aj*d/aij+1/sqrt(aij))^li * (ai*d/aij+1/sqrt(aij))^lj * (pi/aij)^1.5
-        //    <~ (d+1/sqrt(aij))^(li+lj) * (pi/aij)^1.5
+        
+        
+        
+        
+        
+        
         aij = ai[iprim-1] + aj[jprim-1];
         double log_rr_ij = 1.7 - 1.5 * approx_log(aij);
         int lij = li_ceil + lj_ceil;
@@ -8030,8 +8128,13 @@ void CINTOpt_setij(CINTOpt *opt, FINT *ng,
         if (tot_prim == 0 || tot_prim > MAX_PGTO_FOR_PAIRDATA) {
                 return;
         }
+        #ifdef __cplusplus 
+        opt->pairdata = new PairData*[1024]; 
+        PairData *pdata = new PairData[1024]; 
+        #else
         opt->pairdata = malloc(sizeof(PairData *) * MAX(nbas * nbas, 1));
         PairData *pdata = malloc(sizeof(PairData) * tot_prim * tot_prim);
+        #endif
         opt->pairdata[0] = pdata;
 
         FINT ijkl_inc;
@@ -8072,7 +8175,7 @@ void CINTOpt_setij(CINTOpt *opt, FINT *ng,
                                 if (i != j) {
                                         opt->pairdata[j*nbas+i] = pdata;
                                         pdata0 = opt->pairdata[i*nbas+j];
-                                        // transpose pairdata
+                                        
                                         for (ip = 0; ip < iprim; ip++) {
                                         for (jp = 0; jp < jprim; jp++, pdata++) {
                                                 memcpy(pdata, pdata0+jp*iprim+ip,
@@ -8080,8 +8183,9 @@ void CINTOpt_setij(CINTOpt *opt, FINT *ng,
                                         } }
                                 }
                         } else {
-                                opt->pairdata[i*nbas+j] = NOVALUE;
-                                opt->pairdata[j*nbas+i] = NOVALUE;
+                                // ALEX: Warning
+                                //opt->pairdata[i*nbas+j] = NOVALUE;
+                                //opt->pairdata[j*nbas+i] = NOVALUE;
                         }
                 }
         }
@@ -8090,8 +8194,8 @@ void CINTOpt_setij(CINTOpt *opt, FINT *ng,
 void CINTdel_pairdata_optimizer(CINTOpt *cintopt)
 {
         if (cintopt != NULL && cintopt->pairdata != NULL) {
-                free(cintopt->pairdata[0]);
-                free(cintopt->pairdata);
+                //free(cintopt->pairdata[0]);
+                //free(cintopt->pairdata);
                 cintopt->pairdata = NULL;
         }
 }
@@ -8111,7 +8215,7 @@ void CINTOpt_non0coeff_byshell(FINT *sortedidx, FINT *non0ctr, double *ci,
                                 kp++;
                         }
                 }
-// Append the index of zero-coeff to sortedidx for function CINTprim_to_ctr_0
+
                 for (j = 0; j < kp; j++) {
                         sortedidx[k+j] = zeroidx[j];
                 }
@@ -8135,10 +8239,17 @@ void CINTOpt_set_non0coeff(CINTOpt *opt, FINT *atm, FINT natm,
                 return;
         }
 
+        #ifdef __cplusplus 
+        opt->non0ctr = new FINT*[1024]; 
+        opt->sortedidx = new FINT*[1024];
+        FINT *pnon0ctr = new FINT[1024]; 
+        FINT *psortedidx = new FINT[1024]; 
+        #else
         opt->non0ctr = malloc(sizeof(FINT *) * MAX(nbas, 1));
         opt->sortedidx = malloc(sizeof(FINT *) * MAX(nbas, 1));
         FINT *pnon0ctr = malloc(sizeof(FINT) * tot_prim);
         FINT *psortedidx = malloc(sizeof(FINT) * tot_prim_ctr);
+        #endif
         opt->non0ctr[0] = pnon0ctr;
         opt->sortedidx[0] = psortedidx;
         for (i = 0; i < nbas; i++) {
@@ -8152,10 +8263,7 @@ void CINTOpt_set_non0coeff(CINTOpt *opt, FINT *atm, FINT natm,
                 psortedidx += iprim * ictr;
         }
 }
-/*
- * Copyright (C) 2013  Qiming Sun <osirpt.sun@gmail.com>
- *
- */
+
 
 #include <string.h>
 #include <math.h>
@@ -8173,7 +8281,7 @@ int CINTlrys_laguerre(int n, double x, double lower, double *roots, double *weig
 int CINTrys_jacobi(int n, double x, double lower, double *roots, double *weights){}
 int CINTlrys_jacobi(int n, double x, double lower, double *roots, double *weights){}
 #ifdef HAVE_QUADMATH_H
-int CINTqrys_schmidt(int nroots, double x, double lower, double *roots, double *weights);
+int CINTqrys_schmidt(int nroots, double x, double lower, double *roots, double *weights) {};
 int CINTqrys_laguerre(int n, double x, double lower, double *roots, double *weights){};
 int CINTqrys_jacobi(int n, double x, double lower, double *roots, double *weights){};
 #else
@@ -8184,13 +8292,14 @@ int CINTqrys_jacobi(int n, double x, double lower, double *roots, double *weight
 
 void gamma_inc_like(double *f, double t, int m){}
 void lgamma_inc_like(long double *f, long double t, int m){}
-//void fmt1_gamma_inc_like(double *f, double t, int m);
-//void fmt1_lgamma_inc_like(long double *f, long double t, int m);
+
+
 void fmt_erfc_like(double *f, double t, double lower, int m){}
 void fmt1_erfc_like(double *f, double t, double lower, int m);
 void fmt_lerfc_like(long double *f, long double t, long double lower, int m){}
 void fmt1_lerfc_like(long double *f, long double t, long double lower, int m);
 #ifdef HAVE_QUADMATH_H
+#define __float128 double 
 void qgamma_inc_like(__float128 *f, __float128 t, int m){}
 void fmt_qerfc_like(__float128 *f, __float128 t, __float128 lower, int m){}
 void fmt1_qerfc_like(__float128 *f, __float128 t, __float128 lower, int m);
@@ -8200,10 +8309,10 @@ void fmt1_qerfc_like(__float128 *f, __float128 t, __float128 lower, int m);
 #define fmt1_qerfc_like         fmt1_lerfc_like
 #endif
 
-// FIXME:
-// short-range Coulomb kernel is numerically very instable when the integrals
-// are close to zero (x*lower**2 > 40). Use this cutoff as a temporary solution
-// to avoid the numerical issue in sr_rys_roots
+
+
+
+
 #define EXPCUTOFF_SR    40
 
 void CINTinit_int1e_EnvVars(CINTEnvVars *envs, FINT *ng, FINT *shls,
@@ -8336,13 +8445,13 @@ FINT CINTg1e_ovlp(double *g, CINTEnvVars *envs)
         FINT i, j, n, ptr;
         double *rx;
         if (envs->li_ceil > envs->lj_ceil) {
-                // li = envs->li_ceil;
+                
                 lj = envs->lj_ceil;
                 di = envs->g_stride_i;
                 dj = envs->g_stride_j;
                 rx = envs->ri;
         } else {
-                // li = envs->lj_ceil;
+                
                 lj = envs->li_ceil;
                 di = envs->g_stride_j;
                 dj = envs->g_stride_i;
@@ -8375,10 +8484,7 @@ FINT CINTg1e_ovlp(double *g, CINTEnvVars *envs)
         return 1;
 }
 
-/*
- * Calculate temporary parameter tau for nuclear charge distribution.
- * The charge parameter zeta is defined as    rho(r) = Norm * exp(-zeta*r^2)
- */
+
 double CINTnuc_mod(double aij, FINT nuc_id, FINT *atm, double *env)
 {
         double zeta;
@@ -8447,13 +8553,13 @@ FINT CINTg1e_nuc(double *g, CINTEnvVars *envs, FINT nuc_id)
         FINT lj, di, dj;
         double *rx;
         if (envs->li_ceil > envs->lj_ceil) {
-                // li = envs->li_ceil;
+                
                 lj = envs->lj_ceil;
                 di = envs->g_stride_i;
                 dj = envs->g_stride_j;
                 rx = envs->ri;
         } else {
-                // li = envs->lj_ceil;
+                
                 lj = envs->li_ceil;
                 di = envs->g_stride_j;
                 dj = envs->g_stride_i;
@@ -8528,11 +8634,11 @@ void CINTnabla1i_1e(double *f, double *g,
         for (k = 0; k <= lk; k++) {
         for (j = 0; j <= lj; j++) {
                 ptr = dj * j + dk * k;
-                //f(...,0,...) = -2*ai*g(...,1,...)
+                
                 fx[ptr] = ai2 * gx[ptr+1];
                 fy[ptr] = ai2 * gy[ptr+1];
                 fz[ptr] = ai2 * gz[ptr+1];
-                //f(...,i,...) = i*g(...,i-1,...)-2*ai*g(...,i+1,...)
+                
                 for (i = 1; i <= li; i++) {
                         fx[ptr+i] = i * gx[ptr+i-1] + ai2 * gx[ptr+i+1];
                         fy[ptr+i] = i * gy[ptr+i-1] + ai2 * gy[ptr+i+1];
@@ -8557,13 +8663,13 @@ void CINTnabla1j_1e(double *f, double *g,
 
         for (k = 0; k <= lk; k++) {
                 ptr = dk * k;
-                //f(...,0,...) = -2*aj*g(...,1,...)
+                
                 for (i = ptr; i <= ptr+li; i++) {
                         fx[i] = aj2 * gx[i+dj];
                         fy[i] = aj2 * gy[i+dj];
                         fz[i] = aj2 * gz[i+dj];
                 }
-                //f(...,j,...) = j*g(...,j-1,...)-2*aj*g(...,j+1,...)
+                
                 for (j = 1; j <= lj; j++) {
                         ptr = dj * j + dk * k;
                         for (i = ptr; i <= ptr+li; i++) {
@@ -8575,9 +8681,7 @@ void CINTnabla1j_1e(double *f, double *g,
         }
 }
 
-/*
- * ( ij | \nabla k )
- */
+
 void CINTnabla1k_1e(double *f, double *g,
                     FINT li, FINT lj, FINT lk, CINTEnvVars *envs)
 {
@@ -8612,11 +8716,7 @@ void CINTnabla1k_1e(double *f, double *g,
         }
 }
 
-/*
- * ( x^1 i j | k )
- * ri is the shift from the center R_O to the center of |i>
- * r - R_O = (r-R_i) + ri, ri = R_i - R_O
- */
+
 void CINTx1i_1e(double *f, double *g, double ri[3],
                 FINT li, FINT lj, FINT lk, CINTEnvVars *envs)
 {
@@ -8689,14 +8789,7 @@ void CINTx1k_1e(double *f, double *g, double *rk,
         } }
 }
 
-/*
- * gc    contracted GTO integral
- * nf    number of primitive integral
- * gp    primitive GTO integral
- * inc   increment of gp
- * shl   nth shell
- * ip    ith-1 primitive GTO
- */
+
 void CINTprim_to_ctr(double *gc, FINT nf, double *gp,
                      FINT inc, FINT nprim, FINT nctr, double *coeff)
 {
@@ -8705,7 +8798,7 @@ void CINTprim_to_ctr(double *gc, FINT nf, double *gp,
         double c;
 
         for (i = 0; i < inc; i++) {
-                //dger(nf, nctr, 1.d0, gp(i+1), inc, env(ptr), nprim, gc(1,i*nctr+1), nf)
+                
                 for (n = 0; n < nctr; n++) {
                         c = coeff[nprim*n];
                         if (c != 0) {
@@ -8713,7 +8806,7 @@ void CINTprim_to_ctr(double *gc, FINT nf, double *gp,
                                         pgc[k] += c * gp[k*inc+i];
                                 }
                         }
-                        // next cgto block
+                        
                         pgc += nf;
                 }
         }
@@ -8750,10 +8843,7 @@ void CINTprim_to_ctr_1(double *gc, double *gp, double *coeff, size_t nf,
         }
 }
 
-/*
- * to optimize memory copy in cart2sph.c, remove the common factor for s
- * and p function in cart2sph
- */
+
 double CINTcommon_fac_sp(FINT l)
 {
         switch (l) {
@@ -8762,11 +8852,7 @@ double CINTcommon_fac_sp(FINT l)
                 default: return 1;
         }
 }
-/*
- * Copyright (C) 2013-  Qiming Sun <osirpt.sun@gmail.com>
- *
- * basic cGTO integrals
- */
+
 
 #include <stdlib.h>
 #include <math.h>
@@ -8810,14 +8896,10 @@ ALL_CINT(int1e_ovlp);
 ALL_CINT(int1e_nuc);
 ALL_CINT_FORTRAN_(int1e_ovlp);
 ALL_CINT_FORTRAN_(int1e_nuc);
-/*
- * Copyright (C) 2013  Qiming Sun <osirpt.sun@gmail.com>
- *
- * blas-like functions
- */
+
 
 #include <string.h>
-#include <complex.h>
+//#include <complex.h>
 
 #define OF_CMPLX        2
 
@@ -8829,22 +8911,18 @@ void CINTdset0(FINT n, double *x)
         }
 }
 
-/*
- * v = a * x + y
- */
+
 void CINTdaxpy2v(FINT n, double a, double *x, double *y, double *v)
 {
-        //cblas_dcopy(n, y, 1, v, 1);
-        //cblas_daxpy(n, a, x, 1, v, 1);
+        
+        
         FINT i;
         for (i = 0; i < n; i++) {
                 v[i] = a * x[i] + y[i];
         }
 }
 
-/*
- * a[m,n] -> a_t[n,m]
- */
+
 void CINTdmat_transpose(double *a_t, double *a, FINT m, FINT n)
 {
         FINT i, j, k;
@@ -8884,9 +8962,7 @@ void CINTdmat_transpose(double *a_t, double *a, FINT m, FINT n)
         }
 }
 
-/*
- * a_t[n,m] += a[m,n]
- */
+
 void CINTdplus_transpose(double *a_t, double *a, FINT m, FINT n)
 {
         FINT i, j, k;
@@ -8926,10 +9002,8 @@ void CINTdplus_transpose(double *a_t, double *a, FINT m, FINT n)
         }
 }
 
-/*
- * a[m,n] -> a_t[n,m]
- */
-void CINTzmat_transpose(double complex *a_t, double complex *a, FINT m, FINT n)
+
+void CINTzmat_transpose(double *a_t, double *a, FINT m, FINT n)
 {
         FINT i, j;
 
@@ -8957,16 +9031,6 @@ void CINTzmat_transpose(double complex *a_t, double complex *a, FINT m, FINT n)
         }
 }
 
-void CINTzmat_dagger(double complex *a_t, double complex *a, FINT m, FINT n)
-{
-        FINT i, j;
-
-        for (i = 0; i < n; i++) {
-                for (j = 0; j < m; j++) {
-                        a_t[i*m+j] = conj(a[j*n+i]);
-                }
-        }
-}
 
 void CINTdgemm_NN1(FINT m, FINT n, FINT k,
                    double *a, double *b, double *c, FINT ldc)
@@ -9028,63 +9092,12 @@ void CINTdgemm_NT(FINT m, FINT n, FINT k,
                 }
         }
 }
-/*
- * Copyright (C) 2013  Qiming Sun <osirpt.sun@gmail.com>
- *
- * basic functions
- */
+
 
 #include <math.h>
-#include <complex.h>
+//#include <complex.h>
 
-void CINTdcmplx_re(const FINT n, double complex *z, const double *re)
-{
-        FINT i;
-        for (i = 0; i < n; i++) {
-                z[i] = re[i] + 0 * _Complex_I;
-        }
-}
 
-void CINTdcmplx_im(const FINT n, double complex *z, const double *im)
-{
-        FINT i;
-        for (i = 0; i < n; i++) {
-                z[i] = 0 + im[i] * _Complex_I;
-        }
-}
-
-void CINTdcmplx_pp(const FINT n, double complex *z,
-                   const double *re, const double *im)
-{
-        FINT i;
-        for (i = 0; i < n; i++) {
-                z[i] = re[i] + im[i] * _Complex_I;
-        }
-}
-void CINTdcmplx_pn(const FINT n, double complex *z,
-                   const double *re, const double *im)
-{
-        FINT i;
-        for (i = 0; i < n; i++) {
-                z[i] = re[i] - im[i] * _Complex_I;
-        }
-}
-void CINTdcmplx_np(const FINT n, double complex *z,
-                   const double *re, const double *im)
-{
-        FINT i;
-        for (i = 0; i < n; i++) {
-                z[i] = -re[i] + im[i] * _Complex_I;
-        }
-}
-void CINTdcmplx_nn(const FINT n, double complex *z,
-                   const double *re, const double *im)
-{
-        FINT i;
-        for (i = 0; i < n; i++) {
-                z[i] = -re[i] - im[i] * _Complex_I;
-        }
-}
 
 double CINTsquare_dist(const double *r1, const double *r2)
 {
@@ -9097,114 +9110,93 @@ double CINTsquare_dist(const double *r1, const double *r2)
         return r12[0] * r12[0] + r12[1] * r12[1] + r12[2] * r12[2];
 }
 
-static double _gaussian_int(FINT n, double alpha)
+/*static double _gaussian_int(FINT n, double alpha)
 {
         double n1 = (n + 1) * .5;
         return exp(lgamma(n1)) / (2. * pow(alpha, n1));
 }
 
-/*
- * Normalized factor for GTO radial part g=r^l e^{-\alpha r^2}
- *
- * \frac{1}{\sqrt{\int g^2 r^2 dr}}
- *   = \sqrt{\frac{2^{2l+3} (l+1)! (2a)^{l+1.5}}{(2l+2)!\sqrt{\pi}}}
- *
- * Ref: H. B. Schlegel and M. J. Frisch, Int. J. Quant.  Chem., 54(1995), 83-87.
- */
 double CINTgto_norm(FINT n, double a)
 {
-        //double nn = pow(2, (2*n+3)) * factorial(n+1) * pow((2*a), (n+1.5)) \
-        //        / (factorial(2*n+2) * sqrt(M_PI));
-        //return sqrt(nn);
+        
         return 1. / sqrt(_gaussian_int(n*2+2, 2*a));
-
 }
 double CINTgto_norm_(FINT *n, double *a)
 {
         return CINTgto_norm(*n, *a);
-}
-/*
- * Copyright (C) 2013- Qiming Sun <osirpt.sun@gmail.com>
- *
- * Cartisen GTO to spheric or spinor GTO transformation
- * (and reorder the integrals from block(i,j,k,l)_{contr_idx(I,K,L,J)}
- * to (iI,jJ,kK,lL))
- *
- * Cartesian to real-spheric coefficients
- * ref: H. B. Schlegel and M. J.  Frisch, Int. J. Quant. Chem., 54(1995), 83-87.
- * See also the python implementation xyz2sph_real in testsuit/cart2sph.py
- */
+}*/
+
 
 #include <stdlib.h>
-#include <complex.h>
+//#include <complex.h>
 
 static double g_trans_cart2sph[] = {
-        1, /* factors of s and p are moved to CINTcommon_fac_sp */
-        // px
+        1, 
+        
 #ifdef PYPZPX
-        // py
+        
         0,
         1,
         0,
-        // pz
+        
         0,
         0,
         1,
-        // px
+        
         1,
         0,
         0,
 #else
-// by default, p orbitals are ordered px, py, pz
-        // px
+
+        
         1,
         0,
         0,
-        // py
+        
         0,
         1,
         0,
-        // pz
+        
         0,
         0,
         1,
 #endif
-        // dxy
+        
         0,
         1.092548430592079070,
         0,
         0,
         0,
         0,
-        // dyz
+        
         0,
         0,
         0,
         0,
         1.092548430592079070,
         0,
-        // dz2
+        
         -0.315391565252520002,
         0,
         0,
         -0.315391565252520002,
         0,
         0.630783130505040012,
-        // dxz
+        
         0,
         0,
         1.092548430592079070,
         0,
         0,
         0,
-        // dy2
+        
         0.546274215296039535,
         0,
         0,
         -0.546274215296039535,
         0,
         0,
-        // f-3 ~ fyx2
+        
         0,
         1.770130769779930531,
         0,
@@ -9215,7 +9207,7 @@ static double g_trans_cart2sph[] = {
         0,
         0,
         0,
-        // f-2 ~ fxyz
+        
         0,
         0,
         0,
@@ -9226,7 +9218,7 @@ static double g_trans_cart2sph[] = {
         0,
         0,
         0,
-        // f-1 ~ fyz2
+        
         0,
         -0.457045799464465739,
         0,
@@ -9237,7 +9229,7 @@ static double g_trans_cart2sph[] = {
         0,
         1.828183197857862944,
         0,
-        // f0 ~ fz3
+        
         0,
         0,
         -1.119528997770346170,
@@ -9248,7 +9240,7 @@ static double g_trans_cart2sph[] = {
         -1.119528997770346170,
         0,
         0.746352665180230782,
-        // f1 ~ fxz2
+        
         -0.457045799464465739,
         0,
         0,
@@ -9259,7 +9251,7 @@ static double g_trans_cart2sph[] = {
         0,
         0,
         0,
-        // f2 ~ fzx2
+        
         0,
         0,
         1.445305721320277020,
@@ -9270,7 +9262,7 @@ static double g_trans_cart2sph[] = {
         -1.445305721320277020,
         0,
         0,
-        // f3 ~ fx3
+        
         0.590043589926643510,
         0,
         0,
@@ -9281,7 +9273,7 @@ static double g_trans_cart2sph[] = {
         0,
         0,
         0,
-        // g-4 ~ gyx3
+        
         0,
         2.503342941796704538,
         0,
@@ -9297,7 +9289,7 @@ static double g_trans_cart2sph[] = {
         0,
         0,
         0,
-        // g-3 ~ gx2yz
+        
         0,
         0,
         0,
@@ -9313,7 +9305,7 @@ static double g_trans_cart2sph[] = {
         0,
         0,
         0,
-        // g-2 ~ gxyz2
+        
         0,
         -0.946174695757560014,
         0,
@@ -9329,7 +9321,7 @@ static double g_trans_cart2sph[] = {
         0,
         0,
         0,
-        // g-1 ~ gyz3
+        
         0,
         0,
         0,
@@ -9345,7 +9337,7 @@ static double g_trans_cart2sph[] = {
         0,
         2.676186174229156671,
         0,
-        // g0 ~ gz4
+        
         0.317356640745612911,
         0,
         0,
@@ -9361,7 +9353,7 @@ static double g_trans_cart2sph[] = {
         -2.538853125964903290,
         0,
         0.846284375321634430,
-        // g1 ~ gxz3
+        
         0,
         0,
         -2.007139630671867500,
@@ -9377,7 +9369,7 @@ static double g_trans_cart2sph[] = {
         0,
         0,
         0,
-        // g2 ~ gx2z2
+        
         -0.473087347878780002,
         0,
         0,
@@ -9393,7 +9385,7 @@ static double g_trans_cart2sph[] = {
         -2.838524087272680050,
         0,
         0,
-        // g3 ~ gzx3
+        
         0,
         0,
         1.770130769779930531,
@@ -9409,7 +9401,7 @@ static double g_trans_cart2sph[] = {
         0,
         0,
         0,
-        // g4 ~ gy4
+        
         0.625835735449176134,
         0,
         0,
@@ -9425,7 +9417,7 @@ static double g_trans_cart2sph[] = {
         0,
         0,
         0,
-        // h-5 ~ hyx4
+        
         0,
         3.281910284200850514,
         0,
@@ -9447,7 +9439,7 @@ static double g_trans_cart2sph[] = {
         0,
         0,
         0,
-        // h-4 ~ hx3yz
+        
         0,
         0,
         0,
@@ -9469,7 +9461,7 @@ static double g_trans_cart2sph[] = {
         0,
         0,
         0,
-        // h-3 ~ hyx2z2
+        
         0,
         -1.467714898305751160,
         0,
@@ -9491,7 +9483,7 @@ static double g_trans_cart2sph[] = {
         0,
         0,
         0,
-        // h-2 ~ hxyz3
+        
         0,
         0,
         0,
@@ -9513,7 +9505,7 @@ static double g_trans_cart2sph[] = {
         0,
         0,
         0,
-        // h-1 ~ hyz4
+        
         0,
         0.452946651195696921,
         0,
@@ -9535,7 +9527,7 @@ static double g_trans_cart2sph[] = {
         0,
         3.623573209565575370,
         0,
-        // h0 ~ hx2y2z
+        
         0,
         0,
         1.754254836801353946,
@@ -9557,7 +9549,7 @@ static double g_trans_cart2sph[] = {
         -4.678012898136943850,
         0,
         0.935602579627388771,
-        // h1 ~ xz4
+        
         0.452946651195696921,
         0,
         0,
@@ -9579,7 +9571,7 @@ static double g_trans_cart2sph[] = {
         0,
         0,
         0,
-        // h2 ~ hx2z3
+        
         0,
         0,
         -2.396768392486661870,
@@ -9601,7 +9593,7 @@ static double g_trans_cart2sph[] = {
         -4.793536784973323750,
         0,
         0,
-        // h3 ~ hx3z2
+        
         -0.489238299435250389,
         0,
         0,
@@ -9623,7 +9615,7 @@ static double g_trans_cart2sph[] = {
         0,
         0,
         0,
-        // h4 ~ hzy4
+        
         0,
         0,
         2.075662314881041278,
@@ -9645,7 +9637,7 @@ static double g_trans_cart2sph[] = {
         0,
         0,
         0,
-        // h5 ~ hxy4
+        
         0.656382056840170102,
         0,
         0,
@@ -9667,63 +9659,63 @@ static double g_trans_cart2sph[] = {
         0,
         0,
         0,
-        //i-6
+        
         0, 4.0991046311514863, 0, 0, 0, 0, -13.6636821038382887, 0, 0, 0, 0, 0, 0, 0, 0, 4.0991046311514863, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //i-5
+        
         0, 0, 0, 0, 11.8330958111587634, 0, 0, 0, 0, 0, 0, -23.6661916223175268, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.3666191622317525, 0, 0, 0, 0, 0,
-        //i-4
+        
         0, -2.0182596029148963, 0, 0, 0, 0, 0, 0, 20.1825960291489679, 0, 0, 0, 0, 0, 0, 2.0182596029148963, 0, -20.1825960291489679, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //i-3
+        
         0, 0, 0, 0, -8.2908473356343109, 0, 0, 0, 0, 0, 0, -5.5272315570895412, 0, 22.1089262283581647, 0, 0, 0, 0, 0, 0, 0, 0, 2.7636157785447706, 0, -7.3696420761193888, 0, 0, 0,
-        //i-2
+        
         0, 0.9212052595149236, 0, 0, 0, 0, 1.8424105190298472, 0, -14.7392841522387776, 0, 0, 0, 0, 0, 0, 0.9212052595149236, 0, -14.7392841522387776, 0, 14.7392841522387776, 0, 0, 0, 0, 0, 0, 0, 0,
-        //i-1
+        
         0, 0, 0, 0, 2.9131068125936568, 0, 0, 0, 0, 0, 0, 5.8262136251873136, 0, -11.6524272503746271, 0, 0, 0, 0, 0, 0, 0, 0, 2.9131068125936568, 0, -11.6524272503746271, 0, 4.6609709001498505, 0,
-        //i0
+        
         -0.3178460113381421, 0, 0, -0.9535380340144264, 0, 5.7212282040865583, 0, 0, 0, 0, -0.9535380340144264, 0, 11.4424564081731166, 0, -7.6283042721154111, 0, 0, 0, 0, 0, 0, -0.3178460113381421, 0, 5.7212282040865583, 0, -7.6283042721154111, 0, 1.0171072362820548,
-        //i1
+        
         0, 0, 2.9131068125936568, 0, 0, 0, 0, 5.8262136251873136, 0, -11.6524272503746271, 0, 0, 0, 0, 0, 0, 2.9131068125936568, 0, -11.6524272503746271, 0, 4.6609709001498505, 0, 0, 0, 0, 0, 0, 0,
-        //i2
+        
         0.4606026297574618, 0, 0, 0.4606026297574618, 0, -7.3696420761193888, 0, 0, 0, 0, -0.4606026297574618, 0, 0, 0, 7.3696420761193888, 0, 0, 0, 0, 0, 0, -0.4606026297574618, 0, 7.3696420761193888, 0, -7.3696420761193888, 0, 0,
-        //i3
+        
         0, 0, -2.7636157785447706, 0, 0, 0, 0, 5.5272315570895412, 0, 7.3696420761193888, 0, 0, 0, 0, 0, 0, 8.2908473356343109, 0, -22.1089262283581647, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //i4
+        
         -0.5045649007287241, 0, 0, 2.5228245036436201, 0, 5.0456490072872420, 0, 0, 0, 0, 2.5228245036436201, 0, -30.2738940437234518, 0, 0, 0, 0, 0, 0, 0, 0, -0.5045649007287241, 0, 5.0456490072872420, 0, 0, 0, 0,
-        //i5
+        
         0, 0, 2.3666191622317525, 0, 0, 0, 0, -23.6661916223175268, 0, 0, 0, 0, 0, 0, 0, 0, 11.8330958111587634, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //i6
+        
         0.6831841051919144, 0, 0, -10.2477615778787161, 0, 0, 0, 0, 0, 0, 10.2477615778787161, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.6831841051919144, 0, 0, 0, 0, 0, 0,
-        //j-7
+        
         0, 4.9501391276721742, 0, 0, 0, 0, -24.7506956383608703, 0, 0, 0, 0, 0, 0, 0, 0, 14.8504173830165218, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.7071627325245963, 0, 0, 0, 0, 0, 0, 0,
-        //j-6
+        
         0, 0, 0, 0, 15.8757639708114002, 0, 0, 0, 0, 0, 0, -52.9192132360380043, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15.8757639708114002, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j-5
+        
         0, -2.5945778936013020, 0, 0, 0, 0, 2.5945778936013020, 0, 31.1349347232156219, 0, 0, 0, 0, 0, 0, 4.6702402084823440, 0, -62.2698694464312439, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.5189155787202604, 0, 6.2269869446431247, 0, 0, 0, 0, 0,
-        //j-4
+        
         0, 0, 0, 0, -12.4539738892862495, 0, 0, 0, 0, 0, 0, 0, 0, 41.5132462976208316, 0, 0, 0, 0, 0, 0, 0, 0, 12.4539738892862495, 0, -41.5132462976208316, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j-3
+        
         0, 1.4081304047606462, 0, 0, 0, 0, 2.3468840079344107, 0, -28.1626080952129243, 0, 0, 0, 0, 0, 0, 0.4693768015868821, 0, -18.7750720634752817, 0, 37.5501441269505705, 0, 0, 0, 0, 0, 0, 0, 0, -0.4693768015868821, 0, 9.3875360317376408, 0, -12.5167147089835229, 0, 0, 0,
-        //j-2
+        
         0, 0, 0, 0, 6.6379903866747414, 0, 0, 0, 0, 0, 0, 13.2759807733494828, 0, -35.4026153955986160, 0, 0, 0, 0, 0, 0, 0, 0, 6.6379903866747414, 0, -35.4026153955986160, 0, 21.2415692373591725, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j-1
+        
         0, -0.4516580379125866, 0, 0, 0, 0, -1.3549741137377600, 0, 10.8397929099020782, 0, 0, 0, 0, 0, 0, -1.3549741137377600, 0, 21.6795858198041564, 0, -21.6795858198041564, 0, 0, 0, 0, 0, 0, 0, 0, -0.4516580379125866, 0, 10.8397929099020782, 0, -21.6795858198041564, 0, 5.7812228852811094, 0,
-        //j0
+        
         0, 0, -2.3899496919201728, 0, 0, 0, 0, -7.1698490757605189, 0, 14.3396981515210360, 0, 0, 0, 0, 0, 0, -7.1698490757605189, 0, 28.6793963030420720, 0, -11.4717585212168292, 0, 0, 0, 0, 0, 0, 0, 0, -2.3899496919201728, 0, 14.3396981515210360, 0, -11.4717585212168292, 0, 1.0925484305920790,
-        //j1
+        
         -0.4516580379125866, 0, 0, -1.3549741137377600, 0, 10.8397929099020782, 0, 0, 0, 0, -1.3549741137377600, 0, 21.6795858198041564, 0, -21.6795858198041564, 0, 0, 0, 0, 0, 0, -0.4516580379125866, 0, 10.8397929099020782, 0, -21.6795858198041564, 0, 5.7812228852811094, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j2
+        
         0, 0, 3.3189951933373707, 0, 0, 0, 0, 3.3189951933373707, 0, -17.7013076977993080, 0, 0, 0, 0, 0, 0, -3.3189951933373707, 0, 0, 0, 10.6207846186795862, 0, 0, 0, 0, 0, 0, 0, 0, -3.3189951933373707, 0, 17.7013076977993080, 0, -10.6207846186795862, 0, 0,
-        //j3
+        
         0.4693768015868821, 0, 0, -0.4693768015868821, 0, -9.3875360317376408, 0, 0, 0, 0, -2.3468840079344107, 0, 18.7750720634752817, 0, 12.5167147089835229, 0, 0, 0, 0, 0, 0, -1.4081304047606462, 0, 28.1626080952129243, 0, -37.5501441269505705, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j4
+        
         0, 0, -3.1134934723215624, 0, 0, 0, 0, 15.5674673616078110, 0, 10.3783115744052079, 0, 0, 0, 0, 0, 0, 15.5674673616078110, 0, -62.2698694464312439, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -3.1134934723215624, 0, 10.3783115744052079, 0, 0, 0, 0,
-        //j5
+        
         -0.5189155787202604, 0, 0, 4.6702402084823440, 0, 6.2269869446431247, 0, 0, 0, 0, 2.5945778936013020, 0, -62.2698694464312439, 0, 0, 0, 0, 0, 0, 0, 0, -2.5945778936013020, 0, 31.1349347232156219, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j6
+        
         0, 0, 2.6459606618019000, 0, 0, 0, 0, -39.6894099270284997, 0, 0, 0, 0, 0, 0, 0, 0, 39.6894099270284997, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.6459606618019000, 0, 0, 0, 0, 0, 0,
-        //j7
+        
         0.7071627325245963, 0, 0, -14.8504173830165218, 0, 0, 0, 0, 0, 0, 24.7506956383608703, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -4.9501391276721742, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // l = 8
+        
         0, 5.83141328139864, 0, 0, 0, 0, -40.81989296979048, 0, 0, 0, 0, 0, 0, 0, 0, 40.81989296979048, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -5.83141328139864, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 20.40994648489524, 0, 0, 0, 0, 0, 0, -102.0497324244762, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 61.22983945468572, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.91570664069932, 0, 0, 0, 0, 0, 0, 0,
         0, -3.193996596357255, 0, 0, 0, 0, 7.452658724833595, 0, 44.71595234900157, 0, 0, 0, 0, 0, 0, 7.452658724833595, 0, -149.0531744966719, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -3.193996596357255, 0, 44.71595234900157, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -9741,7 +9733,7 @@ static double g_trans_cart2sph[] = {
         -0.5323327660595425, 0, 0, 7.452658724833595, 0, 7.452658724833595, 0, 0, 0, 0, 0, 0, -111.7898808725039, 0, 0, 0, 0, 0, 0, 0, 0, -7.452658724833595, 0, 111.7898808725039, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.5323327660595425, 0, -7.452658724833595, 0, 0, 0, 0, 0, 0,
         0, 0, 2.91570664069932, 0, 0, 0, 0, -61.22983945468572, 0, 0, 0, 0, 0, 0, 0, 0, 102.0497324244762, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -20.40994648489524, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.72892666017483, 0, 0, -20.40994648489524, 0, 0, 0, 0, 0, 0, 51.0248662122381, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -20.40994648489524, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.72892666017483, 0, 0, 0, 0, 0, 0, 0, 0,
-        // l = 9
+        
         0, 6.740108566678694, 0, 0, 0, 0, -62.9076799556678, 0, 0, 0, 0, 0, 0, 0, 0, 94.36151993350171, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -26.96043426671477, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.7489009518531882, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 25.41854119163758, 0, 0, 0, 0, 0, 0, -177.9297883414631, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 177.9297883414631, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -25.41854119163758, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -3.814338369408373, 0, 0, 0, 0, 15.25735347763349, 0, 61.02941391053396, 0, 0, 0, 0, 0, 0, 7.628676738816745, 0, -305.1470695526698, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -10.89810962688107, 0, 183.0882417316019, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.5449054813440533, 0, -8.718487701504852, 0, 0, 0, 0, 0, 0, 0,
@@ -9761,7 +9753,7 @@ static double g_trans_cart2sph[] = {
         -0.5449054813440533, 0, 0, 10.89810962688107, 0, 8.718487701504852, 0, 0, 0, 0, -7.628676738816745, 0, -183.0882417316019, 0, 0, 0, 0, 0, 0, 0, 0, -15.25735347763349, 0, 305.1470695526698, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.814338369408373, 0, -61.02941391053396, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 3.177317648954698, 0, 0, 0, 0, -88.96489417073154, 0, 0, 0, 0, 0, 0, 0, 0, 222.4122354268289, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -88.96489417073154, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.177317648954698, 0, 0, 0, 0, 0, 0, 0, 0,
         0.7489009518531882, 0, 0, -26.96043426671477, 0, 0, 0, 0, 0, 0, 94.36151993350171, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -62.9076799556678, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6.740108566678694, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // l = 10
+        
         0, 7.673951182219901, 0, 0, 0, 0, -92.08741418663881, 0, 0, 0, 0, 0, 0, 0, 0, 193.3835697919415, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -92.08741418663881, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7.673951182219901, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 30.88705769902543, 0, 0, 0, 0, 0, 0, -288.2792051909041, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 432.4188077863561, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -123.5482307961017, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.431895299891715, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -4.453815461763347, 0, 0, 0, 0, 26.72289277058008, 0, 80.16867831174027, 0, 0, 0, 0, 0, 0, 0, 0, -561.1807481821819, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -26.72289277058008, 0, 561.1807481821819, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4.453815461763347, 0, -80.16867831174027, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -9783,7 +9775,7 @@ static double g_trans_cart2sph[] = {
         -0.5567269327204184, 0, 0, 15.0316271834513, 0, 10.02108478896753, 0, 0, 0, 0, -23.38253117425757, 0, -280.590374091091, 0, 0, 0, 0, 0, 0, 0, 0, -23.38253117425757, 0, 701.4759352277273, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15.0316271834513, 0, -280.590374091091, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.5567269327204184, 0, 10.02108478896753, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 3.431895299891715, 0, 0, 0, 0, -123.5482307961017, 0, 0, 0, 0, 0, 0, 0, 0, 432.4188077863561, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -288.2792051909041, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 30.88705769902543, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.7673951182219901, 0, 0, -34.53278031998956, 0, 0, 0, 0, 0, 0, 161.1529748266179, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -161.1529748266179, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 34.53278031998956, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.7673951182219901, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // l = 11
+        
         0, 8.631063163659167, 0, 0, 0, 0, -129.4659474548875, 0, 0, 0, 0, 0, 0, 0, 0, 362.504652873685, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -258.9318949097751, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 43.15531581829584, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.7846421057871971, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 36.80297698805311, 0, 0, 0, 0, 0, 0, -441.6357238566373, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 927.4350200989384, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -441.6357238566373, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36.80297698805311, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -5.110940374050938, 0, 0, 0, 0, 42.59116978375781, 0, 102.2188074810188, 0, 0, 0, 0, 0, 0, -23.85105507890438, 0, -954.0422031561751, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -51.10940374050938, 0, 1431.063304734263, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19.87587923242031, 0, -408.875229924075, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.5678822637834375, 0, 11.35764527566875, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -9807,7 +9799,7 @@ static double g_trans_cart2sph[] = {
         -0.5678822637834375, 0, 0, 19.87587923242031, 0, 11.35764527566875, 0, 0, 0, 0, -51.10940374050938, 0, -408.875229924075, 0, 0, 0, 0, 0, 0, 0, 0, -23.85105507890438, 0, 1431.063304734263, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 42.59116978375781, 0, -954.0422031561751, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -5.110940374050938, 0, 102.2188074810188, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 3.680297698805311, 0, 0, 0, 0, -165.613396446239, 0, 0, 0, 0, 0, 0, 0, 0, 772.8625167491152, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -772.8625167491152, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 165.613396446239, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -3.680297698805311, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.7846421057871971, 0, 0, -43.15531581829584, 0, 0, 0, 0, 0, 0, 258.9318949097751, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -362.504652873685, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 129.4659474548875, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -8.631063163659167, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // l = 12
+        
         0, 9.609863949407661, 0, 0, 0, 0, -176.1808390724738, 0, 0, 0, 0, 0, 0, 0, 0, 634.2510206609056, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -634.2510206609056, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 176.1808390724738, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -9.609863949407661, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 43.15531581829583, 0, 0, 0, 0, 0, 0, -647.3297372744373, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1812.523264368425, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1294.659474548875, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 215.7765790914791, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -3.923210528935984, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -5.784458347938102, 0, 0, 0, 0, 63.62904182731912, 0, 127.2580836546383, 0, 0, 0, 0, 0, 0, -76.35485019278295, 0, -1527.097003855659, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -76.35485019278295, 0, 3206.903708096884, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 63.62904182731912, 0, -1527.097003855659, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -5.784458347938102, 0, 127.2580836546383, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -9833,7 +9825,7 @@ static double g_trans_cart2sph[] = {
         -0.5784458347938102, 0, 0, 25.45161673092765, 0, 12.72580836546383, 0, 0, 0, 0, -95.44356274097868, 0, -572.6613764458722, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2672.419756747403, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 95.44356274097868, 0, -2672.419756747403, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -25.45161673092765, 0, 572.6613764458722, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.5784458347938102, 0, -12.72580836546383, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 3.923210528935984, 0, 0, 0, 0, -215.7765790914791, 0, 0, 0, 0, 0, 0, 0, 0, 1294.659474548875, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1812.523264368425, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 647.3297372744373, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -43.15531581829583, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.8008219957839717, 0, 0, -52.85425172174213, 0, 0, 0, 0, 0, 0, 396.406887913066, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -739.9595241043899, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 396.406887913066, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -52.85425172174213, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.8008219957839717, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // l = 13
+        
         0, 10.60900254488917, 0, 0, 0, 0, -233.3980559875617, 0, 0, 0, 0, 0, 0, 0, 0, 1050.291251944028, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1400.38833592537, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 583.4951399689042, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -63.65401526933501, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.8160771188376283, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 49.93431784259574, 0, 0, 0, 0, 0, 0, -915.4624937809218, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3295.664977611319, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -3295.664977611319, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 915.4624937809218, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -49.93431784259574, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -6.473297372744374, 0, 0, 0, 0, 90.62616321842124, 0, 155.359136945865, 0, 0, 0, 0, 0, 0, -174.7790290640981, 0, -2330.387054187975, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -77.67956847293249, 0, 6525.083751726329, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 161.8324343186094, 0, -4660.774108375949, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -31.77800528438147, 0, 776.7956847293249, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.5884815793403977, 0, -14.12355790416954, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -9861,7 +9853,7 @@ static double g_trans_cart2sph[] = {
         -0.5884815793403977, 0, 0, 31.77800528438147, 0, 14.12355790416954, 0, 0, 0, 0, -161.8324343186094, 0, -776.7956847293249, 0, 0, 0, 0, 0, 0, 0, 0, 77.67956847293249, 0, 4660.774108375949, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 174.7790290640981, 0, -6525.083751726329, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -90.62616321842124, 0, 2330.387054187975, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6.473297372744374, 0, -155.359136945865, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 4.161193153549645, 0, 0, 0, 0, -274.6387481342766, 0, 0, 0, 0, 0, 0, 0, 0, 2059.790611007074, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -3844.942473879872, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2059.790611007074, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -274.6387481342766, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4.161193153549645, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.8160771188376283, 0, 0, -63.65401526933501, 0, 0, 0, 0, 0, 0, 583.4951399689042, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1400.38833592537, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1050.291251944028, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -233.3980559875617, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10.60900254488917, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // l = 14
+        
         0, 11.62730916290334, 0, 0, 0, 0, -302.3100382354867, 0, 0, 0, 0, 0, 0, 0, 0, 1662.705210295177, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2850.351789077446, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1662.705210295177, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -302.3100382354867, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11.62730916290334, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 57.13122714353754, 0, 0, 0, 0, 0, 0, -1256.886997157826, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5655.991487210216, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -7541.321982946955, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3142.217492894565, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -342.7873628612252, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4.394709780272118, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -7.176531019523646, 0, 0, 0, 0, 124.3932043384099, 0, 186.5898065076148, 0, 0, 0, 0, 0, 0, -342.0813119306271, 0, -3420.813119306271, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12314.92722950258, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 342.0813119306271, 0, -12314.92722950258, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -124.3932043384099, 0, 3420.813119306271, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7.176531019523646, 0, -186.5898065076148, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -9891,7 +9883,7 @@ static double g_trans_cart2sph[] = {
         -0.5980442516269705, 0, 0, 38.87287635575308, 0, 15.54915054230123, 0, 0, 0, 0, -256.5609839479703, 0, -1026.243935791881, 0, 0, 0, 0, 0, 0, 0, 0, 256.5609839479703, 0, 7696.82951843911, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 256.5609839479703, 0, -14367.41510108634, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -256.5609839479703, 0, 7696.82951843911, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 38.87287635575308, 0, -1026.243935791881, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.5980442516269705, 0, 15.54915054230123, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 4.394709780272118, 0, 0, 0, 0, -342.7873628612252, 0, 0, 0, 0, 0, 0, 0, 0, 3142.217492894565, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -7541.321982946955, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5655.991487210216, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1256.886997157826, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 57.13122714353754, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.830522083064524, 0, 0, -75.57750955887168, 0, 0, 0, 0, 0, 0, 831.3526051475885, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2494.057815442766, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2494.057815442766, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -831.3526051475885, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 75.57750955887168, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.830522083064524, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // l = 15
+        
         0, 12.66375976286059, 0, 0, 0, 0, -384.1340461401045, 0, 0, 0, 0, 0, 0, 0, 0, 2535.28470452469, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -5432.752938267193, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4225.47450754115, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1152.402138420314, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 88.64631834002413, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.8442506508573726, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 64.73811759282017, 0, 0, 0, 0, 0, 0, -1683.191057413324, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9257.550815773284, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -15870.0871127542, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9257.550815773284, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1683.191057413324, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64.73811759282017, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -7.893350484654575, 0, 0, 0, 0, 165.7603601777461, 0, 221.0138135703281, 0, 0, 0, 0, 0, 0, -607.7879873184023, 0, -4862.303898547218, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 260.480565993601, 0, 21880.36754346248, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 607.7879873184023, 0, -29173.82339128331, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -386.7741737480742, 0, 12155.75974636805, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 46.75292210141556, 0, -1326.082881421969, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.6071808065118904, 0, 17.00106258233293, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -9925,17 +9917,13 @@ static double g_trans_cart2sph[] = {
         0.8442506508573726, 0, 0, -88.64631834002413, 0, 0, 0, 0, 0, 0, 1152.402138420314, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -4225.47450754115, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5432.752938267193, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2535.28470452469, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 384.1340461401045, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -12.66375976286059, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 };
 
-/*
- * Real part of cartesian to spinor transformation
- * / xyz_alpha \
- * \ xyz_beta  /
- */
+
 static double g_trans_cart2jR[] = {
         0,
         1,
         1,
         0,
-       -0.577350269189625764,  // p1/2
+       -0.577350269189625764,  
         0,
         0,
         0,
@@ -9947,7 +9935,7 @@ static double g_trans_cart2jR[] = {
        -0.577350269189625764,
         0,
         0,
-        0,  // p3/2
+        0,  
         0,
         0,
         0.707106781186547524,
@@ -9971,7 +9959,7 @@ static double g_trans_cart2jR[] = {
         0,
         0,
         0,
-       -0.345494149471335479,  // d3/2
+       -0.345494149471335479,  
         0,
         0,
         0.345494149471335479,
@@ -10019,7 +10007,7 @@ static double g_trans_cart2jR[] = {
        -0.345494149471335479,
         0,
         0,
-        0,  // d5/2
+        0,  
         0,
         0,
         0,
@@ -10091,7 +10079,7 @@ static double g_trans_cart2jR[] = {
         0,
         0,
         0,
-       -0.386274202023189580,  // f5/2
+       -0.386274202023189580,  
         0,
         0,
         1.158822606069568741,
@@ -10211,7 +10199,7 @@ static double g_trans_cart2jR[] = {
         0,
         0,
         0,
-        0,  // f7/2
+        0,  
         0,
         0,
         0,
@@ -10371,934 +10359,932 @@ static double g_trans_cart2jR[] = {
         0,
         0,
         0,
-        // g7/2, -7/2
+        
         -0.417223823632784089, 0, 0, 2.503342941796704538, 0, 0, 0, 0, 0, 0, -0.417223823632784089, 0, 0, 0, 0,
         0, 0, 0.417223823632784089, 0, 0, 0, 0, -1.251671470898352269, 0, 0, 0, 0, 0, 0, 0,
-        // g7/2, -5/2
+        
         0, 0, -1.103870478383820021, 0, 0, 0, 0, 3.311611435151460063, 0, 0, 0, 0, 0, 0, 0,
         -0.157695782626260003, 0, 0, 0, 0, 0.946174695757560018, 0, 0, 0, 0, 0.157695782626260003, 0, -0.946174695757560018, 0, 0,
-        // g7/2, -3/2
+        
         0.273137107648019767, 0, 0, 0, 0, -1.638822645888118605, 0, 0, 0, 0, -0.273137107648019767, 0, 1.638822645888118605, 0, 0,
         0, 0, -0.819411322944059302, 0, 0, 0, 0, -0.819411322944059302, 0, 1.092548430592079070, 0, 0, 0, 0, 0,
-        // g7/2, -1/2
+        
         0, 0, 1.057855469152043038, 0, 0, 0, 0, 1.057855469152043038, 0, -1.410473958869390717, 0, 0, 0, 0, 0,
         0.211571093830408607, 0, 0, 0.423142187660817215, 0, -1.692568750643268860, 0, 0, 0, 0, 0.211571093830408607, 0, -1.692568750643268860, 0, 0.564189583547756286,
-        // g7/2, 1/2
+        
         -0.211571093830408607, 0, 0, -0.423142187660817215, 0, 1.692568750643268860, 0, 0, 0, 0, -0.211571093830408607, 0, 1.692568750643268860, 0, -0.564189583547756286,
         0, 0, 1.057855469152043038, 0, 0, 0, 0, 1.057855469152043038, 0, -1.410473958869390717, 0, 0, 0, 0, 0,
-        // g7/2, 3/2
+        
         0, 0, -0.819411322944059302, 0, 0, 0, 0, -0.819411322944059302, 0, 1.092548430592079070, 0, 0, 0, 0, 0,
         -0.273137107648019767, 0, 0, 0, 0, 1.638822645888118605, 0, 0, 0, 0, 0.273137107648019767, 0, -1.638822645888118605, 0, 0,
-        // g7/2, 5/2
+        
         0.157695782626260003, 0, 0, 0, 0, -0.946174695757560018, 0, 0, 0, 0, -0.157695782626260003, 0, 0.946174695757560018, 0, 0,
         0, 0, -1.103870478383820021, 0, 0, 0, 0, 3.311611435151460063, 0, 0, 0, 0, 0, 0, 0,
-        // g7/2, 7/2
+        
         0, 0, 0.417223823632784089, 0, 0, 0, 0, -1.251671470898352269, 0, 0, 0, 0, 0, 0, 0,
         0.417223823632784089, 0, 0, -2.503342941796704538, 0, 0, 0, 0, 0, 0, 0.417223823632784089, 0, 0, 0, 0,
-        // g9/2, -9/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.442532692444982632, 0, 0, -2.655196154669895796, 0, 0, 0, 0, 0, 0, 0.442532692444982632, 0, 0, 0, 0,
-        // g9/2, -7/2
+        
         0.147510897481660877, 0, 0, -0.885065384889965265, 0, 0, 0, 0, 0, 0, 0.147510897481660877, 0, 0, 0, 0,
         0, 0, 1.180087179853287020, 0, 0, 0, 0, -3.540261539559861062, 0, 0, 0, 0, 0, 0, 0,
-        // g9/2, -5/2
+        
         0, 0, 0.590043589926643510, 0, 0, 0, 0, -1.770130769779930531, 0, 0, 0, 0, 0, 0, 0,
         -0.295021794963321755, 0, 0, 0, 0, 1.770130769779930531, 0, 0, 0, 0, 0.295021794963321755, 0, -1.770130769779930531, 0, 0,
-        // g9/2, -3/2
+        
         -0.193137101011594790, 0, 0, 0, 0, 1.158822606069568741, 0, 0, 0, 0, 0.193137101011594790, 0, -1.158822606069568741, 0, 0,
         0, 0, -1.158822606069568741, 0, 0, 0, 0, -1.158822606069568741, 0, 1.545096808092758321, 0, 0, 0, 0, 0,
-        // g9/2, -1/2
+        
         0, 0, -0.946174695757560018, 0, 0, 0, 0, -0.946174695757560018, 0, 1.261566261010080024, 0, 0, 0, 0, 0,
         0.236543673939390004, 0, 0, 0.473087347878780009, 0, -1.892349391515120036, 0, 0, 0, 0, 0.236543673939390004, 0, -1.892349391515120036, 0, 0.630783130505040012,
-        // g9/2, 1/2
+        
         0.236543673939390004, 0, 0, 0.473087347878780009, 0, -1.892349391515120036, 0, 0, 0, 0, 0.236543673939390004, 0, -1.892349391515120036, 0, 0.630783130505040012,
         0, 0, 0.946174695757560018, 0, 0, 0, 0, 0.946174695757560018, 0, -1.261566261010080024, 0, 0, 0, 0, 0,
-        // g9/2, 3/2
+        
         0, 0, 1.158822606069568741, 0, 0, 0, 0, 1.158822606069568741, 0, -1.545096808092758321, 0, 0, 0, 0, 0,
         -0.193137101011594790, 0, 0, 0, 0, 1.158822606069568741, 0, 0, 0, 0, 0.193137101011594790, 0, -1.158822606069568741, 0, 0,
-        // g9/2, 5/2
+        
         -0.295021794963321755, 0, 0, 0, 0, 1.770130769779930531, 0, 0, 0, 0, 0.295021794963321755, 0, -1.770130769779930531, 0, 0,
         0, 0, -0.590043589926643510, 0, 0, 0, 0, 1.770130769779930531, 0, 0, 0, 0, 0, 0, 0,
-        // g9/2, 7/2
+        
         0, 0, -1.180087179853287020, 0, 0, 0, 0, 3.540261539559861062, 0, 0, 0, 0, 0, 0, 0,
         0.147510897481660877, 0, 0, -0.885065384889965265, 0, 0, 0, 0, 0, 0, 0.147510897481660877, 0, 0, 0, 0,
-        // g9/2, 9/2
+        
         0.442532692444982632, 0, 0, -2.655196154669895796, 0, 0, 0, 0, 0, 0, 0.442532692444982632, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // h9/2, -9/2
+        
         -0.442532692444982632, 0, 0, 4.425326924449826327, 0, 0, 0, 0, 0, 0, -2.212663462224913163, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0.442532692444982632, 0, 0, 0, 0, -2.655196154669895796, 0, 0, 0, 0, 0, 0, 0, 0, 0.442532692444982632, 0, 0, 0, 0,
-        // h9/2, -7/2
+        
         0, 0, -1.327598077334947898, 0, 0, 0, 0, 7.965588464009687389, 0, 0, 0, 0, 0, 0, 0, 0, -1.327598077334947898, 0, 0, 0, 0,
         -0.147510897481660877, 0, 0, 0.295021794963321755, 0, 1.180087179853287020, 0, 0, 0, 0, 0.442532692444982632, 0, -3.540261539559861062, 0, 0, 0, 0, 0, 0, 0, 0,
-        // h9/2, -5/2
+        
         0.295021794963321755, 0, 0, -0.590043589926643510, 0, -2.360174359706574041, 0, 0, 0, 0, -0.885065384889965265, 0, 7.080523079119722124, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, -0.885065384889965265, 0, 0, 0, 0, 0, 0, 1.770130769779930531, 0, 0, 0, 0, 0, 0, 0.885065384889965265, 0, -1.770130769779930531, 0, 0,
-        // h9/2, -3/2
+        
         0, 0, 1.351959707081163531, 0, 0, 0, 0, 0, 0, -2.703919414162327062, 0, 0, 0, 0, 0, 0, -1.351959707081163531, 0, 2.703919414162327062, 0, 0,
         0.193137101011594790, 0, 0, 0.386274202023189580, 0, -2.317645212139137482, 0, 0, 0, 0, 0.193137101011594790, 0, -2.317645212139137482, 0, 1.545096808092758321, 0, 0, 0, 0, 0, 0,
-        // h9/2, -1/2
+        
         -0.236543673939390004, 0, 0, -0.473087347878780009, 0, 2.838524087272680054, 0, 0, 0, 0, -0.236543673939390004, 0, 2.838524087272680054, 0, -1.892349391515120036, 0, 0, 0, 0, 0, 0,
         0, 0, 1.182718369696950022, 0, 0, 0, 0, 2.365436739393900045, 0, -3.153915652525200060, 0, 0, 0, 0, 0, 0, 1.182718369696950022, 0, -3.153915652525200060, 0, 0.630783130505040012,
-        // h9/2, 1/2
+        
         0, 0, -1.182718369696950022, 0, 0, 0, 0, -2.365436739393900045, 0, 3.153915652525200060, 0, 0, 0, 0, 0, 0, -1.182718369696950022, 0, 3.153915652525200060, 0, -0.630783130505040012,
         -0.236543673939390004, 0, 0, -0.473087347878780009, 0, 2.838524087272680054, 0, 0, 0, 0, -0.236543673939390004, 0, 2.838524087272680054, 0, -1.892349391515120036, 0, 0, 0, 0, 0, 0,
-        // h9/2, 3/2
+        
         0.193137101011594790, 0, 0, 0.386274202023189580, 0, -2.317645212139137482, 0, 0, 0, 0, 0.193137101011594790, 0, -2.317645212139137482, 0, 1.545096808092758321, 0, 0, 0, 0, 0, 0,
         0, 0, -1.351959707081163531, 0, 0, 0, 0, 0, 0, 2.703919414162327062, 0, 0, 0, 0, 0, 0, 1.351959707081163531, 0, -2.703919414162327062, 0, 0,
-        // h9/2, 5/2
+        
         0, 0, 0.885065384889965265, 0, 0, 0, 0, 0, 0, -1.770130769779930531, 0, 0, 0, 0, 0, 0, -0.885065384889965265, 0, 1.770130769779930531, 0, 0,
         0.295021794963321755, 0, 0, -0.590043589926643510, 0, -2.360174359706574041, 0, 0, 0, 0, -0.885065384889965265, 0, 7.080523079119722124, 0, 0, 0, 0, 0, 0, 0, 0,
-        // h9/2, 7/2
+        
         -0.147510897481660877, 0, 0, 0.295021794963321755, 0, 1.180087179853287020, 0, 0, 0, 0, 0.442532692444982632, 0, -3.540261539559861062, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 1.327598077334947898, 0, 0, 0, 0, -7.965588464009687389, 0, 0, 0, 0, 0, 0, 0, 0, 1.327598077334947898, 0, 0, 0, 0,
-        // h9/2, 9/2
+        
         0, 0, -0.442532692444982632, 0, 0, 0, 0, 2.655196154669895796, 0, 0, 0, 0, 0, 0, 0, 0, -0.442532692444982632, 0, 0, 0, 0,
         -0.442532692444982632, 0, 0, 4.425326924449826327, 0, 0, 0, 0, 0, 0, -2.212663462224913163, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // h11/2, -11/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.464132203440858160, 0, 0, -4.641322034408581606, 0, 0, 0, 0, 0, 0, 2.320661017204290803, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // h11/2, -9/2
+        
         0.139941124721293271, 0, 0, -1.399411247212932717, 0, 0, 0, 0, 0, 0, 0.699705623606466358, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 1.399411247212932717, 0, 0, 0, 0, -8.396467483277596306, 0, 0, 0, 0, 0, 0, 0, 0, 1.399411247212932717, 0, 0, 0, 0,
-        // h11/2, -7/2
+        
         0, 0, 0.625835735449176134, 0, 0, 0, 0, -3.755014412695056807, 0, 0, 0, 0, 0, 0, 0, 0, 0.625835735449176134, 0, 0, 0, 0,
         -0.312917867724588067, 0, 0, 0.625835735449176134, 0, 2.503342941796704538, 0, 0, 0, 0, 0.938753603173764201, 0, -7.510028825390113615, 0, 0, 0, 0, 0, 0, 0, 0,
-        // h11/2, -5/2
+        
         -0.180663215165034628, 0, 0, 0.361326430330069256, 0, 1.445305721320277027, 0, 0, 0, 0, 0.541989645495103885, 0, -4.335917163960831083, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, -1.445305721320277027, 0, 0, 0, 0, 0, 0, 2.890611442640554055, 0, 0, 0, 0, 0, 0, 1.445305721320277027, 0, -2.890611442640554055, 0, 0,
-        // h11/2, -3/2
+        
         0, 0, -1.021985476433282363, 0, 0, 0, 0, 0, 0, 2.043970952866564726, 0, 0, 0, 0, 0, 0, 1.021985476433282363, 0, -2.043970952866564726, 0, 0,
         0.255496369108320590, 0, 0, 0.510992738216641181, 0, -3.065956429299847090, 0, 0, 0, 0, 0.255496369108320590, 0, -3.065956429299847090, 0, 2.043970952866564726, 0, 0, 0, 0, 0, 0,
-        // h11/2, -1/2
+        
         0.215933843419584674, 0, 0, 0.431867686839169349, 0, -2.591206121035016094, 0, 0, 0, 0, 0.215933843419584674, 0, -2.591206121035016094, 0, 1.727470747356677396, 0, 0, 0, 0, 0, 0,
         0, 0, 1.295603060517508047, 0, 0, 0, 0, 2.591206121035016094, 0, -3.454941494713354792, 0, 0, 0, 0, 0, 0, 1.295603060517508047, 0, -3.454941494713354792, 0, 0.690988298942670958,
-        // h11/2, 1/2
+        
         0, 0, 1.295603060517508047, 0, 0, 0, 0, 2.591206121035016094, 0, -3.454941494713354792, 0, 0, 0, 0, 0, 0, 1.295603060517508047, 0, -3.454941494713354792, 0, 0.690988298942670958,
         -0.215933843419584674, 0, 0, -0.431867686839169349, 0, 2.591206121035016094, 0, 0, 0, 0, -0.215933843419584674, 0, 2.591206121035016094, 0, -1.727470747356677396, 0, 0, 0, 0, 0, 0,
-        // h11/2, 3/2
+        
         -0.255496369108320590, 0, 0, -0.510992738216641181, 0, 3.065956429299847090, 0, 0, 0, 0, -0.255496369108320590, 0, 3.065956429299847090, 0, -2.043970952866564726, 0, 0, 0, 0, 0, 0,
         0, 0, -1.021985476433282363, 0, 0, 0, 0, 0, 0, 2.043970952866564726, 0, 0, 0, 0, 0, 0, 1.021985476433282363, 0, -2.043970952866564726, 0, 0,
-        // h11/2, 5/2
+        
         0, 0, -1.445305721320277027, 0, 0, 0, 0, 0, 0, 2.890611442640554055, 0, 0, 0, 0, 0, 0, 1.445305721320277027, 0, -2.890611442640554055, 0, 0,
         0.180663215165034628, 0, 0, -0.361326430330069256, 0, -1.445305721320277027, 0, 0, 0, 0, -0.541989645495103885, 0, 4.335917163960831083, 0, 0, 0, 0, 0, 0, 0, 0,
-        // h11/2, 7/2
+        
         0.312917867724588067, 0, 0, -0.625835735449176134, 0, -2.503342941796704538, 0, 0, 0, 0, -0.938753603173764201, 0, 7.510028825390113615, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0.625835735449176134, 0, 0, 0, 0, -3.755014412695056807, 0, 0, 0, 0, 0, 0, 0, 0, 0.625835735449176134, 0, 0, 0, 0,
-        // h11/2, 9/2
+        
         0, 0, 1.399411247212932717, 0, 0, 0, 0, -8.396467483277596306, 0, 0, 0, 0, 0, 0, 0, 0, 1.399411247212932717, 0, 0, 0, 0,
         -0.139941124721293271, 0, 0, 1.399411247212932717, 0, 0, 0, 0, 0, 0, -0.699705623606466358, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // h11/2, 11/2
+        
         -0.464132203440858160, 0, 0, 4.641322034408581606, 0, 0, 0, 0, 0, 0, -2.320661017204290803, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //i11/2,-11/2
+        
         -0.4641322034408583, 0, 0, 6.9619830516128740, 0, 0, 0, 0, 0, 0, -6.9619830516128740, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.4641322034408583, 0, 0, 0, 0, 0, 0,
         0, 0, 0.4641322034408583, 0, 0, 0, 0, -4.6413220344085833, 0, 0, 0, 0, 0, 0, 0, 0, 2.3206610172042916, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //i11/2,-9/2
+        
         0, 0, -1.5393523719342264, 0, 0, 0, 0, 15.3935237193422640, 0, 0, 0, 0, 0, 0, 0, 0, -7.6967618596711320, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.1399411247212932, 0, 0, 0.6997056236064662, 0, 1.3994112472129330, 0, 0, 0, 0, 0.6997056236064662, 0, -8.3964674832775970, 0, 0, 0, 0, 0, 0, 0, 0, -0.1399411247212932, 0, 1.3994112472129330, 0, 0, 0, 0,
-        //i11/2,-7/2
+        
         0.3129178677245880, 0, 0, -1.5645893386229399, 0, -3.1291786772458812, 0, 0, 0, 0, -1.5645893386229399, 0, 18.7750720634752852, 0, 0, 0, 0, 0, 0, 0, 0, 0.3129178677245880, 0, -3.1291786772458812, 0, 0, 0, 0,
         0, 0, -0.9387536031737643, 0, 0, 0, 0, 1.8775072063475287, 0, 2.5033429417967050, 0, 0, 0, 0, 0, 0, 2.8162608095212929, 0, -7.5100288253901146, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //i11/2,-5/2
+        
         0, 0, 1.6259689364853118, 0, 0, 0, 0, -3.2519378729706236, 0, -4.3359171639608318, 0, 0, 0, 0, 0, 0, -4.8779068094559346, 0, 13.0077514918824946, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.1806632151650347, 0, 0, 0.1806632151650347, 0, -2.8906114426405547, 0, 0, 0, 0, -0.1806632151650347, 0, 0, 0, 2.8906114426405547, 0, 0, 0, 0, 0, 0, -0.1806632151650347, 0, 2.8906114426405547, 0, -2.8906114426405547, 0, 0,
-        //i11/2,-3/2
+        
         -0.2554963691083206, 0, 0, -0.2554963691083206, 0, 4.0879419057331301, 0, 0, 0, 0, 0.2554963691083206, 0, 0, 0, -4.0879419057331301, 0, 0, 0, 0, 0, 0, 0.2554963691083206, 0, -4.0879419057331301, 0, 4.0879419057331301, 0, 0,
         0, 0, 1.2774818455416030, 0, 0, 0, 0, 2.5549636910832061, 0, -5.1099273821664122, 0, 0, 0, 0, 0, 0, 1.2774818455416030, 0, -5.1099273821664122, 0, 2.0439709528665646, 0, 0, 0, 0, 0, 0, 0,
-        //i11/2,-1/2
+        
         0, 0, -1.5115369039370925, 0, 0, 0, 0, -3.0230738078741850, 0, 6.0461476157483700, 0, 0, 0, 0, 0, 0, -1.5115369039370925, 0, 6.0461476157483700, 0, -2.4184590462993478, 0, 0, 0, 0, 0, 0, 0,
         -0.2159338434195847, 0, 0, -0.6478015302587540, 0, 3.8868091815525241, 0, 0, 0, 0, -0.6478015302587540, 0, 7.7736183631050482, 0, -5.1824122420700318, 0, 0, 0, 0, 0, 0, -0.2159338434195847, 0, 3.8868091815525241, 0, -5.1824122420700318, 0, 0.6909882989426709,
-        //i11/2,1/2
+        
         0.2159338434195847, 0, 0, 0.6478015302587540, 0, -3.8868091815525241, 0, 0, 0, 0, 0.6478015302587540, 0, -7.7736183631050482, 0, 5.1824122420700318, 0, 0, 0, 0, 0, 0, 0.2159338434195847, 0, -3.8868091815525241, 0, 5.1824122420700318, 0, -0.6909882989426709,
         0, 0, -1.5115369039370925, 0, 0, 0, 0, -3.0230738078741850, 0, 6.0461476157483700, 0, 0, 0, 0, 0, 0, -1.5115369039370925, 0, 6.0461476157483700, 0, -2.4184590462993478, 0, 0, 0, 0, 0, 0, 0,
-        //i11/2,3/2
+        
         0, 0, 1.2774818455416030, 0, 0, 0, 0, 2.5549636910832061, 0, -5.1099273821664122, 0, 0, 0, 0, 0, 0, 1.2774818455416030, 0, -5.1099273821664122, 0, 2.0439709528665646, 0, 0, 0, 0, 0, 0, 0,
         0.2554963691083206, 0, 0, 0.2554963691083206, 0, -4.0879419057331301, 0, 0, 0, 0, -0.2554963691083206, 0, 0, 0, 4.0879419057331301, 0, 0, 0, 0, 0, 0, -0.2554963691083206, 0, 4.0879419057331301, 0, -4.0879419057331301, 0, 0,
-        //i11/2,5/2
+        
         -0.1806632151650347, 0, 0, -0.1806632151650347, 0, 2.8906114426405547, 0, 0, 0, 0, 0.1806632151650347, 0, 0, 0, -2.8906114426405547, 0, 0, 0, 0, 0, 0, 0.1806632151650347, 0, -2.8906114426405547, 0, 2.8906114426405547, 0, 0,
         0, 0, 1.6259689364853118, 0, 0, 0, 0, -3.2519378729706236, 0, -4.3359171639608318, 0, 0, 0, 0, 0, 0, -4.8779068094559346, 0, 13.0077514918824946, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //i11/2,7/2
+        
         0, 0, -0.9387536031737643, 0, 0, 0, 0, 1.8775072063475287, 0, 2.5033429417967050, 0, 0, 0, 0, 0, 0, 2.8162608095212929, 0, -7.5100288253901146, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.3129178677245880, 0, 0, 1.5645893386229399, 0, 3.1291786772458812, 0, 0, 0, 0, 1.5645893386229399, 0, -18.7750720634752852, 0, 0, 0, 0, 0, 0, 0, 0, -0.3129178677245880, 0, 3.1291786772458812, 0, 0, 0, 0,
-        //i11/2,9/2
+        
         0.1399411247212932, 0, 0, -0.6997056236064662, 0, -1.3994112472129330, 0, 0, 0, 0, -0.6997056236064662, 0, 8.3964674832775970, 0, 0, 0, 0, 0, 0, 0, 0, 0.1399411247212932, 0, -1.3994112472129330, 0, 0, 0, 0,
         0, 0, -1.5393523719342264, 0, 0, 0, 0, 15.3935237193422640, 0, 0, 0, 0, 0, 0, 0, 0, -7.6967618596711320, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //i11/2,11/2
+        
         0, 0, 0.4641322034408583, 0, 0, 0, 0, -4.6413220344085833, 0, 0, 0, 0, 0, 0, 0, 0, 2.3206610172042916, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.4641322034408583, 0, 0, -6.9619830516128740, 0, 0, 0, 0, 0, 0, 6.9619830516128740, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.4641322034408583, 0, 0, 0, 0, 0, 0,
-        //i13/2,-13/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.4830841135800663, 0, 0, -7.2462617037009949, 0, 0, 0, 0, 0, 0, 7.2462617037009949, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.4830841135800663, 0, 0, 0, 0, 0, 0,
-        //i13/2,-11/2
+        
         0.1339834262980768, 0, 0, -2.0097513944711523, 0, 0, 0, 0, 0, 0, 2.0097513944711523, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.1339834262980768, 0, 0, 0, 0, 0, 0,
         0, 0, 1.6078011155769223, 0, 0, 0, 0, -16.0780111557692216, 0, 0, 0, 0, 0, 0, 0, 0, 8.0390055778846108, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //i13/2,-9/2
+        
         0, 0, 0.6563820568401703, 0, 0, 0, 0, -6.5638205684017032, 0, 0, 0, 0, 0, 0, 0, 0, 3.2819102842008516, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.3281910284200850, 0, 0, 1.6409551421004249, 0, 3.2819102842008507, 0, 0, 0, 0, 1.6409551421004249, 0, -19.6914617052051035, 0, 0, 0, 0, 0, 0, 0, 0, -0.3281910284200850, 0, 3.2819102842008507, 0, 0, 0, 0,
-        //i13/2,-7/2
+        
         -0.1713921747991747, 0, 0, 0.8569608739958732, 0, 1.7139217479917468, 0, 0, 0, 0, 0.8569608739958732, 0, -10.2835304879504807, 0, 0, 0, 0, 0, 0, 0, 0, -0.1713921747991747, 0, 1.7139217479917468, 0, 0, 0, 0,
         0, 0, -1.7139217479917466, 0, 0, 0, 0, 3.4278434959834931, 0, 4.5704579946446584, 0, 0, 0, 0, 0, 0, 5.1417652439752395, 0, -13.7113739839339726, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //i13/2,-5/2
+        
         0, 0, -1.0839792909902080, 0, 0, 0, 0, 2.1679585819804159, 0, 2.8906114426405547, 0, 0, 0, 0, 0, 0, 3.2519378729706232, 0, -8.6718343279216636, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.2709948227475520, 0, 0, 0.2709948227475520, 0, -4.3359171639608318, 0, 0, 0, 0, -0.2709948227475520, 0, 0, 0, 4.3359171639608318, 0, 0, 0, 0, 0, 0, -0.2709948227475520, 0, 4.3359171639608318, 0, -4.3359171639608318, 0, 0,
-        //i13/2,-3/2
+        
         0.2019876150713442, 0, 0, 0.2019876150713442, 0, -3.2318018411415070, 0, 0, 0, 0, -0.2019876150713442, 0, 0, 0, 3.2318018411415070, 0, 0, 0, 0, 0, 0, -0.2019876150713442, 0, 3.2318018411415070, 0, -3.2318018411415070, 0, 0,
         0, 0, 1.6159009205707533, 0, 0, 0, 0, 3.2318018411415066, 0, -6.4636036822830132, 0, 0, 0, 0, 0, 0, 1.6159009205707533, 0, -6.4636036822830132, 0, 2.5854414729132049, 0, 0, 0, 0, 0, 0, 0,
-        //i13/2,-1/2
+        
         0, 0, 1.3994112472129328, 0, 0, 0, 0, 2.7988224944258655, 0, -5.5976449888517310, 0, 0, 0, 0, 0, 0, 1.3994112472129328, 0, -5.5976449888517310, 0, 2.2390579955406920, 0, 0, 0, 0, 0, 0, 0,
         -0.2332352078688221, 0, 0, -0.6997056236064663, 0, 4.1982337416387976, 0, 0, 0, 0, -0.6997056236064663, 0, 8.3964674832775952, 0, -5.5976449888517301, 0, 0, 0, 0, 0, 0, -0.2332352078688221, 0, 4.1982337416387976, 0, -5.5976449888517301, 0, 0.7463526651802307,
-        //i13/2,1/2
+        
         -0.2332352078688221, 0, 0, -0.6997056236064663, 0, 4.1982337416387976, 0, 0, 0, 0, -0.6997056236064663, 0, 8.3964674832775952, 0, -5.5976449888517301, 0, 0, 0, 0, 0, 0, -0.2332352078688221, 0, 4.1982337416387976, 0, -5.5976449888517301, 0, 0.7463526651802307,
         0, 0, -1.3994112472129328, 0, 0, 0, 0, -2.7988224944258655, 0, 5.5976449888517310, 0, 0, 0, 0, 0, 0, -1.3994112472129328, 0, 5.5976449888517310, 0, -2.2390579955406920, 0, 0, 0, 0, 0, 0, 0,
-        //i13/2,3/2
+        
         0, 0, -1.6159009205707533, 0, 0, 0, 0, -3.2318018411415066, 0, 6.4636036822830132, 0, 0, 0, 0, 0, 0, -1.6159009205707533, 0, 6.4636036822830132, 0, -2.5854414729132049, 0, 0, 0, 0, 0, 0, 0,
         0.2019876150713442, 0, 0, 0.2019876150713442, 0, -3.2318018411415070, 0, 0, 0, 0, -0.2019876150713442, 0, 0, 0, 3.2318018411415070, 0, 0, 0, 0, 0, 0, -0.2019876150713442, 0, 3.2318018411415070, 0, -3.2318018411415070, 0, 0,
-        //i13/2,5/2
+        
         0.2709948227475520, 0, 0, 0.2709948227475520, 0, -4.3359171639608318, 0, 0, 0, 0, -0.2709948227475520, 0, 0, 0, 4.3359171639608318, 0, 0, 0, 0, 0, 0, -0.2709948227475520, 0, 4.3359171639608318, 0, -4.3359171639608318, 0, 0,
         0, 0, 1.0839792909902080, 0, 0, 0, 0, -2.1679585819804159, 0, -2.8906114426405547, 0, 0, 0, 0, 0, 0, -3.2519378729706232, 0, 8.6718343279216636, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //i13/2,7/2
+        
         0, 0, 1.7139217479917466, 0, 0, 0, 0, -3.4278434959834931, 0, -4.5704579946446584, 0, 0, 0, 0, 0, 0, -5.1417652439752395, 0, 13.7113739839339726, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.1713921747991747, 0, 0, 0.8569608739958732, 0, 1.7139217479917468, 0, 0, 0, 0, 0.8569608739958732, 0, -10.2835304879504807, 0, 0, 0, 0, 0, 0, 0, 0, -0.1713921747991747, 0, 1.7139217479917468, 0, 0, 0, 0,
-        //i13/2,9/2
+        
         -0.3281910284200850, 0, 0, 1.6409551421004249, 0, 3.2819102842008507, 0, 0, 0, 0, 1.6409551421004249, 0, -19.6914617052051035, 0, 0, 0, 0, 0, 0, 0, 0, -0.3281910284200850, 0, 3.2819102842008507, 0, 0, 0, 0,
         0, 0, -0.6563820568401703, 0, 0, 0, 0, 6.5638205684017032, 0, 0, 0, 0, 0, 0, 0, 0, -3.2819102842008516, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //i13/2,11/2
+        
         0, 0, -1.6078011155769223, 0, 0, 0, 0, 16.0780111557692216, 0, 0, 0, 0, 0, 0, 0, 0, -8.0390055778846108, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.1339834262980768, 0, 0, -2.0097513944711523, 0, 0, 0, 0, 0, 0, 2.0097513944711523, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.1339834262980768, 0, 0, 0, 0, 0, 0,
-        //i13/2,13/2
+        
         0.4830841135800663, 0, 0, -7.2462617037009949, 0, 0, 0, 0, 0, 0, 7.2462617037009949, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.4830841135800663, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j13/2,-13/2
+        
         -0.4830841135800663, 0, 0, 10.1447663851813932, 0, 0, 0, 0, 0, 0, -16.9079439753023237, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.3815887950604644, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0.4830841135800661, 0, 0, 0, 0, -7.2462617037009922, 0, 0, 0, 0, 0, 0, 0, 0, 7.2462617037009922, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.4830841135800661, 0, 0, 0, 0, 0, 0,
-        //j13/2,-11/2
+        
         0, 0, -1.7417845418749984, 0, 0, 0, 0, 26.1267681281249757, 0, 0, 0, 0, 0, 0, 0, 0, -26.1267681281249757, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.7417845418749984, 0, 0, 0, 0, 0, 0,
         -0.1339834262980768, 0, 0, 1.2058508366826914, 0, 1.6078011155769216, 0, 0, 0, 0, 0.6699171314903840, 0, -16.0780111557692145, 0, 0, 0, 0, 0, 0, 0, 0, -0.6699171314903840, 0, 8.0390055778846072, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j13/2,-9/2
+        
         0.3281910284200851, 0, 0, -2.9537192557807663, 0, -3.9382923410410213, 0, 0, 0, 0, -1.6409551421004256, 0, 39.3829234104102142, 0, 0, 0, 0, 0, 0, 0, 0, 1.6409551421004256, 0, -19.6914617052051071, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, -0.9845730852602553, 0, 0, 0, 0, 4.9228654263012768, 0, 3.2819102842008512, 0, 0, 0, 0, 0, 0, 4.9228654263012768, 0, -19.6914617052051071, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.9845730852602553, 0, 3.2819102842008512, 0, 0, 0, 0,
-        //j13/2,-7/2
+        
         0, 0, 1.8853139227909212, 0, 0, 0, 0, -9.4265696139546051, 0, -6.2843797426364043, 0, 0, 0, 0, 0, 0, -9.4265696139546051, 0, 37.7062784558184205, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.8853139227909212, 0, -6.2843797426364043, 0, 0, 0, 0,
         0.1713921747991747, 0, 0, -0.1713921747991747, 0, -3.4278434959834923, 0, 0, 0, 0, -0.8569608739958733, 0, 6.8556869919669845, 0, 4.5704579946446575, 0, 0, 0, 0, 0, 0, -0.5141765243975239, 0, 10.2835304879504772, 0, -13.7113739839339726, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j13/2,-5/2
+        
         -0.2709948227475520, 0, 0, 0.2709948227475520, 0, 5.4198964549510391, 0, 0, 0, 0, 1.3549741137377600, 0, -10.8397929099020782, 0, -7.2265286066013861, 0, 0, 0, 0, 0, 0, 0.8129844682426559, 0, -16.2596893648531164, 0, 21.6795858198041600, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 1.3549741137377600, 0, 0, 0, 0, 1.3549741137377600, 0, -7.2265286066013861, 0, 0, 0, 0, 0, 0, -1.3549741137377600, 0, 0, 0, 4.3359171639608327, 0, 0, 0, 0, 0, 0, 0, 0, -1.3549741137377600, 0, 7.2265286066013861, 0, -4.3359171639608327, 0, 0,
-        //j13/2,-3/2
+        
         0, 0, -1.8178885356420982, 0, 0, 0, 0, -1.8178885356420982, 0, 9.6954055234245224, 0, 0, 0, 0, 0, 0, 1.8178885356420982, 0, 0, 0, -5.8172433140547142, 0, 0, 0, 0, 0, 0, 0, 0, 1.8178885356420982, 0, -9.6954055234245224, 0, 5.8172433140547142, 0, 0,
         -0.2019876150713442, 0, 0, -0.6059628452140327, 0, 4.8477027617122603, 0, 0, 0, 0, -0.6059628452140327, 0, 9.6954055234245207, 0, -9.6954055234245207, 0, 0, 0, 0, 0, 0, -0.2019876150713442, 0, 4.8477027617122603, 0, -9.6954055234245207, 0, 2.5854414729132063, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j13/2,-1/2
+        
         0.2332352078688221, 0, 0, 0.6997056236064664, 0, -5.5976449888517301, 0, 0, 0, 0, 0.6997056236064664, 0, -11.1952899777034602, 0, 11.1952899777034602, 0, 0, 0, 0, 0, 0, 0.2332352078688221, 0, -5.5976449888517301, 0, 11.1952899777034602, 0, -2.9854106607209236, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, -1.6326464550817545, 0, 0, 0, 0, -4.8979393652452643, 0, 9.7958787304905268, 0, 0, 0, 0, 0, 0, -4.8979393652452643, 0, 19.5917574609810536, 0, -7.8367029843924216, 0, 0, 0, 0, 0, 0, 0, 0, -1.6326464550817545, 0, 9.7958787304905268, 0, -7.8367029843924216, 0, 0.7463526651802307,
-        //j13/2,1/2
+        
         0, 0, 1.6326464550817545, 0, 0, 0, 0, 4.8979393652452643, 0, -9.7958787304905268, 0, 0, 0, 0, 0, 0, 4.8979393652452643, 0, -19.5917574609810536, 0, 7.8367029843924216, 0, 0, 0, 0, 0, 0, 0, 0, 1.6326464550817545, 0, -9.7958787304905268, 0, 7.8367029843924216, 0, -0.7463526651802307,
         0.2332352078688221, 0, 0, 0.6997056236064664, 0, -5.5976449888517301, 0, 0, 0, 0, 0.6997056236064664, 0, -11.1952899777034602, 0, 11.1952899777034602, 0, 0, 0, 0, 0, 0, 0.2332352078688221, 0, -5.5976449888517301, 0, 11.1952899777034602, 0, -2.9854106607209236, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j13/2,3/2
+        
         -0.2019876150713442, 0, 0, -0.6059628452140327, 0, 4.8477027617122603, 0, 0, 0, 0, -0.6059628452140327, 0, 9.6954055234245207, 0, -9.6954055234245207, 0, 0, 0, 0, 0, 0, -0.2019876150713442, 0, 4.8477027617122603, 0, -9.6954055234245207, 0, 2.5854414729132063, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 1.8178885356420982, 0, 0, 0, 0, 1.8178885356420982, 0, -9.6954055234245224, 0, 0, 0, 0, 0, 0, -1.8178885356420982, 0, 0, 0, 5.8172433140547142, 0, 0, 0, 0, 0, 0, 0, 0, -1.8178885356420982, 0, 9.6954055234245224, 0, -5.8172433140547142, 0, 0,
-        //j13/2,5/2
+        
         0, 0, -1.3549741137377600, 0, 0, 0, 0, -1.3549741137377600, 0, 7.2265286066013861, 0, 0, 0, 0, 0, 0, 1.3549741137377600, 0, 0, 0, -4.3359171639608327, 0, 0, 0, 0, 0, 0, 0, 0, 1.3549741137377600, 0, -7.2265286066013861, 0, 4.3359171639608327, 0, 0,
         -0.2709948227475520, 0, 0, 0.2709948227475520, 0, 5.4198964549510391, 0, 0, 0, 0, 1.3549741137377600, 0, -10.8397929099020782, 0, -7.2265286066013861, 0, 0, 0, 0, 0, 0, 0.8129844682426559, 0, -16.2596893648531164, 0, 21.6795858198041600, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j13/2,7/2
+        
         0.1713921747991747, 0, 0, -0.1713921747991747, 0, -3.4278434959834923, 0, 0, 0, 0, -0.8569608739958733, 0, 6.8556869919669845, 0, 4.5704579946446575, 0, 0, 0, 0, 0, 0, -0.5141765243975239, 0, 10.2835304879504772, 0, -13.7113739839339726, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, -1.8853139227909212, 0, 0, 0, 0, 9.4265696139546051, 0, 6.2843797426364043, 0, 0, 0, 0, 0, 0, 9.4265696139546051, 0, -37.7062784558184205, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.8853139227909212, 0, 6.2843797426364043, 0, 0, 0, 0,
-        //j13/2,9/2
+        
         0, 0, 0.9845730852602553, 0, 0, 0, 0, -4.9228654263012768, 0, -3.2819102842008512, 0, 0, 0, 0, 0, 0, -4.9228654263012768, 0, 19.6914617052051071, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.9845730852602553, 0, -3.2819102842008512, 0, 0, 0, 0,
         0.3281910284200851, 0, 0, -2.9537192557807663, 0, -3.9382923410410213, 0, 0, 0, 0, -1.6409551421004256, 0, 39.3829234104102142, 0, 0, 0, 0, 0, 0, 0, 0, 1.6409551421004256, 0, -19.6914617052051071, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j13/2,11/2
+        
         -0.1339834262980768, 0, 0, 1.2058508366826914, 0, 1.6078011155769216, 0, 0, 0, 0, 0.6699171314903840, 0, -16.0780111557692145, 0, 0, 0, 0, 0, 0, 0, 0, -0.6699171314903840, 0, 8.0390055778846072, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 1.7417845418749984, 0, 0, 0, 0, -26.1267681281249757, 0, 0, 0, 0, 0, 0, 0, 0, 26.1267681281249757, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.7417845418749984, 0, 0, 0, 0, 0, 0,
-        //j13/2,13/2
+        
         0, 0, -0.4830841135800661, 0, 0, 0, 0, 7.2462617037009922, 0, 0, 0, 0, 0, 0, 0, 0, -7.2462617037009922, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.4830841135800661, 0, 0, 0, 0, 0, 0,
         -0.4830841135800663, 0, 0, 10.1447663851813932, 0, 0, 0, 0, 0, 0, -16.9079439753023237, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.3815887950604644, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j15/2,-15/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.5000395635705508, 0, 0, -10.5008308349815653, 0, 0, 0, 0, 0, 0, 17.5013847249692773, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -3.5002769449938556, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j15/2,-13/2
+        
         0.1291096601435712, 0, 0, -2.7113028630149949, 0, 0, 0, 0, 0, 0, 4.5188381050249919, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.9037676210049984, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 1.8075352420099966, 0, 0, 0, 0, -27.1130286301499481, 0, 0, 0, 0, 0, 0, 0, 0, 27.1130286301499481, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.8075352420099966, 0, 0, 0, 0, 0, 0,
-        //j15/2,-11/2
+        
         0, 0, 0.6831841051919142, 0, 0, 0, 0, -10.2477615778787126, 0, 0, 0, 0, 0, 0, 0, 0, 10.2477615778787126, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.6831841051919142, 0, 0, 0, 0, 0, 0,
         -0.3415920525959572, 0, 0, 3.0743284733636154, 0, 4.0991046311514863, 0, 0, 0, 0, 1.7079602629797861, 0, -40.9910463115148644, 0, 0, 0, 0, 0, 0, 0, 0, -1.7079602629797861, 0, 20.4955231557574322, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j15/2,-9/2
+        
         -0.1640955142100426, 0, 0, 1.4768596278903832, 0, 1.9691461705205107, 0, 0, 0, 0, 0.8204775710502128, 0, -19.6914617052051071, 0, 0, 0, 0, 0, 0, 0, 0, -0.8204775710502128, 0, 9.8457308526025535, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, -1.9691461705205107, 0, 0, 0, 0, 9.8457308526025535, 0, 6.5638205684017024, 0, 0, 0, 0, 0, 0, 9.8457308526025535, 0, -39.3829234104102142, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.9691461705205107, 0, 6.5638205684017024, 0, 0, 0, 0,
-        //j15/2,-7/2
+        
         0, 0, -1.1368870716237374, 0, 0, 0, 0, 5.6844353581186864, 0, 3.7896235720791247, 0, 0, 0, 0, 0, 0, 5.6844353581186864, 0, -22.7377414324747456, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.1368870716237374, 0, 3.7896235720791247, 0, 0, 0, 0,
         0.2842217679059343, 0, 0, -0.2842217679059343, 0, -5.6844353581186855, 0, 0, 0, 0, -1.4211088395296716, 0, 11.3688707162373710, 0, 7.5792471441582485, 0, 0, 0, 0, 0, 0, -0.8526653037178029, 0, 17.0533060743560583, 0, -22.7377414324747456, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j15/2,-5/2
+        
         0.1916222768312404, 0, 0, -0.1916222768312404, 0, -3.8324455366248085, 0, 0, 0, 0, -0.9581113841562022, 0, 7.6648910732496169, 0, 5.1099273821664122, 0, 0, 0, 0, 0, 0, -0.5748668304937213, 0, 11.4973366098744254, 0, -15.3297821464992357, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 1.9162227683124053, 0, 0, 0, 0, 1.9162227683124053, 0, -10.2198547643328261, 0, 0, 0, 0, 0, 0, -1.9162227683124053, 0, 0, 0, 6.1319128585996969, 0, 0, 0, 0, 0, 0, 0, 0, -1.9162227683124053, 0, 10.2198547643328261, 0, -6.1319128585996969, 0, 0,
-        //j15/2,-3/2
+        
         0, 0, 1.4842997738594836, 0, 0, 0, 0, 1.4842997738594836, 0, -7.9162654605839124, 0, 0, 0, 0, 0, 0, -1.4842997738594836, 0, 0, 0, 4.7497592763503480, 0, 0, 0, 0, 0, 0, 0, 0, -1.4842997738594836, 0, 7.9162654605839124, 0, -4.7497592763503480, 0, 0,
         -0.2473832956432473, 0, 0, -0.7421498869297418, 0, 5.9371990954379337, 0, 0, 0, 0, -0.7421498869297418, 0, 11.8743981908758673, 0, -11.8743981908758673, 0, 0, 0, 0, 0, 0, -0.2473832956432473, 0, 5.9371990954379337, 0, -11.8743981908758673, 0, 3.1665061842335653, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j15/2,-1/2
+        
         -0.2181715595945335, 0, 0, -0.6545146787836006, 0, 5.2361174302688038, 0, 0, 0, 0, -0.6545146787836006, 0, 10.4722348605376077, 0, -10.4722348605376077, 0, 0, 0, 0, 0, 0, -0.2181715595945335, 0, 5.2361174302688038, 0, -10.4722348605376077, 0, 2.7925959628100294, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, -1.7453724767562677, 0, 0, 0, 0, -5.2361174302688038, 0, 10.4722348605376059, 0, 0, 0, 0, 0, 0, -5.2361174302688038, 0, 20.9444697210752118, 0, -8.3777878884300847, 0, 0, 0, 0, 0, 0, 0, 0, -1.7453724767562677, 0, 10.4722348605376059, 0, -8.3777878884300847, 0, 0.7978845608028652,
-        //j15/2,1/2
+        
         0, 0, -1.7453724767562677, 0, 0, 0, 0, -5.2361174302688038, 0, 10.4722348605376059, 0, 0, 0, 0, 0, 0, -5.2361174302688038, 0, 20.9444697210752118, 0, -8.3777878884300847, 0, 0, 0, 0, 0, 0, 0, 0, -1.7453724767562677, 0, 10.4722348605376059, 0, -8.3777878884300847, 0, 0.7978845608028652,
         0.2181715595945335, 0, 0, 0.6545146787836006, 0, -5.2361174302688038, 0, 0, 0, 0, 0.6545146787836006, 0, -10.4722348605376077, 0, 10.4722348605376077, 0, 0, 0, 0, 0, 0, 0.2181715595945335, 0, -5.2361174302688038, 0, 10.4722348605376077, 0, -2.7925959628100294, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j15/2,3/2
+        
         0.2473832956432473, 0, 0, 0.7421498869297418, 0, -5.9371990954379337, 0, 0, 0, 0, 0.7421498869297418, 0, -11.8743981908758673, 0, 11.8743981908758673, 0, 0, 0, 0, 0, 0, 0.2473832956432473, 0, -5.9371990954379337, 0, 11.8743981908758673, 0, -3.1665061842335653, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 1.4842997738594836, 0, 0, 0, 0, 1.4842997738594836, 0, -7.9162654605839124, 0, 0, 0, 0, 0, 0, -1.4842997738594836, 0, 0, 0, 4.7497592763503480, 0, 0, 0, 0, 0, 0, 0, 0, -1.4842997738594836, 0, 7.9162654605839124, 0, -4.7497592763503480, 0, 0,
-        //j15/2,5/2
+        
         0, 0, 1.9162227683124053, 0, 0, 0, 0, 1.9162227683124053, 0, -10.2198547643328261, 0, 0, 0, 0, 0, 0, -1.9162227683124053, 0, 0, 0, 6.1319128585996969, 0, 0, 0, 0, 0, 0, 0, 0, -1.9162227683124053, 0, 10.2198547643328261, 0, -6.1319128585996969, 0, 0,
         -0.1916222768312404, 0, 0, 0.1916222768312404, 0, 3.8324455366248085, 0, 0, 0, 0, 0.9581113841562022, 0, -7.6648910732496169, 0, -5.1099273821664122, 0, 0, 0, 0, 0, 0, 0.5748668304937213, 0, -11.4973366098744254, 0, 15.3297821464992357, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j15/2,7/2
+        
         -0.2842217679059343, 0, 0, 0.2842217679059343, 0, 5.6844353581186855, 0, 0, 0, 0, 1.4211088395296716, 0, -11.3688707162373710, 0, -7.5792471441582485, 0, 0, 0, 0, 0, 0, 0.8526653037178029, 0, -17.0533060743560583, 0, 22.7377414324747456, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, -1.1368870716237374, 0, 0, 0, 0, 5.6844353581186864, 0, 3.7896235720791247, 0, 0, 0, 0, 0, 0, 5.6844353581186864, 0, -22.7377414324747456, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.1368870716237374, 0, 3.7896235720791247, 0, 0, 0, 0,
-        //j15/2,9/2
+        
         0, 0, -1.9691461705205107, 0, 0, 0, 0, 9.8457308526025535, 0, 6.5638205684017024, 0, 0, 0, 0, 0, 0, 9.8457308526025535, 0, -39.3829234104102142, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.9691461705205107, 0, 6.5638205684017024, 0, 0, 0, 0,
         0.1640955142100426, 0, 0, -1.4768596278903832, 0, -1.9691461705205107, 0, 0, 0, 0, -0.8204775710502128, 0, 19.6914617052051071, 0, 0, 0, 0, 0, 0, 0, 0, 0.8204775710502128, 0, -9.8457308526025535, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j15/2,11/2
+        
         0.3415920525959572, 0, 0, -3.0743284733636154, 0, -4.0991046311514863, 0, 0, 0, 0, -1.7079602629797861, 0, 40.9910463115148644, 0, 0, 0, 0, 0, 0, 0, 0, 1.7079602629797861, 0, -20.4955231557574322, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0.6831841051919142, 0, 0, 0, 0, -10.2477615778787126, 0, 0, 0, 0, 0, 0, 0, 0, 10.2477615778787126, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.6831841051919142, 0, 0, 0, 0, 0, 0,
-        //j15/2,13/2
+        
         0, 0, 1.8075352420099966, 0, 0, 0, 0, -27.1130286301499481, 0, 0, 0, 0, 0, 0, 0, 0, 27.1130286301499481, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.8075352420099966, 0, 0, 0, 0, 0, 0,
         -0.1291096601435712, 0, 0, 2.7113028630149949, 0, 0, 0, 0, 0, 0, -4.5188381050249919, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.9037676210049984, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j15/2,15/2
+        
         -0.5000395635705508, 0, 0, 10.5008308349815653, 0, 0, 0, 0, 0, 0, -17.5013847249692773, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.5002769449938556, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 15/2, mj = -15/2
+        
         -0.500039563570550664, 0, 0, 14.0011077799754186, 0, 0, 0, 0, 0, 0, -35.0027694499385465, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14.0011077799754186, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.500039563570550664, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0.500039563570550664, 0, 0, 0, 0, -10.5008308349815639, 0, 0, 0, 0, 0, 0, 0, 0, 17.5013847249692732, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -3.50027694499385465, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 15/2, mj = -13/2
+        
         0, 0, -1.93664490215356767, 0, 0, 0, 0, 40.669542945224921, 0, 0, 0, 0, 0, 0, 0, 0, -67.7825715753748683, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13.5565143150749737, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.129109660143571178, 0, 0, 1.80753524200999649, 0, 1.80753524200999649, 0, 0, 0, 0, 0, 0, -27.1130286301499473, 0, 0, 0, 0, 0, 0, 0, 0, -1.80753524200999649, 0, 27.1130286301499473, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.129109660143571178, 0, -1.80753524200999649, 0, 0, 0, 0, 0, 0,
-        // j = 15/2, mj = -11/2
+        
         0.341592052595957161, 0, 0, -4.78228873634340025, 0, -4.78228873634340025, 0, 0, 0, 0, 0, 0, 71.7343310451510038, 0, 0, 0, 0, 0, 0, 0, 0, 4.78228873634340025, 0, -71.7343310451510038, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.341592052595957161, 0, 4.78228873634340025, 0, 0, 0, 0, 0, 0,
         0, 0, -1.02477615778787148, 0, 0, 0, 0, 9.22298542009084335, 0, 4.09910463115148593, 0, 0, 0, 0, 0, 0, 5.12388078893935741, 0, -40.9910463115148593, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -5.12388078893935741, 0, 20.4955231557574297, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 15/2, mj = -9/2
+        
         0, 0, 2.13324168473055283, 0, 0, 0, 0, -19.1991751625749755, 0, -8.53296673892221134, 0, 0, 0, 0, 0, 0, -10.6662084236527642, 0, 85.3296673892221134, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10.6662084236527642, 0, -42.6648336946110567, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.164095514210042526, 0, 0, -0.656382056840170103, 0, -3.93829234104102062, 0, 0, 0, 0, -1.64095514210042526, 0, 19.6914617052051031, 0, 6.56382056840170103, 0, 0, 0, 0, 0, 0, -0.656382056840170103, 0, 19.6914617052051031, 0, -39.3829234104102062, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.164095514210042526, 0, -3.93829234104102062, 0, 6.56382056840170103, 0, 0, 0, 0,
-        // j = 15/2, mj = -7/2
+        
         -0.284221767905934336, 0, 0, 1.13688707162373734, 0, 6.82132242974242407, 0, 0, 0, 0, 2.84221767905934336, 0, -34.1066121487121203, 0, -11.3688707162373734, 0, 0, 0, 0, 0, 0, 1.13688707162373734, 0, -34.1066121487121203, 0, 68.2132242974242407, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.284221767905934336, 0, 6.82132242974242407, 0, -11.3688707162373734, 0, 0, 0, 0,
         0, 0, 1.42110883952967168, 0, 0, 0, 0, -1.42110883952967168, 0, -9.47405893019781121, 0, 0, 0, 0, 0, 0, -7.1055441976483584, 0, 18.9481178603956224, 0, 7.57924714415824896, 0, 0, 0, 0, 0, 0, 0, 0, -4.26332651858901504, 0, 28.4221767905934336, 0, -22.7377414324747469, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 15/2, mj = -5/2
+        
         0, 0, -2.10784504514364487, 0, 0, 0, 0, 2.10784504514364487, 0, 14.0523003009576325, 0, 0, 0, 0, 0, 0, 10.5392252257182244, 0, -28.104600601915265, 0, -11.241840240766106, 0, 0, 0, 0, 0, 0, 0, 0, 6.32353513543093462, 0, -42.1569009028728975, 0, 33.725520722298318, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.191622276831240443, 0, 0, -0.383244553662480886, 0, 5.74866830493721329, 0, 0, 0, 0, 0, 0, 5.74866830493721329, 0, -15.3297821464992355, 0, 0, 0, 0, 0, 0, 0.383244553662480886, 0, -5.74866830493721329, 0, 0, 0, 6.13191285859969418, 0, 0, 0, 0, 0, 0, 0, 0, 0.191622276831240443, 0, -5.74866830493721329, 0, 15.3297821464992355, 0, -6.13191285859969418, 0, 0,
-        // j = 15/2, mj = -3/2
+        
         0.247383295643247195, 0, 0, 0.49476659128649439, 0, -7.42149886929741585, 0, 0, 0, 0, 0, 0, -7.42149886929741585, 0, 19.7906636514597756, 0, 0, 0, 0, 0, 0, -0.49476659128649439, 0, 7.42149886929741585, 0, 0, 0, -7.91626546058391024, 0, 0, 0, 0, 0, 0, 0, 0, -0.247383295643247195, 0, 7.42149886929741585, 0, -19.7906636514597756, 0, 7.91626546058391024, 0, 0,
         0, 0, -1.73168306950273036, 0, 0, 0, 0, -5.19504920850819109, 0, 13.8534645560218429, 0, 0, 0, 0, 0, 0, -5.19504920850819109, 0, 27.7069291120436858, 0, -16.6241574672262115, 0, 0, 0, 0, 0, 0, 0, 0, -1.73168306950273036, 0, 13.8534645560218429, 0, -16.6241574672262115, 0, 3.16650618423356409, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 15/2, mj = -1/2
+        
         0, 0, 1.96354403635080146, 0, 0, 0, 0, 5.89063210905240439, 0, -15.7083522908064117, 0, 0, 0, 0, 0, 0, 5.89063210905240439, 0, -31.4167045816128234, 0, 18.850022748967694, 0, 0, 0, 0, 0, 0, 0, 0, 1.96354403635080146, 0, -15.7083522908064117, 0, 18.850022748967694, 0, -3.5904805236128941, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.218171559594533496, 0, 0, 0.872686238378133983, 0, -6.98148990702507186, 0, 0, 0, 0, 1.30902935756720097, 0, -20.9444697210752156, 0, 20.9444697210752156, 0, 0, 0, 0, 0, 0, 0.872686238378133983, 0, -20.9444697210752156, 0, 41.8889394421504312, 0, -11.170383851240115, 0, 0, 0, 0, 0, 0, 0, 0, 0.218171559594533496, 0, -6.98148990702507186, 0, 20.9444697210752156, 0, -11.170383851240115, 0, 0.797884560802865356,
-        // j = 15/2, mj = 1/2
+        
         -0.218171559594533496, 0, 0, -0.872686238378133983, 0, 6.98148990702507186, 0, 0, 0, 0, -1.30902935756720097, 0, 20.9444697210752156, 0, -20.9444697210752156, 0, 0, 0, 0, 0, 0, -0.872686238378133983, 0, 20.9444697210752156, 0, -41.8889394421504312, 0, 11.170383851240115, 0, 0, 0, 0, 0, 0, 0, 0, -0.218171559594533496, 0, 6.98148990702507186, 0, -20.9444697210752156, 0, 11.170383851240115, 0, -0.797884560802865356,
         0, 0, 1.96354403635080146, 0, 0, 0, 0, 5.89063210905240439, 0, -15.7083522908064117, 0, 0, 0, 0, 0, 0, 5.89063210905240439, 0, -31.4167045816128234, 0, 18.850022748967694, 0, 0, 0, 0, 0, 0, 0, 0, 1.96354403635080146, 0, -15.7083522908064117, 0, 18.850022748967694, 0, -3.5904805236128941, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 15/2, mj = 3/2
+        
         0, 0, -1.73168306950273036, 0, 0, 0, 0, -5.19504920850819109, 0, 13.8534645560218429, 0, 0, 0, 0, 0, 0, -5.19504920850819109, 0, 27.7069291120436858, 0, -16.6241574672262115, 0, 0, 0, 0, 0, 0, 0, 0, -1.73168306950273036, 0, 13.8534645560218429, 0, -16.6241574672262115, 0, 3.16650618423356409, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.247383295643247195, 0, 0, -0.49476659128649439, 0, 7.42149886929741585, 0, 0, 0, 0, 0, 0, 7.42149886929741585, 0, -19.7906636514597756, 0, 0, 0, 0, 0, 0, 0.49476659128649439, 0, -7.42149886929741585, 0, 0, 0, 7.91626546058391024, 0, 0, 0, 0, 0, 0, 0, 0, 0.247383295643247195, 0, -7.42149886929741585, 0, 19.7906636514597756, 0, -7.91626546058391024, 0, 0,
-        // j = 15/2, mj = 5/2
+        
         0.191622276831240443, 0, 0, 0.383244553662480886, 0, -5.74866830493721329, 0, 0, 0, 0, 0, 0, -5.74866830493721329, 0, 15.3297821464992355, 0, 0, 0, 0, 0, 0, -0.383244553662480886, 0, 5.74866830493721329, 0, 0, 0, -6.13191285859969418, 0, 0, 0, 0, 0, 0, 0, 0, -0.191622276831240443, 0, 5.74866830493721329, 0, -15.3297821464992355, 0, 6.13191285859969418, 0, 0,
         0, 0, -2.10784504514364487, 0, 0, 0, 0, 2.10784504514364487, 0, 14.0523003009576325, 0, 0, 0, 0, 0, 0, 10.5392252257182244, 0, -28.104600601915265, 0, -11.241840240766106, 0, 0, 0, 0, 0, 0, 0, 0, 6.32353513543093462, 0, -42.1569009028728975, 0, 33.725520722298318, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 15/2, mj = 7/2
+        
         0, 0, 1.42110883952967168, 0, 0, 0, 0, -1.42110883952967168, 0, -9.47405893019781121, 0, 0, 0, 0, 0, 0, -7.1055441976483584, 0, 18.9481178603956224, 0, 7.57924714415824896, 0, 0, 0, 0, 0, 0, 0, 0, -4.26332651858901504, 0, 28.4221767905934336, 0, -22.7377414324747469, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.284221767905934336, 0, 0, -1.13688707162373734, 0, -6.82132242974242407, 0, 0, 0, 0, -2.84221767905934336, 0, 34.1066121487121203, 0, 11.3688707162373734, 0, 0, 0, 0, 0, 0, -1.13688707162373734, 0, 34.1066121487121203, 0, -68.2132242974242407, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.284221767905934336, 0, -6.82132242974242407, 0, 11.3688707162373734, 0, 0, 0, 0,
-        // j = 15/2, mj = 9/2
+        
         -0.164095514210042526, 0, 0, 0.656382056840170103, 0, 3.93829234104102062, 0, 0, 0, 0, 1.64095514210042526, 0, -19.6914617052051031, 0, -6.56382056840170103, 0, 0, 0, 0, 0, 0, 0.656382056840170103, 0, -19.6914617052051031, 0, 39.3829234104102062, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.164095514210042526, 0, 3.93829234104102062, 0, -6.56382056840170103, 0, 0, 0, 0,
         0, 0, 2.13324168473055283, 0, 0, 0, 0, -19.1991751625749755, 0, -8.53296673892221134, 0, 0, 0, 0, 0, 0, -10.6662084236527642, 0, 85.3296673892221134, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10.6662084236527642, 0, -42.6648336946110567, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 15/2, mj = 11/2
+        
         0, 0, -1.02477615778787148, 0, 0, 0, 0, 9.22298542009084335, 0, 4.09910463115148593, 0, 0, 0, 0, 0, 0, 5.12388078893935741, 0, -40.9910463115148593, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -5.12388078893935741, 0, 20.4955231557574297, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.341592052595957161, 0, 0, 4.78228873634340025, 0, 4.78228873634340025, 0, 0, 0, 0, 0, 0, -71.7343310451510038, 0, 0, 0, 0, 0, 0, 0, 0, -4.78228873634340025, 0, 71.7343310451510038, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.341592052595957161, 0, -4.78228873634340025, 0, 0, 0, 0, 0, 0,
-        // j = 15/2, mj = 13/2
+        
         0.129109660143571178, 0, 0, -1.80753524200999649, 0, -1.80753524200999649, 0, 0, 0, 0, 0, 0, 27.1130286301499473, 0, 0, 0, 0, 0, 0, 0, 0, 1.80753524200999649, 0, -27.1130286301499473, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.129109660143571178, 0, 1.80753524200999649, 0, 0, 0, 0, 0, 0,
         0, 0, -1.93664490215356767, 0, 0, 0, 0, 40.669542945224921, 0, 0, 0, 0, 0, 0, 0, 0, -67.7825715753748683, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13.5565143150749737, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 15/2, mj = 15/2
+        
         0, 0, 0.500039563570550664, 0, 0, 0, 0, -10.5008308349815639, 0, 0, 0, 0, 0, 0, 0, 0, 17.5013847249692732, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -3.50027694499385465, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.500039563570550664, 0, 0, -14.0011077799754186, 0, 0, 0, 0, 0, 0, 35.0027694499385465, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -14.0011077799754186, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.500039563570550664, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = -17/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.51542898439728431, 0, 0, -14.4320115631239607, 0, 0, 0, 0, 0, 0, 36.0800289078099017, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -14.4320115631239607, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.51542898439728431, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = -15/2
+        
         0.125009890892637666, 0, 0, -3.50027694499385465, 0, 0, 0, 0, 0, 0, 8.75069236248463662, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -3.50027694499385465, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.125009890892637666, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 2.00015825428220266, 0, 0, 0, 0, -42.0033233399262558, 0, 0, 0, 0, 0, 0, 0, 0, 70.005538899877093, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -14.0011077799754186, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = -13/2
+        
         0, 0, 0.707162732524596178, 0, 0, 0, 0, -14.8504173830165197, 0, 0, 0, 0, 0, 0, 0, 0, 24.7506956383608662, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -4.95013912767217325, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.353581366262298089, 0, 0, 4.95013912767217325, 0, 4.95013912767217325, 0, 0, 0, 0, 0, 0, -74.2520869150825987, 0, 0, 0, 0, 0, 0, 0, 0, -4.95013912767217325, 0, 74.2520869150825987, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.353581366262298089, 0, -4.95013912767217325, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = -11/2
+        
         -0.158126394107949853, 0, 0, 2.21376951751129794, 0, 2.21376951751129794, 0, 0, 0, 0, 0, 0, -33.2065427626694691, 0, 0, 0, 0, 0, 0, 0, 0, -2.21376951751129794, 0, 33.2065427626694691, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.158126394107949853, 0, -2.21376951751129794, 0, 0, 0, 0, 0, 0,
         0, 0, -2.21376951751129794, 0, 0, 0, 0, 19.9239256576016814, 0, 8.85507807004519175, 0, 0, 0, 0, 0, 0, 11.0688475875564897, 0, -88.5507807004519175, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -11.0688475875564897, 0, 44.2753903502259587, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = -9/2
+        
         0, 0, -1.18330958111587602, 0, 0, 0, 0, 10.6497862300428841, 0, 4.73323832446350406, 0, 0, 0, 0, 0, 0, 5.91654790557938008, 0, -47.3323832446350406, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -5.91654790557938008, 0, 23.6661916223175203, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.295827395278969004, 0, 0, -1.18330958111587602, 0, -7.0998574866952561, 0, 0, 0, 0, -2.95827395278969004, 0, 35.4992874334762805, 0, 11.8330958111587602, 0, 0, 0, 0, 0, 0, -1.18330958111587602, 0, 35.4992874334762805, 0, -70.998574866952561, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.295827395278969004, 0, -7.0998574866952561, 0, 11.8330958111587602, 0, 0, 0, 0,
-        // j = 17/2, mj = -7/2
+        
         0.183464362288218895, 0, 0, -0.733857449152875582, 0, -4.40314469491725349, 0, 0, 0, 0, -1.83464362288218895, 0, 22.0157234745862674, 0, 7.33857449152875582, 0, 0, 0, 0, 0, 0, -0.733857449152875582, 0, 22.0157234745862674, 0, -44.0314469491725349, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.183464362288218895, 0, -4.40314469491725349, 0, 7.33857449152875582, 0, 0, 0, 0,
         0, 0, 2.20157234745862674, 0, 0, 0, 0, -2.20157234745862674, 0, -14.6771489830575116, 0, 0, 0, 0, 0, 0, -11.0078617372931337, 0, 29.3542979661150233, 0, 11.7417191864460093, 0, 0, 0, 0, 0, 0, 0, 0, -6.60471704237588023, 0, 44.0314469491725349, 0, -35.2251575593380279, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = -5/2
+        
         0, 0, 1.55674673616078096, 0, 0, 0, 0, -1.55674673616078096, 0, -10.3783115744052064, 0, 0, 0, 0, 0, 0, -7.7837336808039048, 0, 20.7566231488104128, 0, 8.30264925952416512, 0, 0, 0, 0, 0, 0, 0, 0, -4.67024020848234288, 0, 31.1349347232156192, 0, -24.9079477785724953, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.25945778936013016, 0, 0, -0.51891557872026032, 0, 7.7837336808039048, 0, 0, 0, 0, 0, 0, 7.7837336808039048, 0, -20.7566231488104128, 0, 0, 0, 0, 0, 0, 0.51891557872026032, 0, -7.7837336808039048, 0, 0, 0, 8.30264925952416512, 0, 0, 0, 0, 0, 0, 0, 0, 0.25945778936013016, 0, -7.7837336808039048, 0, 20.7566231488104128, 0, -8.30264925952416512, 0, 0,
-        // j = 17/2, mj = -3/2
+        
         -0.206975714696966254, 0, 0, -0.413951429393932508, 0, 6.20927144090898762, 0, 0, 0, 0, 0, 0, 6.20927144090898762, 0, -16.5580571757573003, 0, 0, 0, 0, 0, 0, 0.413951429393932508, 0, -6.20927144090898762, 0, 0, 0, 6.62322287030292013, 0, 0, 0, 0, 0, 0, 0, 0, 0.206975714696966254, 0, -6.20927144090898762, 0, 16.5580571757573003, 0, -6.62322287030292013, 0, 0,
         0, 0, -2.06975714696966254, 0, 0, 0, 0, -6.20927144090898762, 0, 16.5580571757573003, 0, 0, 0, 0, 0, 0, -6.20927144090898762, 0, 33.1161143515146006, 0, -19.8696686109087604, 0, 0, 0, 0, 0, 0, 0, 0, -2.06975714696966254, 0, 16.5580571757573003, 0, -19.8696686109087604, 0, 3.78469878303024007, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = -1/2
+        
         0, 0, -1.85124707101607532, 0, 0, 0, 0, -5.55374121304822595, 0, 14.8099765681286025, 0, 0, 0, 0, 0, 0, -5.55374121304822595, 0, 29.6199531362572051, 0, -17.771971881754323, 0, 0, 0, 0, 0, 0, 0, 0, -1.85124707101607532, 0, 14.8099765681286025, 0, -17.771971881754323, 0, 3.38513750128653772, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.231405883877009415, 0, 0, 0.925623535508037658, 0, -7.40498828406430127, 0, 0, 0, 0, 1.38843530326205649, 0, -22.2149648521929038, 0, 22.2149648521929038, 0, 0, 0, 0, 0, 0, 0.925623535508037658, 0, -22.2149648521929038, 0, 44.4299297043858076, 0, -11.847981254502882, 0, 0, 0, 0, 0, 0, 0, 0, 0.231405883877009415, 0, -7.40498828406430127, 0, 22.2149648521929038, 0, -11.847981254502882, 0, 0.84628437532163443,
-        // j = 17/2, mj = 1/2
+        
         0.231405883877009415, 0, 0, 0.925623535508037658, 0, -7.40498828406430127, 0, 0, 0, 0, 1.38843530326205649, 0, -22.2149648521929038, 0, 22.2149648521929038, 0, 0, 0, 0, 0, 0, 0.925623535508037658, 0, -22.2149648521929038, 0, 44.4299297043858076, 0, -11.847981254502882, 0, 0, 0, 0, 0, 0, 0, 0, 0.231405883877009415, 0, -7.40498828406430127, 0, 22.2149648521929038, 0, -11.847981254502882, 0, 0.84628437532163443,
         0, 0, 1.85124707101607532, 0, 0, 0, 0, 5.55374121304822595, 0, -14.8099765681286025, 0, 0, 0, 0, 0, 0, 5.55374121304822595, 0, -29.6199531362572051, 0, 17.771971881754323, 0, 0, 0, 0, 0, 0, 0, 0, 1.85124707101607532, 0, -14.8099765681286025, 0, 17.771971881754323, 0, -3.38513750128653772, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = 3/2
+        
         0, 0, 2.06975714696966254, 0, 0, 0, 0, 6.20927144090898762, 0, -16.5580571757573003, 0, 0, 0, 0, 0, 0, 6.20927144090898762, 0, -33.1161143515146006, 0, 19.8696686109087604, 0, 0, 0, 0, 0, 0, 0, 0, 2.06975714696966254, 0, -16.5580571757573003, 0, 19.8696686109087604, 0, -3.78469878303024007, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.206975714696966254, 0, 0, -0.413951429393932508, 0, 6.20927144090898762, 0, 0, 0, 0, 0, 0, 6.20927144090898762, 0, -16.5580571757573003, 0, 0, 0, 0, 0, 0, 0.413951429393932508, 0, -6.20927144090898762, 0, 0, 0, 6.62322287030292013, 0, 0, 0, 0, 0, 0, 0, 0, 0.206975714696966254, 0, -6.20927144090898762, 0, 16.5580571757573003, 0, -6.62322287030292013, 0, 0,
-        // j = 17/2, mj = 5/2
+        
         -0.25945778936013016, 0, 0, -0.51891557872026032, 0, 7.7837336808039048, 0, 0, 0, 0, 0, 0, 7.7837336808039048, 0, -20.7566231488104128, 0, 0, 0, 0, 0, 0, 0.51891557872026032, 0, -7.7837336808039048, 0, 0, 0, 8.30264925952416512, 0, 0, 0, 0, 0, 0, 0, 0, 0.25945778936013016, 0, -7.7837336808039048, 0, 20.7566231488104128, 0, -8.30264925952416512, 0, 0,
         0, 0, -1.55674673616078096, 0, 0, 0, 0, 1.55674673616078096, 0, 10.3783115744052064, 0, 0, 0, 0, 0, 0, 7.7837336808039048, 0, -20.7566231488104128, 0, -8.30264925952416512, 0, 0, 0, 0, 0, 0, 0, 0, 4.67024020848234288, 0, -31.1349347232156192, 0, 24.9079477785724953, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = 7/2
+        
         0, 0, -2.20157234745862674, 0, 0, 0, 0, 2.20157234745862674, 0, 14.6771489830575116, 0, 0, 0, 0, 0, 0, 11.0078617372931337, 0, -29.3542979661150233, 0, -11.7417191864460093, 0, 0, 0, 0, 0, 0, 0, 0, 6.60471704237588023, 0, -44.0314469491725349, 0, 35.2251575593380279, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.183464362288218895, 0, 0, -0.733857449152875582, 0, -4.40314469491725349, 0, 0, 0, 0, -1.83464362288218895, 0, 22.0157234745862674, 0, 7.33857449152875582, 0, 0, 0, 0, 0, 0, -0.733857449152875582, 0, 22.0157234745862674, 0, -44.0314469491725349, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.183464362288218895, 0, -4.40314469491725349, 0, 7.33857449152875582, 0, 0, 0, 0,
-        // j = 17/2, mj = 9/2
+        
         0.295827395278969004, 0, 0, -1.18330958111587602, 0, -7.0998574866952561, 0, 0, 0, 0, -2.95827395278969004, 0, 35.4992874334762805, 0, 11.8330958111587602, 0, 0, 0, 0, 0, 0, -1.18330958111587602, 0, 35.4992874334762805, 0, -70.998574866952561, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.295827395278969004, 0, -7.0998574866952561, 0, 11.8330958111587602, 0, 0, 0, 0,
         0, 0, 1.18330958111587602, 0, 0, 0, 0, -10.6497862300428841, 0, -4.73323832446350406, 0, 0, 0, 0, 0, 0, -5.91654790557938008, 0, 47.3323832446350406, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5.91654790557938008, 0, -23.6661916223175203, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = 11/2
+        
         0, 0, 2.21376951751129794, 0, 0, 0, 0, -19.9239256576016814, 0, -8.85507807004519175, 0, 0, 0, 0, 0, 0, -11.0688475875564897, 0, 88.5507807004519175, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11.0688475875564897, 0, -44.2753903502259587, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.158126394107949853, 0, 0, 2.21376951751129794, 0, 2.21376951751129794, 0, 0, 0, 0, 0, 0, -33.2065427626694691, 0, 0, 0, 0, 0, 0, 0, 0, -2.21376951751129794, 0, 33.2065427626694691, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.158126394107949853, 0, -2.21376951751129794, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = 13/2
+        
         -0.353581366262298089, 0, 0, 4.95013912767217325, 0, 4.95013912767217325, 0, 0, 0, 0, 0, 0, -74.2520869150825987, 0, 0, 0, 0, 0, 0, 0, 0, -4.95013912767217325, 0, 74.2520869150825987, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.353581366262298089, 0, -4.95013912767217325, 0, 0, 0, 0, 0, 0,
         0, 0, -0.707162732524596178, 0, 0, 0, 0, 14.8504173830165197, 0, 0, 0, 0, 0, 0, 0, 0, -24.7506956383608662, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4.95013912767217325, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = 15/2
+        
         0, 0, -2.00015825428220266, 0, 0, 0, 0, 42.0033233399262558, 0, 0, 0, 0, 0, 0, 0, 0, -70.005538899877093, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14.0011077799754186, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.125009890892637666, 0, 0, -3.50027694499385465, 0, 0, 0, 0, 0, 0, 8.75069236248463662, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -3.50027694499385465, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.125009890892637666, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = 17/2
+        
         0.51542898439728431, 0, 0, -14.4320115631239607, 0, 0, 0, 0, 0, 0, 36.0800289078099017, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -14.4320115631239607, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.51542898439728431, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = -17/2
+        
         -0.51542898439728431, 0, 0, 18.5554434383022352, 0, 0, 0, 0, 0, 0, -64.944052034057823, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 43.296034689371882, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -4.63886085957555879, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0.51542898439728431, 0, 0, 0, 0, -14.4320115631239607, 0, 0, 0, 0, 0, 0, 0, 0, 36.0800289078099017, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -14.4320115631239607, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.51542898439728431, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = -15/2
+        
         0, 0, -2.12516814517484032, 0, 0, 0, 0, 59.504708064895529, 0, 0, 0, 0, 0, 0, 0, 0, -148.761770162238823, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 59.504708064895529, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.12516814517484032, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.125009890892637666, 0, 0, 2.50019781785275332, 0, 2.00015825428220266, 0, 0, 0, 0, -1.75013847249692732, 0, -42.0033233399262558, 0, 0, 0, 0, 0, 0, 0, 0, -3.50027694499385465, 0, 70.005538899877093, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.875069236248463662, 0, -14.0011077799754186, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = -13/2
+        
         0.353581366262298089, 0, 0, -7.07162732524596178, 0, -5.65730186019676943, 0, 0, 0, 0, 4.95013912767217325, 0, 118.803339064132158, 0, 0, 0, 0, 0, 0, 0, 0, 9.9002782553443465, 0, -198.00556510688693, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.47506956383608662, 0, 39.601113021377386, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, -1.06074409878689427, 0, 0, 0, 0, 14.8504173830165197, 0, 4.95013912767217325, 0, 0, 0, 0, 0, 0, 0, 0, -74.2520869150825987, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -14.8504173830165197, 0, 74.2520869150825987, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.06074409878689427, 0, -4.95013912767217325, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = -11/2
+        
         0, 0, 2.37189591161924779, 0, 0, 0, 0, -33.2065427626694691, 0, -11.0688475875564897, 0, 0, 0, 0, 0, 0, 0, 0, 166.032713813347345, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33.2065427626694691, 0, -166.032713813347345, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.37189591161924779, 0, 11.0688475875564897, 0, 0, 0, 0, 0, 0,
         0.158126394107949853, 0, 0, -1.26501115286359882, 0, -4.42753903502259587, 0, 0, 0, 0, -2.21376951751129794, 0, 39.8478513152033629, 0, 8.85507807004519175, 0, 0, 0, 0, 0, 0, 0, 0, 22.1376951751129794, 0, -88.5507807004519175, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.790631970539749263, 0, -22.1376951751129794, 0, 44.2753903502259587, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = -9/2
+        
         -0.295827395278969004, 0, 0, 2.36661916223175203, 0, 8.28316706781113211, 0, 0, 0, 0, 4.14158353390556606, 0, -74.548503610300189, 0, -16.5663341356222642, 0, 0, 0, 0, 0, 0, 0, 0, -41.4158353390556606, 0, 165.663341356222642, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.47913697639484502, 0, 41.4158353390556606, 0, -82.8316706781113211, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 1.47913697639484502, 0, 0, 0, 0, -5.91654790557938008, 0, -11.8330958111587602, 0, 0, 0, 0, 0, 0, -14.7913697639484502, 0, 59.1654790557938008, 0, 11.8330958111587602, 0, 0, 0, 0, 0, 0, 0, 0, -5.91654790557938008, 0, 59.1654790557938008, 0, -70.998574866952561, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.47913697639484502, 0, -11.8330958111587602, 0, 11.8330958111587602, 0, 0, 0, 0,
-        // j = 17/2, mj = -7/2
+        
         0, 0, -2.38503670974684564, 0, 0, 0, 0, 9.54014683898738256, 0, 19.0802936779747651, 0, 0, 0, 0, 0, 0, 23.8503670974684564, 0, -95.4014683898738256, 0, -19.0802936779747651, 0, 0, 0, 0, 0, 0, 0, 0, 9.54014683898738256, 0, -95.4014683898738256, 0, 114.481762067848591, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.38503670974684564, 0, 19.0802936779747651, 0, -19.0802936779747651, 0, 0, 0, 0,
         -0.183464362288218895, 0, 0, 0, 0, 6.60471704237588023, 0, 0, 0, 0, 1.10078617372931337, 0, -6.60471704237588023, 0, -22.0157234745862674, 0, 0, 0, 0, 0, 0, 1.46771489830575116, 0, -33.0235852118794012, 0, 44.0314469491725349, 0, 11.7417191864460093, 0, 0, 0, 0, 0, 0, 0, 0, 0.550393086864656686, 0, -19.8141511271276407, 0, 66.0471704237588023, 0, -35.2251575593380279, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = -5/2
+        
         0.25945778936013016, 0, 0, 0, 0, -9.34048041696468576, 0, 0, 0, 0, -1.55674673616078096, 0, 9.34048041696468576, 0, 31.1349347232156192, 0, 0, 0, 0, 0, 0, -2.07566231488104128, 0, 46.7024020848234288, 0, -62.2698694464312384, 0, -16.6052985190483302, 0, 0, 0, 0, 0, 0, 0, 0, -0.77837336808039048, 0, 28.0214412508940573, 0, -93.4048041696468576, 0, 49.8158955571449907, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, -1.81620452552091112, 0, 0, 0, 0, -3.63240905104182224, 0, 18.1620452552091112, 0, 0, 0, 0, 0, 0, 0, 0, 18.1620452552091112, 0, -29.0592724083345779, 0, 0, 0, 0, 0, 0, 0, 0, 3.63240905104182224, 0, -18.1620452552091112, 0, 0, 0, 8.30264925952416512, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.81620452552091112, 0, -18.1620452552091112, 0, 29.0592724083345779, 0, -8.30264925952416512, 0, 0,
-        // j = 17/2, mj = -3/2
+        
         0, 0, 2.27673286166662879, 0, 0, 0, 0, 4.55346572333325759, 0, -22.7673286166662879, 0, 0, 0, 0, 0, 0, 0, 0, -22.7673286166662879, 0, 36.4277257866660607, 0, 0, 0, 0, 0, 0, 0, 0, -4.55346572333325759, 0, 22.7673286166662879, 0, 0, 0, -10.4079216533331602, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.27673286166662879, 0, 22.7673286166662879, 0, -36.4277257866660607, 0, 10.4079216533331602, 0, 0,
         0.206975714696966254, 0, 0, 0.827902858787865016, 0, -8.27902858787865016, 0, 0, 0, 0, 1.24185428818179752, 0, -24.8370857636359505, 0, 33.1161143515146006, 0, 0, 0, 0, 0, 0, 0.827902858787865016, 0, -24.8370857636359505, 0, 66.2322287030292013, 0, -26.4928914812116805, 0, 0, 0, 0, 0, 0, 0, 0, 0.206975714696966254, 0, -8.27902858787865016, 0, 33.1161143515146006, 0, -26.4928914812116805, 0, 3.78469878303024007, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = -1/2
+        
         -0.231405883877009415, 0, 0, -0.925623535508037658, 0, 9.25623535508037658, 0, 0, 0, 0, -1.38843530326205649, 0, 27.7687060652411297, 0, -37.0249414203215063, 0, 0, 0, 0, 0, 0, -0.925623535508037658, 0, 27.7687060652411297, 0, -74.0498828406430127, 0, 29.6199531362572051, 0, 0, 0, 0, 0, 0, 0, 0, -0.231405883877009415, 0, 9.25623535508037658, 0, -37.0249414203215063, 0, 29.6199531362572051, 0, -4.23142187660817215, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 2.08265295489308473, 0, 0, 0, 0, 8.33061181957233892, 0, -22.2149648521929038, 0, 0, 0, 0, 0, 0, 12.4959177293585084, 0, -66.6448945565787114, 0, 39.9869367339472268, 0, 0, 0, 0, 0, 0, 0, 0, 8.33061181957233892, 0, -66.6448945565787114, 0, 79.9738734678944537, 0, -15.2331187557894197, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.08265295489308473, 0, -22.2149648521929038, 0, 39.9869367339472268, 0, -15.2331187557894197, 0, 0.84628437532163443,
-        // j = 17/2, mj = 1/2
+        
         0, 0, -2.08265295489308473, 0, 0, 0, 0, -8.33061181957233892, 0, 22.2149648521929038, 0, 0, 0, 0, 0, 0, -12.4959177293585084, 0, 66.6448945565787114, 0, -39.9869367339472268, 0, 0, 0, 0, 0, 0, 0, 0, -8.33061181957233892, 0, 66.6448945565787114, 0, -79.9738734678944537, 0, 15.2331187557894197, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.08265295489308473, 0, 22.2149648521929038, 0, -39.9869367339472268, 0, 15.2331187557894197, 0, -0.84628437532163443,
         -0.231405883877009415, 0, 0, -0.925623535508037658, 0, 9.25623535508037658, 0, 0, 0, 0, -1.38843530326205649, 0, 27.7687060652411297, 0, -37.0249414203215063, 0, 0, 0, 0, 0, 0, -0.925623535508037658, 0, 27.7687060652411297, 0, -74.0498828406430127, 0, 29.6199531362572051, 0, 0, 0, 0, 0, 0, 0, 0, -0.231405883877009415, 0, 9.25623535508037658, 0, -37.0249414203215063, 0, 29.6199531362572051, 0, -4.23142187660817215, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = 3/2
+        
         0.206975714696966254, 0, 0, 0.827902858787865016, 0, -8.27902858787865016, 0, 0, 0, 0, 1.24185428818179752, 0, -24.8370857636359505, 0, 33.1161143515146006, 0, 0, 0, 0, 0, 0, 0.827902858787865016, 0, -24.8370857636359505, 0, 66.2322287030292013, 0, -26.4928914812116805, 0, 0, 0, 0, 0, 0, 0, 0, 0.206975714696966254, 0, -8.27902858787865016, 0, 33.1161143515146006, 0, -26.4928914812116805, 0, 3.78469878303024007, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, -2.27673286166662879, 0, 0, 0, 0, -4.55346572333325759, 0, 22.7673286166662879, 0, 0, 0, 0, 0, 0, 0, 0, 22.7673286166662879, 0, -36.4277257866660607, 0, 0, 0, 0, 0, 0, 0, 0, 4.55346572333325759, 0, -22.7673286166662879, 0, 0, 0, 10.4079216533331602, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.27673286166662879, 0, -22.7673286166662879, 0, 36.4277257866660607, 0, -10.4079216533331602, 0, 0,
-        // j = 17/2, mj = 5/2
+        
         0, 0, 1.81620452552091112, 0, 0, 0, 0, 3.63240905104182224, 0, -18.1620452552091112, 0, 0, 0, 0, 0, 0, 0, 0, -18.1620452552091112, 0, 29.0592724083345779, 0, 0, 0, 0, 0, 0, 0, 0, -3.63240905104182224, 0, 18.1620452552091112, 0, 0, 0, -8.30264925952416512, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.81620452552091112, 0, 18.1620452552091112, 0, -29.0592724083345779, 0, 8.30264925952416512, 0, 0,
         0.25945778936013016, 0, 0, 0, 0, -9.34048041696468576, 0, 0, 0, 0, -1.55674673616078096, 0, 9.34048041696468576, 0, 31.1349347232156192, 0, 0, 0, 0, 0, 0, -2.07566231488104128, 0, 46.7024020848234288, 0, -62.2698694464312384, 0, -16.6052985190483302, 0, 0, 0, 0, 0, 0, 0, 0, -0.77837336808039048, 0, 28.0214412508940573, 0, -93.4048041696468576, 0, 49.8158955571449907, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = 7/2
+        
         -0.183464362288218895, 0, 0, 0, 0, 6.60471704237588023, 0, 0, 0, 0, 1.10078617372931337, 0, -6.60471704237588023, 0, -22.0157234745862674, 0, 0, 0, 0, 0, 0, 1.46771489830575116, 0, -33.0235852118794012, 0, 44.0314469491725349, 0, 11.7417191864460093, 0, 0, 0, 0, 0, 0, 0, 0, 0.550393086864656686, 0, -19.8141511271276407, 0, 66.0471704237588023, 0, -35.2251575593380279, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 2.38503670974684564, 0, 0, 0, 0, -9.54014683898738256, 0, -19.0802936779747651, 0, 0, 0, 0, 0, 0, -23.8503670974684564, 0, 95.4014683898738256, 0, 19.0802936779747651, 0, 0, 0, 0, 0, 0, 0, 0, -9.54014683898738256, 0, 95.4014683898738256, 0, -114.481762067848591, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.38503670974684564, 0, -19.0802936779747651, 0, 19.0802936779747651, 0, 0, 0, 0,
-        // j = 17/2, mj = 9/2
+        
         0, 0, -1.47913697639484502, 0, 0, 0, 0, 5.91654790557938008, 0, 11.8330958111587602, 0, 0, 0, 0, 0, 0, 14.7913697639484502, 0, -59.1654790557938008, 0, -11.8330958111587602, 0, 0, 0, 0, 0, 0, 0, 0, 5.91654790557938008, 0, -59.1654790557938008, 0, 70.998574866952561, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.47913697639484502, 0, 11.8330958111587602, 0, -11.8330958111587602, 0, 0, 0, 0,
         -0.295827395278969004, 0, 0, 2.36661916223175203, 0, 8.28316706781113211, 0, 0, 0, 0, 4.14158353390556606, 0, -74.548503610300189, 0, -16.5663341356222642, 0, 0, 0, 0, 0, 0, 0, 0, -41.4158353390556606, 0, 165.663341356222642, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.47913697639484502, 0, 41.4158353390556606, 0, -82.8316706781113211, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = 11/2
+        
         0.158126394107949853, 0, 0, -1.26501115286359882, 0, -4.42753903502259587, 0, 0, 0, 0, -2.21376951751129794, 0, 39.8478513152033629, 0, 8.85507807004519175, 0, 0, 0, 0, 0, 0, 0, 0, 22.1376951751129794, 0, -88.5507807004519175, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.790631970539749263, 0, -22.1376951751129794, 0, 44.2753903502259587, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, -2.37189591161924779, 0, 0, 0, 0, 33.2065427626694691, 0, 11.0688475875564897, 0, 0, 0, 0, 0, 0, 0, 0, -166.032713813347345, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -33.2065427626694691, 0, 166.032713813347345, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.37189591161924779, 0, -11.0688475875564897, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = 13/2
+        
         0, 0, 1.06074409878689427, 0, 0, 0, 0, -14.8504173830165197, 0, -4.95013912767217325, 0, 0, 0, 0, 0, 0, 0, 0, 74.2520869150825987, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14.8504173830165197, 0, -74.2520869150825987, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.06074409878689427, 0, 4.95013912767217325, 0, 0, 0, 0, 0, 0,
         0.353581366262298089, 0, 0, -7.07162732524596178, 0, -5.65730186019676943, 0, 0, 0, 0, 4.95013912767217325, 0, 118.803339064132158, 0, 0, 0, 0, 0, 0, 0, 0, 9.9002782553443465, 0, -198.00556510688693, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.47506956383608662, 0, 39.601113021377386, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = 15/2
+        
         -0.125009890892637666, 0, 0, 2.50019781785275332, 0, 2.00015825428220266, 0, 0, 0, 0, -1.75013847249692732, 0, -42.0033233399262558, 0, 0, 0, 0, 0, 0, 0, 0, -3.50027694499385465, 0, 70.005538899877093, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.875069236248463662, 0, -14.0011077799754186, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 2.12516814517484032, 0, 0, 0, 0, -59.504708064895529, 0, 0, 0, 0, 0, 0, 0, 0, 148.761770162238823, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -59.504708064895529, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.12516814517484032, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = 17/2
+        
         0, 0, -0.51542898439728431, 0, 0, 0, 0, 14.4320115631239607, 0, 0, 0, 0, 0, 0, 0, 0, -36.0800289078099017, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14.4320115631239607, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.51542898439728431, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.51542898439728431, 0, 0, 18.5554434383022352, 0, 0, 0, 0, 0, 0, -64.944052034057823, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 43.296034689371882, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -4.63886085957555879, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = -19/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.52955294149244958, 0, 0, -19.0639058937281849, 0, 0, 0, 0, 0, 0, 66.723670628048647, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -44.4824470853657647, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4.76597647343204622, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = -17/2
+        
         0.121487776695804978, 0, 0, -4.37355996104897921, 0, 0, 0, 0, 0, 0, 15.3074598636714272, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -10.2049732424476182, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.0933899902622448, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 2.18677998052448961, 0, 0, 0, 0, -61.229839454685709, 0, 0, 0, 0, 0, 0, 0, 0, 153.074598636714272, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -61.229839454685709, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.18677998052448961, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = -15/2
+        
         0, 0, 0.728926660174829869, 0, 0, 0, 0, -20.4099464848952363, 0, 0, 0, 0, 0, 0, 0, 0, 51.0248662122380908, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -20.4099464848952363, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.728926660174829869, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.364463330087414934, 0, 0, 7.28926660174829869, 0, 5.83141328139863895, 0, 0, 0, 0, -5.10248662122380908, 0, -122.459678909371418, 0, 0, 0, 0, 0, 0, 0, 0, -10.2049732424476182, 0, 204.099464848952363, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.55124331061190454, 0, -40.8198929697904727, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = -13/2
+        
         -0.153105222743980097, 0, 0, 3.06210445487960195, 0, 2.44968356390368156, 0, 0, 0, 0, -2.14347311841572136, 0, -51.4433548419773127, 0, 0, 0, 0, 0, 0, 0, 0, -4.28694623683144273, 0, 85.7389247366288545, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.07173655920786068, 0, -17.1477849473257709, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, -2.44968356390368156, 0, 0, 0, 0, 34.2955698946515418, 0, 11.4318566315505139, 0, 0, 0, 0, 0, 0, 0, 0, -171.477849473257709, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -34.2955698946515418, 0, 171.477849473257709, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.44968356390368156, 0, -11.4318566315505139, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = -11/2
+        
         0, 0, -1.22484178195184078, 0, 0, 0, 0, 17.1477849473257709, 0, 5.71592831577525697, 0, 0, 0, 0, 0, 0, 0, 0, -85.7389247366288545, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -17.1477849473257709, 0, 85.7389247366288545, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.22484178195184078, 0, -5.71592831577525697, 0, 0, 0, 0, 0, 0,
         0.306210445487960195, 0, 0, -2.44968356390368156, 0, -8.57389247366288545, 0, 0, 0, 0, -4.28694623683144273, 0, 77.1650322629659691, 0, 17.1477849473257709, 0, 0, 0, 0, 0, 0, 0, 0, 42.8694623683144273, 0, -171.477849473257709, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.53105222743980097, 0, -42.8694623683144273, 0, 85.7389247366288545, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = -9/2
+        
         0.176790683131149045, 0, 0, -1.41432546504919236, 0, -4.95013912767217325, 0, 0, 0, 0, -2.47506956383608662, 0, 44.5512521490495592, 0, 9.9002782553443465, 0, 0, 0, 0, 0, 0, 0, 0, 24.7506956383608662, 0, -99.002782553443465, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.883953415655745223, 0, -24.7506956383608662, 0, 49.5013912767217325, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 2.47506956383608662, 0, 0, 0, 0, -9.9002782553443465, 0, -19.800556510688693, 0, 0, 0, 0, 0, 0, -24.7506956383608662, 0, 99.002782553443465, 0, 19.800556510688693, 0, 0, 0, 0, 0, 0, 0, 0, -9.9002782553443465, 0, 99.002782553443465, 0, -118.803339064132158, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.47506956383608662, 0, -19.800556510688693, 0, 19.800556510688693, 0, 0, 0, 0,
-        // j = 19/2, mj = -7/2
+        
         0, 0, 1.62031337522288607, 0, 0, 0, 0, -6.48125350089154427, 0, -12.9625070017830885, 0, 0, 0, 0, 0, 0, -16.2031337522288607, 0, 64.8125350089154427, 0, 12.9625070017830885, 0, 0, 0, 0, 0, 0, 0, 0, -6.48125350089154427, 0, 64.8125350089154427, 0, -77.7750420106985312, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.62031337522288607, 0, -12.9625070017830885, 0, 12.9625070017830885, 0, 0, 0, 0,
         -0.270052229203814345, 0, 0, 0, 0, 9.7218802513373164, 0, 0, 0, 0, 1.62031337522288607, 0, -9.7218802513373164, 0, -32.4062675044577213, 0, 0, 0, 0, 0, 0, 2.16041783363051476, 0, -48.609401256686582, 0, 64.8125350089154427, 0, 17.2833426690441181, 0, 0, 0, 0, 0, 0, 0, 0, 0.810156687611443034, 0, -29.1656407540119492, 0, 97.218802513373164, 0, -51.8500280071323542, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = -5/2
+        
         -0.198164159898117403, 0, 0, 0, 0, 7.13390975633222651, 0, 0, 0, 0, 1.18898495938870442, 0, -7.13390975633222651, 0, -23.7796991877740884, 0, 0, 0, 0, 0, 0, 1.58531327918493922, 0, -35.6695487816611326, 0, 47.5593983755481767, 0, 12.6825062334795138, 0, 0, 0, 0, 0, 0, 0, 0, 0.594492479694352209, 0, -21.4017292689966795, 0, 71.3390975633222651, 0, -38.0475187004385414, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, -2.37796991877740884, 0, 0, 0, 0, -4.75593983755481767, 0, 23.7796991877740884, 0, 0, 0, 0, 0, 0, 0, 0, 23.7796991877740884, 0, -38.0475187004385414, 0, 0, 0, 0, 0, 0, 0, 0, 4.75593983755481767, 0, -23.7796991877740884, 0, 0, 0, 10.8707196286967261, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.37796991877740884, 0, -23.7796991877740884, 0, 38.0475187004385414, 0, -10.8707196286967261, 0, 0,
-        // j = 19/2, mj = -3/2
+        
         0, 0, -1.9416043082307367, 0, 0, 0, 0, -3.88320861646147339, 0, 19.416043082307367, 0, 0, 0, 0, 0, 0, 0, 0, 19.416043082307367, 0, -31.0656689316917871, 0, 0, 0, 0, 0, 0, 0, 0, 3.88320861646147339, 0, -19.416043082307367, 0, 0, 0, 8.87590540905479632, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.9416043082307367, 0, -19.416043082307367, 0, 31.0656689316917871, 0, -8.87590540905479632, 0, 0,
         0.242700538528842087, 0, 0, 0.970802154115368348, 0, -9.70802154115368348, 0, 0, 0, 0, 1.45620323117305252, 0, -29.1240646234610504, 0, 38.8320861646147339, 0, 0, 0, 0, 0, 0, 0.970802154115368348, 0, -29.1240646234610504, 0, 77.6641723292294678, 0, -31.0656689316917871, 0, 0, 0, 0, 0, 0, 0, 0, 0.242700538528842087, 0, -9.70802154115368348, 0, 38.8320861646147339, 0, -31.0656689316917871, 0, 4.43795270452739816, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = -1/2
+        
         0.219530897104735508, 0, 0, 0.878123588418942033, 0, -8.78123588418942033, 0, 0, 0, 0, 1.31718538262841305, 0, -26.343707652568261, 0, 35.1249435367576813, 0, 0, 0, 0, 0, 0, 0.878123588418942033, 0, -26.343707652568261, 0, 70.2498870735153626, 0, -28.0999548294061451, 0, 0, 0, 0, 0, 0, 0, 0, 0.219530897104735508, 0, -8.78123588418942033, 0, 35.1249435367576813, 0, -28.0999548294061451, 0, 4.01427926134373501, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 2.19530897104735508, 0, 0, 0, 0, 8.78123588418942033, 0, -23.4166290245051209, 0, 0, 0, 0, 0, 0, 13.1718538262841305, 0, -70.2498870735153626, 0, 42.1499322441092176, 0, 0, 0, 0, 0, 0, 0, 0, 8.78123588418942033, 0, -70.2498870735153626, 0, 84.2998644882184352, 0, -16.05711704537494, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.19530897104735508, 0, -23.4166290245051209, 0, 42.1499322441092176, 0, -16.05711704537494, 0, 0.892062058076385557,
-        // j = 19/2, mj = 1/2
+        
         0, 0, 2.19530897104735508, 0, 0, 0, 0, 8.78123588418942033, 0, -23.4166290245051209, 0, 0, 0, 0, 0, 0, 13.1718538262841305, 0, -70.2498870735153626, 0, 42.1499322441092176, 0, 0, 0, 0, 0, 0, 0, 0, 8.78123588418942033, 0, -70.2498870735153626, 0, 84.2998644882184352, 0, -16.05711704537494, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.19530897104735508, 0, -23.4166290245051209, 0, 42.1499322441092176, 0, -16.05711704537494, 0, 0.892062058076385557,
         -0.219530897104735508, 0, 0, -0.878123588418942033, 0, 8.78123588418942033, 0, 0, 0, 0, -1.31718538262841305, 0, 26.343707652568261, 0, -35.1249435367576813, 0, 0, 0, 0, 0, 0, -0.878123588418942033, 0, 26.343707652568261, 0, -70.2498870735153626, 0, 28.0999548294061451, 0, 0, 0, 0, 0, 0, 0, 0, -0.219530897104735508, 0, 8.78123588418942033, 0, -35.1249435367576813, 0, 28.0999548294061451, 0, -4.01427926134373501, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = 3/2
+        
         -0.242700538528842087, 0, 0, -0.970802154115368348, 0, 9.70802154115368348, 0, 0, 0, 0, -1.45620323117305252, 0, 29.1240646234610504, 0, -38.8320861646147339, 0, 0, 0, 0, 0, 0, -0.970802154115368348, 0, 29.1240646234610504, 0, -77.6641723292294678, 0, 31.0656689316917871, 0, 0, 0, 0, 0, 0, 0, 0, -0.242700538528842087, 0, 9.70802154115368348, 0, -38.8320861646147339, 0, 31.0656689316917871, 0, -4.43795270452739816, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, -1.9416043082307367, 0, 0, 0, 0, -3.88320861646147339, 0, 19.416043082307367, 0, 0, 0, 0, 0, 0, 0, 0, 19.416043082307367, 0, -31.0656689316917871, 0, 0, 0, 0, 0, 0, 0, 0, 3.88320861646147339, 0, -19.416043082307367, 0, 0, 0, 8.87590540905479632, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.9416043082307367, 0, -19.416043082307367, 0, 31.0656689316917871, 0, -8.87590540905479632, 0, 0,
-        // j = 19/2, mj = 5/2
+        
         0, 0, -2.37796991877740884, 0, 0, 0, 0, -4.75593983755481767, 0, 23.7796991877740884, 0, 0, 0, 0, 0, 0, 0, 0, 23.7796991877740884, 0, -38.0475187004385414, 0, 0, 0, 0, 0, 0, 0, 0, 4.75593983755481767, 0, -23.7796991877740884, 0, 0, 0, 10.8707196286967261, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.37796991877740884, 0, -23.7796991877740884, 0, 38.0475187004385414, 0, -10.8707196286967261, 0, 0,
         0.198164159898117403, 0, 0, 0, 0, -7.13390975633222651, 0, 0, 0, 0, -1.18898495938870442, 0, 7.13390975633222651, 0, 23.7796991877740884, 0, 0, 0, 0, 0, 0, -1.58531327918493922, 0, 35.6695487816611326, 0, -47.5593983755481767, 0, -12.6825062334795138, 0, 0, 0, 0, 0, 0, 0, 0, -0.594492479694352209, 0, 21.4017292689966795, 0, -71.3390975633222651, 0, 38.0475187004385414, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = 7/2
+        
         0.270052229203814345, 0, 0, 0, 0, -9.7218802513373164, 0, 0, 0, 0, -1.62031337522288607, 0, 9.7218802513373164, 0, 32.4062675044577213, 0, 0, 0, 0, 0, 0, -2.16041783363051476, 0, 48.609401256686582, 0, -64.8125350089154427, 0, -17.2833426690441181, 0, 0, 0, 0, 0, 0, 0, 0, -0.810156687611443034, 0, 29.1656407540119492, 0, -97.218802513373164, 0, 51.8500280071323542, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 1.62031337522288607, 0, 0, 0, 0, -6.48125350089154427, 0, -12.9625070017830885, 0, 0, 0, 0, 0, 0, -16.2031337522288607, 0, 64.8125350089154427, 0, 12.9625070017830885, 0, 0, 0, 0, 0, 0, 0, 0, -6.48125350089154427, 0, 64.8125350089154427, 0, -77.7750420106985312, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.62031337522288607, 0, -12.9625070017830885, 0, 12.9625070017830885, 0, 0, 0, 0,
-        // j = 19/2, mj = 9/2
+        
         0, 0, 2.47506956383608662, 0, 0, 0, 0, -9.9002782553443465, 0, -19.800556510688693, 0, 0, 0, 0, 0, 0, -24.7506956383608662, 0, 99.002782553443465, 0, 19.800556510688693, 0, 0, 0, 0, 0, 0, 0, 0, -9.9002782553443465, 0, 99.002782553443465, 0, -118.803339064132158, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.47506956383608662, 0, -19.800556510688693, 0, 19.800556510688693, 0, 0, 0, 0,
         -0.176790683131149045, 0, 0, 1.41432546504919236, 0, 4.95013912767217325, 0, 0, 0, 0, 2.47506956383608662, 0, -44.5512521490495592, 0, -9.9002782553443465, 0, 0, 0, 0, 0, 0, 0, 0, -24.7506956383608662, 0, 99.002782553443465, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.883953415655745223, 0, 24.7506956383608662, 0, -49.5013912767217325, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = 11/2
+        
         -0.306210445487960195, 0, 0, 2.44968356390368156, 0, 8.57389247366288545, 0, 0, 0, 0, 4.28694623683144273, 0, -77.1650322629659691, 0, -17.1477849473257709, 0, 0, 0, 0, 0, 0, 0, 0, -42.8694623683144273, 0, 171.477849473257709, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.53105222743980097, 0, 42.8694623683144273, 0, -85.7389247366288545, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, -1.22484178195184078, 0, 0, 0, 0, 17.1477849473257709, 0, 5.71592831577525697, 0, 0, 0, 0, 0, 0, 0, 0, -85.7389247366288545, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -17.1477849473257709, 0, 85.7389247366288545, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.22484178195184078, 0, -5.71592831577525697, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = 13/2
+        
         0, 0, -2.44968356390368156, 0, 0, 0, 0, 34.2955698946515418, 0, 11.4318566315505139, 0, 0, 0, 0, 0, 0, 0, 0, -171.477849473257709, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -34.2955698946515418, 0, 171.477849473257709, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.44968356390368156, 0, -11.4318566315505139, 0, 0, 0, 0, 0, 0,
         0.153105222743980097, 0, 0, -3.06210445487960195, 0, -2.44968356390368156, 0, 0, 0, 0, 2.14347311841572136, 0, 51.4433548419773127, 0, 0, 0, 0, 0, 0, 0, 0, 4.28694623683144273, 0, -85.7389247366288545, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.07173655920786068, 0, 17.1477849473257709, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = 15/2
+        
         0.364463330087414934, 0, 0, -7.28926660174829869, 0, -5.83141328139863895, 0, 0, 0, 0, 5.10248662122380908, 0, 122.459678909371418, 0, 0, 0, 0, 0, 0, 0, 0, 10.2049732424476182, 0, -204.099464848952363, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.55124331061190454, 0, 40.8198929697904727, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0.728926660174829869, 0, 0, 0, 0, -20.4099464848952363, 0, 0, 0, 0, 0, 0, 0, 0, 51.0248662122380908, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -20.4099464848952363, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.728926660174829869, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = 17/2
+        
         0, 0, 2.18677998052448961, 0, 0, 0, 0, -61.229839454685709, 0, 0, 0, 0, 0, 0, 0, 0, 153.074598636714272, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -61.229839454685709, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.18677998052448961, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.121487776695804978, 0, 0, 4.37355996104897921, 0, 0, 0, 0, 0, 0, -15.3074598636714272, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10.2049732424476182, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.0933899902622448, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = 19/2
+        
         -0.52955294149244958, 0, 0, 19.0639058937281849, 0, 0, 0, 0, 0, 0, -66.723670628048647, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 44.4824470853657647, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -4.76597647343204622, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = -19/2
+        
         -0.52955294149244958, 0, 0, 23.8298823671602311, 0, 0, 0, 0, 0, 0, -111.206117713414412, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 111.206117713414412, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -23.8298823671602311, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.52955294149244958, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0.52955294149244958, 0, 0, 0, 0, -19.0639058937281849, 0, 0, 0, 0, 0, 0, 0, 0, 66.723670628048647, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -44.4824470853657647, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4.76597647343204622, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = -17/2
+        
         0, 0, -2.30826775722029458, 0, 0, 0, 0, 83.0976392599306051, 0, 0, 0, 0, 0, 0, 0, 0, -290.841737409757118, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 193.894491606504745, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -20.7744098149826513, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.121487776695804978, 0, 0, 3.28016997078673441, 0, 2.18677998052448961, 0, 0, 0, 0, -5.10248662122380908, 0, -61.229839454685709, 0, 0, 0, 0, 0, 0, 0, 0, -5.10248662122380908, 0, 153.074598636714272, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.28016997078673441, 0, -61.229839454685709, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.121487776695804978, 0, 2.18677998052448961, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = -15/2
+        
         0.364463330087414934, 0, 0, -9.84050991236020323, 0, -6.56033994157346882, 0, 0, 0, 0, 15.3074598636714272, 0, 183.689518364057127, 0, 0, 0, 0, 0, 0, 0, 0, 15.3074598636714272, 0, -459.223795910142817, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -9.84050991236020323, 0, 183.689518364057127, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.364463330087414934, 0, -6.56033994157346882, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, -1.0933899902622448, 0, 0, 0, 0, 21.8677998052448961, 0, 5.83141328139863895, 0, 0, 0, 0, 0, 0, -15.3074598636714272, 0, -122.459678909371418, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -30.6149197273428545, 0, 204.099464848952363, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7.65372993183571362, 0, -40.8198929697904727, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = -13/2
+        
         0, 0, 2.60278878664766166, 0, 0, 0, 0, -52.0557757329532331, 0, -13.8815401954541955, 0, 0, 0, 0, 0, 0, 36.4390430130672632, 0, 291.512344104538105, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 72.8780860261345264, 0, -485.853906840896842, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -18.2195215065336316, 0, 97.1707813681793685, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.153105222743980097, 0, 0, -1.99036789567174127, 0, -4.89936712780736312, 0, 0, 0, 0, -2.14347311841572136, 0, 68.5911397893030836, 0, 11.4318566315505139, 0, 0, 0, 0, 0, 0, 2.14347311841572136, 0, 0, 0, -171.477849473257709, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.99036789567174127, 0, -68.5911397893030836, 0, 171.477849473257709, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.153105222743980097, 0, 4.89936712780736312, 0, -11.4318566315505139, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = -11/2
+        
         -0.306210445487960195, 0, 0, 3.98073579134348253, 0, 9.79873425561472623, 0, 0, 0, 0, 4.28694623683144273, 0, -137.182279578606167, 0, -22.8637132631010279, 0, 0, 0, 0, 0, 0, -4.28694623683144273, 0, 0, 0, 342.955698946515418, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -3.98073579134348253, 0, 137.182279578606167, 0, -342.955698946515418, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.306210445487960195, 0, -9.79873425561472623, 0, 22.8637132631010279, 0, 0, 0, 0, 0, 0,
         0, 0, 1.53105222743980097, 0, 0, 0, 0, -12.2484178195184078, 0, -14.2898207894381424, 0, 0, 0, 0, 0, 0, -21.4347311841572136, 0, 128.608387104943282, 0, 17.1477849473257709, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 71.4491039471907121, 0, -171.477849473257709, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7.65526113719900487, 0, -71.4491039471907121, 0, 85.7389247366288545, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = -9/2
+        
         0, 0, -2.65186024696723567, 0, 0, 0, 0, 21.2148819757378853, 0, 24.7506956383608662, 0, 0, 0, 0, 0, 0, 37.1260434575412994, 0, -222.756260745247796, 0, -29.7008347660330395, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -123.753478191804331, 0, 297.008347660330395, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -13.2593012348361783, 0, 123.753478191804331, 0, -148.504173830165197, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.176790683131149045, 0, 0, 0.530372049393447134, 0, 7.42520869150825987, 0, 0, 0, 0, 2.47506956383608662, 0, -29.7008347660330395, 0, -29.7008347660330395, 0, 0, 0, 0, 0, 0, 2.47506956383608662, 0, -74.2520869150825987, 0, 148.504173830165197, 0, 19.800556510688693, 0, 0, 0, 0, 0, 0, 0, 0, 0.530372049393447134, 0, -29.7008347660330395, 0, 148.504173830165197, 0, -118.803339064132158, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.176790683131149045, 0, 7.42520869150825987, 0, -29.7008347660330395, 0, 19.800556510688693, 0, 0, 0, 0,
-        // j = 19/2, mj = -7/2
+        
         0.270052229203814345, 0, 0, -0.810156687611443034, 0, -11.3421936265602025, 0, 0, 0, 0, -3.78073120885340082, 0, 45.3687745062408099, 0, 45.3687745062408099, 0, 0, 0, 0, 0, 0, -3.78073120885340082, 0, 113.421936265602025, 0, -226.843872531204049, 0, -30.2458496708272066, 0, 0, 0, 0, 0, 0, 0, 0, -0.810156687611443034, 0, 45.3687745062408099, 0, -226.843872531204049, 0, 181.47509802496324, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.270052229203814345, 0, -11.3421936265602025, 0, 45.3687745062408099, 0, -30.2458496708272066, 0, 0, 0, 0,
         0, 0, -1.89036560442670041, 0, 0, 0, 0, 0, 0, 22.6843872531204049, 0, 0, 0, 0, 0, 0, 11.3421936265602025, 0, -22.6843872531204049, 0, -45.3687745062408099, 0, 0, 0, 0, 0, 0, 0, 0, 15.1229248354136033, 0, -113.421936265602025, 0, 90.7375490124816198, 0, 17.2833426690441181, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5.67109681328010124, 0, -68.0531617593612148, 0, 136.10632351872243, 0, -51.8500280071323542, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = -5/2
+        
         0, 0, 2.57613407867552624, 0, 0, 0, 0, 0, 0, -30.9136089441063149, 0, 0, 0, 0, 0, 0, -15.4568044720531574, 0, 30.9136089441063149, 0, 61.8272178882126298, 0, 0, 0, 0, 0, 0, 0, 0, -20.6090726294042099, 0, 154.568044720531574, 0, -123.65443577642526, 0, -23.5532258621762399, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -7.72840223602657872, 0, 92.7408268323189446, 0, -185.481653664637889, 0, 70.6596775865287197, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.198164159898117403, 0, 0, 0.594492479694352209, 0, -9.51187967510963535, 0, 0, 0, 0, 0.396328319796234806, 0, -19.0237593502192707, 0, 47.5593983755481767, 0, 0, 0, 0, 0, 0, -0.396328319796234806, 0, 0, 0, 47.5593983755481767, 0, -50.7300249339180552, 0, 0, 0, 0, 0, 0, 0, 0, -0.594492479694352209, 0, 19.0237593502192707, 0, -47.5593983755481767, 0, 0, 0, 10.8707196286967261, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.198164159898117403, 0, 9.51187967510963535, 0, -47.5593983755481767, 0, 50.7300249339180552, 0, -10.8707196286967261, 0, 0,
-        // j = 19/2, mj = -3/2
+        
         -0.242700538528842087, 0, 0, -0.728101615586526261, 0, 11.6496258493844202, 0, 0, 0, 0, -0.485401077057684174, 0, 23.2992516987688403, 0, -58.2481292469221009, 0, 0, 0, 0, 0, 0, 0.485401077057684174, 0, 0, 0, -58.2481292469221009, 0, 62.1313378633835742, 0, 0, 0, 0, 0, 0, 0, 0, 0.728101615586526261, 0, -23.2992516987688403, 0, 58.2481292469221009, 0, 0, 0, -13.3138581135821945, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.242700538528842087, 0, -11.6496258493844202, 0, 58.2481292469221009, 0, -62.1313378633835742, 0, 13.3138581135821945, 0, 0,
         0, 0, 2.18430484675957878, 0, 0, 0, 0, 8.73721938703831513, 0, -29.1240646234610504, 0, 0, 0, 0, 0, 0, 13.1058290805574727, 0, -87.3721938703831513, 0, 69.897755096306521, 0, 0, 0, 0, 0, 0, 0, 0, 8.73721938703831513, 0, -87.3721938703831513, 0, 139.795510192613042, 0, -39.9415743407465834, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.18430484675957878, 0, -29.1240646234610504, 0, 69.897755096306521, 0, -39.9415743407465834, 0, 4.43795270452739816, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = -1/2
+        
         0, 0, -2.41483986815209059, 0, 0, 0, 0, -9.65935947260836236, 0, 32.1978649086945412, 0, 0, 0, 0, 0, 0, -14.4890392089125435, 0, 96.5935947260836236, 0, -77.2748757808668989, 0, 0, 0, 0, 0, 0, 0, 0, -9.65935947260836236, 0, 96.5935947260836236, 0, -154.549751561733798, 0, 44.1570718747810851, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.41483986815209059, 0, 32.1978649086945412, 0, -77.2748757808668989, 0, 44.1570718747810851, 0, -4.90634131942012056, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.219530897104735508, 0, 0, -1.09765448552367754, 0, 10.9765448552367754, 0, 0, 0, 0, -2.19530897104735508, 0, 43.9061794209471016, 0, -58.5415725612628022, 0, 0, 0, 0, 0, 0, -2.19530897104735508, 0, 65.8592691314206525, 0, -175.624717683788407, 0, 70.2498870735153626, 0, 0, 0, 0, 0, 0, 0, 0, -1.09765448552367754, 0, 43.9061794209471016, 0, -175.624717683788407, 0, 140.499774147030725, 0, -20.071396306718675, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.219530897104735508, 0, 10.9765448552367754, 0, -58.5415725612628022, 0, 70.2498870735153626, 0, -20.071396306718675, 0, 0.892062058076385557,
-        // j = 19/2, mj = 1/2
+        
         0.219530897104735508, 0, 0, 1.09765448552367754, 0, -10.9765448552367754, 0, 0, 0, 0, 2.19530897104735508, 0, -43.9061794209471016, 0, 58.5415725612628022, 0, 0, 0, 0, 0, 0, 2.19530897104735508, 0, -65.8592691314206525, 0, 175.624717683788407, 0, -70.2498870735153626, 0, 0, 0, 0, 0, 0, 0, 0, 1.09765448552367754, 0, -43.9061794209471016, 0, 175.624717683788407, 0, -140.499774147030725, 0, 20.071396306718675, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.219530897104735508, 0, -10.9765448552367754, 0, 58.5415725612628022, 0, -70.2498870735153626, 0, 20.071396306718675, 0, -0.892062058076385557,
         0, 0, -2.41483986815209059, 0, 0, 0, 0, -9.65935947260836236, 0, 32.1978649086945412, 0, 0, 0, 0, 0, 0, -14.4890392089125435, 0, 96.5935947260836236, 0, -77.2748757808668989, 0, 0, 0, 0, 0, 0, 0, 0, -9.65935947260836236, 0, 96.5935947260836236, 0, -154.549751561733798, 0, 44.1570718747810851, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.41483986815209059, 0, 32.1978649086945412, 0, -77.2748757808668989, 0, 44.1570718747810851, 0, -4.90634131942012056, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = 3/2
+        
         0, 0, 2.18430484675957878, 0, 0, 0, 0, 8.73721938703831513, 0, -29.1240646234610504, 0, 0, 0, 0, 0, 0, 13.1058290805574727, 0, -87.3721938703831513, 0, 69.897755096306521, 0, 0, 0, 0, 0, 0, 0, 0, 8.73721938703831513, 0, -87.3721938703831513, 0, 139.795510192613042, 0, -39.9415743407465834, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.18430484675957878, 0, -29.1240646234610504, 0, 69.897755096306521, 0, -39.9415743407465834, 0, 4.43795270452739816, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.242700538528842087, 0, 0, 0.728101615586526261, 0, -11.6496258493844202, 0, 0, 0, 0, 0.485401077057684174, 0, -23.2992516987688403, 0, 58.2481292469221009, 0, 0, 0, 0, 0, 0, -0.485401077057684174, 0, 0, 0, 58.2481292469221009, 0, -62.1313378633835742, 0, 0, 0, 0, 0, 0, 0, 0, -0.728101615586526261, 0, 23.2992516987688403, 0, -58.2481292469221009, 0, 0, 0, 13.3138581135821945, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.242700538528842087, 0, 11.6496258493844202, 0, -58.2481292469221009, 0, 62.1313378633835742, 0, -13.3138581135821945, 0, 0,
-        // j = 19/2, mj = 5/2
+        
         -0.198164159898117403, 0, 0, -0.594492479694352209, 0, 9.51187967510963535, 0, 0, 0, 0, -0.396328319796234806, 0, 19.0237593502192707, 0, -47.5593983755481767, 0, 0, 0, 0, 0, 0, 0.396328319796234806, 0, 0, 0, -47.5593983755481767, 0, 50.7300249339180552, 0, 0, 0, 0, 0, 0, 0, 0, 0.594492479694352209, 0, -19.0237593502192707, 0, 47.5593983755481767, 0, 0, 0, -10.8707196286967261, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.198164159898117403, 0, -9.51187967510963535, 0, 47.5593983755481767, 0, -50.7300249339180552, 0, 10.8707196286967261, 0, 0,
         0, 0, 2.57613407867552624, 0, 0, 0, 0, 0, 0, -30.9136089441063149, 0, 0, 0, 0, 0, 0, -15.4568044720531574, 0, 30.9136089441063149, 0, 61.8272178882126298, 0, 0, 0, 0, 0, 0, 0, 0, -20.6090726294042099, 0, 154.568044720531574, 0, -123.65443577642526, 0, -23.5532258621762399, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -7.72840223602657872, 0, 92.7408268323189446, 0, -185.481653664637889, 0, 70.6596775865287197, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = 7/2
+        
         0, 0, -1.89036560442670041, 0, 0, 0, 0, 0, 0, 22.6843872531204049, 0, 0, 0, 0, 0, 0, 11.3421936265602025, 0, -22.6843872531204049, 0, -45.3687745062408099, 0, 0, 0, 0, 0, 0, 0, 0, 15.1229248354136033, 0, -113.421936265602025, 0, 90.7375490124816198, 0, 17.2833426690441181, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5.67109681328010124, 0, -68.0531617593612148, 0, 136.10632351872243, 0, -51.8500280071323542, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.270052229203814345, 0, 0, 0.810156687611443034, 0, 11.3421936265602025, 0, 0, 0, 0, 3.78073120885340082, 0, -45.3687745062408099, 0, -45.3687745062408099, 0, 0, 0, 0, 0, 0, 3.78073120885340082, 0, -113.421936265602025, 0, 226.843872531204049, 0, 30.2458496708272066, 0, 0, 0, 0, 0, 0, 0, 0, 0.810156687611443034, 0, -45.3687745062408099, 0, 226.843872531204049, 0, -181.47509802496324, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.270052229203814345, 0, 11.3421936265602025, 0, -45.3687745062408099, 0, 30.2458496708272066, 0, 0, 0, 0,
-        // j = 19/2, mj = 9/2
+        
         0.176790683131149045, 0, 0, -0.530372049393447134, 0, -7.42520869150825987, 0, 0, 0, 0, -2.47506956383608662, 0, 29.7008347660330395, 0, 29.7008347660330395, 0, 0, 0, 0, 0, 0, -2.47506956383608662, 0, 74.2520869150825987, 0, -148.504173830165197, 0, -19.800556510688693, 0, 0, 0, 0, 0, 0, 0, 0, -0.530372049393447134, 0, 29.7008347660330395, 0, -148.504173830165197, 0, 118.803339064132158, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.176790683131149045, 0, -7.42520869150825987, 0, 29.7008347660330395, 0, -19.800556510688693, 0, 0, 0, 0,
         0, 0, -2.65186024696723567, 0, 0, 0, 0, 21.2148819757378853, 0, 24.7506956383608662, 0, 0, 0, 0, 0, 0, 37.1260434575412994, 0, -222.756260745247796, 0, -29.7008347660330395, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -123.753478191804331, 0, 297.008347660330395, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -13.2593012348361783, 0, 123.753478191804331, 0, -148.504173830165197, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = 11/2
+        
         0, 0, 1.53105222743980097, 0, 0, 0, 0, -12.2484178195184078, 0, -14.2898207894381424, 0, 0, 0, 0, 0, 0, -21.4347311841572136, 0, 128.608387104943282, 0, 17.1477849473257709, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 71.4491039471907121, 0, -171.477849473257709, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7.65526113719900487, 0, -71.4491039471907121, 0, 85.7389247366288545, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.306210445487960195, 0, 0, -3.98073579134348253, 0, -9.79873425561472623, 0, 0, 0, 0, -4.28694623683144273, 0, 137.182279578606167, 0, 22.8637132631010279, 0, 0, 0, 0, 0, 0, 4.28694623683144273, 0, 0, 0, -342.955698946515418, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.98073579134348253, 0, -137.182279578606167, 0, 342.955698946515418, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.306210445487960195, 0, 9.79873425561472623, 0, -22.8637132631010279, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = 13/2
+        
         -0.153105222743980097, 0, 0, 1.99036789567174127, 0, 4.89936712780736312, 0, 0, 0, 0, 2.14347311841572136, 0, -68.5911397893030836, 0, -11.4318566315505139, 0, 0, 0, 0, 0, 0, -2.14347311841572136, 0, 0, 0, 171.477849473257709, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.99036789567174127, 0, 68.5911397893030836, 0, -171.477849473257709, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.153105222743980097, 0, -4.89936712780736312, 0, 11.4318566315505139, 0, 0, 0, 0, 0, 0,
         0, 0, 2.60278878664766166, 0, 0, 0, 0, -52.0557757329532331, 0, -13.8815401954541955, 0, 0, 0, 0, 0, 0, 36.4390430130672632, 0, 291.512344104538105, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 72.8780860261345264, 0, -485.853906840896842, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -18.2195215065336316, 0, 97.1707813681793685, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = 15/2
+        
         0, 0, -1.0933899902622448, 0, 0, 0, 0, 21.8677998052448961, 0, 5.83141328139863895, 0, 0, 0, 0, 0, 0, -15.3074598636714272, 0, -122.459678909371418, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -30.6149197273428545, 0, 204.099464848952363, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7.65372993183571362, 0, -40.8198929697904727, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.364463330087414934, 0, 0, 9.84050991236020323, 0, 6.56033994157346882, 0, 0, 0, 0, -15.3074598636714272, 0, -183.689518364057127, 0, 0, 0, 0, 0, 0, 0, 0, -15.3074598636714272, 0, 459.223795910142817, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9.84050991236020323, 0, -183.689518364057127, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.364463330087414934, 0, 6.56033994157346882, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = 17/2
+        
         0.121487776695804978, 0, 0, -3.28016997078673441, 0, -2.18677998052448961, 0, 0, 0, 0, 5.10248662122380908, 0, 61.229839454685709, 0, 0, 0, 0, 0, 0, 0, 0, 5.10248662122380908, 0, -153.074598636714272, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -3.28016997078673441, 0, 61.229839454685709, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.121487776695804978, 0, -2.18677998052448961, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, -2.30826775722029458, 0, 0, 0, 0, 83.0976392599306051, 0, 0, 0, 0, 0, 0, 0, 0, -290.841737409757118, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 193.894491606504745, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -20.7744098149826513, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = 19/2
+        
         0, 0, 0.52955294149244958, 0, 0, 0, 0, -19.0639058937281849, 0, 0, 0, 0, 0, 0, 0, 0, 66.723670628048647, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -44.4824470853657647, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4.76597647343204622, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.52955294149244958, 0, 0, -23.8298823671602311, 0, 0, 0, 0, 0, 0, 111.206117713414412, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -111.206117713414412, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 23.8298823671602311, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.52955294149244958, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -21/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.542630291944221461, 0, 0, -24.4183631374899657, 0, 0, 0, 0, 0, 0, 113.952361308286507, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -113.952361308286507, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24.4183631374899657, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.542630291944221461, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -19/2
+        
         0.11841163748620862, 0, 0, -5.32852368687938788, 0, 0, 0, 0, 0, 0, 24.8664438721038101, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -24.8664438721038101, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5.32852368687938788, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.11841163748620862, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 2.36823274972417239, 0, 0, 0, 0, -85.2563789900702061, 0, 0, 0, 0, 0, 0, 0, 0, 298.397326465245721, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -198.931550976830481, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 21.3140947475175515, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -17/2
+        
         0, 0, 0.748900951853188297, 0, 0, 0, 0, -26.9604342667147787, 0, 0, 0, 0, 0, 0, 0, 0, 94.3615199335017254, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -62.9076799556678169, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6.74010856667869467, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.374450475926594148, 0, 0, 10.110162850018042, 0, 6.74010856667869467, 0, 0, 0, 0, -15.7269199889169542, 0, -188.723039867003451, 0, 0, 0, 0, 0, 0, 0, 0, -15.7269199889169542, 0, 471.807599667508627, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10.110162850018042, 0, -188.723039867003451, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.374450475926594148, 0, 6.74010856667869467, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -15/2
+        
         -0.148791531444953757, 0, 0, 4.01737134901375144, 0, 2.67824756600916763, 0, 0, 0, 0, -6.2492443206880578, 0, -74.9909318482566936, 0, 0, 0, 0, 0, 0, 0, 0, -6.2492443206880578, 0, 187.477329620641734, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4.01737134901375144, 0, -74.9909318482566936, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.148791531444953757, 0, 2.67824756600916763, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, -2.67824756600916763, 0, 0, 0, 0, 53.5649513201833526, 0, 14.2839870187155607, 0, 0, 0, 0, 0, 0, -37.4954659241283468, 0, -299.963727393026774, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -74.9909318482566936, 0, 499.939545655044624, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 18.7477329620641734, 0, -99.9879091310089248, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -13/2
+        
         0, 0, -1.26253801041429866, 0, 0, 0, 0, 25.2507602082859732, 0, 6.73353605554292619, 0, 0, 0, 0, 0, 0, -17.6755321458001813, 0, -141.40425716640145, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -35.3510642916003625, 0, 235.673761944002417, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.83776607290009063, 0, -47.1347523888004833, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.315634502603574665, 0, 0, -4.10324853384647065, 0, -10.1003040833143893, 0, 0, 0, 0, -4.41888303645004531, 0, 141.40425716640145, 0, 23.5673761944002417, 0, 0, 0, 0, 0, 0, 4.41888303645004531, 0, 0, 0, -353.510642916003625, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4.10324853384647065, 0, -141.40425716640145, 0, 353.510642916003625, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.315634502603574665, 0, 10.1003040833143893, 0, -23.5673761944002417, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -11/2
+        
         0.171176842882893189, 0, 0, -2.22529895747761146, 0, -5.47765897225258205, 0, 0, 0, 0, -2.39647580036050465, 0, 76.6872256115361487, 0, 12.7812042685893581, 0, 0, 0, 0, 0, 0, 2.39647580036050465, 0, 0, 0, -191.718064028840372, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.22529895747761146, 0, -76.6872256115361487, 0, 191.718064028840372, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.171176842882893189, 0, 5.47765897225258205, 0, -12.7812042685893581, 0, 0, 0, 0, 0, 0,
         0, 0, 2.73882948612629102, 0, 0, 0, 0, -21.9106358890103282, 0, -25.5624085371787162, 0, 0, 0, 0, 0, 0, -38.3436128057680743, 0, 230.061676834608446, 0, 30.6748902446144595, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 127.812042685893581, 0, -306.748902446144595, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13.6941474306314551, 0, -127.812042685893581, 0, 153.374451223072297, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -9/2
+        
         0, 0, 1.67718368337461811, 0, 0, 0, 0, -13.4174694669969449, 0, -15.6537143781631024, 0, 0, 0, 0, 0, 0, -23.4805715672446536, 0, 140.883429403467921, 0, 18.7844572537957229, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 78.2685718908155119, 0, -187.844572537957229, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.38591841687309056, 0, -78.2685718908155119, 0, 93.9222862689786143, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.279530613895769685, 0, 0, 0.838591841687309056, 0, 11.7402857836223268, 0, 0, 0, 0, 3.9134285945407756, 0, -46.9611431344893072, 0, -46.9611431344893072, 0, 0, 0, 0, 0, 0, 3.9134285945407756, 0, -117.402857836223268, 0, 234.805715672446536, 0, 31.3074287563262048, 0, 0, 0, 0, 0, 0, 0, 0, 0.838591841687309056, 0, -46.9611431344893072, 0, 234.805715672446536, 0, -187.844572537957229, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.279530613895769685, 0, 11.7402857836223268, 0, -46.9611431344893072, 0, 31.3074287563262048, 0, 0, 0, 0,
-        // j = 21/2, mj = -7/2
+        
         -0.190955762544560929, 0, 0, 0.572867287633682787, 0, 8.02014202687155901, 0, 0, 0, 0, 2.673380675623853, 0, -32.0805681074862361, 0, -32.0805681074862361, 0, 0, 0, 0, 0, 0, 2.673380675623853, 0, -80.2014202687155901, 0, 160.40284053743118, 0, 21.387045404990824, 0, 0, 0, 0, 0, 0, 0, 0, 0.572867287633682787, 0, -32.0805681074862361, 0, 160.40284053743118, 0, -128.322272429944944, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.190955762544560929, 0, 8.02014202687155901, 0, -32.0805681074862361, 0, 21.387045404990824, 0, 0, 0, 0,
         0, 0, -2.673380675623853, 0, 0, 0, 0, 0, 0, 32.0805681074862361, 0, 0, 0, 0, 0, 0, 16.040284053743118, 0, -32.0805681074862361, 0, -64.1611362149724721, 0, 0, 0, 0, 0, 0, 0, 0, 21.387045404990824, 0, -160.40284053743118, 0, 128.322272429944944, 0, 24.4423376057037989, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.02014202687155901, 0, -96.2417043224587082, 0, 192.483408644917416, 0, -73.3270128171113967, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -5/2
+        
         0, 0, -2.02088583643044288, 0, 0, 0, 0, 0, 0, 24.2506300371653145, 0, 0, 0, 0, 0, 0, 12.1253150185826573, 0, -24.2506300371653145, 0, -48.501260074330629, 0, 0, 0, 0, 0, 0, 0, 0, 16.167086691443543, 0, -121.253150185826573, 0, 97.0025201486612581, 0, 18.4766705045069063, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6.06265750929132863, 0, -72.7518901114959435, 0, 145.503780222991887, 0, -55.4300115135207189, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.25261072955380536, 0, 0, 0.757832188661416079, 0, -12.1253150185826573, 0, 0, 0, 0, 0.505221459107610719, 0, -24.2506300371653145, 0, 60.6265750929132863, 0, 0, 0, 0, 0, 0, -0.505221459107610719, 0, 0, 0, 60.6265750929132863, 0, -64.668346765774172, 0, 0, 0, 0, 0, 0, 0, 0, -0.757832188661416079, 0, 24.2506300371653145, 0, -60.6265750929132863, 0, 0, 0, 13.8575028783801797, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.25261072955380536, 0, 12.1253150185826573, 0, -60.6265750929132863, 0, 64.668346765774172, 0, -13.8575028783801797, 0, 0,
-        // j = 21/2, mj = -3/2
+        
         0.210184831878141177, 0, 0, 0.630554495634423532, 0, -10.0888719301507765, 0, 0, 0, 0, 0.420369663756282355, 0, -20.177743860301553, 0, 50.4443596507538826, 0, 0, 0, 0, 0, 0, -0.420369663756282355, 0, 0, 0, 50.4443596507538826, 0, -53.8073169608041414, 0, 0, 0, 0, 0, 0, 0, 0, -0.630554495634423532, 0, 20.177743860301553, 0, -50.4443596507538826, 0, 0, 0, 11.5301393487437446, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.210184831878141177, 0, 10.0888719301507765, 0, -50.4443596507538826, 0, 53.8073169608041414, 0, -11.5301393487437446, 0, 0,
         0, 0, 2.52221798253769413, 0, 0, 0, 0, 10.0888719301507765, 0, -33.6295731005025884, 0, 0, 0, 0, 0, 0, 15.1333078952261648, 0, -100.888719301507765, 0, 80.7109754412062121, 0, 0, 0, 0, 0, 0, 0, 0, 10.0888719301507765, 0, -100.888719301507765, 0, 161.421950882412424, 0, -46.1205573949749784, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.52221798253769413, 0, -33.6295731005025884, 0, 80.7109754412062121, 0, -46.1205573949749784, 0, 5.12450637721944204, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -1/2
+        
         0, 0, 2.30245947330177705, 0, 0, 0, 0, 9.20983789320710822, 0, -30.6994596440236941, 0, 0, 0, 0, 0, 0, 13.8147568398106623, 0, -92.0983789320710822, 0, 73.6787031456568658, 0, 0, 0, 0, 0, 0, 0, 0, 9.20983789320710822, 0, -92.0983789320710822, 0, 147.357406291313732, 0, -42.1021160832324947, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.30245947330177705, 0, -30.6994596440236941, 0, 73.6787031456568658, 0, -42.1021160832324947, 0, 4.67801289813694386, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.230245947330177705, 0, 0, -1.15122973665088853, 0, 11.5122973665088853, 0, 0, 0, 0, -2.30245947330177705, 0, 46.0491894660355411, 0, -61.3989192880473881, 0, 0, 0, 0, 0, 0, -2.30245947330177705, 0, 69.0737841990533116, 0, -184.196757864142164, 0, 73.6787031456568658, 0, 0, 0, 0, 0, 0, 0, 0, -1.15122973665088853, 0, 46.0491894660355411, 0, -184.196757864142164, 0, 147.357406291313732, 0, -21.0510580416162474, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.230245947330177705, 0, 11.5122973665088853, 0, -61.3989192880473881, 0, 73.6787031456568658, 0, -21.0510580416162474, 0, 0.935602579627388772,
-        // j = 21/2, mj = 1/2
+        
         -0.230245947330177705, 0, 0, -1.15122973665088853, 0, 11.5122973665088853, 0, 0, 0, 0, -2.30245947330177705, 0, 46.0491894660355411, 0, -61.3989192880473881, 0, 0, 0, 0, 0, 0, -2.30245947330177705, 0, 69.0737841990533116, 0, -184.196757864142164, 0, 73.6787031456568658, 0, 0, 0, 0, 0, 0, 0, 0, -1.15122973665088853, 0, 46.0491894660355411, 0, -184.196757864142164, 0, 147.357406291313732, 0, -21.0510580416162474, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.230245947330177705, 0, 11.5122973665088853, 0, -61.3989192880473881, 0, 73.6787031456568658, 0, -21.0510580416162474, 0, 0.935602579627388772,
         0, 0, -2.30245947330177705, 0, 0, 0, 0, -9.20983789320710822, 0, 30.6994596440236941, 0, 0, 0, 0, 0, 0, -13.8147568398106623, 0, 92.0983789320710822, 0, -73.6787031456568658, 0, 0, 0, 0, 0, 0, 0, 0, -9.20983789320710822, 0, 92.0983789320710822, 0, -147.357406291313732, 0, 42.1021160832324947, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.30245947330177705, 0, 30.6994596440236941, 0, -73.6787031456568658, 0, 42.1021160832324947, 0, -4.67801289813694386, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = 3/2
+        
         0, 0, -2.52221798253769413, 0, 0, 0, 0, -10.0888719301507765, 0, 33.6295731005025884, 0, 0, 0, 0, 0, 0, -15.1333078952261648, 0, 100.888719301507765, 0, -80.7109754412062121, 0, 0, 0, 0, 0, 0, 0, 0, -10.0888719301507765, 0, 100.888719301507765, 0, -161.421950882412424, 0, 46.1205573949749784, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.52221798253769413, 0, 33.6295731005025884, 0, -80.7109754412062121, 0, 46.1205573949749784, 0, -5.12450637721944204, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.210184831878141177, 0, 0, 0.630554495634423532, 0, -10.0888719301507765, 0, 0, 0, 0, 0.420369663756282355, 0, -20.177743860301553, 0, 50.4443596507538826, 0, 0, 0, 0, 0, 0, -0.420369663756282355, 0, 0, 0, 50.4443596507538826, 0, -53.8073169608041414, 0, 0, 0, 0, 0, 0, 0, 0, -0.630554495634423532, 0, 20.177743860301553, 0, -50.4443596507538826, 0, 0, 0, 11.5301393487437446, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.210184831878141177, 0, 10.0888719301507765, 0, -50.4443596507538826, 0, 53.8073169608041414, 0, -11.5301393487437446, 0, 0,
-        // j = 21/2, mj = 5/2
+        
         0.25261072955380536, 0, 0, 0.757832188661416079, 0, -12.1253150185826573, 0, 0, 0, 0, 0.505221459107610719, 0, -24.2506300371653145, 0, 60.6265750929132863, 0, 0, 0, 0, 0, 0, -0.505221459107610719, 0, 0, 0, 60.6265750929132863, 0, -64.668346765774172, 0, 0, 0, 0, 0, 0, 0, 0, -0.757832188661416079, 0, 24.2506300371653145, 0, -60.6265750929132863, 0, 0, 0, 13.8575028783801797, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.25261072955380536, 0, 12.1253150185826573, 0, -60.6265750929132863, 0, 64.668346765774172, 0, -13.8575028783801797, 0, 0,
         0, 0, 2.02088583643044288, 0, 0, 0, 0, 0, 0, -24.2506300371653145, 0, 0, 0, 0, 0, 0, -12.1253150185826573, 0, 24.2506300371653145, 0, 48.501260074330629, 0, 0, 0, 0, 0, 0, 0, 0, -16.167086691443543, 0, 121.253150185826573, 0, -97.0025201486612581, 0, -18.4766705045069063, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -6.06265750929132863, 0, 72.7518901114959435, 0, -145.503780222991887, 0, 55.4300115135207189, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = 7/2
+        
         0, 0, 2.673380675623853, 0, 0, 0, 0, 0, 0, -32.0805681074862361, 0, 0, 0, 0, 0, 0, -16.040284053743118, 0, 32.0805681074862361, 0, 64.1611362149724721, 0, 0, 0, 0, 0, 0, 0, 0, -21.387045404990824, 0, 160.40284053743118, 0, -128.322272429944944, 0, -24.4423376057037989, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -8.02014202687155901, 0, 96.2417043224587082, 0, -192.483408644917416, 0, 73.3270128171113967, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.190955762544560929, 0, 0, 0.572867287633682787, 0, 8.02014202687155901, 0, 0, 0, 0, 2.673380675623853, 0, -32.0805681074862361, 0, -32.0805681074862361, 0, 0, 0, 0, 0, 0, 2.673380675623853, 0, -80.2014202687155901, 0, 160.40284053743118, 0, 21.387045404990824, 0, 0, 0, 0, 0, 0, 0, 0, 0.572867287633682787, 0, -32.0805681074862361, 0, 160.40284053743118, 0, -128.322272429944944, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.190955762544560929, 0, 8.02014202687155901, 0, -32.0805681074862361, 0, 21.387045404990824, 0, 0, 0, 0,
-        // j = 21/2, mj = 9/2
+        
         -0.279530613895769685, 0, 0, 0.838591841687309056, 0, 11.7402857836223268, 0, 0, 0, 0, 3.9134285945407756, 0, -46.9611431344893072, 0, -46.9611431344893072, 0, 0, 0, 0, 0, 0, 3.9134285945407756, 0, -117.402857836223268, 0, 234.805715672446536, 0, 31.3074287563262048, 0, 0, 0, 0, 0, 0, 0, 0, 0.838591841687309056, 0, -46.9611431344893072, 0, 234.805715672446536, 0, -187.844572537957229, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.279530613895769685, 0, 11.7402857836223268, 0, -46.9611431344893072, 0, 31.3074287563262048, 0, 0, 0, 0,
         0, 0, -1.67718368337461811, 0, 0, 0, 0, 13.4174694669969449, 0, 15.6537143781631024, 0, 0, 0, 0, 0, 0, 23.4805715672446536, 0, -140.883429403467921, 0, -18.7844572537957229, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -78.2685718908155119, 0, 187.844572537957229, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -8.38591841687309056, 0, 78.2685718908155119, 0, -93.9222862689786143, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = 11/2
+        
         0, 0, -2.73882948612629102, 0, 0, 0, 0, 21.9106358890103282, 0, 25.5624085371787162, 0, 0, 0, 0, 0, 0, 38.3436128057680743, 0, -230.061676834608446, 0, -30.6748902446144595, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -127.812042685893581, 0, 306.748902446144595, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -13.6941474306314551, 0, 127.812042685893581, 0, -153.374451223072297, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.171176842882893189, 0, 0, -2.22529895747761146, 0, -5.47765897225258205, 0, 0, 0, 0, -2.39647580036050465, 0, 76.6872256115361487, 0, 12.7812042685893581, 0, 0, 0, 0, 0, 0, 2.39647580036050465, 0, 0, 0, -191.718064028840372, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.22529895747761146, 0, -76.6872256115361487, 0, 191.718064028840372, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.171176842882893189, 0, 5.47765897225258205, 0, -12.7812042685893581, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = 13/2
+        
         0.315634502603574665, 0, 0, -4.10324853384647065, 0, -10.1003040833143893, 0, 0, 0, 0, -4.41888303645004531, 0, 141.40425716640145, 0, 23.5673761944002417, 0, 0, 0, 0, 0, 0, 4.41888303645004531, 0, 0, 0, -353.510642916003625, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4.10324853384647065, 0, -141.40425716640145, 0, 353.510642916003625, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.315634502603574665, 0, 10.1003040833143893, 0, -23.5673761944002417, 0, 0, 0, 0, 0, 0,
         0, 0, 1.26253801041429866, 0, 0, 0, 0, -25.2507602082859732, 0, -6.73353605554292619, 0, 0, 0, 0, 0, 0, 17.6755321458001813, 0, 141.40425716640145, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35.3510642916003625, 0, -235.673761944002417, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -8.83776607290009063, 0, 47.1347523888004833, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = 15/2
+        
         0, 0, 2.67824756600916763, 0, 0, 0, 0, -53.5649513201833526, 0, -14.2839870187155607, 0, 0, 0, 0, 0, 0, 37.4954659241283468, 0, 299.963727393026774, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 74.9909318482566936, 0, -499.939545655044624, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -18.7477329620641734, 0, 99.9879091310089248, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.148791531444953757, 0, 0, 4.01737134901375144, 0, 2.67824756600916763, 0, 0, 0, 0, -6.2492443206880578, 0, -74.9909318482566936, 0, 0, 0, 0, 0, 0, 0, 0, -6.2492443206880578, 0, 187.477329620641734, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4.01737134901375144, 0, -74.9909318482566936, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.148791531444953757, 0, 2.67824756600916763, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = 17/2
+        
         -0.374450475926594148, 0, 0, 10.110162850018042, 0, 6.74010856667869467, 0, 0, 0, 0, -15.7269199889169542, 0, -188.723039867003451, 0, 0, 0, 0, 0, 0, 0, 0, -15.7269199889169542, 0, 471.807599667508627, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10.110162850018042, 0, -188.723039867003451, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.374450475926594148, 0, 6.74010856667869467, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, -0.748900951853188297, 0, 0, 0, 0, 26.9604342667147787, 0, 0, 0, 0, 0, 0, 0, 0, -94.3615199335017254, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 62.9076799556678169, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -6.74010856667869467, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = 19/2
+        
         0, 0, -2.36823274972417239, 0, 0, 0, 0, 85.2563789900702061, 0, 0, 0, 0, 0, 0, 0, 0, -298.397326465245721, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 198.931550976830481, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -21.3140947475175515, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.11841163748620862, 0, 0, -5.32852368687938788, 0, 0, 0, 0, 0, 0, 24.8664438721038101, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -24.8664438721038101, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5.32852368687938788, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.11841163748620862, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = 21/2
+        
         0.542630291944221461, 0, 0, -24.4183631374899657, 0, 0, 0, 0, 0, 0, 113.952361308286507, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -113.952361308286507, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24.4183631374899657, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.542630291944221461, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -21/2
+        
         -0.542630291944221461, 0, 0, 29.8446660569321803, 0, 0, 0, 0, 0, 0, -179.067996341593082, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 250.695194878230315, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -89.533998170796541, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5.96893321138643607, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0.542630291944221461, 0, 0, 0, 0, -24.4183631374899657, 0, 0, 0, 0, 0, 0, 0, 0, 113.952361308286507, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -113.952361308286507, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24.4183631374899657, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.542630291944221461, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -19/2
+        
         0, 0, -2.48664438721038101, 0, 0, 0, 0, 111.898997424467146, 0, 0, 0, 0, 0, 0, 0, 0, -522.195321314180012, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 522.195321314180012, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -111.898997424467146, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.48664438721038101, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.11841163748620862, 0, 0, 4.14440731201730169, 0, 2.36823274972417239, 0, 0, 0, 0, -10.6570473737587758, 0, -85.2563789900702061, 0, 0, 0, 0, 0, 0, 0, 0, -4.97328877442076202, 0, 298.397326465245721, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.88087281146564647, 0, -198.931550976830481, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.06570473737587758, 0, 21.3140947475175515, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -17/2
+        
         0.374450475926594148, 0, 0, -13.1057666574307952, 0, -7.48900951853188297, 0, 0, 0, 0, 33.7005428333934733, 0, 269.604342667147787, 0, 0, 0, 0, 0, 0, 0, 0, 15.7269199889169542, 0, -943.615199335017254, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -28.0837856944945611, 0, 629.076799556678169, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.37005428333934733, 0, -67.4010856667869467, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, -1.12335142777978244, 0, 0, 0, 0, 30.330488550054126, 0, 6.74010856667869467, 0, 0, 0, 0, 0, 0, -47.1807599667508627, 0, -188.723039867003451, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -47.1807599667508627, 0, 471.807599667508627, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 30.330488550054126, 0, -188.723039867003451, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.12335142777978244, 0, 6.74010856667869467, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -15/2
+        
         0, 0, 2.82703909745412139, 0, 0, 0, 0, -76.3300556312612774, 0, -16.9622345847247283, 0, 0, 0, 0, 0, 0, 118.735642093073098, 0, 474.942568372292393, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 118.735642093073098, 0, -1187.35642093073098, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -76.3300556312612774, 0, 474.942568372292393, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.82703909745412139, 0, -16.9622345847247283, 0, 0, 0, 0, 0, 0, 0, 0,
         0.148791531444953757, 0, 0, -2.82703909745412139, 0, -5.35649513201833526, 0, 0, 0, 0, -0.892749188669722543, 0, 107.129902640366705, 0, 14.2839870187155607, 0, 0, 0, 0, 0, 0, 6.2492443206880578, 0, -74.9909318482566936, 0, -299.963727393026774, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.1246221603440289, 0, -149.981863696513387, 0, 499.939545655044624, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.0415407201146763, 0, 37.4954659241283468, 0, -99.9879091310089248, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -13/2
+        
         -0.315634502603574665, 0, 0, 5.99705554946791864, 0, 11.3628420937286879, 0, 0, 0, 0, 1.89380701562144799, 0, -227.256841874573759, 0, -30.3009122499431679, 0, 0, 0, 0, 0, 0, -13.2566491093501359, 0, 159.079789312201631, 0, 636.319157248806525, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -6.62832455467506797, 0, 318.159578624403263, 0, -1060.53192874801088, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.20944151822502266, 0, -79.5398946561008156, 0, 212.106385749602175, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 1.57817251301787333, 0, 0, 0, 0, -20.5162426692323532, 0, -16.8338401388573155, 0, 0, 0, 0, 0, 0, -22.0944151822502266, 0, 235.673761944002417, 0, 23.5673761944002417, 0, 0, 0, 0, 0, 0, 0, 0, 22.0944151822502266, 0, 0, 0, -353.510642916003625, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20.5162426692323532, 0, -235.673761944002417, 0, 353.510642916003625, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.57817251301787333, 0, 16.8338401388573155, 0, -23.5673761944002417, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -11/2
+        
         0, 0, -2.91000632900918421, 0, 0, 0, 0, 37.8300822771193948, 0, 31.0400675094312983, 0, 0, 0, 0, 0, 0, 40.740088606128579, 0, -434.560945132038176, 0, -43.4560945132038176, 0, 0, 0, 0, 0, 0, 0, 0, -40.740088606128579, 0, 0, 0, 651.841417698057264, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -37.8300822771193948, 0, 434.560945132038176, 0, -651.841417698057264, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.91000632900918421, 0, -31.0400675094312983, 0, 43.4560945132038176, 0, 0, 0, 0, 0, 0,
         -0.171176842882893189, 0, 0, 1.19823790018025232, 0, 8.21648845837887307, 0, 0, 0, 0, 3.76589054342365016, 0, -65.7319076670309846, 0, -38.3436128057680743, 0, 0, 0, 0, 0, 0, 2.39647580036050465, 0, -115.030838417304223, 0, 345.092515251912669, 0, 30.6748902446144595, 0, 0, 0, 0, 0, 0, 0, 0, -0.855884214414465945, 0, 0, 0, 191.718064028840372, 0, -306.748902446144595, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.855884214414465945, 0, 41.0824422918943654, 0, -191.718064028840372, 0, 153.374451223072297, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -9/2
+        
         0.279530613895769685, 0, 0, -1.9567142972703878, 0, -13.4174694669969449, 0, 0, 0, 0, -6.14967350570693308, 0, 107.339755735975559, 0, 62.6148575126524095, 0, 0, 0, 0, 0, 0, -3.9134285945407756, 0, 187.844572537957229, 0, -563.533717613871686, 0, -50.0918860101219276, 0, 0, 0, 0, 0, 0, 0, 0, 1.39765306947884843, 0, 0, 0, -313.074287563262048, 0, 500.918860101219276, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.39765306947884843, 0, -67.0873473349847245, 0, 313.074287563262048, 0, -250.459430050609638, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, -1.9567142972703878, 0, 0, 0, 0, 5.87014289181116339, 0, 27.3940001617854292, 0, 0, 0, 0, 0, 0, 27.3940001617854292, 0, -109.576000647141717, 0, -65.74560038828503, 0, 0, 0, 0, 0, 0, 0, 0, 27.3940001617854292, 0, -273.940001617854292, 0, 328.72800194142515, 0, 31.3074287563262048, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5.87014289181116339, 0, -109.576000647141717, 0, 328.72800194142515, 0, -187.844572537957229, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.9567142972703878, 0, 27.3940001617854292, 0, -65.74560038828503, 0, 31.3074287563262048, 0, 0, 0, 0,
-        // j = 21/2, mj = -7/2
+        
         0, 0, 2.86433643816841393, 0, 0, 0, 0, -8.5930093145052418, 0, -40.1007101343577951, 0, 0, 0, 0, 0, 0, -40.1007101343577951, 0, 160.40284053743118, 0, 96.2417043224587082, 0, 0, 0, 0, 0, 0, 0, 0, -40.1007101343577951, 0, 401.007101343577951, 0, -481.208521612293541, 0, -45.8293830106946229, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -8.5930093145052418, 0, 160.40284053743118, 0, -481.208521612293541, 0, 274.976298064167738, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.86433643816841393, 0, -40.1007101343577951, 0, 96.2417043224587082, 0, -45.8293830106946229, 0, 0, 0, 0,
         0.190955762544560929, 0, 0, 0.190955762544560929, 0, -10.693522702495412, 0, 0, 0, 0, -1.14573457526736557, 0, 0, 0, 64.1611362149724721, 0, 0, 0, 0, 0, 0, -2.673380675623853, 0, 64.1611362149724721, 0, -64.1611362149724721, 0, -85.5481816199632961, 0, 0, 0, 0, 0, 0, 0, 0, -2.10051338799017022, 0, 85.5481816199632961, 0, -320.805681074862361, 0, 171.096363239926592, 0, 24.4423376057037989, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.572867287633682787, 0, 32.0805681074862361, 0, -192.483408644917416, 0, 256.644544859889888, 0, -73.3270128171113967, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -5/2
+        
         -0.25261072955380536, 0, 0, -0.25261072955380536, 0, 14.1462008550131001, 0, 0, 0, 0, 1.51566437732283216, 0, 0, 0, -84.8772051300786008, 0, 0, 0, 0, 0, 0, 3.53655021375327503, 0, -84.8772051300786008, 0, 84.8772051300786008, 0, 113.169606840104801, 0, 0, 0, 0, 0, 0, 0, 0, 2.77871802509185895, 0, -113.169606840104801, 0, 424.386025650393004, 0, -226.339213680209602, 0, -32.334173382887086, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.757832188661416079, 0, -42.4386025650393004, 0, 254.631615390235802, 0, -339.508820520314403, 0, 97.0025201486612581, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 2.27349656598424824, 0, 0, 0, 0, 6.82048969795274471, 0, -36.3759450557479718, 0, 0, 0, 0, 0, 0, 4.54699313196849647, 0, -72.7518901114959435, 0, 109.127835167243915, 0, 0, 0, 0, 0, 0, 0, 0, -4.54699313196849647, 0, 0, 0, 109.127835167243915, 0, -83.1450172702810783, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -6.82048969795274471, 0, 72.7518901114959435, 0, -109.127835167243915, 0, 0, 0, 13.8575028783801797, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.27349656598424824, 0, 36.3759450557479718, 0, -109.127835167243915, 0, 83.1450172702810783, 0, -13.8575028783801797, 0, 0,
-        // j = 21/2, mj = -3/2
+        
         0, 0, -2.73240281441583531, 0, 0, 0, 0, -8.19720844324750592, 0, 43.7184450306533649, 0, 0, 0, 0, 0, 0, -5.46480562883167061, 0, 87.4368900613067298, 0, -131.155335091960095, 0, 0, 0, 0, 0, 0, 0, 0, 5.46480562883167061, 0, 0, 0, -131.155335091960095, 0, 99.9278743557791198, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.19720844324750592, 0, -87.4368900613067298, 0, 131.155335091960095, 0, 0, 0, -16.6546457259631866, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.73240281441583531, 0, -43.7184450306533649, 0, 131.155335091960095, 0, -99.9278743557791198, 0, 16.6546457259631866, 0, 0,
         -0.210184831878141177, 0, 0, -1.05092415939070589, 0, 12.6110899126884706, 0, 0, 0, 0, -2.10184831878141177, 0, 50.4443596507538826, 0, -84.073932751256471, 0, 0, 0, 0, 0, 0, -2.10184831878141177, 0, 75.6665394761308239, 0, -252.221798253769413, 0, 134.518292402010354, 0, 0, 0, 0, 0, 0, 0, 0, -1.05092415939070589, 0, 50.4443596507538826, 0, -252.221798253769413, 0, 269.036584804020707, 0, -57.650696743718723, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.210184831878141177, 0, 12.6110899126884706, 0, -84.073932751256471, 0, 134.518292402010354, 0, -57.650696743718723, 0, 5.12450637721944204, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -1/2
+        
         0.230245947330177705, 0, 0, 1.15122973665088853, 0, -13.8147568398106623, 0, 0, 0, 0, 2.30245947330177705, 0, -55.2590273592426493, 0, 92.0983789320710822, 0, 0, 0, 0, 0, 0, 2.30245947330177705, 0, -82.888541038863974, 0, 276.295136796213247, 0, -147.357406291313732, 0, 0, 0, 0, 0, 0, 0, 0, 1.15122973665088853, 0, -55.2590273592426493, 0, 276.295136796213247, 0, -294.714812582627463, 0, 63.1531741248487421, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.230245947330177705, 0, -13.8147568398106623, 0, 92.0983789320710822, 0, -147.357406291313732, 0, 63.1531741248487421, 0, -5.61361547776433263, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, -2.53270542063195476, 0, 0, 0, 0, -12.6635271031597738, 0, 42.2117570105325793, 0, 0, 0, 0, 0, 0, -25.3270542063195476, 0, 168.847028042130317, 0, -135.077622433704254, 0, 0, 0, 0, 0, 0, 0, 0, -25.3270542063195476, 0, 253.270542063195476, 0, -405.232867301112762, 0, 115.78081922888936, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -12.6635271031597738, 0, 168.847028042130317, 0, -405.232867301112762, 0, 231.561638457778721, 0, -25.7290709397531912, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.53270542063195476, 0, 42.2117570105325793, 0, -135.077622433704254, 0, 115.78081922888936, 0, -25.7290709397531912, 0, 0.935602579627388772,
-        // j = 21/2, mj = 1/2
+        
         0, 0, 2.53270542063195476, 0, 0, 0, 0, 12.6635271031597738, 0, -42.2117570105325793, 0, 0, 0, 0, 0, 0, 25.3270542063195476, 0, -168.847028042130317, 0, 135.077622433704254, 0, 0, 0, 0, 0, 0, 0, 0, 25.3270542063195476, 0, -253.270542063195476, 0, 405.232867301112762, 0, -115.78081922888936, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12.6635271031597738, 0, -168.847028042130317, 0, 405.232867301112762, 0, -231.561638457778721, 0, 25.7290709397531912, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.53270542063195476, 0, -42.2117570105325793, 0, 135.077622433704254, 0, -115.78081922888936, 0, 25.7290709397531912, 0, -0.935602579627388772,
         0.230245947330177705, 0, 0, 1.15122973665088853, 0, -13.8147568398106623, 0, 0, 0, 0, 2.30245947330177705, 0, -55.2590273592426493, 0, 92.0983789320710822, 0, 0, 0, 0, 0, 0, 2.30245947330177705, 0, -82.888541038863974, 0, 276.295136796213247, 0, -147.357406291313732, 0, 0, 0, 0, 0, 0, 0, 0, 1.15122973665088853, 0, -55.2590273592426493, 0, 276.295136796213247, 0, -294.714812582627463, 0, 63.1531741248487421, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.230245947330177705, 0, -13.8147568398106623, 0, 92.0983789320710822, 0, -147.357406291313732, 0, 63.1531741248487421, 0, -5.61361547776433263, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = 3/2
+        
         -0.210184831878141177, 0, 0, -1.05092415939070589, 0, 12.6110899126884706, 0, 0, 0, 0, -2.10184831878141177, 0, 50.4443596507538826, 0, -84.073932751256471, 0, 0, 0, 0, 0, 0, -2.10184831878141177, 0, 75.6665394761308239, 0, -252.221798253769413, 0, 134.518292402010354, 0, 0, 0, 0, 0, 0, 0, 0, -1.05092415939070589, 0, 50.4443596507538826, 0, -252.221798253769413, 0, 269.036584804020707, 0, -57.650696743718723, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.210184831878141177, 0, 12.6110899126884706, 0, -84.073932751256471, 0, 134.518292402010354, 0, -57.650696743718723, 0, 5.12450637721944204, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 2.73240281441583531, 0, 0, 0, 0, 8.19720844324750592, 0, -43.7184450306533649, 0, 0, 0, 0, 0, 0, 5.46480562883167061, 0, -87.4368900613067298, 0, 131.155335091960095, 0, 0, 0, 0, 0, 0, 0, 0, -5.46480562883167061, 0, 0, 0, 131.155335091960095, 0, -99.9278743557791198, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -8.19720844324750592, 0, 87.4368900613067298, 0, -131.155335091960095, 0, 0, 0, 16.6546457259631866, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.73240281441583531, 0, 43.7184450306533649, 0, -131.155335091960095, 0, 99.9278743557791198, 0, -16.6546457259631866, 0, 0,
-        // j = 21/2, mj = 5/2
+        
         0, 0, -2.27349656598424824, 0, 0, 0, 0, -6.82048969795274471, 0, 36.3759450557479718, 0, 0, 0, 0, 0, 0, -4.54699313196849647, 0, 72.7518901114959435, 0, -109.127835167243915, 0, 0, 0, 0, 0, 0, 0, 0, 4.54699313196849647, 0, 0, 0, -109.127835167243915, 0, 83.1450172702810783, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6.82048969795274471, 0, -72.7518901114959435, 0, 109.127835167243915, 0, 0, 0, -13.8575028783801797, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.27349656598424824, 0, -36.3759450557479718, 0, 109.127835167243915, 0, -83.1450172702810783, 0, 13.8575028783801797, 0, 0,
         -0.25261072955380536, 0, 0, -0.25261072955380536, 0, 14.1462008550131001, 0, 0, 0, 0, 1.51566437732283216, 0, 0, 0, -84.8772051300786008, 0, 0, 0, 0, 0, 0, 3.53655021375327503, 0, -84.8772051300786008, 0, 84.8772051300786008, 0, 113.169606840104801, 0, 0, 0, 0, 0, 0, 0, 0, 2.77871802509185895, 0, -113.169606840104801, 0, 424.386025650393004, 0, -226.339213680209602, 0, -32.334173382887086, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.757832188661416079, 0, -42.4386025650393004, 0, 254.631615390235802, 0, -339.508820520314403, 0, 97.0025201486612581, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = 7/2
+        
         0.190955762544560929, 0, 0, 0.190955762544560929, 0, -10.693522702495412, 0, 0, 0, 0, -1.14573457526736557, 0, 0, 0, 64.1611362149724721, 0, 0, 0, 0, 0, 0, -2.673380675623853, 0, 64.1611362149724721, 0, -64.1611362149724721, 0, -85.5481816199632961, 0, 0, 0, 0, 0, 0, 0, 0, -2.10051338799017022, 0, 85.5481816199632961, 0, -320.805681074862361, 0, 171.096363239926592, 0, 24.4423376057037989, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.572867287633682787, 0, 32.0805681074862361, 0, -192.483408644917416, 0, 256.644544859889888, 0, -73.3270128171113967, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, -2.86433643816841393, 0, 0, 0, 0, 8.5930093145052418, 0, 40.1007101343577951, 0, 0, 0, 0, 0, 0, 40.1007101343577951, 0, -160.40284053743118, 0, -96.2417043224587082, 0, 0, 0, 0, 0, 0, 0, 0, 40.1007101343577951, 0, -401.007101343577951, 0, 481.208521612293541, 0, 45.8293830106946229, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.5930093145052418, 0, -160.40284053743118, 0, 481.208521612293541, 0, -274.976298064167738, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.86433643816841393, 0, 40.1007101343577951, 0, -96.2417043224587082, 0, 45.8293830106946229, 0, 0, 0, 0,
-        // j = 21/2, mj = 9/2
+        
         0, 0, 1.9567142972703878, 0, 0, 0, 0, -5.87014289181116339, 0, -27.3940001617854292, 0, 0, 0, 0, 0, 0, -27.3940001617854292, 0, 109.576000647141717, 0, 65.74560038828503, 0, 0, 0, 0, 0, 0, 0, 0, -27.3940001617854292, 0, 273.940001617854292, 0, -328.72800194142515, 0, -31.3074287563262048, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -5.87014289181116339, 0, 109.576000647141717, 0, -328.72800194142515, 0, 187.844572537957229, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.9567142972703878, 0, -27.3940001617854292, 0, 65.74560038828503, 0, -31.3074287563262048, 0, 0, 0, 0,
         0.279530613895769685, 0, 0, -1.9567142972703878, 0, -13.4174694669969449, 0, 0, 0, 0, -6.14967350570693308, 0, 107.339755735975559, 0, 62.6148575126524095, 0, 0, 0, 0, 0, 0, -3.9134285945407756, 0, 187.844572537957229, 0, -563.533717613871686, 0, -50.0918860101219276, 0, 0, 0, 0, 0, 0, 0, 0, 1.39765306947884843, 0, 0, 0, -313.074287563262048, 0, 500.918860101219276, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.39765306947884843, 0, -67.0873473349847245, 0, 313.074287563262048, 0, -250.459430050609638, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = 11/2
+        
         -0.171176842882893189, 0, 0, 1.19823790018025232, 0, 8.21648845837887307, 0, 0, 0, 0, 3.76589054342365016, 0, -65.7319076670309846, 0, -38.3436128057680743, 0, 0, 0, 0, 0, 0, 2.39647580036050465, 0, -115.030838417304223, 0, 345.092515251912669, 0, 30.6748902446144595, 0, 0, 0, 0, 0, 0, 0, 0, -0.855884214414465945, 0, 0, 0, 191.718064028840372, 0, -306.748902446144595, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.855884214414465945, 0, 41.0824422918943654, 0, -191.718064028840372, 0, 153.374451223072297, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 2.91000632900918421, 0, 0, 0, 0, -37.8300822771193948, 0, -31.0400675094312983, 0, 0, 0, 0, 0, 0, -40.740088606128579, 0, 434.560945132038176, 0, 43.4560945132038176, 0, 0, 0, 0, 0, 0, 0, 0, 40.740088606128579, 0, 0, 0, -651.841417698057264, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 37.8300822771193948, 0, -434.560945132038176, 0, 651.841417698057264, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.91000632900918421, 0, 31.0400675094312983, 0, -43.4560945132038176, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = 13/2
+        
         0, 0, -1.57817251301787333, 0, 0, 0, 0, 20.5162426692323532, 0, 16.8338401388573155, 0, 0, 0, 0, 0, 0, 22.0944151822502266, 0, -235.673761944002417, 0, -23.5673761944002417, 0, 0, 0, 0, 0, 0, 0, 0, -22.0944151822502266, 0, 0, 0, 353.510642916003625, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -20.5162426692323532, 0, 235.673761944002417, 0, -353.510642916003625, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.57817251301787333, 0, -16.8338401388573155, 0, 23.5673761944002417, 0, 0, 0, 0, 0, 0,
         -0.315634502603574665, 0, 0, 5.99705554946791864, 0, 11.3628420937286879, 0, 0, 0, 0, 1.89380701562144799, 0, -227.256841874573759, 0, -30.3009122499431679, 0, 0, 0, 0, 0, 0, -13.2566491093501359, 0, 159.079789312201631, 0, 636.319157248806525, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -6.62832455467506797, 0, 318.159578624403263, 0, -1060.53192874801088, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.20944151822502266, 0, -79.5398946561008156, 0, 212.106385749602175, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = 15/2
+        
         0.148791531444953757, 0, 0, -2.82703909745412139, 0, -5.35649513201833526, 0, 0, 0, 0, -0.892749188669722543, 0, 107.129902640366705, 0, 14.2839870187155607, 0, 0, 0, 0, 0, 0, 6.2492443206880578, 0, -74.9909318482566936, 0, -299.963727393026774, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.1246221603440289, 0, -149.981863696513387, 0, 499.939545655044624, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.0415407201146763, 0, 37.4954659241283468, 0, -99.9879091310089248, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, -2.82703909745412139, 0, 0, 0, 0, 76.3300556312612774, 0, 16.9622345847247283, 0, 0, 0, 0, 0, 0, -118.735642093073098, 0, -474.942568372292393, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -118.735642093073098, 0, 1187.35642093073098, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 76.3300556312612774, 0, -474.942568372292393, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.82703909745412139, 0, 16.9622345847247283, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = 17/2
+        
         0, 0, 1.12335142777978244, 0, 0, 0, 0, -30.330488550054126, 0, -6.74010856667869467, 0, 0, 0, 0, 0, 0, 47.1807599667508627, 0, 188.723039867003451, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 47.1807599667508627, 0, -471.807599667508627, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -30.330488550054126, 0, 188.723039867003451, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.12335142777978244, 0, -6.74010856667869467, 0, 0, 0, 0, 0, 0, 0, 0,
         0.374450475926594148, 0, 0, -13.1057666574307952, 0, -7.48900951853188297, 0, 0, 0, 0, 33.7005428333934733, 0, 269.604342667147787, 0, 0, 0, 0, 0, 0, 0, 0, 15.7269199889169542, 0, -943.615199335017254, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -28.0837856944945611, 0, 629.076799556678169, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.37005428333934733, 0, -67.4010856667869467, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = 19/2
+        
         -0.11841163748620862, 0, 0, 4.14440731201730169, 0, 2.36823274972417239, 0, 0, 0, 0, -10.6570473737587758, 0, -85.2563789900702061, 0, 0, 0, 0, 0, 0, 0, 0, -4.97328877442076202, 0, 298.397326465245721, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.88087281146564647, 0, -198.931550976830481, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.06570473737587758, 0, 21.3140947475175515, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 2.48664438721038101, 0, 0, 0, 0, -111.898997424467146, 0, 0, 0, 0, 0, 0, 0, 0, 522.195321314180012, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -522.195321314180012, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 111.898997424467146, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.48664438721038101, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = 21/2
+        
         0, 0, -0.542630291944221461, 0, 0, 0, 0, 24.4183631374899657, 0, 0, 0, 0, 0, 0, 0, 0, -113.952361308286507, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 113.952361308286507, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -24.4183631374899657, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.542630291944221461, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.542630291944221461, 0, 0, 29.8446660569321803, 0, 0, 0, 0, 0, 0, -179.067996341593082, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 250.695194878230315, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -89.533998170796541, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5.96893321138643607, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -23/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.554825753806619302, 0, 0, -30.5154164593640616, 0, 0, 0, 0, 0, 0, 183.09249875618437, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -256.329498258658117, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 91.5462493780921848, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -6.10308329187281232, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -21/2
+        
         0.115689166958762041, 0, 0, -6.36290418273191227, 0, 0, 0, 0, 0, 0, 38.1774250963914736, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -53.4483951349480631, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19.0887125481957368, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.27258083654638245, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 2.54516167309276491, 0, 0, 0, 0, -114.532275289174421, 0, 0, 0, 0, 0, 0, 0, 0, 534.483951349480631, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -534.483951349480631, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 114.532275289174421, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.54516167309276491, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -19/2
+        
         0, 0, 0.767395118221990013, 0, 0, 0, 0, -34.5327803199895506, 0, 0, 0, 0, 0, 0, 0, 0, 161.152974826617903, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -161.152974826617903, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 34.5327803199895506, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.767395118221990013, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.383697559110995006, 0, 0, 13.4294145688848252, 0, 7.67395118221990013, 0, 0, 0, 0, -34.5327803199895506, 0, -276.262242559916405, 0, 0, 0, 0, 0, 0, 0, 0, -16.1152974826617903, 0, 966.917848959707416, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 28.7773169333246255, 0, -644.611899306471611, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -3.45327803199895506, 0, 69.0655606399791011, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -17/2
+        
         -0.145024045724314041, 0, 0, 5.07584160035099142, 0, 2.90048091448628081, 0, 0, 0, 0, -13.0521641151882637, 0, -104.417312921506109, 0, 0, 0, 0, 0, 0, 0, 0, -6.09100992042118971, 0, 365.460595225271382, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10.876803429323553, 0, -243.640396816847588, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.30521641151882637, 0, 26.1043282303765273, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, -2.90048091448628081, 0, 0, 0, 0, 78.3129846911295819, 0, 17.4028854869176849, 0, 0, 0, 0, 0, 0, -121.820198408423794, 0, -487.280793633695176, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -121.820198408423794, 0, 1218.20198408423794, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 78.3129846911295819, 0, -487.280793633695176, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.90048091448628081, 0, 17.4028854869176849, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -15/2
+        
         0, 0, -1.29713449844641568, 0, 0, 0, 0, 35.0226314580532234, 0, 7.78280699067849409, 0, 0, 0, 0, 0, 0, -54.4796489347494586, 0, -217.918595738997834, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -54.4796489347494586, 0, 544.796489347494586, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35.0226314580532234, 0, -217.918595738997834, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.29713449844641568, 0, 7.78280699067849409, 0, 0, 0, 0, 0, 0, 0, 0,
         0.32428362461160392, 0, 0, -6.16138886762047449, 0, -11.6742104860177411, 0, 0, 0, 0, -1.94570174766962352, 0, 233.484209720354823, 0, 31.1312279627139763, 0, 0, 0, 0, 0, 0, 13.6199122336873647, 0, -163.438946804248376, 0, -653.755787216993503, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6.80995611684368233, 0, -326.877893608496752, 0, 1089.59297869498917, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.26998537228122744, 0, 81.7194734021241879, 0, -217.918595738997834, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -13/2
+        
         0.166353989393607054, 0, 0, -3.16072579847853403, 0, -5.98874361816985396, 0, 0, 0, 0, -0.998123936361642327, 0, 119.774872363397079, 0, 15.9699829817862772, 0, 0, 0, 0, 0, 0, 6.98686755453149629, 0, -83.8424106543779555, 0, -335.369642617511822, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.49343377726574814, 0, -167.684821308755911, 0, 558.949404362519703, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.16447792575524938, 0, 41.9212053271889777, 0, -111.789880872503941, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 2.99437180908492698, 0, 0, 0, 0, -38.9268335181040507, 0, -31.9399659635725545, 0, 0, 0, 0, 0, 0, -41.9212053271889777, 0, 447.159523490015762, 0, 44.7159523490015762, 0, 0, 0, 0, 0, 0, 0, 0, 41.9212053271889777, 0, 0, 0, -670.739285235023644, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 38.9268335181040507, 0, -447.159523490015762, 0, 670.739285235023644, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.99437180908492698, 0, 31.9399659635725545, 0, -44.7159523490015762, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -11/2
+        
         0, 0, 1.72880137002900928, 0, 0, 0, 0, -22.4744178103771206, 0, -18.440547946976099, 0, 0, 0, 0, 0, 0, -24.2032191804061299, 0, 258.167671257665386, 0, 25.8167671257665386, 0, 0, 0, 0, 0, 0, 0, 0, 24.2032191804061299, 0, 0, 0, -387.251506886498079, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 22.4744178103771206, 0, -258.167671257665386, 0, 387.251506886498079, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.72880137002900928, 0, 18.440547946976099, 0, -25.8167671257665386, 0, 0, 0, 0, 0, 0,
         -0.288133561671501547, 0, 0, 2.01693493170051083, 0, 13.8304109602320742, 0, 0, 0, 0, 6.33893835677303403, 0, -110.643287681856594, 0, -64.5419178144163464, 0, 0, 0, 0, 0, 0, 4.03386986340102165, 0, -193.625753443249039, 0, 580.877260329747118, 0, 51.6335342515330771, 0, 0, 0, 0, 0, 0, 0, 0, -1.44066780835750773, 0, 0, 0, 322.709589072081732, 0, -516.335342515330771, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.44066780835750773, 0, 69.1520548011603712, 0, -322.709589072081732, 0, 258.167671257665386, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -9/2
+        
         -0.184892122049355627, 0, 0, 1.29424485434548939, 0, 8.87482185836907012, 0, 0, 0, 0, 4.0676266850858238, 0, -70.998574866952561, 0, -41.4158353390556606, 0, 0, 0, 0, 0, 0, 2.58848970869097878, 0, -124.247506017166982, 0, 372.742518051500945, 0, 33.1326682712445284, 0, 0, 0, 0, 0, 0, 0, 0, -0.924460610246778137, 0, 0, 0, 207.079176695278303, 0, -331.326682712445284, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.924460610246778137, 0, 44.3741092918453506, 0, -207.079176695278303, 0, 165.663341356222642, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, -2.95827395278969004, 0, 0, 0, 0, 8.87482185836907012, 0, 41.4158353390556606, 0, 0, 0, 0, 0, 0, 41.4158353390556606, 0, -165.663341356222642, 0, -99.3980048137335853, 0, 0, 0, 0, 0, 0, 0, 0, 41.4158353390556606, 0, -414.158353390556606, 0, 496.990024068667927, 0, 47.3323832446350406, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.87482185836907012, 0, -165.663341356222642, 0, 496.990024068667927, 0, -283.994299467810244, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.95827395278969004, 0, 41.4158353390556606, 0, -99.3980048137335853, 0, 47.3323832446350406, 0, 0, 0, 0,
-        // j = 23/2, mj = -7/2
+        
         0, 0, -2.09181557262512238, 0, 0, 0, 0, 6.27544671787536713, 0, 29.2854180167517133, 0, 0, 0, 0, 0, 0, 29.2854180167517133, 0, -117.141672067006853, 0, -70.2850032402041119, 0, 0, 0, 0, 0, 0, 0, 0, 29.2854180167517133, 0, -292.854180167517133, 0, 351.425016201020559, 0, 33.469049162001958, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6.27544671787536713, 0, -117.141672067006853, 0, 351.425016201020559, 0, -200.814294972011748, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.09181557262512238, 0, 29.2854180167517133, 0, -70.2850032402041119, 0, 33.469049162001958, 0, 0, 0, 0,
         0.261476946578140297, 0, 0, 0.261476946578140297, 0, -14.6427090083758566, 0, 0, 0, 0, -1.56886167946884178, 0, 0, 0, 87.8562540502551398, 0, 0, 0, 0, 0, 0, -3.66067725209396416, 0, 87.8562540502551398, 0, -87.8562540502551398, 0, -117.141672067006853, 0, 0, 0, 0, 0, 0, 0, 0, -2.87624641235954327, 0, 117.141672067006853, 0, -439.281270251275699, 0, 234.283344134013706, 0, 33.469049162001958, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.784430839734420891, 0, 43.9281270251275699, 0, -263.568762150765419, 0, 351.425016201020559, 0, -100.407147486005874, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -5/2
+        
         0.202539171902860758, 0, 0, 0.202539171902860758, 0, -11.3421936265602025, 0, 0, 0, 0, -1.21523503141716455, 0, 0, 0, 68.0531617593612148, 0, 0, 0, 0, 0, 0, -2.83554840664005062, 0, 68.0531617593612148, 0, -68.0531617593612148, 0, -90.7375490124816198, 0, 0, 0, 0, 0, 0, 0, 0, -2.22793089093146834, 0, 90.7375490124816198, 0, -340.265808796806074, 0, 181.47509802496324, 0, 25.9250140035661771, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.607617515708582275, 0, 34.0265808796806074, 0, -204.159485278083644, 0, 272.212647037444859, 0, -77.7750420106985312, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 2.83554840664005062, 0, 0, 0, 0, 8.50664521992015185, 0, -45.3687745062408099, 0, 0, 0, 0, 0, 0, 5.67109681328010124, 0, -90.7375490124816198, 0, 136.10632351872243, 0, 0, 0, 0, 0, 0, 0, 0, -5.67109681328010124, 0, 0, 0, 136.10632351872243, 0, -103.700056014264708, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -8.50664521992015185, 0, 90.7375490124816198, 0, -136.10632351872243, 0, 0, 0, 17.2833426690441181, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.83554840664005062, 0, 45.3687745062408099, 0, -136.10632351872243, 0, 103.700056014264708, 0, -17.2833426690441181, 0, 0,
-        // j = 23/2, mj = -3/2
+        
         0, 0, 2.39647580036050465, 0, 0, 0, 0, 7.18942740108151394, 0, -38.3436128057680743, 0, 0, 0, 0, 0, 0, 4.79295160072100929, 0, -76.6872256115361487, 0, 115.030838417304223, 0, 0, 0, 0, 0, 0, 0, 0, -4.79295160072100929, 0, 0, 0, 115.030838417304223, 0, -87.6425435560413128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -7.18942740108151394, 0, 76.6872256115361487, 0, -115.030838417304223, 0, 0, 0, 14.6070905926735521, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.39647580036050465, 0, 38.3436128057680743, 0, -115.030838417304223, 0, 87.6425435560413128, 0, -14.6070905926735521, 0, 0,
         -0.239647580036050465, 0, 0, -1.19823790018025232, 0, 14.3788548021630279, 0, 0, 0, 0, -2.39647580036050465, 0, 57.5154192086521115, 0, -95.8590320144201859, 0, 0, 0, 0, 0, 0, -2.39647580036050465, 0, 86.2731288129781673, 0, -287.577096043260558, 0, 153.374451223072297, 0, 0, 0, 0, 0, 0, 0, 0, -1.19823790018025232, 0, 57.5154192086521115, 0, -287.577096043260558, 0, 306.748902446144595, 0, -65.7319076670309846, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.239647580036050465, 0, 14.3788548021630279, 0, -95.8590320144201859, 0, 153.374451223072297, 0, -65.7319076670309846, 0, 5.84283623706942085, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -1/2
+        
         -0.220443711424950199, 0, 0, -1.10221855712475099, 0, 13.2266226854970119, 0, 0, 0, 0, -2.20443711424950199, 0, 52.9064907419880478, 0, -88.1774845699800796, 0, 0, 0, 0, 0, 0, -2.20443711424950199, 0, 79.3597361129820716, 0, -264.532453709940239, 0, 141.083975311968127, 0, 0, 0, 0, 0, 0, 0, 0, -1.10221855712475099, 0, 52.9064907419880478, 0, -264.532453709940239, 0, 282.167950623936255, 0, -60.4645608479863403, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.220443711424950199, 0, 13.2266226854970119, 0, -88.1774845699800796, 0, 141.083975311968127, 0, -60.4645608479863403, 0, 5.37462763093211914, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, -2.64532453709940239, 0, 0, 0, 0, -13.2266226854970119, 0, 44.0887422849900398, 0, 0, 0, 0, 0, 0, -26.4532453709940239, 0, 176.354969139960159, 0, -141.083975311968127, 0, 0, 0, 0, 0, 0, 0, 0, -26.4532453709940239, 0, 264.532453709940239, 0, -423.251925935904382, 0, 120.929121695972681, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -13.2266226854970119, 0, 176.354969139960159, 0, -423.251925935904382, 0, 241.858243391945361, 0, -26.8731381546605957, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.64532453709940239, 0, 44.0887422849900398, 0, -141.083975311968127, 0, 120.929121695972681, 0, -26.8731381546605957, 0, 0.977205023805839843,
-        // j = 23/2, mj = 1/2
+        
         0, 0, -2.64532453709940239, 0, 0, 0, 0, -13.2266226854970119, 0, 44.0887422849900398, 0, 0, 0, 0, 0, 0, -26.4532453709940239, 0, 176.354969139960159, 0, -141.083975311968127, 0, 0, 0, 0, 0, 0, 0, 0, -26.4532453709940239, 0, 264.532453709940239, 0, -423.251925935904382, 0, 120.929121695972681, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -13.2266226854970119, 0, 176.354969139960159, 0, -423.251925935904382, 0, 241.858243391945361, 0, -26.8731381546605957, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.64532453709940239, 0, 44.0887422849900398, 0, -141.083975311968127, 0, 120.929121695972681, 0, -26.8731381546605957, 0, 0.977205023805839843,
         0.220443711424950199, 0, 0, 1.10221855712475099, 0, -13.2266226854970119, 0, 0, 0, 0, 2.20443711424950199, 0, -52.9064907419880478, 0, 88.1774845699800796, 0, 0, 0, 0, 0, 0, 2.20443711424950199, 0, -79.3597361129820716, 0, 264.532453709940239, 0, -141.083975311968127, 0, 0, 0, 0, 0, 0, 0, 0, 1.10221855712475099, 0, -52.9064907419880478, 0, 264.532453709940239, 0, -282.167950623936255, 0, 60.4645608479863403, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.220443711424950199, 0, -13.2266226854970119, 0, 88.1774845699800796, 0, -141.083975311968127, 0, 60.4645608479863403, 0, -5.37462763093211914, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 3/2
+        
         0.239647580036050465, 0, 0, 1.19823790018025232, 0, -14.3788548021630279, 0, 0, 0, 0, 2.39647580036050465, 0, -57.5154192086521115, 0, 95.8590320144201859, 0, 0, 0, 0, 0, 0, 2.39647580036050465, 0, -86.2731288129781673, 0, 287.577096043260558, 0, -153.374451223072297, 0, 0, 0, 0, 0, 0, 0, 0, 1.19823790018025232, 0, -57.5154192086521115, 0, 287.577096043260558, 0, -306.748902446144595, 0, 65.7319076670309846, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.239647580036050465, 0, -14.3788548021630279, 0, 95.8590320144201859, 0, -153.374451223072297, 0, 65.7319076670309846, 0, -5.84283623706942085, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 2.39647580036050465, 0, 0, 0, 0, 7.18942740108151394, 0, -38.3436128057680743, 0, 0, 0, 0, 0, 0, 4.79295160072100929, 0, -76.6872256115361487, 0, 115.030838417304223, 0, 0, 0, 0, 0, 0, 0, 0, -4.79295160072100929, 0, 0, 0, 115.030838417304223, 0, -87.6425435560413128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -7.18942740108151394, 0, 76.6872256115361487, 0, -115.030838417304223, 0, 0, 0, 14.6070905926735521, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.39647580036050465, 0, 38.3436128057680743, 0, -115.030838417304223, 0, 87.6425435560413128, 0, -14.6070905926735521, 0, 0,
-        // j = 23/2, mj = 5/2
+        
         0, 0, 2.83554840664005062, 0, 0, 0, 0, 8.50664521992015185, 0, -45.3687745062408099, 0, 0, 0, 0, 0, 0, 5.67109681328010124, 0, -90.7375490124816198, 0, 136.10632351872243, 0, 0, 0, 0, 0, 0, 0, 0, -5.67109681328010124, 0, 0, 0, 136.10632351872243, 0, -103.700056014264708, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -8.50664521992015185, 0, 90.7375490124816198, 0, -136.10632351872243, 0, 0, 0, 17.2833426690441181, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.83554840664005062, 0, 45.3687745062408099, 0, -136.10632351872243, 0, 103.700056014264708, 0, -17.2833426690441181, 0, 0,
         -0.202539171902860758, 0, 0, -0.202539171902860758, 0, 11.3421936265602025, 0, 0, 0, 0, 1.21523503141716455, 0, 0, 0, -68.0531617593612148, 0, 0, 0, 0, 0, 0, 2.83554840664005062, 0, -68.0531617593612148, 0, 68.0531617593612148, 0, 90.7375490124816198, 0, 0, 0, 0, 0, 0, 0, 0, 2.22793089093146834, 0, -90.7375490124816198, 0, 340.265808796806074, 0, -181.47509802496324, 0, -25.9250140035661771, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.607617515708582275, 0, -34.0265808796806074, 0, 204.159485278083644, 0, -272.212647037444859, 0, 77.7750420106985312, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 7/2
+        
         -0.261476946578140297, 0, 0, -0.261476946578140297, 0, 14.6427090083758566, 0, 0, 0, 0, 1.56886167946884178, 0, 0, 0, -87.8562540502551398, 0, 0, 0, 0, 0, 0, 3.66067725209396416, 0, -87.8562540502551398, 0, 87.8562540502551398, 0, 117.141672067006853, 0, 0, 0, 0, 0, 0, 0, 0, 2.87624641235954327, 0, -117.141672067006853, 0, 439.281270251275699, 0, -234.283344134013706, 0, -33.469049162001958, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.784430839734420891, 0, -43.9281270251275699, 0, 263.568762150765419, 0, -351.425016201020559, 0, 100.407147486005874, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, -2.09181557262512238, 0, 0, 0, 0, 6.27544671787536713, 0, 29.2854180167517133, 0, 0, 0, 0, 0, 0, 29.2854180167517133, 0, -117.141672067006853, 0, -70.2850032402041119, 0, 0, 0, 0, 0, 0, 0, 0, 29.2854180167517133, 0, -292.854180167517133, 0, 351.425016201020559, 0, 33.469049162001958, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6.27544671787536713, 0, -117.141672067006853, 0, 351.425016201020559, 0, -200.814294972011748, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.09181557262512238, 0, 29.2854180167517133, 0, -70.2850032402041119, 0, 33.469049162001958, 0, 0, 0, 0,
-        // j = 23/2, mj = 9/2
+        
         0, 0, -2.95827395278969004, 0, 0, 0, 0, 8.87482185836907012, 0, 41.4158353390556606, 0, 0, 0, 0, 0, 0, 41.4158353390556606, 0, -165.663341356222642, 0, -99.3980048137335853, 0, 0, 0, 0, 0, 0, 0, 0, 41.4158353390556606, 0, -414.158353390556606, 0, 496.990024068667927, 0, 47.3323832446350406, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.87482185836907012, 0, -165.663341356222642, 0, 496.990024068667927, 0, -283.994299467810244, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.95827395278969004, 0, 41.4158353390556606, 0, -99.3980048137335853, 0, 47.3323832446350406, 0, 0, 0, 0,
         0.184892122049355627, 0, 0, -1.29424485434548939, 0, -8.87482185836907012, 0, 0, 0, 0, -4.0676266850858238, 0, 70.998574866952561, 0, 41.4158353390556606, 0, 0, 0, 0, 0, 0, -2.58848970869097878, 0, 124.247506017166982, 0, -372.742518051500945, 0, -33.1326682712445284, 0, 0, 0, 0, 0, 0, 0, 0, 0.924460610246778137, 0, 0, 0, -207.079176695278303, 0, 331.326682712445284, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.924460610246778137, 0, -44.3741092918453506, 0, 207.079176695278303, 0, -165.663341356222642, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 11/2
+        
         0.288133561671501547, 0, 0, -2.01693493170051083, 0, -13.8304109602320742, 0, 0, 0, 0, -6.33893835677303403, 0, 110.643287681856594, 0, 64.5419178144163464, 0, 0, 0, 0, 0, 0, -4.03386986340102165, 0, 193.625753443249039, 0, -580.877260329747118, 0, -51.6335342515330771, 0, 0, 0, 0, 0, 0, 0, 0, 1.44066780835750773, 0, 0, 0, -322.709589072081732, 0, 516.335342515330771, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.44066780835750773, 0, -69.1520548011603712, 0, 322.709589072081732, 0, -258.167671257665386, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 1.72880137002900928, 0, 0, 0, 0, -22.4744178103771206, 0, -18.440547946976099, 0, 0, 0, 0, 0, 0, -24.2032191804061299, 0, 258.167671257665386, 0, 25.8167671257665386, 0, 0, 0, 0, 0, 0, 0, 0, 24.2032191804061299, 0, 0, 0, -387.251506886498079, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 22.4744178103771206, 0, -258.167671257665386, 0, 387.251506886498079, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.72880137002900928, 0, 18.440547946976099, 0, -25.8167671257665386, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 13/2
+        
         0, 0, 2.99437180908492698, 0, 0, 0, 0, -38.9268335181040507, 0, -31.9399659635725545, 0, 0, 0, 0, 0, 0, -41.9212053271889777, 0, 447.159523490015762, 0, 44.7159523490015762, 0, 0, 0, 0, 0, 0, 0, 0, 41.9212053271889777, 0, 0, 0, -670.739285235023644, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 38.9268335181040507, 0, -447.159523490015762, 0, 670.739285235023644, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.99437180908492698, 0, 31.9399659635725545, 0, -44.7159523490015762, 0, 0, 0, 0, 0, 0,
         -0.166353989393607054, 0, 0, 3.16072579847853403, 0, 5.98874361816985396, 0, 0, 0, 0, 0.998123936361642327, 0, -119.774872363397079, 0, -15.9699829817862772, 0, 0, 0, 0, 0, 0, -6.98686755453149629, 0, 83.8424106543779555, 0, 335.369642617511822, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -3.49343377726574814, 0, 167.684821308755911, 0, -558.949404362519703, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.16447792575524938, 0, -41.9212053271889777, 0, 111.789880872503941, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 15/2
+        
         -0.32428362461160392, 0, 0, 6.16138886762047449, 0, 11.6742104860177411, 0, 0, 0, 0, 1.94570174766962352, 0, -233.484209720354823, 0, -31.1312279627139763, 0, 0, 0, 0, 0, 0, -13.6199122336873647, 0, 163.438946804248376, 0, 653.755787216993503, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -6.80995611684368233, 0, 326.877893608496752, 0, -1089.59297869498917, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.26998537228122744, 0, -81.7194734021241879, 0, 217.918595738997834, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, -1.29713449844641568, 0, 0, 0, 0, 35.0226314580532234, 0, 7.78280699067849409, 0, 0, 0, 0, 0, 0, -54.4796489347494586, 0, -217.918595738997834, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -54.4796489347494586, 0, 544.796489347494586, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35.0226314580532234, 0, -217.918595738997834, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.29713449844641568, 0, 7.78280699067849409, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 17/2
+        
         0, 0, -2.90048091448628081, 0, 0, 0, 0, 78.3129846911295819, 0, 17.4028854869176849, 0, 0, 0, 0, 0, 0, -121.820198408423794, 0, -487.280793633695176, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -121.820198408423794, 0, 1218.20198408423794, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 78.3129846911295819, 0, -487.280793633695176, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.90048091448628081, 0, 17.4028854869176849, 0, 0, 0, 0, 0, 0, 0, 0,
         0.145024045724314041, 0, 0, -5.07584160035099142, 0, -2.90048091448628081, 0, 0, 0, 0, 13.0521641151882637, 0, 104.417312921506109, 0, 0, 0, 0, 0, 0, 0, 0, 6.09100992042118971, 0, -365.460595225271382, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -10.876803429323553, 0, 243.640396816847588, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.30521641151882637, 0, -26.1043282303765273, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 19/2
+        
         0.383697559110995006, 0, 0, -13.4294145688848252, 0, -7.67395118221990013, 0, 0, 0, 0, 34.5327803199895506, 0, 276.262242559916405, 0, 0, 0, 0, 0, 0, 0, 0, 16.1152974826617903, 0, -966.917848959707416, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -28.7773169333246255, 0, 644.611899306471611, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.45327803199895506, 0, -69.0655606399791011, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0.767395118221990013, 0, 0, 0, 0, -34.5327803199895506, 0, 0, 0, 0, 0, 0, 0, 0, 161.152974826617903, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -161.152974826617903, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 34.5327803199895506, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.767395118221990013, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 21/2
+        
         0, 0, 2.54516167309276491, 0, 0, 0, 0, -114.532275289174421, 0, 0, 0, 0, 0, 0, 0, 0, 534.483951349480631, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -534.483951349480631, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 114.532275289174421, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.54516167309276491, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.115689166958762041, 0, 0, 6.36290418273191227, 0, 0, 0, 0, 0, 0, -38.1774250963914736, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 53.4483951349480631, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -19.0887125481957368, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.27258083654638245, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 23/2
+        
         -0.554825753806619302, 0, 0, 30.5154164593640616, 0, 0, 0, 0, 0, 0, -183.09249875618437, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 256.329498258658117, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -91.5462493780921848, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6.10308329187281232, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -23/2
+        
         -0.554825753806619302, 0, 0, 36.6184997512368739, 0, 0, 0, 0, 0, 0, -274.638748134276554, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 512.658996517316235, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -274.638748134276554, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36.6184997512368739, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.554825753806619302, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0.554825753806619302, 0, 0, 0, 0, -30.5154164593640616, 0, 0, 0, 0, 0, 0, 0, 0, 183.09249875618437, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -256.329498258658117, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 91.5462493780921848, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -6.10308329187281232, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -21/2
+        
         0, 0, -2.66085084005152695, 0, 0, 0, 0, 146.346796202833982, 0, 0, 0, 0, 0, 0, 0, 0, -878.080777217003893, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1229.31308810380545, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -439.040388608501947, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 29.2693592405667964, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.115689166958762041, 0, 0, 5.09032334618552982, 0, 2.54516167309276491, 0, 0, 0, 0, -19.0887125481957368, 0, -114.532275289174421, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 534.483951349480631, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19.0887125481957368, 0, -534.483951349480631, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -5.09032334618552982, 0, 114.532275289174421, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.115689166958762041, 0, -2.54516167309276491, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -19/2
+        
         0.383697559110995006, 0, 0, -16.8826926008837803, 0, -8.44134630044189014, 0, 0, 0, 0, 63.310097253314176, 0, 379.860583519885056, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1772.68272309279693, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -63.310097253314176, 0, 1772.68272309279693, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16.8826926008837803, 0, -379.860583519885056, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.383697559110995006, 0, 8.44134630044189014, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, -1.15109267733298502, 0, 0, 0, 0, 40.2882437066544757, 0, 7.67395118221990013, 0, 0, 0, 0, 0, 0, -103.598340959968652, 0, -276.262242559916405, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -48.3458924479853708, 0, 966.917848959707416, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 86.3319507999738764, 0, -644.611899306471611, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -10.3598340959968652, 0, 69.0655606399791011, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -17/2
+        
         0, 0, 3.04550496021059485, 0, 0, 0, 0, -106.59267360737082, 0, -20.3033664014039657, 0, 0, 0, 0, 0, 0, 274.095446418953537, 0, 730.921190450542765, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 127.911208328844984, 0, -2558.22416657689968, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -228.412872015794614, 0, 1705.48277771793312, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 27.4095446418953537, 0, -182.730297612635691, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.145024045724314041, 0, 0, -3.77062518883216506, 0, -5.80096182897256162, 0, 0, 0, 0, 2.17536068586471061, 0, 156.625969382259164, 0, 17.4028854869176849, 0, 0, 0, 0, 0, 0, 12.1820198408423794, 0, -243.640396816847588, 0, -487.280793633695176, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.17536068586471061, 0, -243.640396816847588, 0, 1218.20198408423794, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -3.77062518883216506, 0, 156.625969382259164, 0, -487.280793633695176, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.145024045724314041, 0, -5.80096182897256162, 0, 17.4028854869176849, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -15/2
+        
         -0.32428362461160392, 0, 0, 8.43137423990170193, 0, 12.9713449844641568, 0, 0, 0, 0, -4.8642543691740588, 0, -350.226314580532234, 0, -38.9140349533924704, 0, 0, 0, 0, 0, 0, -27.2398244673747293, 0, 544.796489347494586, 0, 1089.59297869498917, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -4.8642543691740588, 0, 544.796489347494586, 0, -2723.98244673747293, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.43137423990170193, 0, -350.226314580532234, 0, 1089.59297869498917, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.32428362461160392, 0, 12.9713449844641568, 0, -38.9140349533924704, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 1.6214181230580196, 0, 0, 0, 0, -30.8069443381023724, 0, -19.4570174766962352, 0, 0, 0, 0, 0, 0, -9.72850873834811761, 0, 389.140349533924704, 0, 31.1312279627139763, 0, 0, 0, 0, 0, 0, 0, 0, 68.0995611684368233, 0, -272.398244673747293, 0, -653.755787216993503, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 34.0497805842184116, 0, -544.796489347494586, 0, 1089.59297869498917, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -11.3499268614061372, 0, 136.199122336873647, 0, -217.918595738997834, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -13/2
+        
         0, 0, -3.16072579847853403, 0, 0, 0, 0, 60.0537901710921467, 0, 37.9287095817424084, 0, 0, 0, 0, 0, 0, 18.9643547908712042, 0, -758.574191634848168, 0, -60.6859353307878535, 0, 0, 0, 0, 0, 0, 0, 0, -132.750483536098429, 0, 531.001934144393718, 0, 1274.40464194654492, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -66.3752417680492147, 0, 1062.00386828878744, 0, -2124.00773657757487, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 22.1250805893497382, 0, -265.500967072196859, 0, 424.801547315514974, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.166353989393607054, 0, 0, 1.99624787272328465, 0, 8.98311542725478094, 0, 0, 0, 0, 4.49155771362739047, 0, -116.780500554312152, 0, -47.9099489453588317, 0, 0, 0, 0, 0, 0, 0, 0, -125.763615981566933, 0, 670.739285235023644, 0, 44.7159523490015762, 0, 0, 0, 0, 0, 0, 0, 0, -4.49155771362739047, 0, 125.763615981566933, 0, 0, 0, -670.739285235023644, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.99624787272328465, 0, 116.780500554312152, 0, -670.739285235023644, 0, 670.739285235023644, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.166353989393607054, 0, -8.98311542725478094, 0, 47.9099489453588317, 0, -44.7159523490015762, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -11/2
+        
         0.288133561671501547, 0, 0, -3.45760274005801856, 0, -15.5592123302610835, 0, 0, 0, 0, -7.77960616513054176, 0, 202.269760293394086, 0, 82.9824657613924454, 0, 0, 0, 0, 0, 0, 0, 0, 217.828972623655169, 0, -1161.75452065949424, 0, -77.4503013772996157, 0, 0, 0, 0, 0, 0, 0, 0, 7.77960616513054176, 0, -217.828972623655169, 0, 0, 0, 1161.75452065949424, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.45760274005801856, 0, -202.269760293394086, 0, 1161.75452065949424, 0, -1161.75452065949424, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.288133561671501547, 0, 15.5592123302610835, 0, -82.9824657613924454, 0, 77.4503013772996157, 0, 0, 0, 0, 0, 0,
         0, 0, -2.01693493170051083, 0, 0, 0, 0, 14.1185445219035758, 0, 32.2709589072081732, 0, 0, 0, 0, 0, 0, 44.3725684974112382, 0, -258.167671257665386, 0, -90.358684940182885, 0, 0, 0, 0, 0, 0, 0, 0, 28.2370890438071516, 0, -451.793424700914425, 0, 813.228164461645965, 0, 51.6335342515330771, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -10.0846746585025541, 0, 0, 0, 451.793424700914425, 0, -516.335342515330771, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -10.0846746585025541, 0, 161.354794536040866, 0, -451.793424700914425, 0, 258.167671257665386, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -9/2
+        
         0, 0, 3.14316607483904567, 0, 0, 0, 0, -22.0021625238733197, 0, -50.2906571974247307, 0, 0, 0, 0, 0, 0, -69.1496536464590047, 0, 402.325257579397845, 0, 140.813840152789246, 0, 0, 0, 0, 0, 0, 0, 0, -44.0043250477466393, 0, 704.06920076394623, 0, -1267.32456137510321, 0, -80.4650515158795691, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15.7158303741952283, 0, 0, 0, -704.06920076394623, 0, 804.650515158795691, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15.7158303741952283, 0, -251.453285987123653, 0, 704.06920076394623, 0, -402.325257579397845, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.184892122049355627, 0, 0, -0.369784244098711255, 0, -11.8330958111587602, 0, 0, 0, 0, -3.14316607483904567, 0, 35.4992874334762805, 0, 82.8316706781113211, 0, 0, 0, 0, 0, 0, -5.17697941738195757, 0, 165.663341356222642, 0, -331.326682712445284, 0, -132.530673084978114, 0, 0, 0, 0, 0, 0, 0, 0, -3.14316607483904567, 0, 165.663341356222642, 0, -828.316706781113211, 0, 662.653365424890569, 0, 47.3323832446350406, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.369784244098711255, 0, 35.4992874334762805, 0, -331.326682712445284, 0, 662.653365424890569, 0, -283.994299467810244, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.184892122049355627, 0, -11.8330958111587602, 0, 82.8316706781113211, 0, -132.530673084978114, 0, 47.3323832446350406, 0, 0, 0, 0,
-        // j = 23/2, mj = -7/2
+        
         -0.261476946578140297, 0, 0, 0.522953893156280594, 0, 16.734524581000979, 0, 0, 0, 0, 4.44510809182838505, 0, -50.203573743002937, 0, -117.141672067006853, 0, 0, 0, 0, 0, 0, 7.32135450418792832, 0, -234.283344134013706, 0, 468.566688268027412, 0, 187.426675307210965, 0, 0, 0, 0, 0, 0, 0, 0, 4.44510809182838505, 0, -234.283344134013706, 0, 1171.41672067006853, 0, -937.133376536054825, 0, -66.938098324003916, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.522953893156280594, 0, -50.203573743002937, 0, 468.566688268027412, 0, -937.133376536054825, 0, 401.628589944023496, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.261476946578140297, 0, 16.734524581000979, 0, -117.141672067006853, 0, 187.426675307210965, 0, -66.938098324003916, 0, 0, 0, 0,
         0, 0, 2.35329251920326267, 0, 0, 0, 0, 2.35329251920326267, 0, -43.9281270251275699, 0, 0, 0, 0, 0, 0, -14.119755115219576, 0, 0, 0, 158.141257290459252, 0, 0, 0, 0, 0, 0, 0, 0, -32.9460952688456774, 0, 263.568762150765419, 0, -158.141257290459252, 0, -150.610721229008811, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -25.8862177112358894, 0, 351.425016201020559, 0, -790.706286452296258, 0, 301.221442458017622, 0, 33.469049162001958, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -7.05987755760978802, 0, 131.78438107538271, 0, -474.423771871377755, 0, 451.832163687026433, 0, -100.407147486005874, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -5/2
+        
         0, 0, -3.03808757854291138, 0, 0, 0, 0, -3.03808757854291138, 0, 56.7109681328010124, 0, 0, 0, 0, 0, 0, 18.2285254712574683, 0, 0, 0, -204.159485278083644, 0, 0, 0, 0, 0, 0, 0, 0, 42.5332260996007593, 0, -340.265808796806074, 0, 204.159485278083644, 0, 194.437605026746328, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33.4189633639720251, 0, -453.687745062408099, 0, 1020.79742639041822, 0, -388.875210053492656, 0, -43.2083566726102951, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9.11426273562873413, 0, -170.132904398403037, 0, 612.478455834250933, 0, -583.312815080238984, 0, 129.625070017830885, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.202539171902860758, 0, 0, -0.810156687611443034, 0, 14.1777420332002531, 0, 0, 0, 0, -1.01269585951430379, 0, 42.5332260996007593, 0, -113.421936265602025, 0, 0, 0, 0, 0, 0, 0, 0, 28.3554840664005062, 0, -226.843872531204049, 0, 226.843872531204049, 0, 0, 0, 0, 0, 0, 0, 0, 1.01269585951430379, 0, -28.3554840664005062, 0, 0, 0, 226.843872531204049, 0, -129.625070017830885, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.810156687611443034, 0, -42.5332260996007593, 0, 226.843872531204049, 0, -226.843872531204049, 0, 0, 0, 17.2833426690441181, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.202539171902860758, 0, -14.1777420332002531, 0, 113.421936265602025, 0, -226.843872531204049, 0, 129.625070017830885, 0, -17.2833426690441181, 0, 0,
-        // j = 23/2, mj = -3/2
+        
         0.239647580036050465, 0, 0, 0.958590320144201859, 0, -16.7753306025235325, 0, 0, 0, 0, 1.19823790018025232, 0, -50.3259918075705976, 0, 134.20264482018826, 0, 0, 0, 0, 0, 0, 0, 0, -33.5506612050470651, 0, 268.40528964037652, 0, -268.40528964037652, 0, 0, 0, 0, 0, 0, 0, 0, -1.19823790018025232, 0, 33.5506612050470651, 0, 0, 0, -268.40528964037652, 0, 153.374451223072297, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.958590320144201859, 0, 50.3259918075705976, 0, -268.40528964037652, 0, 268.40528964037652, 0, 0, 0, -20.449926829742973, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.239647580036050465, 0, 16.7753306025235325, 0, -134.20264482018826, 0, 268.40528964037652, 0, -153.374451223072297, 0, 20.449926829742973, 0, 0,
         0, 0, -2.63612338039655511, 0, 0, 0, 0, -13.1806169019827756, 0, 52.7224676079311022, 0, 0, 0, 0, 0, 0, -26.3612338039655511, 0, 210.889870431724409, 0, -210.889870431724409, 0, 0, 0, 0, 0, 0, 0, 0, -26.3612338039655511, 0, 316.334805647586613, 0, -632.669611295173227, 0, 241.01699477911361, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -13.1806169019827756, 0, 210.889870431724409, 0, -632.669611295173227, 0, 482.03398955822722, 0, -80.3389982597045367, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.63612338039655511, 0, 52.7224676079311022, 0, -210.889870431724409, 0, 241.01699477911361, 0, -80.3389982597045367, 0, 5.84283623706942085, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -1/2
+        
         0, 0, 2.86576824852435259, 0, 0, 0, 0, 14.3288412426217629, 0, -57.3153649704870517, 0, 0, 0, 0, 0, 0, 28.6576824852435259, 0, -229.261459881948207, 0, 229.261459881948207, 0, 0, 0, 0, 0, 0, 0, 0, 28.6576824852435259, 0, -343.89218982292231, 0, 687.784379645844621, 0, -262.013097007940808, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14.3288412426217629, 0, -229.261459881948207, 0, 687.784379645844621, 0, -524.026194015881616, 0, 87.337699002646936, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.86576824852435259, 0, -57.3153649704870517, 0, 229.261459881948207, 0, -262.013097007940808, 0, 87.337699002646936, 0, -6.35183265473795898, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.220443711424950199, 0, 0, 1.32266226854970119, 0, -15.8719472225964143, 0, 0, 0, 0, 3.30665567137425298, 0, -79.3597361129820716, 0, 132.266226854970119, 0, 0, 0, 0, 0, 0, 4.40887422849900398, 0, -158.719472225964143, 0, 529.064907419880478, 0, -282.167950623936255, 0, 0, 0, 0, 0, 0, 0, 0, 3.30665567137425298, 0, -158.719472225964143, 0, 793.597361129820716, 0, -846.503851871808764, 0, 181.393682543959021, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.32266226854970119, 0, -79.3597361129820716, 0, 529.064907419880478, 0, -846.503851871808764, 0, 362.787365087918042, 0, -32.2477657855927148, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.220443711424950199, 0, -15.8719472225964143, 0, 132.266226854970119, 0, -282.167950623936255, 0, 181.393682543959021, 0, -32.2477657855927148, 0, 0.977205023805839843,
-        // j = 23/2, mj = 1/2
+        
         -0.220443711424950199, 0, 0, -1.32266226854970119, 0, 15.8719472225964143, 0, 0, 0, 0, -3.30665567137425298, 0, 79.3597361129820716, 0, -132.266226854970119, 0, 0, 0, 0, 0, 0, -4.40887422849900398, 0, 158.719472225964143, 0, -529.064907419880478, 0, 282.167950623936255, 0, 0, 0, 0, 0, 0, 0, 0, -3.30665567137425298, 0, 158.719472225964143, 0, -793.597361129820716, 0, 846.503851871808764, 0, -181.393682543959021, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.32266226854970119, 0, 79.3597361129820716, 0, -529.064907419880478, 0, 846.503851871808764, 0, -362.787365087918042, 0, 32.2477657855927148, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.220443711424950199, 0, 15.8719472225964143, 0, -132.266226854970119, 0, 282.167950623936255, 0, -181.393682543959021, 0, 32.2477657855927148, 0, -0.977205023805839843,
         0, 0, 2.86576824852435259, 0, 0, 0, 0, 14.3288412426217629, 0, -57.3153649704870517, 0, 0, 0, 0, 0, 0, 28.6576824852435259, 0, -229.261459881948207, 0, 229.261459881948207, 0, 0, 0, 0, 0, 0, 0, 0, 28.6576824852435259, 0, -343.89218982292231, 0, 687.784379645844621, 0, -262.013097007940808, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14.3288412426217629, 0, -229.261459881948207, 0, 687.784379645844621, 0, -524.026194015881616, 0, 87.337699002646936, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.86576824852435259, 0, -57.3153649704870517, 0, 229.261459881948207, 0, -262.013097007940808, 0, 87.337699002646936, 0, -6.35183265473795898, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 3/2
+        
         0, 0, -2.63612338039655511, 0, 0, 0, 0, -13.1806169019827756, 0, 52.7224676079311022, 0, 0, 0, 0, 0, 0, -26.3612338039655511, 0, 210.889870431724409, 0, -210.889870431724409, 0, 0, 0, 0, 0, 0, 0, 0, -26.3612338039655511, 0, 316.334805647586613, 0, -632.669611295173227, 0, 241.01699477911361, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -13.1806169019827756, 0, 210.889870431724409, 0, -632.669611295173227, 0, 482.03398955822722, 0, -80.3389982597045367, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.63612338039655511, 0, 52.7224676079311022, 0, -210.889870431724409, 0, 241.01699477911361, 0, -80.3389982597045367, 0, 5.84283623706942085, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.239647580036050465, 0, 0, -0.958590320144201859, 0, 16.7753306025235325, 0, 0, 0, 0, -1.19823790018025232, 0, 50.3259918075705976, 0, -134.20264482018826, 0, 0, 0, 0, 0, 0, 0, 0, 33.5506612050470651, 0, -268.40528964037652, 0, 268.40528964037652, 0, 0, 0, 0, 0, 0, 0, 0, 1.19823790018025232, 0, -33.5506612050470651, 0, 0, 0, 268.40528964037652, 0, -153.374451223072297, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.958590320144201859, 0, -50.3259918075705976, 0, 268.40528964037652, 0, -268.40528964037652, 0, 0, 0, 20.449926829742973, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.239647580036050465, 0, -16.7753306025235325, 0, 134.20264482018826, 0, -268.40528964037652, 0, 153.374451223072297, 0, -20.449926829742973, 0, 0,
-        // j = 23/2, mj = 5/2
+        
         0.202539171902860758, 0, 0, 0.810156687611443034, 0, -14.1777420332002531, 0, 0, 0, 0, 1.01269585951430379, 0, -42.5332260996007593, 0, 113.421936265602025, 0, 0, 0, 0, 0, 0, 0, 0, -28.3554840664005062, 0, 226.843872531204049, 0, -226.843872531204049, 0, 0, 0, 0, 0, 0, 0, 0, -1.01269585951430379, 0, 28.3554840664005062, 0, 0, 0, -226.843872531204049, 0, 129.625070017830885, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.810156687611443034, 0, 42.5332260996007593, 0, -226.843872531204049, 0, 226.843872531204049, 0, 0, 0, -17.2833426690441181, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.202539171902860758, 0, 14.1777420332002531, 0, -113.421936265602025, 0, 226.843872531204049, 0, -129.625070017830885, 0, 17.2833426690441181, 0, 0,
         0, 0, -3.03808757854291138, 0, 0, 0, 0, -3.03808757854291138, 0, 56.7109681328010124, 0, 0, 0, 0, 0, 0, 18.2285254712574683, 0, 0, 0, -204.159485278083644, 0, 0, 0, 0, 0, 0, 0, 0, 42.5332260996007593, 0, -340.265808796806074, 0, 204.159485278083644, 0, 194.437605026746328, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33.4189633639720251, 0, -453.687745062408099, 0, 1020.79742639041822, 0, -388.875210053492656, 0, -43.2083566726102951, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9.11426273562873413, 0, -170.132904398403037, 0, 612.478455834250933, 0, -583.312815080238984, 0, 129.625070017830885, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 7/2
+        
         0, 0, 2.35329251920326267, 0, 0, 0, 0, 2.35329251920326267, 0, -43.9281270251275699, 0, 0, 0, 0, 0, 0, -14.119755115219576, 0, 0, 0, 158.141257290459252, 0, 0, 0, 0, 0, 0, 0, 0, -32.9460952688456774, 0, 263.568762150765419, 0, -158.141257290459252, 0, -150.610721229008811, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -25.8862177112358894, 0, 351.425016201020559, 0, -790.706286452296258, 0, 301.221442458017622, 0, 33.469049162001958, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -7.05987755760978802, 0, 131.78438107538271, 0, -474.423771871377755, 0, 451.832163687026433, 0, -100.407147486005874, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.261476946578140297, 0, 0, -0.522953893156280594, 0, -16.734524581000979, 0, 0, 0, 0, -4.44510809182838505, 0, 50.203573743002937, 0, 117.141672067006853, 0, 0, 0, 0, 0, 0, -7.32135450418792832, 0, 234.283344134013706, 0, -468.566688268027412, 0, -187.426675307210965, 0, 0, 0, 0, 0, 0, 0, 0, -4.44510809182838505, 0, 234.283344134013706, 0, -1171.41672067006853, 0, 937.133376536054825, 0, 66.938098324003916, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.522953893156280594, 0, 50.203573743002937, 0, -468.566688268027412, 0, 937.133376536054825, 0, -401.628589944023496, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.261476946578140297, 0, -16.734524581000979, 0, 117.141672067006853, 0, -187.426675307210965, 0, 66.938098324003916, 0, 0, 0, 0,
-        // j = 23/2, mj = 9/2
+        
         -0.184892122049355627, 0, 0, 0.369784244098711255, 0, 11.8330958111587602, 0, 0, 0, 0, 3.14316607483904567, 0, -35.4992874334762805, 0, -82.8316706781113211, 0, 0, 0, 0, 0, 0, 5.17697941738195757, 0, -165.663341356222642, 0, 331.326682712445284, 0, 132.530673084978114, 0, 0, 0, 0, 0, 0, 0, 0, 3.14316607483904567, 0, -165.663341356222642, 0, 828.316706781113211, 0, -662.653365424890569, 0, -47.3323832446350406, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.369784244098711255, 0, -35.4992874334762805, 0, 331.326682712445284, 0, -662.653365424890569, 0, 283.994299467810244, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.184892122049355627, 0, 11.8330958111587602, 0, -82.8316706781113211, 0, 132.530673084978114, 0, -47.3323832446350406, 0, 0, 0, 0,
         0, 0, 3.14316607483904567, 0, 0, 0, 0, -22.0021625238733197, 0, -50.2906571974247307, 0, 0, 0, 0, 0, 0, -69.1496536464590047, 0, 402.325257579397845, 0, 140.813840152789246, 0, 0, 0, 0, 0, 0, 0, 0, -44.0043250477466393, 0, 704.06920076394623, 0, -1267.32456137510321, 0, -80.4650515158795691, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15.7158303741952283, 0, 0, 0, -704.06920076394623, 0, 804.650515158795691, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15.7158303741952283, 0, -251.453285987123653, 0, 704.06920076394623, 0, -402.325257579397845, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 11/2
+        
         0, 0, -2.01693493170051083, 0, 0, 0, 0, 14.1185445219035758, 0, 32.2709589072081732, 0, 0, 0, 0, 0, 0, 44.3725684974112382, 0, -258.167671257665386, 0, -90.358684940182885, 0, 0, 0, 0, 0, 0, 0, 0, 28.2370890438071516, 0, -451.793424700914425, 0, 813.228164461645965, 0, 51.6335342515330771, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -10.0846746585025541, 0, 0, 0, 451.793424700914425, 0, -516.335342515330771, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -10.0846746585025541, 0, 161.354794536040866, 0, -451.793424700914425, 0, 258.167671257665386, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.288133561671501547, 0, 0, 3.45760274005801856, 0, 15.5592123302610835, 0, 0, 0, 0, 7.77960616513054176, 0, -202.269760293394086, 0, -82.9824657613924454, 0, 0, 0, 0, 0, 0, 0, 0, -217.828972623655169, 0, 1161.75452065949424, 0, 77.4503013772996157, 0, 0, 0, 0, 0, 0, 0, 0, -7.77960616513054176, 0, 217.828972623655169, 0, 0, 0, -1161.75452065949424, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -3.45760274005801856, 0, 202.269760293394086, 0, -1161.75452065949424, 0, 1161.75452065949424, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.288133561671501547, 0, -15.5592123302610835, 0, 82.9824657613924454, 0, -77.4503013772996157, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 13/2
+        
         0.166353989393607054, 0, 0, -1.99624787272328465, 0, -8.98311542725478094, 0, 0, 0, 0, -4.49155771362739047, 0, 116.780500554312152, 0, 47.9099489453588317, 0, 0, 0, 0, 0, 0, 0, 0, 125.763615981566933, 0, -670.739285235023644, 0, -44.7159523490015762, 0, 0, 0, 0, 0, 0, 0, 0, 4.49155771362739047, 0, -125.763615981566933, 0, 0, 0, 670.739285235023644, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.99624787272328465, 0, -116.780500554312152, 0, 670.739285235023644, 0, -670.739285235023644, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.166353989393607054, 0, 8.98311542725478094, 0, -47.9099489453588317, 0, 44.7159523490015762, 0, 0, 0, 0, 0, 0,
         0, 0, -3.16072579847853403, 0, 0, 0, 0, 60.0537901710921467, 0, 37.9287095817424084, 0, 0, 0, 0, 0, 0, 18.9643547908712042, 0, -758.574191634848168, 0, -60.6859353307878535, 0, 0, 0, 0, 0, 0, 0, 0, -132.750483536098429, 0, 531.001934144393718, 0, 1274.40464194654492, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -66.3752417680492147, 0, 1062.00386828878744, 0, -2124.00773657757487, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 22.1250805893497382, 0, -265.500967072196859, 0, 424.801547315514974, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 15/2
+        
         0, 0, 1.6214181230580196, 0, 0, 0, 0, -30.8069443381023724, 0, -19.4570174766962352, 0, 0, 0, 0, 0, 0, -9.72850873834811761, 0, 389.140349533924704, 0, 31.1312279627139763, 0, 0, 0, 0, 0, 0, 0, 0, 68.0995611684368233, 0, -272.398244673747293, 0, -653.755787216993503, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 34.0497805842184116, 0, -544.796489347494586, 0, 1089.59297869498917, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -11.3499268614061372, 0, 136.199122336873647, 0, -217.918595738997834, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.32428362461160392, 0, 0, -8.43137423990170193, 0, -12.9713449844641568, 0, 0, 0, 0, 4.8642543691740588, 0, 350.226314580532234, 0, 38.9140349533924704, 0, 0, 0, 0, 0, 0, 27.2398244673747293, 0, -544.796489347494586, 0, -1089.59297869498917, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4.8642543691740588, 0, -544.796489347494586, 0, 2723.98244673747293, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -8.43137423990170193, 0, 350.226314580532234, 0, -1089.59297869498917, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.32428362461160392, 0, -12.9713449844641568, 0, 38.9140349533924704, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 17/2
+        
         -0.145024045724314041, 0, 0, 3.77062518883216506, 0, 5.80096182897256162, 0, 0, 0, 0, -2.17536068586471061, 0, -156.625969382259164, 0, -17.4028854869176849, 0, 0, 0, 0, 0, 0, -12.1820198408423794, 0, 243.640396816847588, 0, 487.280793633695176, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.17536068586471061, 0, 243.640396816847588, 0, -1218.20198408423794, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.77062518883216506, 0, -156.625969382259164, 0, 487.280793633695176, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.145024045724314041, 0, 5.80096182897256162, 0, -17.4028854869176849, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 3.04550496021059485, 0, 0, 0, 0, -106.59267360737082, 0, -20.3033664014039657, 0, 0, 0, 0, 0, 0, 274.095446418953537, 0, 730.921190450542765, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 127.911208328844984, 0, -2558.22416657689968, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -228.412872015794614, 0, 1705.48277771793312, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 27.4095446418953537, 0, -182.730297612635691, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 19/2
+        
         0, 0, -1.15109267733298502, 0, 0, 0, 0, 40.2882437066544757, 0, 7.67395118221990013, 0, 0, 0, 0, 0, 0, -103.598340959968652, 0, -276.262242559916405, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -48.3458924479853708, 0, 966.917848959707416, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 86.3319507999738764, 0, -644.611899306471611, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -10.3598340959968652, 0, 69.0655606399791011, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.383697559110995006, 0, 0, 16.8826926008837803, 0, 8.44134630044189014, 0, 0, 0, 0, -63.310097253314176, 0, -379.860583519885056, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1772.68272309279693, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 63.310097253314176, 0, -1772.68272309279693, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -16.8826926008837803, 0, 379.860583519885056, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.383697559110995006, 0, -8.44134630044189014, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 21/2
+        
         0.115689166958762041, 0, 0, -5.09032334618552982, 0, -2.54516167309276491, 0, 0, 0, 0, 19.0887125481957368, 0, 114.532275289174421, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -534.483951349480631, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -19.0887125481957368, 0, 534.483951349480631, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5.09032334618552982, 0, -114.532275289174421, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.115689166958762041, 0, 2.54516167309276491, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, -2.66085084005152695, 0, 0, 0, 0, 146.346796202833982, 0, 0, 0, 0, 0, 0, 0, 0, -878.080777217003893, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1229.31308810380545, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -439.040388608501947, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 29.2693592405667964, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 23/2
+        
         0, 0, 0.554825753806619302, 0, 0, 0, 0, -30.5154164593640616, 0, 0, 0, 0, 0, 0, 0, 0, 183.09249875618437, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -256.329498258658117, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 91.5462493780921848, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -6.10308329187281232, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.554825753806619302, 0, 0, -36.6184997512368739, 0, 0, 0, 0, 0, 0, 274.638748134276554, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -512.658996517316235, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 274.638748134276554, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -36.6184997512368739, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.554825753806619302, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = -25/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.566266663742191171, 0, 0, -37.3735998069846173, 0, 0, 0, 0, 0, 0, 280.30199855238463, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -523.230397297784642, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 280.30199855238463, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -37.3735998069846173, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.566266663742191171, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = -23/2
+        
         0.113253332748438234, 0, 0, -7.47471996139692346, 0, 0, 0, 0, 0, 0, 56.0603997104769259, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -104.646079459556928, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 56.0603997104769259, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -7.47471996139692346, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.113253332748438234, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 2.71807998596251762, 0, 0, 0, 0, -149.494399227938469, 0, 0, 0, 0, 0, 0, 0, 0, 896.966395367630815, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1255.75295351468314, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 448.483197683815407, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -29.8988798455876938, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = -21/2
+        
         0, 0, 0.784642105787196884, 0, 0, 0, 0, -43.1553158182958286, 0, 0, 0, 0, 0, 0, 0, 0, 258.931894909774972, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -362.50465287368496, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 129.465947454887486, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -8.63106316365916572, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.392321052893598442, 0, 0, 17.2621263273183314, 0, 8.63106316365916572, 0, 0, 0, 0, -64.7329737274437429, 0, -388.397842364662457, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1812.5232643684248, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64.7329737274437429, 0, -1812.5232643684248, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -17.2621263273183314, 0, 388.397842364662457, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.392321052893598442, 0, -8.63106316365916572, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = -19/2
+        
         -0.141689713908309089, 0, 0, 6.23434741196559994, 0, 3.11717370598279997, 0, 0, 0, 0, -23.3788027948709998, 0, -140.272816769225999, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 654.606478256387993, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 23.3788027948709998, 0, -654.606478256387993, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -6.23434741196559994, 0, 140.272816769225999, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.141689713908309089, 0, -3.11717370598279997, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, -3.11717370598279997, 0, 0, 0, 0, 109.101079709397999, 0, 20.7811580398853331, 0, 0, 0, 0, 0, 0, -280.545633538451997, 0, -748.121689435871992, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -130.921295651277599, 0, 2618.42591302555197, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 233.788027948709998, 0, -1745.61727535036798, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -28.0545633538451997, 0, 187.030422358967998, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = -17/2
+        
         0, 0, -1.32916733424081186, 0, 0, 0, 0, 46.5208566984284153, 0, 8.86111556160541243, 0, 0, 0, 0, 0, 0, -119.625060081673068, 0, -319.000160217794847, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -55.8250280381140983, 0, 1116.50056076228197, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 99.6875500680608898, 0, -744.333707174854644, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -11.9625060081673068, 0, 79.7500400544487119, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.332291833560202966, 0, 0, -8.63958767256527712, 0, -13.2916733424081186, 0, 0, 0, 0, 4.98437750340304449, 0, 358.875180245019203, 0, 39.8750200272243559, 0, 0, 0, 0, 0, 0, 27.9125140190570492, 0, -558.250280381140983, 0, -1116.50056076228197, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4.98437750340304449, 0, -558.250280381140983, 0, 2791.25140190570492, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -8.63958767256527712, 0, 358.875180245019203, 0, -1116.50056076228197, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.332291833560202966, 0, -13.2916733424081186, 0, 39.8750200272243559, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = -15/2
+        
         0.16214181230580196, 0, 0, -4.21568711995085096, 0, -6.48567249223207841, 0, 0, 0, 0, 2.4321271845870294, 0, 175.113157290266117, 0, 19.4570174766962352, 0, 0, 0, 0, 0, 0, 13.6199122336873647, 0, -272.398244673747293, 0, -544.796489347494586, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.4321271845870294, 0, -272.398244673747293, 0, 1361.99122336873647, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -4.21568711995085096, 0, 175.113157290266117, 0, -544.796489347494586, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.16214181230580196, 0, -6.48567249223207841, 0, 19.4570174766962352, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 3.2428362461160392, 0, 0, 0, 0, -61.6138886762047449, 0, -38.9140349533924704, 0, 0, 0, 0, 0, 0, -19.4570174766962352, 0, 778.280699067849409, 0, 62.2624559254279527, 0, 0, 0, 0, 0, 0, 0, 0, 136.199122336873647, 0, -544.796489347494586, 0, -1307.51157443398701, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 68.0995611684368233, 0, -1089.59297869498917, 0, 2179.18595738997834, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -22.6998537228122744, 0, 272.398244673747293, 0, -435.837191477995669, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = -13/2
+        
         0, 0, 1.77617456229312929, 0, 0, 0, 0, -33.7473166835694566, 0, -21.3140947475175515, 0, 0, 0, 0, 0, 0, -10.6570473737587758, 0, 426.281894950351031, 0, 34.1025515960280824, 0, 0, 0, 0, 0, 0, 0, 0, 74.5993316163114303, 0, -298.397326465245721, 0, -716.153583516589731, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 37.2996658081557152, 0, -596.794652930491443, 0, 1193.58930586098289, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -12.4332219360519051, 0, 149.198663232622861, 0, -238.717861172196577, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.296029093715521549, 0, 0, 3.55234912458625859, 0, 15.9855710606381636, 0, 0, 0, 0, 7.99278553031908182, 0, -207.812423788296127, 0, -85.2563789900702061, 0, 0, 0, 0, 0, 0, 0, 0, -223.797994848934291, 0, 1193.58930586098289, 0, 79.5726203907321924, 0, 0, 0, 0, 0, 0, 0, 0, -7.99278553031908182, 0, 223.797994848934291, 0, 0, 0, -1193.58930586098289, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -3.55234912458625859, 0, 207.812423788296127, 0, -1193.58930586098289, 0, 1193.58930586098289, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.296029093715521549, 0, -15.9855710606381636, 0, 85.2563789900702061, 0, -79.5726203907321924, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = -11/2
+        
         -0.179682844900943126, 0, 0, 2.15619413881131751, 0, 9.7028736246509288, 0, 0, 0, 0, 4.8514368123254644, 0, -126.137357120462074, 0, -51.7486593314716203, 0, 0, 0, 0, 0, 0, 0, 0, -135.840230745113003, 0, 724.481230640602684, 0, 48.2987487093735122, 0, 0, 0, 0, 0, 0, 0, 0, -4.8514368123254644, 0, 135.840230745113003, 0, 0, 0, -724.481230640602684, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.15619413881131751, 0, 126.137357120462074, 0, -724.481230640602684, 0, 724.481230640602684, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.179682844900943126, 0, -9.7028736246509288, 0, 51.7486593314716203, 0, -48.2987487093735122, 0, 0, 0, 0, 0, 0,
         0, 0, -3.23429120821697627, 0, 0, 0, 0, 22.6400384575188339, 0, 51.7486593314716203, 0, 0, 0, 0, 0, 0, 71.1544065807734779, 0, -413.989274651772962, 0, -144.896246128120537, 0, 0, 0, 0, 0, 0, 0, 0, 45.2800769150376677, 0, -724.481230640602684, 0, 1304.06621515308483, 0, 82.7978549303545924, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -16.1714560410848813, 0, 0, 0, 724.481230640602684, 0, -827.978549303545924, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -16.1714560410848813, 0, 258.743296657358101, 0, -724.481230640602684, 0, 413.989274651772962, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = -9/2
+        
         0, 0, -2.15619413881131751, 0, 0, 0, 0, 15.0933589716792226, 0, 34.4991062209810802, 0, 0, 0, 0, 0, 0, 47.4362710538489852, 0, -275.992849767848641, 0, -96.5974974187470245, 0, 0, 0, 0, 0, 0, 0, 0, 30.1867179433584452, 0, -482.987487093735122, 0, 869.37747676872322, 0, 55.1985699535697283, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -10.7809706940565876, 0, 0, 0, 482.987487093735122, 0, -551.985699535697283, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -10.7809706940565876, 0, 172.495531104905401, 0, -482.987487093735122, 0, 275.992849767848641, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.269524267351414689, 0, 0, -0.539048534702829378, 0, -17.2495531104905401, 0, 0, 0, 0, -4.58191254497404971, 0, 51.7486593314716203, 0, 120.746871773433781, 0, 0, 0, 0, 0, 0, -7.54667948583961129, 0, 241.493743546867561, 0, -482.987487093735122, 0, -193.194994837494049, 0, 0, 0, 0, 0, 0, 0, 0, -4.58191254497404971, 0, 241.493743546867561, 0, -1207.46871773433781, 0, 965.974974187470245, 0, 68.9982124419621604, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.539048534702829378, 0, 51.7486593314716203, 0, -482.987487093735122, 0, 965.974974187470245, 0, -413.989274651772962, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.269524267351414689, 0, -17.2495531104905401, 0, 120.746871773433781, 0, -193.194994837494049, 0, 68.9982124419621604, 0, 0, 0, 0,
-        // j = 25/2, mj = -7/2
+        
         0.196107709933605223, 0, 0, -0.392215419867210446, 0, -12.5508934357507343, 0, 0, 0, 0, -3.33383106887128879, 0, 37.6526803072522028, 0, 87.8562540502551398, 0, 0, 0, 0, 0, 0, -5.49101587814094624, 0, 175.71250810051028, 0, -351.425016201020559, 0, -140.570006480408224, 0, 0, 0, 0, 0, 0, 0, 0, -3.33383106887128879, 0, 175.71250810051028, 0, -878.562540502551398, 0, 702.850032402041119, 0, 50.203573743002937, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.392215419867210446, 0, 37.6526803072522028, 0, -351.425016201020559, 0, 702.850032402041119, 0, -301.221442458017622, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.196107709933605223, 0, -12.5508934357507343, 0, 87.8562540502551398, 0, -140.570006480408224, 0, 50.203573743002937, 0, 0, 0, 0,
         0, 0, 3.13772335893768356, 0, 0, 0, 0, 3.13772335893768356, 0, -58.5708360335034265, 0, 0, 0, 0, 0, 0, -18.8263401536261014, 0, 0, 0, 210.855009720612336, 0, 0, 0, 0, 0, 0, 0, 0, -43.9281270251275699, 0, 351.425016201020559, 0, -210.855009720612336, 0, -200.814294972011748, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -34.5149569483145192, 0, 468.566688268027412, 0, -1054.27504860306168, 0, 401.628589944023496, 0, 44.6253988826692774, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -9.41317007681305069, 0, 175.71250810051028, 0, -632.565029161837007, 0, 602.442884916035244, 0, -133.876196648007832, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = -5/2
+        
         0, 0, 2.48058812043928146, 0, 0, 0, 0, 2.48058812043928146, 0, -46.3043115815332539, 0, 0, 0, 0, 0, 0, -14.8835287226356887, 0, 0, 0, 166.695521693519714, 0, 0, 0, 0, 0, 0, 0, 0, -34.7282336861499404, 0, 277.825869489199523, 0, -166.695521693519714, 0, -158.757639708114013, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -27.286469324832096, 0, 370.434492652266031, 0, -833.47760846759857, 0, 317.515279416228027, 0, 35.279475490692003, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -7.44176436131784437, 0, 138.912934744599762, 0, -500.086565080559142, 0, 476.27291912434204, 0, -105.838426472076009, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.248058812043928146, 0, 0, -0.992235248175712583, 0, 17.3641168430749702, 0, 0, 0, 0, -1.24029406021964073, 0, 52.0923505292249106, 0, -138.912934744599762, 0, 0, 0, 0, 0, 0, 0, 0, 34.7282336861499404, 0, -277.825869489199523, 0, 277.825869489199523, 0, 0, 0, 0, 0, 0, 0, 0, 1.24029406021964073, 0, -34.7282336861499404, 0, 0, 0, 277.825869489199523, 0, -158.757639708114013, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.992235248175712583, 0, -52.0923505292249106, 0, 277.825869489199523, 0, -277.825869489199523, 0, 0, 0, 21.1676852944152018, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.248058812043928146, 0, -17.3641168430749702, 0, 138.912934744599762, 0, -277.825869489199523, 0, 158.757639708114013, 0, -21.1676852944152018, 0, 0,
-        // j = 25/2, mj = -3/2
+        
         -0.212424875592775713, 0, 0, -0.849699502371102853, 0, 14.8697412914942999, 0, 0, 0, 0, -1.06212437796387857, 0, 44.6092238744828998, 0, -118.957930331954399, 0, 0, 0, 0, 0, 0, 0, 0, 29.7394825829885999, 0, -237.915860663908799, 0, 237.915860663908799, 0, 0, 0, 0, 0, 0, 0, 0, 1.06212437796387857, 0, -29.7394825829885999, 0, 0, 0, 237.915860663908799, 0, -135.951920379376457, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.849699502371102853, 0, -44.6092238744828998, 0, 237.915860663908799, 0, -237.915860663908799, 0, 0, 0, 18.1269227172501942, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.212424875592775713, 0, -14.8697412914942999, 0, 118.957930331954399, 0, -237.915860663908799, 0, 135.951920379376457, 0, -18.1269227172501942, 0, 0,
         0, 0, -2.97394825829885999, 0, 0, 0, 0, -14.8697412914942999, 0, 59.4789651659771997, 0, 0, 0, 0, 0, 0, -29.7394825829885999, 0, 237.915860663908799, 0, -237.915860663908799, 0, 0, 0, 0, 0, 0, 0, 0, -29.7394825829885999, 0, 356.873790995863198, 0, -713.747581991726397, 0, 271.903840758752913, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -14.8697412914942999, 0, 237.915860663908799, 0, -713.747581991726397, 0, 543.807681517505826, 0, -90.634613586250971, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.97394825829885999, 0, 59.4789651659771997, 0, -237.915860663908799, 0, 271.903840758752913, 0, -90.634613586250971, 0, 6.59160826081825244, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = -1/2
+        
         0, 0, -2.7533410732166562, 0, 0, 0, 0, -13.766705366083281, 0, 55.066821464333124, 0, 0, 0, 0, 0, 0, -27.533410732166562, 0, 220.267285857332496, 0, -220.267285857332496, 0, 0, 0, 0, 0, 0, 0, 0, -27.533410732166562, 0, 330.400928785998744, 0, -660.801857571997488, 0, 251.734040979808567, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -13.766705366083281, 0, 220.267285857332496, 0, -660.801857571997488, 0, 503.468081959617133, 0, -83.9113469932695222, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.7533410732166562, 0, 55.066821464333124, 0, -220.267285857332496, 0, 251.734040979808567, 0, -83.9113469932695222, 0, 6.10264341769232889, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.22944508943472135, 0, 0, 1.3766705366083281, 0, -16.5200464392999372, 0, 0, 0, 0, 3.44167634152082025, 0, -82.6002321964996859, 0, 137.66705366083281, 0, 0, 0, 0, 0, 0, 4.588901788694427, 0, -165.200464392999372, 0, 550.66821464333124, 0, -293.689714476443328, 0, 0, 0, 0, 0, 0, 0, 0, 3.44167634152082025, 0, -165.200464392999372, 0, 826.002321964996859, 0, -881.069143429329983, 0, 188.800530734856425, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.3766705366083281, 0, -82.6002321964996859, 0, 550.66821464333124, 0, -881.069143429329983, 0, 377.60106146971285, 0, -33.5645387973078089, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.22944508943472135, 0, -16.5200464392999372, 0, 137.66705366083281, 0, -293.689714476443328, 0, 188.800530734856425, 0, -33.5645387973078089, 0, 1.01710723628205481,
-        // j = 25/2, mj = 1/2
+        
         0.22944508943472135, 0, 0, 1.3766705366083281, 0, -16.5200464392999372, 0, 0, 0, 0, 3.44167634152082025, 0, -82.6002321964996859, 0, 137.66705366083281, 0, 0, 0, 0, 0, 0, 4.588901788694427, 0, -165.200464392999372, 0, 550.66821464333124, 0, -293.689714476443328, 0, 0, 0, 0, 0, 0, 0, 0, 3.44167634152082025, 0, -165.200464392999372, 0, 826.002321964996859, 0, -881.069143429329983, 0, 188.800530734856425, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.3766705366083281, 0, -82.6002321964996859, 0, 550.66821464333124, 0, -881.069143429329983, 0, 377.60106146971285, 0, -33.5645387973078089, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.22944508943472135, 0, -16.5200464392999372, 0, 137.66705366083281, 0, -293.689714476443328, 0, 188.800530734856425, 0, -33.5645387973078089, 0, 1.01710723628205481,
         0, 0, 2.7533410732166562, 0, 0, 0, 0, 13.766705366083281, 0, -55.066821464333124, 0, 0, 0, 0, 0, 0, 27.533410732166562, 0, -220.267285857332496, 0, 220.267285857332496, 0, 0, 0, 0, 0, 0, 0, 0, 27.533410732166562, 0, -330.400928785998744, 0, 660.801857571997488, 0, -251.734040979808567, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13.766705366083281, 0, -220.267285857332496, 0, 660.801857571997488, 0, -503.468081959617133, 0, 83.9113469932695222, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.7533410732166562, 0, -55.066821464333124, 0, 220.267285857332496, 0, -251.734040979808567, 0, 83.9113469932695222, 0, -6.10264341769232889, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = 3/2
+        
         0, 0, 2.97394825829885999, 0, 0, 0, 0, 14.8697412914942999, 0, -59.4789651659771997, 0, 0, 0, 0, 0, 0, 29.7394825829885999, 0, -237.915860663908799, 0, 237.915860663908799, 0, 0, 0, 0, 0, 0, 0, 0, 29.7394825829885999, 0, -356.873790995863198, 0, 713.747581991726397, 0, -271.903840758752913, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14.8697412914942999, 0, -237.915860663908799, 0, 713.747581991726397, 0, -543.807681517505826, 0, 90.634613586250971, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.97394825829885999, 0, -59.4789651659771997, 0, 237.915860663908799, 0, -271.903840758752913, 0, 90.634613586250971, 0, -6.59160826081825244, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.212424875592775713, 0, 0, -0.849699502371102853, 0, 14.8697412914942999, 0, 0, 0, 0, -1.06212437796387857, 0, 44.6092238744828998, 0, -118.957930331954399, 0, 0, 0, 0, 0, 0, 0, 0, 29.7394825829885999, 0, -237.915860663908799, 0, 237.915860663908799, 0, 0, 0, 0, 0, 0, 0, 0, 1.06212437796387857, 0, -29.7394825829885999, 0, 0, 0, 237.915860663908799, 0, -135.951920379376457, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.849699502371102853, 0, -44.6092238744828998, 0, 237.915860663908799, 0, -237.915860663908799, 0, 0, 0, 18.1269227172501942, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.212424875592775713, 0, -14.8697412914942999, 0, 118.957930331954399, 0, -237.915860663908799, 0, 135.951920379376457, 0, -18.1269227172501942, 0, 0,
-        // j = 25/2, mj = 5/2
+        
         -0.248058812043928146, 0, 0, -0.992235248175712583, 0, 17.3641168430749702, 0, 0, 0, 0, -1.24029406021964073, 0, 52.0923505292249106, 0, -138.912934744599762, 0, 0, 0, 0, 0, 0, 0, 0, 34.7282336861499404, 0, -277.825869489199523, 0, 277.825869489199523, 0, 0, 0, 0, 0, 0, 0, 0, 1.24029406021964073, 0, -34.7282336861499404, 0, 0, 0, 277.825869489199523, 0, -158.757639708114013, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.992235248175712583, 0, -52.0923505292249106, 0, 277.825869489199523, 0, -277.825869489199523, 0, 0, 0, 21.1676852944152018, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.248058812043928146, 0, -17.3641168430749702, 0, 138.912934744599762, 0, -277.825869489199523, 0, 158.757639708114013, 0, -21.1676852944152018, 0, 0,
         0, 0, -2.48058812043928146, 0, 0, 0, 0, -2.48058812043928146, 0, 46.3043115815332539, 0, 0, 0, 0, 0, 0, 14.8835287226356887, 0, 0, 0, -166.695521693519714, 0, 0, 0, 0, 0, 0, 0, 0, 34.7282336861499404, 0, -277.825869489199523, 0, 166.695521693519714, 0, 158.757639708114013, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 27.286469324832096, 0, -370.434492652266031, 0, 833.47760846759857, 0, -317.515279416228027, 0, -35.279475490692003, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7.44176436131784437, 0, -138.912934744599762, 0, 500.086565080559142, 0, -476.27291912434204, 0, 105.838426472076009, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = 7/2
+        
         0, 0, -3.13772335893768356, 0, 0, 0, 0, -3.13772335893768356, 0, 58.5708360335034265, 0, 0, 0, 0, 0, 0, 18.8263401536261014, 0, 0, 0, -210.855009720612336, 0, 0, 0, 0, 0, 0, 0, 0, 43.9281270251275699, 0, -351.425016201020559, 0, 210.855009720612336, 0, 200.814294972011748, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 34.5149569483145192, 0, -468.566688268027412, 0, 1054.27504860306168, 0, -401.628589944023496, 0, -44.6253988826692774, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9.41317007681305069, 0, -175.71250810051028, 0, 632.565029161837007, 0, -602.442884916035244, 0, 133.876196648007832, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.196107709933605223, 0, 0, -0.392215419867210446, 0, -12.5508934357507343, 0, 0, 0, 0, -3.33383106887128879, 0, 37.6526803072522028, 0, 87.8562540502551398, 0, 0, 0, 0, 0, 0, -5.49101587814094624, 0, 175.71250810051028, 0, -351.425016201020559, 0, -140.570006480408224, 0, 0, 0, 0, 0, 0, 0, 0, -3.33383106887128879, 0, 175.71250810051028, 0, -878.562540502551398, 0, 702.850032402041119, 0, 50.203573743002937, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.392215419867210446, 0, 37.6526803072522028, 0, -351.425016201020559, 0, 702.850032402041119, 0, -301.221442458017622, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.196107709933605223, 0, -12.5508934357507343, 0, 87.8562540502551398, 0, -140.570006480408224, 0, 50.203573743002937, 0, 0, 0, 0,
-        // j = 25/2, mj = 9/2
+        
         0.269524267351414689, 0, 0, -0.539048534702829378, 0, -17.2495531104905401, 0, 0, 0, 0, -4.58191254497404971, 0, 51.7486593314716203, 0, 120.746871773433781, 0, 0, 0, 0, 0, 0, -7.54667948583961129, 0, 241.493743546867561, 0, -482.987487093735122, 0, -193.194994837494049, 0, 0, 0, 0, 0, 0, 0, 0, -4.58191254497404971, 0, 241.493743546867561, 0, -1207.46871773433781, 0, 965.974974187470245, 0, 68.9982124419621604, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.539048534702829378, 0, 51.7486593314716203, 0, -482.987487093735122, 0, 965.974974187470245, 0, -413.989274651772962, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.269524267351414689, 0, -17.2495531104905401, 0, 120.746871773433781, 0, -193.194994837494049, 0, 68.9982124419621604, 0, 0, 0, 0,
         0, 0, 2.15619413881131751, 0, 0, 0, 0, -15.0933589716792226, 0, -34.4991062209810802, 0, 0, 0, 0, 0, 0, -47.4362710538489852, 0, 275.992849767848641, 0, 96.5974974187470245, 0, 0, 0, 0, 0, 0, 0, 0, -30.1867179433584452, 0, 482.987487093735122, 0, -869.37747676872322, 0, -55.1985699535697283, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10.7809706940565876, 0, 0, 0, -482.987487093735122, 0, 551.985699535697283, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10.7809706940565876, 0, -172.495531104905401, 0, 482.987487093735122, 0, -275.992849767848641, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = 11/2
+        
         0, 0, 3.23429120821697627, 0, 0, 0, 0, -22.6400384575188339, 0, -51.7486593314716203, 0, 0, 0, 0, 0, 0, -71.1544065807734779, 0, 413.989274651772962, 0, 144.896246128120537, 0, 0, 0, 0, 0, 0, 0, 0, -45.2800769150376677, 0, 724.481230640602684, 0, -1304.06621515308483, 0, -82.7978549303545924, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16.1714560410848813, 0, 0, 0, -724.481230640602684, 0, 827.978549303545924, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16.1714560410848813, 0, -258.743296657358101, 0, 724.481230640602684, 0, -413.989274651772962, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.179682844900943126, 0, 0, 2.15619413881131751, 0, 9.7028736246509288, 0, 0, 0, 0, 4.8514368123254644, 0, -126.137357120462074, 0, -51.7486593314716203, 0, 0, 0, 0, 0, 0, 0, 0, -135.840230745113003, 0, 724.481230640602684, 0, 48.2987487093735122, 0, 0, 0, 0, 0, 0, 0, 0, -4.8514368123254644, 0, 135.840230745113003, 0, 0, 0, -724.481230640602684, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.15619413881131751, 0, 126.137357120462074, 0, -724.481230640602684, 0, 724.481230640602684, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.179682844900943126, 0, -9.7028736246509288, 0, 51.7486593314716203, 0, -48.2987487093735122, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = 13/2
+        
         -0.296029093715521549, 0, 0, 3.55234912458625859, 0, 15.9855710606381636, 0, 0, 0, 0, 7.99278553031908182, 0, -207.812423788296127, 0, -85.2563789900702061, 0, 0, 0, 0, 0, 0, 0, 0, -223.797994848934291, 0, 1193.58930586098289, 0, 79.5726203907321924, 0, 0, 0, 0, 0, 0, 0, 0, -7.99278553031908182, 0, 223.797994848934291, 0, 0, 0, -1193.58930586098289, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -3.55234912458625859, 0, 207.812423788296127, 0, -1193.58930586098289, 0, 1193.58930586098289, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.296029093715521549, 0, -15.9855710606381636, 0, 85.2563789900702061, 0, -79.5726203907321924, 0, 0, 0, 0, 0, 0,
         0, 0, -1.77617456229312929, 0, 0, 0, 0, 33.7473166835694566, 0, 21.3140947475175515, 0, 0, 0, 0, 0, 0, 10.6570473737587758, 0, -426.281894950351031, 0, -34.1025515960280824, 0, 0, 0, 0, 0, 0, 0, 0, -74.5993316163114303, 0, 298.397326465245721, 0, 716.153583516589731, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -37.2996658081557152, 0, 596.794652930491443, 0, -1193.58930586098289, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12.4332219360519051, 0, -149.198663232622861, 0, 238.717861172196577, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = 15/2
+        
         0, 0, -3.2428362461160392, 0, 0, 0, 0, 61.6138886762047449, 0, 38.9140349533924704, 0, 0, 0, 0, 0, 0, 19.4570174766962352, 0, -778.280699067849409, 0, -62.2624559254279527, 0, 0, 0, 0, 0, 0, 0, 0, -136.199122336873647, 0, 544.796489347494586, 0, 1307.51157443398701, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -68.0995611684368233, 0, 1089.59297869498917, 0, -2179.18595738997834, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 22.6998537228122744, 0, -272.398244673747293, 0, 435.837191477995669, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.16214181230580196, 0, 0, -4.21568711995085096, 0, -6.48567249223207841, 0, 0, 0, 0, 2.4321271845870294, 0, 175.113157290266117, 0, 19.4570174766962352, 0, 0, 0, 0, 0, 0, 13.6199122336873647, 0, -272.398244673747293, 0, -544.796489347494586, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.4321271845870294, 0, -272.398244673747293, 0, 1361.99122336873647, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -4.21568711995085096, 0, 175.113157290266117, 0, -544.796489347494586, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.16214181230580196, 0, -6.48567249223207841, 0, 19.4570174766962352, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = 17/2
+        
         0.332291833560202966, 0, 0, -8.63958767256527712, 0, -13.2916733424081186, 0, 0, 0, 0, 4.98437750340304449, 0, 358.875180245019203, 0, 39.8750200272243559, 0, 0, 0, 0, 0, 0, 27.9125140190570492, 0, -558.250280381140983, 0, -1116.50056076228197, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4.98437750340304449, 0, -558.250280381140983, 0, 2791.25140190570492, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -8.63958767256527712, 0, 358.875180245019203, 0, -1116.50056076228197, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.332291833560202966, 0, -13.2916733424081186, 0, 39.8750200272243559, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 1.32916733424081186, 0, 0, 0, 0, -46.5208566984284153, 0, -8.86111556160541243, 0, 0, 0, 0, 0, 0, 119.625060081673068, 0, 319.000160217794847, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 55.8250280381140983, 0, -1116.50056076228197, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -99.6875500680608898, 0, 744.333707174854644, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11.9625060081673068, 0, -79.7500400544487119, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = 19/2
+        
         0, 0, 3.11717370598279997, 0, 0, 0, 0, -109.101079709397999, 0, -20.7811580398853331, 0, 0, 0, 0, 0, 0, 280.545633538451997, 0, 748.121689435871992, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 130.921295651277599, 0, -2618.42591302555197, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -233.788027948709998, 0, 1745.61727535036798, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 28.0545633538451997, 0, -187.030422358967998, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         -0.141689713908309089, 0, 0, 6.23434741196559994, 0, 3.11717370598279997, 0, 0, 0, 0, -23.3788027948709998, 0, -140.272816769225999, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 654.606478256387993, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 23.3788027948709998, 0, -654.606478256387993, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -6.23434741196559994, 0, 140.272816769225999, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.141689713908309089, 0, -3.11717370598279997, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = 21/2
+        
         -0.392321052893598442, 0, 0, 17.2621263273183314, 0, 8.63106316365916572, 0, 0, 0, 0, -64.7329737274437429, 0, -388.397842364662457, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1812.5232643684248, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64.7329737274437429, 0, -1812.5232643684248, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -17.2621263273183314, 0, 388.397842364662457, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.392321052893598442, 0, -8.63106316365916572, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, -0.784642105787196884, 0, 0, 0, 0, 43.1553158182958286, 0, 0, 0, 0, 0, 0, 0, 0, -258.931894909774972, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 362.50465287368496, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -129.465947454887486, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.63106316365916572, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = 23/2
+        
         0, 0, -2.71807998596251762, 0, 0, 0, 0, 149.494399227938469, 0, 0, 0, 0, 0, 0, 0, 0, -896.966395367630815, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1255.75295351468314, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -448.483197683815407, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 29.8988798455876938, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0.113253332748438234, 0, 0, -7.47471996139692346, 0, 0, 0, 0, 0, 0, 56.0603997104769259, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -104.646079459556928, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 56.0603997104769259, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -7.47471996139692346, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.113253332748438234, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = 25/2
+        
         0.566266663742191171, 0, 0, -37.3735998069846173, 0, 0, 0, 0, 0, 0, 280.30199855238463, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -523.230397297784642, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 280.30199855238463, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -37.3735998069846173, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.566266663742191171, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 };
-/*
- * Imaginary part of cartesian to spinor transformation
- */
+
 static double g_trans_cart2jI[] = {
         0,
         0,
         0,
         0,
-        0,  // p1/2
+        0,  
         0.577350269189625764,
         0,
         0,
@@ -11310,7 +11296,7 @@ static double g_trans_cart2jI[] = {
         0,
        -0.577350269189625764,
         0,
-        0,  // p3/2
+        0,  
         0,
         0,
         0,
@@ -11334,7 +11320,7 @@ static double g_trans_cart2jI[] = {
         0,
         0,
         0,
-        0,  // d3/2
+        0,  
         0.690988298942670958,
         0,
         0,
@@ -11382,7 +11368,7 @@ static double g_trans_cart2jI[] = {
         0,
         0,
         0,
-        0,  // d5/2
+        0,  
         0,
         0,
         0,
@@ -11454,7 +11440,7 @@ static double g_trans_cart2jI[] = {
         0,
         0,
         0,
-        0,  // f5/2
+        0,  
         1.158822606069568741,
         0,
         0,
@@ -11574,7 +11560,7 @@ static double g_trans_cart2jI[] = {
         0,
         0,
         0,
-        0,  // f7/2
+        0,  
         0,
         0,
         0,
@@ -11734,922 +11720,922 @@ static double g_trans_cart2jI[] = {
         0,
         0,
         0,
-        // g7/2, -7/2
+        
         0, 1.668895294531136358, 0, 0, 0, 0, -1.668895294531136358, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -1.251671470898352269, 0, 0, 0, 0, 0, 0, 0.417223823632784089, 0, 0, 0,
-        // g7/2, -5/2
+        
         0, 0, 0, 0, 3.311611435151460063, 0, 0, 0, 0, 0, 0, -1.103870478383820021, 0, 0, 0,
         0, 0.315391565252520006, 0, 0, 0, 0, 0.315391565252520006, 0, -1.892349391515120036, 0, 0, 0, 0, 0, 0,
-        // g7/2, -3/2
+        
         0, -0.546274215296039535, 0, 0, 0, 0, -0.546274215296039535, 0, 3.277645291776237211, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0.819411322944059302, 0, 0, 0, 0, 0, 0, 0.819411322944059302, 0, -1.092548430592079070, 0,
-        // g7/2, -1/2
+        
         0, 0, 0, 0, -1.057855469152043038, 0, 0, 0, 0, 0, 0, -1.057855469152043038, 0, 1.410473958869390717, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // g7/2, 1/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 1.057855469152043038, 0, 0, 0, 0, 0, 0, 1.057855469152043038, 0, -1.410473958869390717, 0,
-        // g7/2, 3/2
+        
         0, 0, 0, 0, -0.819411322944059302, 0, 0, 0, 0, 0, 0, -0.819411322944059302, 0, 1.092548430592079070, 0,
         0, -0.546274215296039535, 0, 0, 0, 0, -0.546274215296039535, 0, 3.277645291776237211, 0, 0, 0, 0, 0, 0,
-        // g7/2, 5/2
+        
         0, 0.315391565252520006, 0, 0, 0, 0, 0.315391565252520006, 0, -1.892349391515120036, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -3.311611435151460063, 0, 0, 0, 0, 0, 0, 1.103870478383820021, 0, 0, 0,
-        // g7/2, 7/2
+        
         0, 0, 0, 0, 1.251671470898352269, 0, 0, 0, 0, 0, 0, -0.417223823632784089, 0, 0, 0,
         0, 1.668895294531136358, 0, 0, 0, 0, -1.668895294531136358, 0, 0, 0, 0, 0, 0, 0, 0,
-        // g9/2, -9/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -1.770130769779930531, 0, 0, 0, 0, 1.770130769779930531, 0, 0, 0, 0, 0, 0, 0, 0,
-        // g9/2, -7/2
+        
         0, -0.590043589926643510, 0, 0, 0, 0, 0.590043589926643510, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -3.540261539559861062, 0, 0, 0, 0, 0, 0, 1.180087179853287020, 0, 0, 0,
-        // g9/2, -5/2
+        
         0, 0, 0, 0, -1.770130769779930531, 0, 0, 0, 0, 0, 0, 0.590043589926643510, 0, 0, 0,
         0, 0.590043589926643510, 0, 0, 0, 0, 0.590043589926643510, 0, -3.540261539559861062, 0, 0, 0, 0, 0, 0,
-        // g9/2, -3/2
+        
         0, 0.386274202023189580, 0, 0, 0, 0, 0.386274202023189580, 0, -2.317645212139137482, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 1.158822606069568741, 0, 0, 0, 0, 0, 0, 1.158822606069568741, 0, -1.545096808092758321, 0,
-        // g9/2, -1/2
+        
         0, 0, 0, 0, 0.946174695757560018, 0, 0, 0, 0, 0, 0, 0.946174695757560018, 0, -1.261566261010080024, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // g9/2, 1/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0.946174695757560018, 0, 0, 0, 0, 0, 0, 0.946174695757560018, 0, -1.261566261010080024, 0,
-        // g9/2, 3/2
+        
         0, 0, 0, 0, 1.158822606069568741, 0, 0, 0, 0, 0, 0, 1.158822606069568741, 0, -1.545096808092758321, 0,
         0, -0.386274202023189580, 0, 0, 0, 0, -0.386274202023189580, 0, 2.317645212139137482, 0, 0, 0, 0, 0, 0,
-        // g9/2, 5/2
+        
         0, -0.590043589926643510, 0, 0, 0, 0, -0.590043589926643510, 0, 3.540261539559861062, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -1.770130769779930531, 0, 0, 0, 0, 0, 0, 0.590043589926643510, 0, 0, 0,
-        // g9/2, 7/2
+        
         0, 0, 0, 0, -3.540261539559861062, 0, 0, 0, 0, 0, 0, 1.180087179853287020, 0, 0, 0,
         0, 0.590043589926643510, 0, 0, 0, 0, -0.590043589926643510, 0, 0, 0, 0, 0, 0, 0, 0,
-        // g9/2, 9/2
+        
         0, 1.770130769779930531, 0, 0, 0, 0, -1.770130769779930531, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // h9/2, -9/2
+        
         0, 2.212663462224913163, 0, 0, 0, 0, -4.425326924449826327, 0, 0, 0, 0, 0, 0, 0, 0, 0.442532692444982632, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -1.770130769779930531, 0, 0, 0, 0, 0, 0, 1.770130769779930531, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // h9/2, -7/2
+        
         0, 0, 0, 0, 5.310392309339791593, 0, 0, 0, 0, 0, 0, -5.310392309339791593, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0.442532692444982632, 0, 0, 0, 0, 0.295021794963321755, 0, -3.540261539559861062, 0, 0, 0, 0, 0, 0, -0.147510897481660877, 0, 1.180087179853287020, 0, 0, 0,
-        // h9/2, -5/2
+        
         0, -0.885065384889965265, 0, 0, 0, 0, -0.590043589926643510, 0, 7.080523079119722124, 0, 0, 0, 0, 0, 0, 0.295021794963321755, 0, -2.360174359706574041, 0, 0, 0,
         0, 0, 0, 0, 1.770130769779930531, 0, 0, 0, 0, 0, 0, 1.770130769779930531, 0, -3.540261539559861062, 0, 0, 0, 0, 0, 0, 0,
-        // h9/2, -3/2
+        
         0, 0, 0, 0, -2.703919414162327062, 0, 0, 0, 0, 0, 0, -2.703919414162327062, 0, 5.407838828324654124, 0, 0, 0, 0, 0, 0, 0,
         0, -0.193137101011594790, 0, 0, 0, 0, -0.386274202023189580, 0, 2.317645212139137482, 0, 0, 0, 0, 0, 0, -0.193137101011594790, 0, 2.317645212139137482, 0, -1.545096808092758321, 0,
-        // h9/2, -1/2
+        
         0, 0.236543673939390004, 0, 0, 0, 0, 0.473087347878780009, 0, -2.838524087272680054, 0, 0, 0, 0, 0, 0, 0.236543673939390004, 0, -2.838524087272680054, 0, 1.892349391515120036, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // h9/2, 1/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -0.236543673939390004, 0, 0, 0, 0, -0.473087347878780009, 0, 2.838524087272680054, 0, 0, 0, 0, 0, 0, -0.236543673939390004, 0, 2.838524087272680054, 0, -1.892349391515120036, 0,
-        // h9/2, 3/2
+        
         0, 0.193137101011594790, 0, 0, 0, 0, 0.386274202023189580, 0, -2.317645212139137482, 0, 0, 0, 0, 0, 0, 0.193137101011594790, 0, -2.317645212139137482, 0, 1.545096808092758321, 0,
         0, 0, 0, 0, -2.703919414162327062, 0, 0, 0, 0, 0, 0, -2.703919414162327062, 0, 5.407838828324654124, 0, 0, 0, 0, 0, 0, 0,
-        // h9/2, 5/2
+        
         0, 0, 0, 0, 1.770130769779930531, 0, 0, 0, 0, 0, 0, 1.770130769779930531, 0, -3.540261539559861062, 0, 0, 0, 0, 0, 0, 0,
         0, 0.885065384889965265, 0, 0, 0, 0, 0.590043589926643510, 0, -7.080523079119722124, 0, 0, 0, 0, 0, 0, -0.295021794963321755, 0, 2.360174359706574041, 0, 0, 0,
-        // h9/2, 7/2
+        
         0, -0.442532692444982632, 0, 0, 0, 0, -0.295021794963321755, 0, 3.540261539559861062, 0, 0, 0, 0, 0, 0, 0.147510897481660877, 0, -1.180087179853287020, 0, 0, 0,
         0, 0, 0, 0, 5.310392309339791593, 0, 0, 0, 0, 0, 0, -5.310392309339791593, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // h9/2, 9/2
+        
         0, 0, 0, 0, -1.770130769779930531, 0, 0, 0, 0, 0, 0, 1.770130769779930531, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -2.212663462224913163, 0, 0, 0, 0, 4.425326924449826327, 0, 0, 0, 0, 0, 0, 0, 0, -0.442532692444982632, 0, 0, 0, 0, 0,
-        // h11/2, -11/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -2.320661017204290803, 0, 0, 0, 0, 4.641322034408581606, 0, 0, 0, 0, 0, 0, 0, 0, -0.464132203440858160, 0, 0, 0, 0, 0,
-        // h11/2, -9/2
+        
         0, -0.699705623606466358, 0, 0, 0, 0, 1.399411247212932717, 0, 0, 0, 0, 0, 0, 0, 0, -0.139941124721293271, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -5.597644988851730871, 0, 0, 0, 0, 0, 0, 5.597644988851730871, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // h11/2, -7/2
+        
         0, 0, 0, 0, -2.503342941796704538, 0, 0, 0, 0, 0, 0, 2.503342941796704538, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0.938753603173764201, 0, 0, 0, 0, 0.625835735449176134, 0, -7.510028825390113615, 0, 0, 0, 0, 0, 0, -0.312917867724588067, 0, 2.503342941796704538, 0, 0, 0,
-        // h11/2, -5/2
+        
         0, 0.541989645495103885, 0, 0, 0, 0, 0.361326430330069256, 0, -4.335917163960831083, 0, 0, 0, 0, 0, 0, -0.180663215165034628, 0, 1.445305721320277027, 0, 0, 0,
         0, 0, 0, 0, 2.890611442640554055, 0, 0, 0, 0, 0, 0, 2.890611442640554055, 0, -5.781222885281108110, 0, 0, 0, 0, 0, 0, 0,
-        // h11/2, -3/2
+        
         0, 0, 0, 0, 2.043970952866564726, 0, 0, 0, 0, 0, 0, 2.043970952866564726, 0, -4.087941905733129453, 0, 0, 0, 0, 0, 0, 0,
         0, -0.255496369108320590, 0, 0, 0, 0, -0.510992738216641181, 0, 3.065956429299847090, 0, 0, 0, 0, 0, 0, -0.255496369108320590, 0, 3.065956429299847090, 0, -2.043970952866564726, 0,
-        // h11/2, -1/2
+        
         0, -0.215933843419584674, 0, 0, 0, 0, -0.431867686839169349, 0, 2.591206121035016094, 0, 0, 0, 0, 0, 0, -0.215933843419584674, 0, 2.591206121035016094, 0, -1.727470747356677396, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // h11/2, 1/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -0.215933843419584674, 0, 0, 0, 0, -0.431867686839169349, 0, 2.591206121035016094, 0, 0, 0, 0, 0, 0, -0.215933843419584674, 0, 2.591206121035016094, 0, -1.727470747356677396, 0,
-        // h11/2, 3/2
+        
         0, -0.255496369108320590, 0, 0, 0, 0, -0.510992738216641181, 0, 3.065956429299847090, 0, 0, 0, 0, 0, 0, -0.255496369108320590, 0, 3.065956429299847090, 0, -2.043970952866564726, 0,
         0, 0, 0, 0, -2.043970952866564726, 0, 0, 0, 0, 0, 0, -2.043970952866564726, 0, 4.087941905733129453, 0, 0, 0, 0, 0, 0, 0,
-        // h11/2, 5/2
+        
         0, 0, 0, 0, -2.890611442640554055, 0, 0, 0, 0, 0, 0, -2.890611442640554055, 0, 5.781222885281108110, 0, 0, 0, 0, 0, 0, 0,
         0, 0.541989645495103885, 0, 0, 0, 0, 0.361326430330069256, 0, -4.335917163960831083, 0, 0, 0, 0, 0, 0, -0.180663215165034628, 0, 1.445305721320277027, 0, 0, 0,
-        // h11/2, 7/2
+        
         0, 0.938753603173764201, 0, 0, 0, 0, 0.625835735449176134, 0, -7.510028825390113615, 0, 0, 0, 0, 0, 0, -0.312917867724588067, 0, 2.503342941796704538, 0, 0, 0,
         0, 0, 0, 0, 2.503342941796704538, 0, 0, 0, 0, 0, 0, -2.503342941796704538, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // h11/2, 9/2
+        
         0, 0, 0, 0, 5.597644988851730871, 0, 0, 0, 0, 0, 0, -5.597644988851730871, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -0.699705623606466358, 0, 0, 0, 0, 1.399411247212932717, 0, 0, 0, 0, 0, 0, 0, 0, -0.139941124721293271, 0, 0, 0, 0, 0,
-        // h11/2, 11/2
+        
         0, -2.320661017204290803, 0, 0, 0, 0, 4.641322034408581606, 0, 0, 0, 0, 0, 0, 0, 0, -0.464132203440858160, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //i11/2,-11/2
+        
         0, 2.7847932206451498, 0, 0, 0, 0, -9.2826440688171665, 0, 0, 0, 0, 0, 0, 0, 0, 2.7847932206451498, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -2.3206610172042916, 0, 0, 0, 0, 0, 0, 4.6413220344085833, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.4641322034408583, 0, 0, 0, 0, 0,
-        //i11/2,-9/2
+        
         0, 0, 0, 0, 7.6967618596711320, 0, 0, 0, 0, 0, 0, -15.3935237193422640, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.5393523719342264, 0, 0, 0, 0, 0,
         0, 0.5597644988851730, 0, 0, 0, 0, 0, 0, -5.5976449888517319, 0, 0, 0, 0, 0, 0, -0.5597644988851730, 0, 5.5976449888517319, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //i11/2,-7/2
+        
         0, -1.2516714708983521, 0, 0, 0, 0, 0, 0, 12.5167147089835247, 0, 0, 0, 0, 0, 0, 1.2516714708983521, 0, -12.5167147089835247, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 2.8162608095212929, 0, 0, 0, 0, 0, 0, 1.8775072063475287, 0, -7.5100288253901146, 0, 0, 0, 0, 0, 0, 0, 0, -0.9387536031737643, 0, 2.5033429417967050, 0, 0, 0,
-        //i11/2,-5/2
+        
         0, 0, 0, 0, -4.8779068094559346, 0, 0, 0, 0, 0, 0, -3.2519378729706236, 0, 13.0077514918824946, 0, 0, 0, 0, 0, 0, 0, 0, 1.6259689364853118, 0, -4.3359171639608318, 0, 0, 0,
         0, -0.3613264303300693, 0, 0, 0, 0, -0.7226528606601387, 0, 5.7812228852811094, 0, 0, 0, 0, 0, 0, -0.3613264303300693, 0, 5.7812228852811094, 0, -5.7812228852811094, 0, 0, 0, 0, 0, 0, 0, 0,
-        //i11/2,-3/2
+        
         0, 0.5109927382166413, 0, 0, 0, 0, 1.0219854764332825, 0, -8.1758838114662602, 0, 0, 0, 0, 0, 0, 0.5109927382166413, 0, -8.1758838114662602, 0, 8.1758838114662602, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -1.2774818455416030, 0, 0, 0, 0, 0, 0, -2.5549636910832061, 0, 5.1099273821664122, 0, 0, 0, 0, 0, 0, 0, 0, -1.2774818455416030, 0, 5.1099273821664122, 0, -2.0439709528665646, 0,
-        //i11/2,-1/2
+        
         0, 0, 0, 0, 1.5115369039370925, 0, 0, 0, 0, 0, 0, 3.0230738078741850, 0, -6.0461476157483700, 0, 0, 0, 0, 0, 0, 0, 0, 1.5115369039370925, 0, -6.0461476157483700, 0, 2.4184590462993478, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //i11/2,1/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -1.5115369039370925, 0, 0, 0, 0, 0, 0, -3.0230738078741850, 0, 6.0461476157483700, 0, 0, 0, 0, 0, 0, 0, 0, -1.5115369039370925, 0, 6.0461476157483700, 0, -2.4184590462993478, 0,
-        //i11/2,3/2
+        
         0, 0, 0, 0, 1.2774818455416030, 0, 0, 0, 0, 0, 0, 2.5549636910832061, 0, -5.1099273821664122, 0, 0, 0, 0, 0, 0, 0, 0, 1.2774818455416030, 0, -5.1099273821664122, 0, 2.0439709528665646, 0,
         0, 0.5109927382166413, 0, 0, 0, 0, 1.0219854764332825, 0, -8.1758838114662602, 0, 0, 0, 0, 0, 0, 0.5109927382166413, 0, -8.1758838114662602, 0, 8.1758838114662602, 0, 0, 0, 0, 0, 0, 0, 0,
-        //i11/2,5/2
+        
         0, -0.3613264303300693, 0, 0, 0, 0, -0.7226528606601387, 0, 5.7812228852811094, 0, 0, 0, 0, 0, 0, -0.3613264303300693, 0, 5.7812228852811094, 0, -5.7812228852811094, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 4.8779068094559346, 0, 0, 0, 0, 0, 0, 3.2519378729706236, 0, -13.0077514918824946, 0, 0, 0, 0, 0, 0, 0, 0, -1.6259689364853118, 0, 4.3359171639608318, 0, 0, 0,
-        //i11/2,7/2
+        
         0, 0, 0, 0, -2.8162608095212929, 0, 0, 0, 0, 0, 0, -1.8775072063475287, 0, 7.5100288253901146, 0, 0, 0, 0, 0, 0, 0, 0, 0.9387536031737643, 0, -2.5033429417967050, 0, 0, 0,
         0, -1.2516714708983521, 0, 0, 0, 0, 0, 0, 12.5167147089835247, 0, 0, 0, 0, 0, 0, 1.2516714708983521, 0, -12.5167147089835247, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //i11/2,9/2
+        
         0, 0.5597644988851730, 0, 0, 0, 0, 0, 0, -5.5976449888517319, 0, 0, 0, 0, 0, 0, -0.5597644988851730, 0, 5.5976449888517319, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -7.6967618596711320, 0, 0, 0, 0, 0, 0, 15.3935237193422640, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.5393523719342264, 0, 0, 0, 0, 0,
-        //i11/2,11/2
+        
         0, 0, 0, 0, 2.3206610172042916, 0, 0, 0, 0, 0, 0, -4.6413220344085833, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.4641322034408583, 0, 0, 0, 0, 0,
         0, 2.7847932206451498, 0, 0, 0, 0, -9.2826440688171665, 0, 0, 0, 0, 0, 0, 0, 0, 2.7847932206451498, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //i13/2,-13/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -2.8985046814803979, 0, 0, 0, 0, 9.6616822716013271, 0, 0, 0, 0, 0, 0, 0, 0, -2.8985046814803979, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //i13/2,-11/2
+        
         0, -0.8039005577884609, 0, 0, 0, 0, 2.6796685259615369, 0, 0, 0, 0, 0, 0, 0, 0, -0.8039005577884609, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -8.0390055778846108, 0, 0, 0, 0, 0, 0, 16.0780111557692216, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.6078011155769223, 0, 0, 0, 0, 0,
-        //i13/2,-9/2
+        
         0, 0, 0, 0, -3.2819102842008516, 0, 0, 0, 0, 0, 0, 6.5638205684017032, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.6563820568401703, 0, 0, 0, 0, 0,
         0, 1.3127641136803401, 0, 0, 0, 0, 0, 0, -13.1276411368034029, 0, 0, 0, 0, 0, 0, -1.3127641136803401, 0, 13.1276411368034029, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //i13/2,-7/2
+        
         0, 0.6855686991966986, 0, 0, 0, 0, 0, 0, -6.8556869919669872, 0, 0, 0, 0, 0, 0, -0.6855686991966986, 0, 6.8556869919669872, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 5.1417652439752395, 0, 0, 0, 0, 0, 0, 3.4278434959834931, 0, -13.7113739839339726, 0, 0, 0, 0, 0, 0, 0, 0, -1.7139217479917466, 0, 4.5704579946446584, 0, 0, 0,
-        //i13/2,-5/2
+        
         0, 0, 0, 0, 3.2519378729706232, 0, 0, 0, 0, 0, 0, 2.1679585819804159, 0, -8.6718343279216636, 0, 0, 0, 0, 0, 0, 0, 0, -1.0839792909902080, 0, 2.8906114426405547, 0, 0, 0,
         0, -0.5419896454951040, 0, 0, 0, 0, -1.0839792909902080, 0, 8.6718343279216636, 0, 0, 0, 0, 0, 0, -0.5419896454951040, 0, 8.6718343279216636, 0, -8.6718343279216636, 0, 0, 0, 0, 0, 0, 0, 0,
-        //i13/2,-3/2
+        
         0, -0.4039752301426884, 0, 0, 0, 0, -0.8079504602853768, 0, 6.4636036822830141, 0, 0, 0, 0, 0, 0, -0.4039752301426884, 0, 6.4636036822830141, 0, -6.4636036822830141, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -1.6159009205707533, 0, 0, 0, 0, 0, 0, -3.2318018411415066, 0, 6.4636036822830132, 0, 0, 0, 0, 0, 0, 0, 0, -1.6159009205707533, 0, 6.4636036822830132, 0, -2.5854414729132049, 0,
-        //i13/2,-1/2
+        
         0, 0, 0, 0, -1.3994112472129328, 0, 0, 0, 0, 0, 0, -2.7988224944258655, 0, 5.5976449888517310, 0, 0, 0, 0, 0, 0, 0, 0, -1.3994112472129328, 0, 5.5976449888517310, 0, -2.2390579955406920, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //i13/2,1/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -1.3994112472129328, 0, 0, 0, 0, 0, 0, -2.7988224944258655, 0, 5.5976449888517310, 0, 0, 0, 0, 0, 0, 0, 0, -1.3994112472129328, 0, 5.5976449888517310, 0, -2.2390579955406920, 0,
-        //i13/2,3/2
+        
         0, 0, 0, 0, -1.6159009205707533, 0, 0, 0, 0, 0, 0, -3.2318018411415066, 0, 6.4636036822830132, 0, 0, 0, 0, 0, 0, 0, 0, -1.6159009205707533, 0, 6.4636036822830132, 0, -2.5854414729132049, 0,
         0, 0.4039752301426884, 0, 0, 0, 0, 0.8079504602853768, 0, -6.4636036822830141, 0, 0, 0, 0, 0, 0, 0.4039752301426884, 0, -6.4636036822830141, 0, 6.4636036822830141, 0, 0, 0, 0, 0, 0, 0, 0,
-        //i13/2,5/2
+        
         0, 0.5419896454951040, 0, 0, 0, 0, 1.0839792909902080, 0, -8.6718343279216636, 0, 0, 0, 0, 0, 0, 0.5419896454951040, 0, -8.6718343279216636, 0, 8.6718343279216636, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 3.2519378729706232, 0, 0, 0, 0, 0, 0, 2.1679585819804159, 0, -8.6718343279216636, 0, 0, 0, 0, 0, 0, 0, 0, -1.0839792909902080, 0, 2.8906114426405547, 0, 0, 0,
-        //i13/2,7/2
+        
         0, 0, 0, 0, 5.1417652439752395, 0, 0, 0, 0, 0, 0, 3.4278434959834931, 0, -13.7113739839339726, 0, 0, 0, 0, 0, 0, 0, 0, -1.7139217479917466, 0, 4.5704579946446584, 0, 0, 0,
         0, -0.6855686991966986, 0, 0, 0, 0, 0, 0, 6.8556869919669872, 0, 0, 0, 0, 0, 0, 0.6855686991966986, 0, -6.8556869919669872, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //i13/2,9/2
+        
         0, -1.3127641136803401, 0, 0, 0, 0, 0, 0, 13.1276411368034029, 0, 0, 0, 0, 0, 0, 1.3127641136803401, 0, -13.1276411368034029, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -3.2819102842008516, 0, 0, 0, 0, 0, 0, 6.5638205684017032, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.6563820568401703, 0, 0, 0, 0, 0,
-        //i13/2,11/2
+        
         0, 0, 0, 0, -8.0390055778846108, 0, 0, 0, 0, 0, 0, 16.0780111557692216, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.6078011155769223, 0, 0, 0, 0, 0,
         0, 0.8039005577884609, 0, 0, 0, 0, -2.6796685259615369, 0, 0, 0, 0, 0, 0, 0, 0, 0.8039005577884609, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //i13/2,13/2
+        
         0, 2.8985046814803979, 0, 0, 0, 0, -9.6616822716013271, 0, 0, 0, 0, 0, 0, 0, 0, 2.8985046814803979, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j13/2,-13/2
+        
         0, 3.3815887950604644, 0, 0, 0, 0, -16.9079439753023237, 0, 0, 0, 0, 0, 0, 0, 0, 10.1447663851813932, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.4830841135800663, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -2.8985046814803970, 0, 0, 0, 0, 0, 0, 9.6616822716013235, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.8985046814803970, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j13/2,-11/2
+        
         0, 0, 0, 0, 10.4507072512499910, 0, 0, 0, 0, 0, 0, -34.8356908374999676, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10.4507072512499910, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0.6699171314903840, 0, 0, 0, 0, -0.6699171314903840, 0, -8.0390055778846072, 0, 0, 0, 0, 0, 0, -1.2058508366826914, 0, 16.0780111557692145, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.1339834262980768, 0, -1.6078011155769216, 0, 0, 0, 0, 0,
-        //j13/2,-9/2
+        
         0, -1.6409551421004256, 0, 0, 0, 0, 1.6409551421004256, 0, 19.6914617052051071, 0, 0, 0, 0, 0, 0, 2.9537192557807663, 0, -39.3829234104102142, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.3281910284200851, 0, 3.9382923410410213, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 3.9382923410410213, 0, 0, 0, 0, 0, 0, 0, 0, -13.1276411368034047, 0, 0, 0, 0, 0, 0, 0, 0, -3.9382923410410213, 0, 13.1276411368034047, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j13/2,-7/2
+        
         0, 0, 0, 0, -7.5412556911636850, 0, 0, 0, 0, 0, 0, 0, 0, 25.1375189705456172, 0, 0, 0, 0, 0, 0, 0, 0, 7.5412556911636850, 0, -25.1375189705456172, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -0.5141765243975239, 0, 0, 0, 0, -0.8569608739958733, 0, 10.2835304879504772, 0, 0, 0, 0, 0, 0, -0.1713921747991747, 0, 6.8556869919669845, 0, -13.7113739839339726, 0, 0, 0, 0, 0, 0, 0, 0, 0.1713921747991747, 0, -3.4278434959834923, 0, 4.5704579946446575, 0, 0, 0,
-        //j13/2,-5/2
+        
         0, 0.8129844682426559, 0, 0, 0, 0, 1.3549741137377600, 0, -16.2596893648531164, 0, 0, 0, 0, 0, 0, 0.2709948227475520, 0, -10.8397929099020782, 0, 21.6795858198041600, 0, 0, 0, 0, 0, 0, 0, 0, -0.2709948227475520, 0, 5.4198964549510391, 0, -7.2265286066013861, 0, 0, 0,
         0, 0, 0, 0, -2.7099482274755200, 0, 0, 0, 0, 0, 0, -5.4198964549510400, 0, 14.4530572132027721, 0, 0, 0, 0, 0, 0, 0, 0, -2.7099482274755200, 0, 14.4530572132027721, 0, -8.6718343279216654, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j13/2,-3/2
+        
         0, 0, 0, 0, 3.6357770712841964, 0, 0, 0, 0, 0, 0, 7.2715541425683927, 0, -19.3908110468490449, 0, 0, 0, 0, 0, 0, 0, 0, 3.6357770712841964, 0, -19.3908110468490449, 0, 11.6344866281094284, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0.2019876150713442, 0, 0, 0, 0, 0.6059628452140327, 0, -4.8477027617122603, 0, 0, 0, 0, 0, 0, 0.6059628452140327, 0, -9.6954055234245207, 0, 9.6954055234245207, 0, 0, 0, 0, 0, 0, 0, 0, 0.2019876150713442, 0, -4.8477027617122603, 0, 9.6954055234245207, 0, -2.5854414729132063, 0,
-        //j13/2,-1/2
+        
         0, -0.2332352078688221, 0, 0, 0, 0, -0.6997056236064664, 0, 5.5976449888517301, 0, 0, 0, 0, 0, 0, -0.6997056236064664, 0, 11.1952899777034602, 0, -11.1952899777034602, 0, 0, 0, 0, 0, 0, 0, 0, -0.2332352078688221, 0, 5.5976449888517301, 0, -11.1952899777034602, 0, 2.9854106607209236, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j13/2,1/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0.2332352078688221, 0, 0, 0, 0, 0.6997056236064664, 0, -5.5976449888517301, 0, 0, 0, 0, 0, 0, 0.6997056236064664, 0, -11.1952899777034602, 0, 11.1952899777034602, 0, 0, 0, 0, 0, 0, 0, 0, 0.2332352078688221, 0, -5.5976449888517301, 0, 11.1952899777034602, 0, -2.9854106607209236, 0,
-        //j13/2,3/2
+        
         0, -0.2019876150713442, 0, 0, 0, 0, -0.6059628452140327, 0, 4.8477027617122603, 0, 0, 0, 0, 0, 0, -0.6059628452140327, 0, 9.6954055234245207, 0, -9.6954055234245207, 0, 0, 0, 0, 0, 0, 0, 0, -0.2019876150713442, 0, 4.8477027617122603, 0, -9.6954055234245207, 0, 2.5854414729132063, 0,
         0, 0, 0, 0, 3.6357770712841964, 0, 0, 0, 0, 0, 0, 7.2715541425683927, 0, -19.3908110468490449, 0, 0, 0, 0, 0, 0, 0, 0, 3.6357770712841964, 0, -19.3908110468490449, 0, 11.6344866281094284, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j13/2,5/2
+        
         0, 0, 0, 0, -2.7099482274755200, 0, 0, 0, 0, 0, 0, -5.4198964549510400, 0, 14.4530572132027721, 0, 0, 0, 0, 0, 0, 0, 0, -2.7099482274755200, 0, 14.4530572132027721, 0, -8.6718343279216654, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -0.8129844682426559, 0, 0, 0, 0, -1.3549741137377600, 0, 16.2596893648531164, 0, 0, 0, 0, 0, 0, -0.2709948227475520, 0, 10.8397929099020782, 0, -21.6795858198041600, 0, 0, 0, 0, 0, 0, 0, 0, 0.2709948227475520, 0, -5.4198964549510391, 0, 7.2265286066013861, 0, 0, 0,
-        //j13/2,7/2
+        
         0, 0.5141765243975239, 0, 0, 0, 0, 0.8569608739958733, 0, -10.2835304879504772, 0, 0, 0, 0, 0, 0, 0.1713921747991747, 0, -6.8556869919669845, 0, 13.7113739839339726, 0, 0, 0, 0, 0, 0, 0, 0, -0.1713921747991747, 0, 3.4278434959834923, 0, -4.5704579946446575, 0, 0, 0,
         0, 0, 0, 0, -7.5412556911636850, 0, 0, 0, 0, 0, 0, 0, 0, 25.1375189705456172, 0, 0, 0, 0, 0, 0, 0, 0, 7.5412556911636850, 0, -25.1375189705456172, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j13/2,9/2
+        
         0, 0, 0, 0, 3.9382923410410213, 0, 0, 0, 0, 0, 0, 0, 0, -13.1276411368034047, 0, 0, 0, 0, 0, 0, 0, 0, -3.9382923410410213, 0, 13.1276411368034047, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 1.6409551421004256, 0, 0, 0, 0, -1.6409551421004256, 0, -19.6914617052051071, 0, 0, 0, 0, 0, 0, -2.9537192557807663, 0, 39.3829234104102142, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.3281910284200851, 0, -3.9382923410410213, 0, 0, 0, 0, 0,
-        //j13/2,11/2
+        
         0, -0.6699171314903840, 0, 0, 0, 0, 0.6699171314903840, 0, 8.0390055778846072, 0, 0, 0, 0, 0, 0, 1.2058508366826914, 0, -16.0780111557692145, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.1339834262980768, 0, 1.6078011155769216, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 10.4507072512499910, 0, 0, 0, 0, 0, 0, -34.8356908374999676, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10.4507072512499910, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j13/2,13/2
+        
         0, 0, 0, 0, -2.8985046814803970, 0, 0, 0, 0, 0, 0, 9.6616822716013235, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.8985046814803970, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -3.3815887950604644, 0, 0, 0, 0, 16.9079439753023237, 0, 0, 0, 0, 0, 0, 0, 0, -10.1447663851813932, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.4830841135800663, 0, 0, 0, 0, 0, 0, 0,
-        //j15/2,-15/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -3.5002769449938556, 0, 0, 0, 0, 17.5013847249692773, 0, 0, 0, 0, 0, 0, 0, 0, -10.5008308349815653, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.5000395635705508, 0, 0, 0, 0, 0, 0, 0,
-        //j15/2,-13/2
+        
         0, -0.9037676210049984, 0, 0, 0, 0, 4.5188381050249919, 0, 0, 0, 0, 0, 0, 0, 0, -2.7113028630149949, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.1291096601435712, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -10.8452114520599796, 0, 0, 0, 0, 0, 0, 36.1507048401999356, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -10.8452114520599796, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j15/2,-11/2
+        
         0, 0, 0, 0, -4.0991046311514854, 0, 0, 0, 0, 0, 0, 13.6636821038382852, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -4.0991046311514854, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 1.7079602629797861, 0, 0, 0, 0, -1.7079602629797861, 0, -20.4955231557574322, 0, 0, 0, 0, 0, 0, -3.0743284733636154, 0, 40.9910463115148644, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.3415920525959572, 0, -4.0991046311514863, 0, 0, 0, 0, 0,
-        //j15/2,-9/2
+        
         0, 0.8204775710502128, 0, 0, 0, 0, -0.8204775710502128, 0, -9.8457308526025535, 0, 0, 0, 0, 0, 0, -1.4768596278903832, 0, 19.6914617052051071, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.1640955142100426, 0, -1.9691461705205107, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 7.8765846820820427, 0, 0, 0, 0, 0, 0, 0, 0, -26.2552822736068094, 0, 0, 0, 0, 0, 0, 0, 0, -7.8765846820820427, 0, 26.2552822736068094, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j15/2,-7/2
+        
         0, 0, 0, 0, 4.5475482864949495, 0, 0, 0, 0, 0, 0, 0, 0, -15.1584942883164988, 0, 0, 0, 0, 0, 0, 0, 0, -4.5475482864949495, 0, 15.1584942883164988, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -0.8526653037178029, 0, 0, 0, 0, -1.4211088395296716, 0, 17.0533060743560583, 0, 0, 0, 0, 0, 0, -0.2842217679059343, 0, 11.3688707162373710, 0, -22.7377414324747456, 0, 0, 0, 0, 0, 0, 0, 0, 0.2842217679059343, 0, -5.6844353581186855, 0, 7.5792471441582485, 0, 0, 0,
-        //j15/2,-5/2
+        
         0, -0.5748668304937213, 0, 0, 0, 0, -0.9581113841562022, 0, 11.4973366098744254, 0, 0, 0, 0, 0, 0, -0.1916222768312404, 0, 7.6648910732496169, 0, -15.3297821464992357, 0, 0, 0, 0, 0, 0, 0, 0, 0.1916222768312404, 0, -3.8324455366248085, 0, 5.1099273821664122, 0, 0, 0,
         0, 0, 0, 0, -3.8324455366248107, 0, 0, 0, 0, 0, 0, -7.6648910732496214, 0, 20.4397095286656523, 0, 0, 0, 0, 0, 0, 0, 0, -3.8324455366248107, 0, 20.4397095286656523, 0, -12.2638257171993938, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j15/2,-3/2
+        
         0, 0, 0, 0, -2.9685995477189673, 0, 0, 0, 0, 0, 0, -5.9371990954379346, 0, 15.8325309211678249, 0, 0, 0, 0, 0, 0, 0, 0, -2.9685995477189673, 0, 15.8325309211678249, 0, -9.4995185527006960, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0.2473832956432473, 0, 0, 0, 0, 0.7421498869297418, 0, -5.9371990954379337, 0, 0, 0, 0, 0, 0, 0.7421498869297418, 0, -11.8743981908758673, 0, 11.8743981908758673, 0, 0, 0, 0, 0, 0, 0, 0, 0.2473832956432473, 0, -5.9371990954379337, 0, 11.8743981908758673, 0, -3.1665061842335653, 0,
-        //j15/2,-1/2
+        
         0, 0.2181715595945335, 0, 0, 0, 0, 0.6545146787836006, 0, -5.2361174302688038, 0, 0, 0, 0, 0, 0, 0.6545146787836006, 0, -10.4722348605376077, 0, 10.4722348605376077, 0, 0, 0, 0, 0, 0, 0, 0, 0.2181715595945335, 0, -5.2361174302688038, 0, 10.4722348605376077, 0, -2.7925959628100294, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j15/2,1/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0.2181715595945335, 0, 0, 0, 0, 0.6545146787836006, 0, -5.2361174302688038, 0, 0, 0, 0, 0, 0, 0.6545146787836006, 0, -10.4722348605376077, 0, 10.4722348605376077, 0, 0, 0, 0, 0, 0, 0, 0, 0.2181715595945335, 0, -5.2361174302688038, 0, 10.4722348605376077, 0, -2.7925959628100294, 0,
-        //j15/2,3/2
+        
         0, 0.2473832956432473, 0, 0, 0, 0, 0.7421498869297418, 0, -5.9371990954379337, 0, 0, 0, 0, 0, 0, 0.7421498869297418, 0, -11.8743981908758673, 0, 11.8743981908758673, 0, 0, 0, 0, 0, 0, 0, 0, 0.2473832956432473, 0, -5.9371990954379337, 0, 11.8743981908758673, 0, -3.1665061842335653, 0,
         0, 0, 0, 0, 2.9685995477189673, 0, 0, 0, 0, 0, 0, 5.9371990954379346, 0, -15.8325309211678249, 0, 0, 0, 0, 0, 0, 0, 0, 2.9685995477189673, 0, -15.8325309211678249, 0, 9.4995185527006960, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j15/2,5/2
+        
         0, 0, 0, 0, 3.8324455366248107, 0, 0, 0, 0, 0, 0, 7.6648910732496214, 0, -20.4397095286656523, 0, 0, 0, 0, 0, 0, 0, 0, 3.8324455366248107, 0, -20.4397095286656523, 0, 12.2638257171993938, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -0.5748668304937213, 0, 0, 0, 0, -0.9581113841562022, 0, 11.4973366098744254, 0, 0, 0, 0, 0, 0, -0.1916222768312404, 0, 7.6648910732496169, 0, -15.3297821464992357, 0, 0, 0, 0, 0, 0, 0, 0, 0.1916222768312404, 0, -3.8324455366248085, 0, 5.1099273821664122, 0, 0, 0,
-        //j15/2,7/2
+        
         0, -0.8526653037178029, 0, 0, 0, 0, -1.4211088395296716, 0, 17.0533060743560583, 0, 0, 0, 0, 0, 0, -0.2842217679059343, 0, 11.3688707162373710, 0, -22.7377414324747456, 0, 0, 0, 0, 0, 0, 0, 0, 0.2842217679059343, 0, -5.6844353581186855, 0, 7.5792471441582485, 0, 0, 0,
         0, 0, 0, 0, -4.5475482864949495, 0, 0, 0, 0, 0, 0, 0, 0, 15.1584942883164988, 0, 0, 0, 0, 0, 0, 0, 0, 4.5475482864949495, 0, -15.1584942883164988, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j15/2,9/2
+        
         0, 0, 0, 0, -7.8765846820820427, 0, 0, 0, 0, 0, 0, 0, 0, 26.2552822736068094, 0, 0, 0, 0, 0, 0, 0, 0, 7.8765846820820427, 0, -26.2552822736068094, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0.8204775710502128, 0, 0, 0, 0, -0.8204775710502128, 0, -9.8457308526025535, 0, 0, 0, 0, 0, 0, -1.4768596278903832, 0, 19.6914617052051071, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.1640955142100426, 0, -1.9691461705205107, 0, 0, 0, 0, 0,
-        //j15/2,11/2
+        
         0, 1.7079602629797861, 0, 0, 0, 0, -1.7079602629797861, 0, -20.4955231557574322, 0, 0, 0, 0, 0, 0, -3.0743284733636154, 0, 40.9910463115148644, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.3415920525959572, 0, -4.0991046311514863, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 4.0991046311514854, 0, 0, 0, 0, 0, 0, -13.6636821038382852, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4.0991046311514854, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //j15/2,13/2
+        
         0, 0, 0, 0, 10.8452114520599796, 0, 0, 0, 0, 0, 0, -36.1507048401999356, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10.8452114520599796, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -0.9037676210049984, 0, 0, 0, 0, 4.5188381050249919, 0, 0, 0, 0, 0, 0, 0, 0, -2.7113028630149949, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.1291096601435712, 0, 0, 0, 0, 0, 0, 0,
-        //j15/2,15/2
+        
         0, -3.5002769449938556, 0, 0, 0, 0, 17.5013847249692773, 0, 0, 0, 0, 0, 0, 0, 0, -10.5008308349815653, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.5000395635705508, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 15/2, mj = -15/2
+        
         0, 4.00031650856440531, 0, 0, 0, 0, -28.0022155599508372, 0, 0, 0, 0, 0, 0, 0, 0, 28.0022155599508372, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -4.00031650856440531, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -3.50027694499385465, 0, 0, 0, 0, 0, 0, 17.5013847249692732, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -10.5008308349815639, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.500039563570550664, 0, 0, 0, 0, 0, 0, 0,
-        // j = 15/2, mj = -13/2
+        
         0, 0, 0, 0, 13.5565143150749737, 0, 0, 0, 0, 0, 0, -67.7825715753748683, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 40.669542945224921, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.93664490215356767, 0, 0, 0, 0, 0, 0, 0,
         0, 0.774657960861427067, 0, 0, 0, 0, -1.80753524200999649, 0, -10.8452114520599789, 0, 0, 0, 0, 0, 0, -1.80753524200999649, 0, 36.1507048401999298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.774657960861427067, 0, -10.8452114520599789, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 15/2, mj = -11/2
+        
         0, -2.04955231557574297, 0, 0, 0, 0, 4.78228873634340025, 0, 28.6937324180604015, 0, 0, 0, 0, 0, 0, 4.78228873634340025, 0, -95.6457747268680051, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.04955231557574297, 0, 28.6937324180604015, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 5.12388078893935741, 0, 0, 0, 0, 0, 0, -5.12388078893935741, 0, -20.4955231557574297, 0, 0, 0, 0, 0, 0, 0, 0, -9.22298542009084335, 0, 40.9910463115148593, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.02477615778787148, 0, -4.09910463115148593, 0, 0, 0, 0, 0,
-        // j = 15/2, mj = -9/2
+        
         0, 0, 0, 0, -10.6662084236527642, 0, 0, 0, 0, 0, 0, 10.6662084236527642, 0, 42.6648336946110567, 0, 0, 0, 0, 0, 0, 0, 0, 19.1991751625749755, 0, -85.3296673892221134, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.13324168473055283, 0, 8.53296673892221134, 0, 0, 0, 0, 0,
         0, -0.656382056840170103, 0, 0, 0, 0, -0.656382056840170103, 0, 15.7531693641640825, 0, 0, 0, 0, 0, 0, 0.656382056840170103, 0, 0, 0, -26.2552822736068041, 0, 0, 0, 0, 0, 0, 0, 0, 0.656382056840170103, 0, -15.7531693641640825, 0, 26.2552822736068041, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 15/2, mj = -7/2
+        
         0, 1.13688707162373734, 0, 0, 0, 0, 1.13688707162373734, 0, -27.2852897189696963, 0, 0, 0, 0, 0, 0, -1.13688707162373734, 0, 0, 0, 45.4754828649494938, 0, 0, 0, 0, 0, 0, 0, 0, -1.13688707162373734, 0, 27.2852897189696963, 0, -45.4754828649494938, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -4.26332651858901504, 0, 0, 0, 0, 0, 0, -7.1055441976483584, 0, 28.4221767905934336, 0, 0, 0, 0, 0, 0, 0, 0, -1.42110883952967168, 0, 18.9481178603956224, 0, -22.7377414324747469, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.42110883952967168, 0, -9.47405893019781121, 0, 7.57924714415824896, 0, 0, 0,
-        // j = 15/2, mj = -5/2
+        
         0, 0, 0, 0, 6.32353513543093462, 0, 0, 0, 0, 0, 0, 10.5392252257182244, 0, -42.1569009028728975, 0, 0, 0, 0, 0, 0, 0, 0, 2.10784504514364487, 0, -28.104600601915265, 0, 33.725520722298318, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.10784504514364487, 0, 14.0523003009576325, 0, -11.241840240766106, 0, 0, 0,
         0, 0.383244553662480886, 0, 0, 0, 0, 1.14973366098744266, 0, -11.4973366098744266, 0, 0, 0, 0, 0, 0, 1.14973366098744266, 0, -22.9946732197488532, 0, 30.6595642929984709, 0, 0, 0, 0, 0, 0, 0, 0, 0.383244553662480886, 0, -11.4973366098744266, 0, 30.6595642929984709, 0, -12.2638257171993884, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 15/2, mj = -3/2
+        
         0, -0.49476659128649439, 0, 0, 0, 0, -1.48429977385948317, 0, 14.8429977385948317, 0, 0, 0, 0, 0, 0, -1.48429977385948317, 0, 29.6859954771896634, 0, -39.5813273029195512, 0, 0, 0, 0, 0, 0, 0, 0, -0.49476659128649439, 0, 14.8429977385948317, 0, -39.5813273029195512, 0, 15.8325309211678205, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 1.73168306950273036, 0, 0, 0, 0, 0, 0, 5.19504920850819109, 0, -13.8534645560218429, 0, 0, 0, 0, 0, 0, 0, 0, 5.19504920850819109, 0, -27.7069291120436858, 0, 16.6241574672262115, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.73168306950273036, 0, -13.8534645560218429, 0, 16.6241574672262115, 0, -3.16650618423356409, 0,
-        // j = 15/2, mj = -1/2
+        
         0, 0, 0, 0, -1.96354403635080146, 0, 0, 0, 0, 0, 0, -5.89063210905240439, 0, 15.7083522908064117, 0, 0, 0, 0, 0, 0, 0, 0, -5.89063210905240439, 0, 31.4167045816128234, 0, -18.850022748967694, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.96354403635080146, 0, 15.7083522908064117, 0, -18.850022748967694, 0, 3.5904805236128941, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 15/2, mj = 1/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 1.96354403635080146, 0, 0, 0, 0, 0, 0, 5.89063210905240439, 0, -15.7083522908064117, 0, 0, 0, 0, 0, 0, 0, 0, 5.89063210905240439, 0, -31.4167045816128234, 0, 18.850022748967694, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.96354403635080146, 0, -15.7083522908064117, 0, 18.850022748967694, 0, -3.5904805236128941, 0,
-        // j = 15/2, mj = 3/2
+        
         0, 0, 0, 0, -1.73168306950273036, 0, 0, 0, 0, 0, 0, -5.19504920850819109, 0, 13.8534645560218429, 0, 0, 0, 0, 0, 0, 0, 0, -5.19504920850819109, 0, 27.7069291120436858, 0, -16.6241574672262115, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.73168306950273036, 0, 13.8534645560218429, 0, -16.6241574672262115, 0, 3.16650618423356409, 0,
         0, -0.49476659128649439, 0, 0, 0, 0, -1.48429977385948317, 0, 14.8429977385948317, 0, 0, 0, 0, 0, 0, -1.48429977385948317, 0, 29.6859954771896634, 0, -39.5813273029195512, 0, 0, 0, 0, 0, 0, 0, 0, -0.49476659128649439, 0, 14.8429977385948317, 0, -39.5813273029195512, 0, 15.8325309211678205, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 15/2, mj = 5/2
+        
         0, 0.383244553662480886, 0, 0, 0, 0, 1.14973366098744266, 0, -11.4973366098744266, 0, 0, 0, 0, 0, 0, 1.14973366098744266, 0, -22.9946732197488532, 0, 30.6595642929984709, 0, 0, 0, 0, 0, 0, 0, 0, 0.383244553662480886, 0, -11.4973366098744266, 0, 30.6595642929984709, 0, -12.2638257171993884, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -6.32353513543093462, 0, 0, 0, 0, 0, 0, -10.5392252257182244, 0, 42.1569009028728975, 0, 0, 0, 0, 0, 0, 0, 0, -2.10784504514364487, 0, 28.104600601915265, 0, -33.725520722298318, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.10784504514364487, 0, -14.0523003009576325, 0, 11.241840240766106, 0, 0, 0,
-        // j = 15/2, mj = 7/2
+        
         0, 0, 0, 0, 4.26332651858901504, 0, 0, 0, 0, 0, 0, 7.1055441976483584, 0, -28.4221767905934336, 0, 0, 0, 0, 0, 0, 0, 0, 1.42110883952967168, 0, -18.9481178603956224, 0, 22.7377414324747469, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.42110883952967168, 0, 9.47405893019781121, 0, -7.57924714415824896, 0, 0, 0,
         0, 1.13688707162373734, 0, 0, 0, 0, 1.13688707162373734, 0, -27.2852897189696963, 0, 0, 0, 0, 0, 0, -1.13688707162373734, 0, 0, 0, 45.4754828649494938, 0, 0, 0, 0, 0, 0, 0, 0, -1.13688707162373734, 0, 27.2852897189696963, 0, -45.4754828649494938, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 15/2, mj = 9/2
+        
         0, -0.656382056840170103, 0, 0, 0, 0, -0.656382056840170103, 0, 15.7531693641640825, 0, 0, 0, 0, 0, 0, 0.656382056840170103, 0, 0, 0, -26.2552822736068041, 0, 0, 0, 0, 0, 0, 0, 0, 0.656382056840170103, 0, -15.7531693641640825, 0, 26.2552822736068041, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 10.6662084236527642, 0, 0, 0, 0, 0, 0, -10.6662084236527642, 0, -42.6648336946110567, 0, 0, 0, 0, 0, 0, 0, 0, -19.1991751625749755, 0, 85.3296673892221134, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.13324168473055283, 0, -8.53296673892221134, 0, 0, 0, 0, 0,
-        // j = 15/2, mj = 11/2
+        
         0, 0, 0, 0, -5.12388078893935741, 0, 0, 0, 0, 0, 0, 5.12388078893935741, 0, 20.4955231557574297, 0, 0, 0, 0, 0, 0, 0, 0, 9.22298542009084335, 0, -40.9910463115148593, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.02477615778787148, 0, 4.09910463115148593, 0, 0, 0, 0, 0,
         0, -2.04955231557574297, 0, 0, 0, 0, 4.78228873634340025, 0, 28.6937324180604015, 0, 0, 0, 0, 0, 0, 4.78228873634340025, 0, -95.6457747268680051, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.04955231557574297, 0, 28.6937324180604015, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 15/2, mj = 13/2
+        
         0, 0.774657960861427067, 0, 0, 0, 0, -1.80753524200999649, 0, -10.8452114520599789, 0, 0, 0, 0, 0, 0, -1.80753524200999649, 0, 36.1507048401999298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.774657960861427067, 0, -10.8452114520599789, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -13.5565143150749737, 0, 0, 0, 0, 0, 0, 67.7825715753748683, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -40.669542945224921, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.93664490215356767, 0, 0, 0, 0, 0, 0, 0,
-        // j = 15/2, mj = 15/2
+        
         0, 0, 0, 0, 3.50027694499385465, 0, 0, 0, 0, 0, 0, -17.5013847249692732, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10.5008308349815639, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.500039563570550664, 0, 0, 0, 0, 0, 0, 0,
         0, 4.00031650856440531, 0, 0, 0, 0, -28.0022155599508372, 0, 0, 0, 0, 0, 0, 0, 0, 28.0022155599508372, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -4.00031650856440531, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = -17/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -4.12343187517827448, 0, 0, 0, 0, 28.8640231262479213, 0, 0, 0, 0, 0, 0, 0, 0, -28.8640231262479213, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4.12343187517827448, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = -15/2
+        
         0, -1.00007912714110133, 0, 0, 0, 0, 7.0005538899877093, 0, 0, 0, 0, 0, 0, 0, 0, -7.0005538899877093, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.00007912714110133, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -14.0011077799754186, 0, 0, 0, 0, 0, 0, 70.005538899877093, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -42.0033233399262558, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.00015825428220266, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = -13/2
+        
         0, 0, 0, 0, -4.95013912767217325, 0, 0, 0, 0, 0, 0, 24.7506956383608662, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -14.8504173830165197, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.707162732524596178, 0, 0, 0, 0, 0, 0, 0,
         0, 2.12148819757378853, 0, 0, 0, 0, -4.95013912767217325, 0, -29.7008347660330395, 0, 0, 0, 0, 0, 0, -4.95013912767217325, 0, 99.002782553443465, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.12148819757378853, 0, -29.7008347660330395, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = -11/2
+        
         0, 0.948758364647699116, 0, 0, 0, 0, -2.21376951751129794, 0, -13.2826171050677876, 0, 0, 0, 0, 0, 0, -2.21376951751129794, 0, 44.2753903502259587, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.948758364647699116, 0, -13.2826171050677876, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 11.0688475875564897, 0, 0, 0, 0, 0, 0, -11.0688475875564897, 0, -44.2753903502259587, 0, 0, 0, 0, 0, 0, 0, 0, -19.9239256576016814, 0, 88.5507807004519175, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.21376951751129794, 0, -8.85507807004519175, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = -9/2
+        
         0, 0, 0, 0, 5.91654790557938008, 0, 0, 0, 0, 0, 0, -5.91654790557938008, 0, -23.6661916223175203, 0, 0, 0, 0, 0, 0, 0, 0, -10.6497862300428841, 0, 47.3323832446350406, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.18330958111587602, 0, -4.73323832446350406, 0, 0, 0, 0, 0,
         0, -1.18330958111587602, 0, 0, 0, 0, -1.18330958111587602, 0, 28.3994299467810244, 0, 0, 0, 0, 0, 0, 1.18330958111587602, 0, 0, 0, -47.3323832446350406, 0, 0, 0, 0, 0, 0, 0, 0, 1.18330958111587602, 0, -28.3994299467810244, 0, 47.3323832446350406, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = -7/2
+        
         0, -0.733857449152875582, 0, 0, 0, 0, -0.733857449152875582, 0, 17.612578779669014, 0, 0, 0, 0, 0, 0, 0.733857449152875582, 0, 0, 0, -29.3542979661150233, 0, 0, 0, 0, 0, 0, 0, 0, 0.733857449152875582, 0, -17.612578779669014, 0, 29.3542979661150233, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -6.60471704237588023, 0, 0, 0, 0, 0, 0, -11.0078617372931337, 0, 44.0314469491725349, 0, 0, 0, 0, 0, 0, 0, 0, -2.20157234745862674, 0, 29.3542979661150233, 0, -35.2251575593380279, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.20157234745862674, 0, -14.6771489830575116, 0, 11.7417191864460093, 0, 0, 0,
-        // j = 17/2, mj = -5/2
+        
         0, 0, 0, 0, -4.67024020848234288, 0, 0, 0, 0, 0, 0, -7.7837336808039048, 0, 31.1349347232156192, 0, 0, 0, 0, 0, 0, 0, 0, -1.55674673616078096, 0, 20.7566231488104128, 0, -24.9079477785724953, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.55674673616078096, 0, -10.3783115744052064, 0, 8.30264925952416512, 0, 0, 0,
         0, 0.51891557872026032, 0, 0, 0, 0, 1.55674673616078096, 0, -15.5674673616078096, 0, 0, 0, 0, 0, 0, 1.55674673616078096, 0, -31.1349347232156192, 0, 41.5132462976208256, 0, 0, 0, 0, 0, 0, 0, 0, 0.51891557872026032, 0, -15.5674673616078096, 0, 41.5132462976208256, 0, -16.6052985190483302, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = -3/2
+        
         0, 0.413951429393932508, 0, 0, 0, 0, 1.24185428818179752, 0, -12.4185428818179752, 0, 0, 0, 0, 0, 0, 1.24185428818179752, 0, -24.8370857636359505, 0, 33.1161143515146006, 0, 0, 0, 0, 0, 0, 0, 0, 0.413951429393932508, 0, -12.4185428818179752, 0, 33.1161143515146006, 0, -13.2464457406058403, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 2.06975714696966254, 0, 0, 0, 0, 0, 0, 6.20927144090898762, 0, -16.5580571757573003, 0, 0, 0, 0, 0, 0, 0, 0, 6.20927144090898762, 0, -33.1161143515146006, 0, 19.8696686109087604, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.06975714696966254, 0, -16.5580571757573003, 0, 19.8696686109087604, 0, -3.78469878303024007, 0,
-        // j = 17/2, mj = -1/2
+        
         0, 0, 0, 0, 1.85124707101607532, 0, 0, 0, 0, 0, 0, 5.55374121304822595, 0, -14.8099765681286025, 0, 0, 0, 0, 0, 0, 0, 0, 5.55374121304822595, 0, -29.6199531362572051, 0, 17.771971881754323, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.85124707101607532, 0, -14.8099765681286025, 0, 17.771971881754323, 0, -3.38513750128653772, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = 1/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 1.85124707101607532, 0, 0, 0, 0, 0, 0, 5.55374121304822595, 0, -14.8099765681286025, 0, 0, 0, 0, 0, 0, 0, 0, 5.55374121304822595, 0, -29.6199531362572051, 0, 17.771971881754323, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.85124707101607532, 0, -14.8099765681286025, 0, 17.771971881754323, 0, -3.38513750128653772, 0,
-        // j = 17/2, mj = 3/2
+        
         0, 0, 0, 0, 2.06975714696966254, 0, 0, 0, 0, 0, 0, 6.20927144090898762, 0, -16.5580571757573003, 0, 0, 0, 0, 0, 0, 0, 0, 6.20927144090898762, 0, -33.1161143515146006, 0, 19.8696686109087604, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.06975714696966254, 0, -16.5580571757573003, 0, 19.8696686109087604, 0, -3.78469878303024007, 0,
         0, -0.413951429393932508, 0, 0, 0, 0, -1.24185428818179752, 0, 12.4185428818179752, 0, 0, 0, 0, 0, 0, -1.24185428818179752, 0, 24.8370857636359505, 0, -33.1161143515146006, 0, 0, 0, 0, 0, 0, 0, 0, -0.413951429393932508, 0, 12.4185428818179752, 0, -33.1161143515146006, 0, 13.2464457406058403, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = 5/2
+        
         0, -0.51891557872026032, 0, 0, 0, 0, -1.55674673616078096, 0, 15.5674673616078096, 0, 0, 0, 0, 0, 0, -1.55674673616078096, 0, 31.1349347232156192, 0, -41.5132462976208256, 0, 0, 0, 0, 0, 0, 0, 0, -0.51891557872026032, 0, 15.5674673616078096, 0, -41.5132462976208256, 0, 16.6052985190483302, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -4.67024020848234288, 0, 0, 0, 0, 0, 0, -7.7837336808039048, 0, 31.1349347232156192, 0, 0, 0, 0, 0, 0, 0, 0, -1.55674673616078096, 0, 20.7566231488104128, 0, -24.9079477785724953, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.55674673616078096, 0, -10.3783115744052064, 0, 8.30264925952416512, 0, 0, 0,
-        // j = 17/2, mj = 7/2
+        
         0, 0, 0, 0, -6.60471704237588023, 0, 0, 0, 0, 0, 0, -11.0078617372931337, 0, 44.0314469491725349, 0, 0, 0, 0, 0, 0, 0, 0, -2.20157234745862674, 0, 29.3542979661150233, 0, -35.2251575593380279, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.20157234745862674, 0, -14.6771489830575116, 0, 11.7417191864460093, 0, 0, 0,
         0, 0.733857449152875582, 0, 0, 0, 0, 0.733857449152875582, 0, -17.612578779669014, 0, 0, 0, 0, 0, 0, -0.733857449152875582, 0, 0, 0, 29.3542979661150233, 0, 0, 0, 0, 0, 0, 0, 0, -0.733857449152875582, 0, 17.612578779669014, 0, -29.3542979661150233, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = 9/2
+        
         0, 1.18330958111587602, 0, 0, 0, 0, 1.18330958111587602, 0, -28.3994299467810244, 0, 0, 0, 0, 0, 0, -1.18330958111587602, 0, 0, 0, 47.3323832446350406, 0, 0, 0, 0, 0, 0, 0, 0, -1.18330958111587602, 0, 28.3994299467810244, 0, -47.3323832446350406, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 5.91654790557938008, 0, 0, 0, 0, 0, 0, -5.91654790557938008, 0, -23.6661916223175203, 0, 0, 0, 0, 0, 0, 0, 0, -10.6497862300428841, 0, 47.3323832446350406, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.18330958111587602, 0, -4.73323832446350406, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = 11/2
+        
         0, 0, 0, 0, 11.0688475875564897, 0, 0, 0, 0, 0, 0, -11.0688475875564897, 0, -44.2753903502259587, 0, 0, 0, 0, 0, 0, 0, 0, -19.9239256576016814, 0, 88.5507807004519175, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.21376951751129794, 0, -8.85507807004519175, 0, 0, 0, 0, 0,
         0, -0.948758364647699116, 0, 0, 0, 0, 2.21376951751129794, 0, 13.2826171050677876, 0, 0, 0, 0, 0, 0, 2.21376951751129794, 0, -44.2753903502259587, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.948758364647699116, 0, 13.2826171050677876, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = 13/2
+        
         0, -2.12148819757378853, 0, 0, 0, 0, 4.95013912767217325, 0, 29.7008347660330395, 0, 0, 0, 0, 0, 0, 4.95013912767217325, 0, -99.002782553443465, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.12148819757378853, 0, 29.7008347660330395, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -4.95013912767217325, 0, 0, 0, 0, 0, 0, 24.7506956383608662, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -14.8504173830165197, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.707162732524596178, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = 15/2
+        
         0, 0, 0, 0, -14.0011077799754186, 0, 0, 0, 0, 0, 0, 70.005538899877093, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -42.0033233399262558, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.00015825428220266, 0, 0, 0, 0, 0, 0, 0,
         0, 1.00007912714110133, 0, 0, 0, 0, -7.0005538899877093, 0, 0, 0, 0, 0, 0, 0, 0, 7.0005538899877093, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.00007912714110133, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = 17/2
+        
         0, 4.12343187517827448, 0, 0, 0, 0, -28.8640231262479213, 0, 0, 0, 0, 0, 0, 0, 0, 28.8640231262479213, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -4.12343187517827448, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = -17/2
+        
         0, 4.63886085957555879, 0, 0, 0, 0, -43.296034689371882, 0, 0, 0, 0, 0, 0, 0, 0, 64.944052034057823, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -18.5554434383022352, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.51542898439728431, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -4.12343187517827448, 0, 0, 0, 0, 0, 0, 28.8640231262479213, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -28.8640231262479213, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4.12343187517827448, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = -15/2
+        
         0, 0, 0, 0, 17.0013451613987226, 0, 0, 0, 0, 0, 0, -119.009416129791058, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 119.009416129791058, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -17.0013451613987226, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0.875069236248463662, 0, 0, 0, 0, -3.50027694499385465, 0, -14.0011077799754186, 0, 0, 0, 0, 0, 0, -1.75013847249692732, 0, 70.005538899877093, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.50019781785275332, 0, -42.0033233399262558, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.125009890892637666, 0, 2.00015825428220266, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = -13/2
+        
         0, -2.47506956383608662, 0, 0, 0, 0, 9.9002782553443465, 0, 39.601113021377386, 0, 0, 0, 0, 0, 0, 4.95013912767217325, 0, -198.00556510688693, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -7.07162732524596178, 0, 118.803339064132158, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.353581366262298089, 0, -5.65730186019676943, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 6.3644645927213656, 0, 0, 0, 0, 0, 0, -14.8504173830165197, 0, -29.7008347660330395, 0, 0, 0, 0, 0, 0, 0, 0, -14.8504173830165197, 0, 99.002782553443465, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6.3644645927213656, 0, -29.7008347660330395, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = -11/2
+        
         0, 0, 0, 0, -14.2313754697154867, 0, 0, 0, 0, 0, 0, 33.2065427626694691, 0, 66.4130855253389381, 0, 0, 0, 0, 0, 0, 0, 0, 33.2065427626694691, 0, -221.376951751129794, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -14.2313754697154867, 0, 66.4130855253389381, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -0.790631970539749263, 0, 0, 0, 0, 0, 0, 22.1376951751129794, 0, 0, 0, 0, 0, 0, 2.21376951751129794, 0, -22.1376951751129794, 0, -44.2753903502259587, 0, 0, 0, 0, 0, 0, 0, 0, 1.26501115286359882, 0, -39.8478513152033629, 0, 88.5507807004519175, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.158126394107949853, 0, 4.42753903502259587, 0, -8.85507807004519175, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = -9/2
+        
         0, 1.47913697639484502, 0, 0, 0, 0, 0, 0, -41.4158353390556606, 0, 0, 0, 0, 0, 0, -4.14158353390556606, 0, 41.4158353390556606, 0, 82.8316706781113211, 0, 0, 0, 0, 0, 0, 0, 0, -2.36661916223175203, 0, 74.548503610300189, 0, -165.663341356222642, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.295827395278969004, 0, -8.28316706781113211, 0, 16.5663341356222642, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -5.91654790557938008, 0, 0, 0, 0, 0, 0, -5.91654790557938008, 0, 47.3323832446350406, 0, 0, 0, 0, 0, 0, 0, 0, 5.91654790557938008, 0, 0, 0, -47.3323832446350406, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5.91654790557938008, 0, -47.3323832446350406, 0, 47.3323832446350406, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = -7/2
+        
         0, 0, 0, 0, 9.54014683898738256, 0, 0, 0, 0, 0, 0, 9.54014683898738256, 0, -76.3211747118990605, 0, 0, 0, 0, 0, 0, 0, 0, -9.54014683898738256, 0, 0, 0, 76.3211747118990605, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -9.54014683898738256, 0, 76.3211747118990605, 0, -76.3211747118990605, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0.550393086864656686, 0, 0, 0, 0, 1.46771489830575116, 0, -19.8141511271276407, 0, 0, 0, 0, 0, 0, 1.10078617372931337, 0, -33.0235852118794012, 0, 66.0471704237588023, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -6.60471704237588023, 0, 44.0314469491725349, 0, -35.2251575593380279, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.183464362288218895, 0, 6.60471704237588023, 0, -22.0157234745862674, 0, 11.7417191864460093, 0, 0, 0,
-        // j = 17/2, mj = -5/2
+        
         0, -0.77837336808039048, 0, 0, 0, 0, -2.07566231488104128, 0, 28.0214412508940573, 0, 0, 0, 0, 0, 0, -1.55674673616078096, 0, 46.7024020848234288, 0, -93.4048041696468576, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9.34048041696468576, 0, -62.2698694464312384, 0, 49.8158955571449907, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.25945778936013016, 0, -9.34048041696468576, 0, 31.1349347232156192, 0, -16.6052985190483302, 0, 0, 0,
         0, 0, 0, 0, 3.63240905104182224, 0, 0, 0, 0, 0, 0, 10.8972271531254667, 0, -36.3240905104182224, 0, 0, 0, 0, 0, 0, 0, 0, 10.8972271531254667, 0, -72.6481810208364448, 0, 58.1185448166691558, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.63240905104182224, 0, -36.3240905104182224, 0, 58.1185448166691558, 0, -16.6052985190483302, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = -3/2
+        
         0, 0, 0, 0, -4.55346572333325759, 0, 0, 0, 0, 0, 0, -13.6603971699997728, 0, 45.5346572333325759, 0, 0, 0, 0, 0, 0, 0, 0, -13.6603971699997728, 0, 91.0693144666651517, 0, -72.8554515733321214, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -4.55346572333325759, 0, 45.5346572333325759, 0, -72.8554515733321214, 0, 20.8158433066663204, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -0.206975714696966254, 0, 0, 0, 0, -0.827902858787865016, 0, 8.27902858787865016, 0, 0, 0, 0, 0, 0, -1.24185428818179752, 0, 24.8370857636359505, 0, -33.1161143515146006, 0, 0, 0, 0, 0, 0, 0, 0, -0.827902858787865016, 0, 24.8370857636359505, 0, -66.2322287030292013, 0, 26.4928914812116805, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.206975714696966254, 0, 8.27902858787865016, 0, -33.1161143515146006, 0, 26.4928914812116805, 0, -3.78469878303024007, 0,
-        // j = 17/2, mj = -1/2
+        
         0, 0.231405883877009415, 0, 0, 0, 0, 0.925623535508037658, 0, -9.25623535508037658, 0, 0, 0, 0, 0, 0, 1.38843530326205649, 0, -27.7687060652411297, 0, 37.0249414203215063, 0, 0, 0, 0, 0, 0, 0, 0, 0.925623535508037658, 0, -27.7687060652411297, 0, 74.0498828406430127, 0, -29.6199531362572051, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.231405883877009415, 0, -9.25623535508037658, 0, 37.0249414203215063, 0, -29.6199531362572051, 0, 4.23142187660817215, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = 1/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -0.231405883877009415, 0, 0, 0, 0, -0.925623535508037658, 0, 9.25623535508037658, 0, 0, 0, 0, 0, 0, -1.38843530326205649, 0, 27.7687060652411297, 0, -37.0249414203215063, 0, 0, 0, 0, 0, 0, 0, 0, -0.925623535508037658, 0, 27.7687060652411297, 0, -74.0498828406430127, 0, 29.6199531362572051, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.231405883877009415, 0, 9.25623535508037658, 0, -37.0249414203215063, 0, 29.6199531362572051, 0, -4.23142187660817215, 0,
-        // j = 17/2, mj = 3/2
+        
         0, 0.206975714696966254, 0, 0, 0, 0, 0.827902858787865016, 0, -8.27902858787865016, 0, 0, 0, 0, 0, 0, 1.24185428818179752, 0, -24.8370857636359505, 0, 33.1161143515146006, 0, 0, 0, 0, 0, 0, 0, 0, 0.827902858787865016, 0, -24.8370857636359505, 0, 66.2322287030292013, 0, -26.4928914812116805, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.206975714696966254, 0, -8.27902858787865016, 0, 33.1161143515146006, 0, -26.4928914812116805, 0, 3.78469878303024007, 0,
         0, 0, 0, 0, -4.55346572333325759, 0, 0, 0, 0, 0, 0, -13.6603971699997728, 0, 45.5346572333325759, 0, 0, 0, 0, 0, 0, 0, 0, -13.6603971699997728, 0, 91.0693144666651517, 0, -72.8554515733321214, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -4.55346572333325759, 0, 45.5346572333325759, 0, -72.8554515733321214, 0, 20.8158433066663204, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = 5/2
+        
         0, 0, 0, 0, 3.63240905104182224, 0, 0, 0, 0, 0, 0, 10.8972271531254667, 0, -36.3240905104182224, 0, 0, 0, 0, 0, 0, 0, 0, 10.8972271531254667, 0, -72.6481810208364448, 0, 58.1185448166691558, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.63240905104182224, 0, -36.3240905104182224, 0, 58.1185448166691558, 0, -16.6052985190483302, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0.77837336808039048, 0, 0, 0, 0, 2.07566231488104128, 0, -28.0214412508940573, 0, 0, 0, 0, 0, 0, 1.55674673616078096, 0, -46.7024020848234288, 0, 93.4048041696468576, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -9.34048041696468576, 0, 62.2698694464312384, 0, -49.8158955571449907, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.25945778936013016, 0, 9.34048041696468576, 0, -31.1349347232156192, 0, 16.6052985190483302, 0, 0, 0,
-        // j = 17/2, mj = 7/2
+        
         0, -0.550393086864656686, 0, 0, 0, 0, -1.46771489830575116, 0, 19.8141511271276407, 0, 0, 0, 0, 0, 0, -1.10078617372931337, 0, 33.0235852118794012, 0, -66.0471704237588023, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6.60471704237588023, 0, -44.0314469491725349, 0, 35.2251575593380279, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.183464362288218895, 0, -6.60471704237588023, 0, 22.0157234745862674, 0, -11.7417191864460093, 0, 0, 0,
         0, 0, 0, 0, 9.54014683898738256, 0, 0, 0, 0, 0, 0, 9.54014683898738256, 0, -76.3211747118990605, 0, 0, 0, 0, 0, 0, 0, 0, -9.54014683898738256, 0, 0, 0, 76.3211747118990605, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -9.54014683898738256, 0, 76.3211747118990605, 0, -76.3211747118990605, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = 9/2
+        
         0, 0, 0, 0, -5.91654790557938008, 0, 0, 0, 0, 0, 0, -5.91654790557938008, 0, 47.3323832446350406, 0, 0, 0, 0, 0, 0, 0, 0, 5.91654790557938008, 0, 0, 0, -47.3323832446350406, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5.91654790557938008, 0, -47.3323832446350406, 0, 47.3323832446350406, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -1.47913697639484502, 0, 0, 0, 0, 0, 0, 41.4158353390556606, 0, 0, 0, 0, 0, 0, 4.14158353390556606, 0, -41.4158353390556606, 0, -82.8316706781113211, 0, 0, 0, 0, 0, 0, 0, 0, 2.36661916223175203, 0, -74.548503610300189, 0, 165.663341356222642, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.295827395278969004, 0, 8.28316706781113211, 0, -16.5663341356222642, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = 11/2
+        
         0, 0.790631970539749263, 0, 0, 0, 0, 0, 0, -22.1376951751129794, 0, 0, 0, 0, 0, 0, -2.21376951751129794, 0, 22.1376951751129794, 0, 44.2753903502259587, 0, 0, 0, 0, 0, 0, 0, 0, -1.26501115286359882, 0, 39.8478513152033629, 0, -88.5507807004519175, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.158126394107949853, 0, -4.42753903502259587, 0, 8.85507807004519175, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -14.2313754697154867, 0, 0, 0, 0, 0, 0, 33.2065427626694691, 0, 66.4130855253389381, 0, 0, 0, 0, 0, 0, 0, 0, 33.2065427626694691, 0, -221.376951751129794, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -14.2313754697154867, 0, 66.4130855253389381, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = 13/2
+        
         0, 0, 0, 0, 6.3644645927213656, 0, 0, 0, 0, 0, 0, -14.8504173830165197, 0, -29.7008347660330395, 0, 0, 0, 0, 0, 0, 0, 0, -14.8504173830165197, 0, 99.002782553443465, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6.3644645927213656, 0, -29.7008347660330395, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 2.47506956383608662, 0, 0, 0, 0, -9.9002782553443465, 0, -39.601113021377386, 0, 0, 0, 0, 0, 0, -4.95013912767217325, 0, 198.00556510688693, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7.07162732524596178, 0, -118.803339064132158, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.353581366262298089, 0, 5.65730186019676943, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = 15/2
+        
         0, -0.875069236248463662, 0, 0, 0, 0, 3.50027694499385465, 0, 14.0011077799754186, 0, 0, 0, 0, 0, 0, 1.75013847249692732, 0, -70.005538899877093, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.50019781785275332, 0, 42.0033233399262558, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.125009890892637666, 0, -2.00015825428220266, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 17.0013451613987226, 0, 0, 0, 0, 0, 0, -119.009416129791058, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 119.009416129791058, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -17.0013451613987226, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 17/2, mj = 17/2
+        
         0, 0, 0, 0, -4.12343187517827448, 0, 0, 0, 0, 0, 0, 28.8640231262479213, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -28.8640231262479213, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4.12343187517827448, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -4.63886085957555879, 0, 0, 0, 0, 43.296034689371882, 0, 0, 0, 0, 0, 0, 0, 0, -64.944052034057823, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 18.5554434383022352, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.51542898439728431, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = -19/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -4.76597647343204622, 0, 0, 0, 0, 44.4824470853657647, 0, 0, 0, 0, 0, 0, 0, 0, -66.723670628048647, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19.0639058937281849, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.52955294149244958, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = -17/2
+        
         0, -1.0933899902622448, 0, 0, 0, 0, 10.2049732424476182, 0, 0, 0, 0, 0, 0, 0, 0, -15.3074598636714272, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4.37355996104897921, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.121487776695804978, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -17.4942398441959169, 0, 0, 0, 0, 0, 0, 122.459678909371418, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -122.459678909371418, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 17.4942398441959169, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = -15/2
+        
         0, 0, 0, 0, -5.83141328139863895, 0, 0, 0, 0, 0, 0, 40.8198929697904727, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -40.8198929697904727, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5.83141328139863895, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 2.55124331061190454, 0, 0, 0, 0, -10.2049732424476182, 0, -40.8198929697904727, 0, 0, 0, 0, 0, 0, -5.10248662122380908, 0, 204.099464848952363, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7.28926660174829869, 0, -122.459678909371418, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.364463330087414934, 0, 5.83141328139863895, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = -13/2
+        
         0, 1.07173655920786068, 0, 0, 0, 0, -4.28694623683144273, 0, -17.1477849473257709, 0, 0, 0, 0, 0, 0, -2.14347311841572136, 0, 85.7389247366288545, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.06210445487960195, 0, -51.4433548419773127, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.153105222743980097, 0, 2.44968356390368156, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 14.6981013834220894, 0, 0, 0, 0, 0, 0, -34.2955698946515418, 0, -68.5911397893030836, 0, 0, 0, 0, 0, 0, 0, 0, -34.2955698946515418, 0, 228.637132631010279, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14.6981013834220894, 0, -68.5911397893030836, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = -11/2
+        
         0, 0, 0, 0, 7.34905069171104468, 0, 0, 0, 0, 0, 0, -17.1477849473257709, 0, -34.2955698946515418, 0, 0, 0, 0, 0, 0, 0, 0, -17.1477849473257709, 0, 114.318566315505139, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7.34905069171104468, 0, -34.2955698946515418, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -1.53105222743980097, 0, 0, 0, 0, 0, 0, 42.8694623683144273, 0, 0, 0, 0, 0, 0, 4.28694623683144273, 0, -42.8694623683144273, 0, -85.7389247366288545, 0, 0, 0, 0, 0, 0, 0, 0, 2.44968356390368156, 0, -77.1650322629659691, 0, 171.477849473257709, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.306210445487960195, 0, 8.57389247366288545, 0, -17.1477849473257709, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = -9/2
+        
         0, -0.883953415655745223, 0, 0, 0, 0, 0, 0, 24.7506956383608662, 0, 0, 0, 0, 0, 0, 2.47506956383608662, 0, -24.7506956383608662, 0, -49.5013912767217325, 0, 0, 0, 0, 0, 0, 0, 0, 1.41432546504919236, 0, -44.5512521490495592, 0, 99.002782553443465, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.176790683131149045, 0, 4.95013912767217325, 0, -9.9002782553443465, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -9.9002782553443465, 0, 0, 0, 0, 0, 0, -9.9002782553443465, 0, 79.202226042754772, 0, 0, 0, 0, 0, 0, 0, 0, 9.9002782553443465, 0, 0, 0, -79.202226042754772, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9.9002782553443465, 0, -79.202226042754772, 0, 79.202226042754772, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = -7/2
+        
         0, 0, 0, 0, -6.48125350089154427, 0, 0, 0, 0, 0, 0, -6.48125350089154427, 0, 51.8500280071323542, 0, 0, 0, 0, 0, 0, 0, 0, 6.48125350089154427, 0, 0, 0, -51.8500280071323542, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6.48125350089154427, 0, -51.8500280071323542, 0, 51.8500280071323542, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0.810156687611443034, 0, 0, 0, 0, 2.16041783363051476, 0, -29.1656407540119492, 0, 0, 0, 0, 0, 0, 1.62031337522288607, 0, -48.609401256686582, 0, 97.218802513373164, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -9.7218802513373164, 0, 64.8125350089154427, 0, -51.8500280071323542, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.270052229203814345, 0, 9.7218802513373164, 0, -32.4062675044577213, 0, 17.2833426690441181, 0, 0, 0,
-        // j = 19/2, mj = -5/2
+        
         0, 0.594492479694352209, 0, 0, 0, 0, 1.58531327918493922, 0, -21.4017292689966795, 0, 0, 0, 0, 0, 0, 1.18898495938870442, 0, -35.6695487816611326, 0, 71.3390975633222651, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -7.13390975633222651, 0, 47.5593983755481767, 0, -38.0475187004385414, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.198164159898117403, 0, 7.13390975633222651, 0, -23.7796991877740884, 0, 12.6825062334795138, 0, 0, 0,
         0, 0, 0, 0, 4.75593983755481767, 0, 0, 0, 0, 0, 0, 14.267819512664453, 0, -47.5593983755481767, 0, 0, 0, 0, 0, 0, 0, 0, 14.267819512664453, 0, -95.1187967510963535, 0, 76.0950374008770828, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4.75593983755481767, 0, -47.5593983755481767, 0, 76.0950374008770828, 0, -21.7414392573934522, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = -3/2
+        
         0, 0, 0, 0, 3.88320861646147339, 0, 0, 0, 0, 0, 0, 11.6496258493844202, 0, -38.8320861646147339, 0, 0, 0, 0, 0, 0, 0, 0, 11.6496258493844202, 0, -77.6641723292294678, 0, 62.1313378633835742, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.88320861646147339, 0, -38.8320861646147339, 0, 62.1313378633835742, 0, -17.7518108181095926, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -0.242700538528842087, 0, 0, 0, 0, -0.970802154115368348, 0, 9.70802154115368348, 0, 0, 0, 0, 0, 0, -1.45620323117305252, 0, 29.1240646234610504, 0, -38.8320861646147339, 0, 0, 0, 0, 0, 0, 0, 0, -0.970802154115368348, 0, 29.1240646234610504, 0, -77.6641723292294678, 0, 31.0656689316917871, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.242700538528842087, 0, 9.70802154115368348, 0, -38.8320861646147339, 0, 31.0656689316917871, 0, -4.43795270452739816, 0,
-        // j = 19/2, mj = -1/2
+        
         0, -0.219530897104735508, 0, 0, 0, 0, -0.878123588418942033, 0, 8.78123588418942033, 0, 0, 0, 0, 0, 0, -1.31718538262841305, 0, 26.343707652568261, 0, -35.1249435367576813, 0, 0, 0, 0, 0, 0, 0, 0, -0.878123588418942033, 0, 26.343707652568261, 0, -70.2498870735153626, 0, 28.0999548294061451, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.219530897104735508, 0, 8.78123588418942033, 0, -35.1249435367576813, 0, 28.0999548294061451, 0, -4.01427926134373501, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = 1/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -0.219530897104735508, 0, 0, 0, 0, -0.878123588418942033, 0, 8.78123588418942033, 0, 0, 0, 0, 0, 0, -1.31718538262841305, 0, 26.343707652568261, 0, -35.1249435367576813, 0, 0, 0, 0, 0, 0, 0, 0, -0.878123588418942033, 0, 26.343707652568261, 0, -70.2498870735153626, 0, 28.0999548294061451, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.219530897104735508, 0, 8.78123588418942033, 0, -35.1249435367576813, 0, 28.0999548294061451, 0, -4.01427926134373501, 0,
-        // j = 19/2, mj = 3/2
+        
         0, -0.242700538528842087, 0, 0, 0, 0, -0.970802154115368348, 0, 9.70802154115368348, 0, 0, 0, 0, 0, 0, -1.45620323117305252, 0, 29.1240646234610504, 0, -38.8320861646147339, 0, 0, 0, 0, 0, 0, 0, 0, -0.970802154115368348, 0, 29.1240646234610504, 0, -77.6641723292294678, 0, 31.0656689316917871, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.242700538528842087, 0, 9.70802154115368348, 0, -38.8320861646147339, 0, 31.0656689316917871, 0, -4.43795270452739816, 0,
         0, 0, 0, 0, -3.88320861646147339, 0, 0, 0, 0, 0, 0, -11.6496258493844202, 0, 38.8320861646147339, 0, 0, 0, 0, 0, 0, 0, 0, -11.6496258493844202, 0, 77.6641723292294678, 0, -62.1313378633835742, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -3.88320861646147339, 0, 38.8320861646147339, 0, -62.1313378633835742, 0, 17.7518108181095926, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = 5/2
+        
         0, 0, 0, 0, -4.75593983755481767, 0, 0, 0, 0, 0, 0, -14.267819512664453, 0, 47.5593983755481767, 0, 0, 0, 0, 0, 0, 0, 0, -14.267819512664453, 0, 95.1187967510963535, 0, -76.0950374008770828, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -4.75593983755481767, 0, 47.5593983755481767, 0, -76.0950374008770828, 0, 21.7414392573934522, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0.594492479694352209, 0, 0, 0, 0, 1.58531327918493922, 0, -21.4017292689966795, 0, 0, 0, 0, 0, 0, 1.18898495938870442, 0, -35.6695487816611326, 0, 71.3390975633222651, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -7.13390975633222651, 0, 47.5593983755481767, 0, -38.0475187004385414, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.198164159898117403, 0, 7.13390975633222651, 0, -23.7796991877740884, 0, 12.6825062334795138, 0, 0, 0,
-        // j = 19/2, mj = 7/2
+        
         0, 0.810156687611443034, 0, 0, 0, 0, 2.16041783363051476, 0, -29.1656407540119492, 0, 0, 0, 0, 0, 0, 1.62031337522288607, 0, -48.609401256686582, 0, 97.218802513373164, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -9.7218802513373164, 0, 64.8125350089154427, 0, -51.8500280071323542, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.270052229203814345, 0, 9.7218802513373164, 0, -32.4062675044577213, 0, 17.2833426690441181, 0, 0, 0,
         0, 0, 0, 0, 6.48125350089154427, 0, 0, 0, 0, 0, 0, 6.48125350089154427, 0, -51.8500280071323542, 0, 0, 0, 0, 0, 0, 0, 0, -6.48125350089154427, 0, 0, 0, 51.8500280071323542, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -6.48125350089154427, 0, 51.8500280071323542, 0, -51.8500280071323542, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = 9/2
+        
         0, 0, 0, 0, 9.9002782553443465, 0, 0, 0, 0, 0, 0, 9.9002782553443465, 0, -79.202226042754772, 0, 0, 0, 0, 0, 0, 0, 0, -9.9002782553443465, 0, 0, 0, 79.202226042754772, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -9.9002782553443465, 0, 79.202226042754772, 0, -79.202226042754772, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -0.883953415655745223, 0, 0, 0, 0, 0, 0, 24.7506956383608662, 0, 0, 0, 0, 0, 0, 2.47506956383608662, 0, -24.7506956383608662, 0, -49.5013912767217325, 0, 0, 0, 0, 0, 0, 0, 0, 1.41432546504919236, 0, -44.5512521490495592, 0, 99.002782553443465, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.176790683131149045, 0, 4.95013912767217325, 0, -9.9002782553443465, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = 11/2
+        
         0, -1.53105222743980097, 0, 0, 0, 0, 0, 0, 42.8694623683144273, 0, 0, 0, 0, 0, 0, 4.28694623683144273, 0, -42.8694623683144273, 0, -85.7389247366288545, 0, 0, 0, 0, 0, 0, 0, 0, 2.44968356390368156, 0, -77.1650322629659691, 0, 171.477849473257709, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.306210445487960195, 0, 8.57389247366288545, 0, -17.1477849473257709, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -7.34905069171104468, 0, 0, 0, 0, 0, 0, 17.1477849473257709, 0, 34.2955698946515418, 0, 0, 0, 0, 0, 0, 0, 0, 17.1477849473257709, 0, -114.318566315505139, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -7.34905069171104468, 0, 34.2955698946515418, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = 13/2
+        
         0, 0, 0, 0, -14.6981013834220894, 0, 0, 0, 0, 0, 0, 34.2955698946515418, 0, 68.5911397893030836, 0, 0, 0, 0, 0, 0, 0, 0, 34.2955698946515418, 0, -228.637132631010279, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -14.6981013834220894, 0, 68.5911397893030836, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 1.07173655920786068, 0, 0, 0, 0, -4.28694623683144273, 0, -17.1477849473257709, 0, 0, 0, 0, 0, 0, -2.14347311841572136, 0, 85.7389247366288545, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.06210445487960195, 0, -51.4433548419773127, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.153105222743980097, 0, 2.44968356390368156, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = 15/2
+        
         0, 2.55124331061190454, 0, 0, 0, 0, -10.2049732424476182, 0, -40.8198929697904727, 0, 0, 0, 0, 0, 0, -5.10248662122380908, 0, 204.099464848952363, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7.28926660174829869, 0, -122.459678909371418, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.364463330087414934, 0, 5.83141328139863895, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 5.83141328139863895, 0, 0, 0, 0, 0, 0, -40.8198929697904727, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 40.8198929697904727, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -5.83141328139863895, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = 17/2
+        
         0, 0, 0, 0, 17.4942398441959169, 0, 0, 0, 0, 0, 0, -122.459678909371418, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 122.459678909371418, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -17.4942398441959169, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -1.0933899902622448, 0, 0, 0, 0, 10.2049732424476182, 0, 0, 0, 0, 0, 0, 0, 0, -15.3074598636714272, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4.37355996104897921, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.121487776695804978, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = 19/2
+        
         0, -4.76597647343204622, 0, 0, 0, 0, 44.4824470853657647, 0, 0, 0, 0, 0, 0, 0, 0, -66.723670628048647, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19.0639058937281849, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.52955294149244958, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = -19/2
+        
         0, 5.2955294149244958, 0, 0, 0, 0, -63.5463529790939495, 0, 0, 0, 0, 0, 0, 0, 0, 133.447341256097294, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -63.5463529790939495, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5.2955294149244958, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -4.76597647343204622, 0, 0, 0, 0, 0, 0, 44.4824470853657647, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -66.723670628048647, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19.0639058937281849, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.52955294149244958, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = -17/2
+        
         0, 0, 0, 0, 20.7744098149826513, 0, 0, 0, 0, 0, 0, -193.894491606504745, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 290.841737409757118, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -83.0976392599306051, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.30826775722029458, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0.971902213566439825, 0, 0, 0, 0, -5.83141328139863895, 0, -17.4942398441959169, 0, 0, 0, 0, 0, 0, 0, 0, 122.459678909371418, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5.83141328139863895, 0, -122.459678909371418, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.971902213566439825, 0, 17.4942398441959169, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = -15/2
+        
         0, -2.91570664069931948, 0, 0, 0, 0, 17.4942398441959169, 0, 52.4827195325877506, 0, 0, 0, 0, 0, 0, 0, 0, -367.379036728114254, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -17.4942398441959169, 0, 367.379036728114254, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.91570664069931948, 0, -52.4827195325877506, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 7.65372993183571362, 0, 0, 0, 0, 0, 0, -30.6149197273428545, 0, -40.8198929697904727, 0, 0, 0, 0, 0, 0, 0, 0, -15.3074598636714272, 0, 204.099464848952363, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 21.8677998052448961, 0, -122.459678909371418, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.0933899902622448, 0, 5.83141328139863895, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = -13/2
+        
         0, 0, 0, 0, -18.2195215065336316, 0, 0, 0, 0, 0, 0, 72.8780860261345264, 0, 97.1707813681793685, 0, 0, 0, 0, 0, 0, 0, 0, 36.4390430130672632, 0, -485.853906840896842, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -52.0557757329532331, 0, 291.512344104538105, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.60278878664766166, 0, -13.8815401954541955, 0, 0, 0, 0, 0, 0, 0,
         0, -0.918631336463880584, 0, 0, 0, 0, 1.22484178195184078, 0, 29.3962027668441787, 0, 0, 0, 0, 0, 0, 4.28694623683144273, 0, -68.5911397893030836, 0, -68.5911397893030836, 0, 0, 0, 0, 0, 0, 0, 0, 1.22484178195184078, 0, -68.5911397893030836, 0, 228.637132631010279, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.918631336463880584, 0, 29.3962027668441787, 0, -68.5911397893030836, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = -11/2
+        
         0, 1.83726267292776117, 0, 0, 0, 0, -2.44968356390368156, 0, -58.7924055336883574, 0, 0, 0, 0, 0, 0, -8.57389247366288545, 0, 137.182279578606167, 0, 137.182279578606167, 0, 0, 0, 0, 0, 0, 0, 0, -2.44968356390368156, 0, 137.182279578606167, 0, -457.274265262020558, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.83726267292776117, 0, -58.7924055336883574, 0, 137.182279578606167, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -7.65526113719900487, 0, 0, 0, 0, 0, 0, 0, 0, 71.4491039471907121, 0, 0, 0, 0, 0, 0, 0, 0, 21.4347311841572136, 0, -71.4491039471907121, 0, -85.7389247366288545, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12.2484178195184078, 0, -128.608387104943282, 0, 171.477849473257709, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.53105222743980097, 0, 14.2898207894381424, 0, -17.1477849473257709, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = -9/2
+        
         0, 0, 0, 0, 13.2593012348361783, 0, 0, 0, 0, 0, 0, 0, 0, -123.753478191804331, 0, 0, 0, 0, 0, 0, 0, 0, -37.1260434575412994, 0, 123.753478191804331, 0, 148.504173830165197, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -21.2148819757378853, 0, 222.756260745247796, 0, -297.008347660330395, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.65186024696723567, 0, -24.7506956383608662, 0, 29.7008347660330395, 0, 0, 0, 0, 0,
         0, 0.707162732524596178, 0, 0, 0, 0, 1.41432546504919236, 0, -29.7008347660330395, 0, 0, 0, 0, 0, 0, 0, 0, -29.7008347660330395, 0, 118.803339064132158, 0, 0, 0, 0, 0, 0, 0, 0, -1.41432546504919236, 0, 29.7008347660330395, 0, 0, 0, -79.202226042754772, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.707162732524596178, 0, 29.7008347660330395, 0, -118.803339064132158, 0, 79.202226042754772, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = -7/2
+        
         0, -1.08020891681525738, 0, 0, 0, 0, -2.16041783363051476, 0, 45.3687745062408099, 0, 0, 0, 0, 0, 0, 0, 0, 45.3687745062408099, 0, -181.47509802496324, 0, 0, 0, 0, 0, 0, 0, 0, 2.16041783363051476, 0, -45.3687745062408099, 0, 0, 0, 120.983398683308826, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.08020891681525738, 0, -45.3687745062408099, 0, 181.47509802496324, 0, -120.983398683308826, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 5.67109681328010124, 0, 0, 0, 0, 0, 0, 15.1229248354136033, 0, -68.0531617593612148, 0, 0, 0, 0, 0, 0, 0, 0, 11.3421936265602025, 0, -113.421936265602025, 0, 136.10632351872243, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -22.6843872531204049, 0, 90.7375490124816198, 0, -51.8500280071323542, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.89036560442670041, 0, 22.6843872531204049, 0, -45.3687745062408099, 0, 17.2833426690441181, 0, 0, 0,
-        // j = 19/2, mj = -5/2
+        
         0, 0, 0, 0, -7.72840223602657872, 0, 0, 0, 0, 0, 0, -20.6090726294042099, 0, 92.7408268323189446, 0, 0, 0, 0, 0, 0, 0, 0, -15.4568044720531574, 0, 154.568044720531574, 0, -185.481653664637889, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 30.9136089441063149, 0, -123.65443577642526, 0, 70.6596775865287197, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.57613407867552624, 0, -30.9136089441063149, 0, 61.8272178882126298, 0, -23.5532258621762399, 0, 0, 0,
         0, -0.396328319796234806, 0, 0, 0, 0, -1.58531327918493922, 0, 19.0237593502192707, 0, 0, 0, 0, 0, 0, -2.37796991877740884, 0, 57.0712780506578121, 0, -95.1187967510963535, 0, 0, 0, 0, 0, 0, 0, 0, -1.58531327918493922, 0, 57.0712780506578121, 0, -190.237593502192707, 0, 101.46004986783611, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.396328319796234806, 0, 19.0237593502192707, 0, -95.1187967510963535, 0, 101.46004986783611, 0, -21.7414392573934522, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = -3/2
+        
         0, 0.485401077057684174, 0, 0, 0, 0, 1.9416043082307367, 0, -23.2992516987688403, 0, 0, 0, 0, 0, 0, 2.91240646234610504, 0, -69.897755096306521, 0, 116.496258493844202, 0, 0, 0, 0, 0, 0, 0, 0, 1.9416043082307367, 0, -69.897755096306521, 0, 232.992516987688403, 0, -124.262675726767148, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.485401077057684174, 0, -23.2992516987688403, 0, 116.496258493844202, 0, -124.262675726767148, 0, 26.627716227164389, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -2.18430484675957878, 0, 0, 0, 0, 0, 0, -8.73721938703831513, 0, 29.1240646234610504, 0, 0, 0, 0, 0, 0, 0, 0, -13.1058290805574727, 0, 87.3721938703831513, 0, -69.897755096306521, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -8.73721938703831513, 0, 87.3721938703831513, 0, -139.795510192613042, 0, 39.9415743407465834, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.18430484675957878, 0, 29.1240646234610504, 0, -69.897755096306521, 0, 39.9415743407465834, 0, -4.43795270452739816, 0,
-        // j = 19/2, mj = -1/2
+        
         0, 0, 0, 0, 2.41483986815209059, 0, 0, 0, 0, 0, 0, 9.65935947260836236, 0, -32.1978649086945412, 0, 0, 0, 0, 0, 0, 0, 0, 14.4890392089125435, 0, -96.5935947260836236, 0, 77.2748757808668989, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9.65935947260836236, 0, -96.5935947260836236, 0, 154.549751561733798, 0, -44.1570718747810851, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.41483986815209059, 0, -32.1978649086945412, 0, 77.2748757808668989, 0, -44.1570718747810851, 0, 4.90634131942012056, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = 1/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -2.41483986815209059, 0, 0, 0, 0, 0, 0, -9.65935947260836236, 0, 32.1978649086945412, 0, 0, 0, 0, 0, 0, 0, 0, -14.4890392089125435, 0, 96.5935947260836236, 0, -77.2748757808668989, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -9.65935947260836236, 0, 96.5935947260836236, 0, -154.549751561733798, 0, 44.1570718747810851, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.41483986815209059, 0, 32.1978649086945412, 0, -77.2748757808668989, 0, 44.1570718747810851, 0, -4.90634131942012056, 0,
-        // j = 19/2, mj = 3/2
+        
         0, 0, 0, 0, 2.18430484675957878, 0, 0, 0, 0, 0, 0, 8.73721938703831513, 0, -29.1240646234610504, 0, 0, 0, 0, 0, 0, 0, 0, 13.1058290805574727, 0, -87.3721938703831513, 0, 69.897755096306521, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.73721938703831513, 0, -87.3721938703831513, 0, 139.795510192613042, 0, -39.9415743407465834, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.18430484675957878, 0, -29.1240646234610504, 0, 69.897755096306521, 0, -39.9415743407465834, 0, 4.43795270452739816, 0,
         0, 0.485401077057684174, 0, 0, 0, 0, 1.9416043082307367, 0, -23.2992516987688403, 0, 0, 0, 0, 0, 0, 2.91240646234610504, 0, -69.897755096306521, 0, 116.496258493844202, 0, 0, 0, 0, 0, 0, 0, 0, 1.9416043082307367, 0, -69.897755096306521, 0, 232.992516987688403, 0, -124.262675726767148, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.485401077057684174, 0, -23.2992516987688403, 0, 116.496258493844202, 0, -124.262675726767148, 0, 26.627716227164389, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = 5/2
+        
         0, -0.396328319796234806, 0, 0, 0, 0, -1.58531327918493922, 0, 19.0237593502192707, 0, 0, 0, 0, 0, 0, -2.37796991877740884, 0, 57.0712780506578121, 0, -95.1187967510963535, 0, 0, 0, 0, 0, 0, 0, 0, -1.58531327918493922, 0, 57.0712780506578121, 0, -190.237593502192707, 0, 101.46004986783611, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.396328319796234806, 0, 19.0237593502192707, 0, -95.1187967510963535, 0, 101.46004986783611, 0, -21.7414392573934522, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 7.72840223602657872, 0, 0, 0, 0, 0, 0, 20.6090726294042099, 0, -92.7408268323189446, 0, 0, 0, 0, 0, 0, 0, 0, 15.4568044720531574, 0, -154.568044720531574, 0, 185.481653664637889, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -30.9136089441063149, 0, 123.65443577642526, 0, -70.6596775865287197, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.57613407867552624, 0, 30.9136089441063149, 0, -61.8272178882126298, 0, 23.5532258621762399, 0, 0, 0,
-        // j = 19/2, mj = 7/2
+        
         0, 0, 0, 0, -5.67109681328010124, 0, 0, 0, 0, 0, 0, -15.1229248354136033, 0, 68.0531617593612148, 0, 0, 0, 0, 0, 0, 0, 0, -11.3421936265602025, 0, 113.421936265602025, 0, -136.10632351872243, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 22.6843872531204049, 0, -90.7375490124816198, 0, 51.8500280071323542, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.89036560442670041, 0, -22.6843872531204049, 0, 45.3687745062408099, 0, -17.2833426690441181, 0, 0, 0,
         0, -1.08020891681525738, 0, 0, 0, 0, -2.16041783363051476, 0, 45.3687745062408099, 0, 0, 0, 0, 0, 0, 0, 0, 45.3687745062408099, 0, -181.47509802496324, 0, 0, 0, 0, 0, 0, 0, 0, 2.16041783363051476, 0, -45.3687745062408099, 0, 0, 0, 120.983398683308826, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.08020891681525738, 0, -45.3687745062408099, 0, 181.47509802496324, 0, -120.983398683308826, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = 9/2
+        
         0, 0.707162732524596178, 0, 0, 0, 0, 1.41432546504919236, 0, -29.7008347660330395, 0, 0, 0, 0, 0, 0, 0, 0, -29.7008347660330395, 0, 118.803339064132158, 0, 0, 0, 0, 0, 0, 0, 0, -1.41432546504919236, 0, 29.7008347660330395, 0, 0, 0, -79.202226042754772, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.707162732524596178, 0, 29.7008347660330395, 0, -118.803339064132158, 0, 79.202226042754772, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -13.2593012348361783, 0, 0, 0, 0, 0, 0, 0, 0, 123.753478191804331, 0, 0, 0, 0, 0, 0, 0, 0, 37.1260434575412994, 0, -123.753478191804331, 0, -148.504173830165197, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 21.2148819757378853, 0, -222.756260745247796, 0, 297.008347660330395, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.65186024696723567, 0, 24.7506956383608662, 0, -29.7008347660330395, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = 11/2
+        
         0, 0, 0, 0, 7.65526113719900487, 0, 0, 0, 0, 0, 0, 0, 0, -71.4491039471907121, 0, 0, 0, 0, 0, 0, 0, 0, -21.4347311841572136, 0, 71.4491039471907121, 0, 85.7389247366288545, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -12.2484178195184078, 0, 128.608387104943282, 0, -171.477849473257709, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.53105222743980097, 0, -14.2898207894381424, 0, 17.1477849473257709, 0, 0, 0, 0, 0,
         0, 1.83726267292776117, 0, 0, 0, 0, -2.44968356390368156, 0, -58.7924055336883574, 0, 0, 0, 0, 0, 0, -8.57389247366288545, 0, 137.182279578606167, 0, 137.182279578606167, 0, 0, 0, 0, 0, 0, 0, 0, -2.44968356390368156, 0, 137.182279578606167, 0, -457.274265262020558, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.83726267292776117, 0, -58.7924055336883574, 0, 137.182279578606167, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = 13/2
+        
         0, -0.918631336463880584, 0, 0, 0, 0, 1.22484178195184078, 0, 29.3962027668441787, 0, 0, 0, 0, 0, 0, 4.28694623683144273, 0, -68.5911397893030836, 0, -68.5911397893030836, 0, 0, 0, 0, 0, 0, 0, 0, 1.22484178195184078, 0, -68.5911397893030836, 0, 228.637132631010279, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.918631336463880584, 0, 29.3962027668441787, 0, -68.5911397893030836, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 18.2195215065336316, 0, 0, 0, 0, 0, 0, -72.8780860261345264, 0, -97.1707813681793685, 0, 0, 0, 0, 0, 0, 0, 0, -36.4390430130672632, 0, 485.853906840896842, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 52.0557757329532331, 0, -291.512344104538105, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.60278878664766166, 0, 13.8815401954541955, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = 15/2
+        
         0, 0, 0, 0, -7.65372993183571362, 0, 0, 0, 0, 0, 0, 30.6149197273428545, 0, 40.8198929697904727, 0, 0, 0, 0, 0, 0, 0, 0, 15.3074598636714272, 0, -204.099464848952363, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -21.8677998052448961, 0, 122.459678909371418, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.0933899902622448, 0, -5.83141328139863895, 0, 0, 0, 0, 0, 0, 0,
         0, -2.91570664069931948, 0, 0, 0, 0, 17.4942398441959169, 0, 52.4827195325877506, 0, 0, 0, 0, 0, 0, 0, 0, -367.379036728114254, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -17.4942398441959169, 0, 367.379036728114254, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.91570664069931948, 0, -52.4827195325877506, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = 17/2
+        
         0, 0.971902213566439825, 0, 0, 0, 0, -5.83141328139863895, 0, -17.4942398441959169, 0, 0, 0, 0, 0, 0, 0, 0, 122.459678909371418, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5.83141328139863895, 0, -122.459678909371418, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.971902213566439825, 0, 17.4942398441959169, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -20.7744098149826513, 0, 0, 0, 0, 0, 0, 193.894491606504745, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -290.841737409757118, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 83.0976392599306051, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.30826775722029458, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 19/2, mj = 19/2
+        
         0, 0, 0, 0, 4.76597647343204622, 0, 0, 0, 0, 0, 0, -44.4824470853657647, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 66.723670628048647, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -19.0639058937281849, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.52955294149244958, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 5.2955294149244958, 0, 0, 0, 0, -63.5463529790939495, 0, 0, 0, 0, 0, 0, 0, 0, 133.447341256097294, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -63.5463529790939495, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5.2955294149244958, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -21/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -5.42630291944221461, 0, 0, 0, 0, 65.1156350333065753, 0, 0, 0, 0, 0, 0, 0, 0, -136.742833569943808, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 65.1156350333065753, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -5.42630291944221461, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -19/2
+        
         0, -1.1841163748620862, 0, 0, 0, 0, 14.2093964983450344, 0, 0, 0, 0, 0, 0, 0, 0, -29.8397326465245721, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14.2093964983450344, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.1841163748620862, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -21.3140947475175515, 0, 0, 0, 0, 0, 0, 198.931550976830481, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -298.397326465245721, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 85.2563789900702061, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.36823274972417239, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -17/2
+        
         0, 0, 0, 0, -6.74010856667869467, 0, 0, 0, 0, 0, 0, 62.9076799556678169, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -94.3615199335017254, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 26.9604342667147787, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.748900951853188297, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 2.99560380741275319, 0, 0, 0, 0, -17.9736228444765191, 0, -53.9208685334295574, 0, 0, 0, 0, 0, 0, 0, 0, 377.446079734006901, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 17.9736228444765191, 0, -377.446079734006901, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.99560380741275319, 0, 53.9208685334295574, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -15/2
+        
         0, 1.19033225155963006, 0, 0, 0, 0, -7.14199350935778034, 0, -21.425980528073341, 0, 0, 0, 0, 0, 0, 0, 0, 149.981863696513387, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7.14199350935778034, 0, -149.981863696513387, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.19033225155963006, 0, 21.425980528073341, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 18.7477329620641734, 0, 0, 0, 0, 0, 0, -74.9909318482566936, 0, -99.9879091310089248, 0, 0, 0, 0, 0, 0, 0, 0, -37.4954659241283468, 0, 499.939545655044624, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 53.5649513201833526, 0, -299.963727393026774, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.67824756600916763, 0, 14.2839870187155607, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -13/2
+        
         0, 0, 0, 0, 8.83776607290009063, 0, 0, 0, 0, 0, 0, -35.3510642916003625, 0, -47.1347523888004833, 0, 0, 0, 0, 0, 0, 0, 0, -17.6755321458001813, 0, 235.673761944002417, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 25.2507602082859732, 0, -141.40425716640145, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.26253801041429866, 0, 6.73353605554292619, 0, 0, 0, 0, 0, 0, 0,
         0, -1.89380701562144799, 0, 0, 0, 0, 2.52507602082859732, 0, 60.6018244998863357, 0, 0, 0, 0, 0, 0, 8.83776607290009063, 0, -141.40425716640145, 0, -141.40425716640145, 0, 0, 0, 0, 0, 0, 0, 0, 2.52507602082859732, 0, -141.40425716640145, 0, 471.347523888004833, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.89380701562144799, 0, 60.6018244998863357, 0, -141.40425716640145, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -11/2
+        
         0, -1.02706105729735913, 0, 0, 0, 0, 1.36941474306314551, 0, 32.8659538335154923, 0, 0, 0, 0, 0, 0, 4.79295160072100929, 0, -76.6872256115361487, 0, -76.6872256115361487, 0, 0, 0, 0, 0, 0, 0, 0, 1.36941474306314551, 0, -76.6872256115361487, 0, 255.624085371787162, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.02706105729735913, 0, 32.8659538335154923, 0, -76.6872256115361487, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -13.6941474306314551, 0, 0, 0, 0, 0, 0, 0, 0, 127.812042685893581, 0, 0, 0, 0, 0, 0, 0, 0, 38.3436128057680743, 0, -127.812042685893581, 0, -153.374451223072297, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 21.9106358890103282, 0, -230.061676834608446, 0, 306.748902446144595, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.73882948612629102, 0, 25.5624085371787162, 0, -30.6748902446144595, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -9/2
+        
         0, 0, 0, 0, -8.38591841687309056, 0, 0, 0, 0, 0, 0, 0, 0, 78.2685718908155119, 0, 0, 0, 0, 0, 0, 0, 0, 23.4805715672446536, 0, -78.2685718908155119, 0, -93.9222862689786143, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13.4174694669969449, 0, -140.883429403467921, 0, 187.844572537957229, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.67718368337461811, 0, 15.6537143781631024, 0, -18.7844572537957229, 0, 0, 0, 0, 0,
         0, 1.11812245558307874, 0, 0, 0, 0, 2.23624491116615748, 0, -46.9611431344893072, 0, 0, 0, 0, 0, 0, 0, 0, -46.9611431344893072, 0, 187.844572537957229, 0, 0, 0, 0, 0, 0, 0, 0, -2.23624491116615748, 0, 46.9611431344893072, 0, 0, 0, -125.229715025304819, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.11812245558307874, 0, 46.9611431344893072, 0, -187.844572537957229, 0, 125.229715025304819, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -7/2
+        
         0, 0.763823050178243716, 0, 0, 0, 0, 1.52764610035648743, 0, -32.0805681074862361, 0, 0, 0, 0, 0, 0, 0, 0, -32.0805681074862361, 0, 128.322272429944944, 0, 0, 0, 0, 0, 0, 0, 0, -1.52764610035648743, 0, 32.0805681074862361, 0, 0, 0, -85.5481816199632961, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.763823050178243716, 0, 32.0805681074862361, 0, -128.322272429944944, 0, 85.5481816199632961, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 8.02014202687155901, 0, 0, 0, 0, 0, 0, 21.387045404990824, 0, -96.2417043224587082, 0, 0, 0, 0, 0, 0, 0, 0, 16.040284053743118, 0, -160.40284053743118, 0, 192.483408644917416, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -32.0805681074862361, 0, 128.322272429944944, 0, -73.3270128171113967, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.673380675623853, 0, 32.0805681074862361, 0, -64.1611362149724721, 0, 24.4423376057037989, 0, 0, 0,
-        // j = 21/2, mj = -5/2
+        
         0, 0, 0, 0, 6.06265750929132863, 0, 0, 0, 0, 0, 0, 16.167086691443543, 0, -72.7518901114959435, 0, 0, 0, 0, 0, 0, 0, 0, 12.1253150185826573, 0, -121.253150185826573, 0, 145.503780222991887, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -24.2506300371653145, 0, 97.0025201486612581, 0, -55.4300115135207189, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.02088583643044288, 0, 24.2506300371653145, 0, -48.501260074330629, 0, 18.4766705045069063, 0, 0, 0,
         0, -0.505221459107610719, 0, 0, 0, 0, -2.02088583643044288, 0, 24.2506300371653145, 0, 0, 0, 0, 0, 0, -3.03132875464566431, 0, 72.7518901114959435, 0, -121.253150185826573, 0, 0, 0, 0, 0, 0, 0, 0, -2.02088583643044288, 0, 72.7518901114959435, 0, -242.506300371653145, 0, 129.336693531548344, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.505221459107610719, 0, 24.2506300371653145, 0, -121.253150185826573, 0, 129.336693531548344, 0, -27.7150057567603594, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -3/2
+        
         0, -0.420369663756282355, 0, 0, 0, 0, -1.68147865502512942, 0, 20.177743860301553, 0, 0, 0, 0, 0, 0, -2.52221798253769413, 0, 60.5332315809046591, 0, -100.888719301507765, 0, 0, 0, 0, 0, 0, 0, 0, -1.68147865502512942, 0, 60.5332315809046591, 0, -201.77743860301553, 0, 107.614633921608283, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.420369663756282355, 0, 20.177743860301553, 0, -100.888719301507765, 0, 107.614633921608283, 0, -23.0602786974874892, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -2.52221798253769413, 0, 0, 0, 0, 0, 0, -10.0888719301507765, 0, 33.6295731005025884, 0, 0, 0, 0, 0, 0, 0, 0, -15.1333078952261648, 0, 100.888719301507765, 0, -80.7109754412062121, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -10.0888719301507765, 0, 100.888719301507765, 0, -161.421950882412424, 0, 46.1205573949749784, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.52221798253769413, 0, 33.6295731005025884, 0, -80.7109754412062121, 0, 46.1205573949749784, 0, -5.12450637721944204, 0,
-        // j = 21/2, mj = -1/2
+        
         0, 0, 0, 0, -2.30245947330177705, 0, 0, 0, 0, 0, 0, -9.20983789320710822, 0, 30.6994596440236941, 0, 0, 0, 0, 0, 0, 0, 0, -13.8147568398106623, 0, 92.0983789320710822, 0, -73.6787031456568658, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -9.20983789320710822, 0, 92.0983789320710822, 0, -147.357406291313732, 0, 42.1021160832324947, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.30245947330177705, 0, 30.6994596440236941, 0, -73.6787031456568658, 0, 42.1021160832324947, 0, -4.67801289813694386, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = 1/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -2.30245947330177705, 0, 0, 0, 0, 0, 0, -9.20983789320710822, 0, 30.6994596440236941, 0, 0, 0, 0, 0, 0, 0, 0, -13.8147568398106623, 0, 92.0983789320710822, 0, -73.6787031456568658, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -9.20983789320710822, 0, 92.0983789320710822, 0, -147.357406291313732, 0, 42.1021160832324947, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.30245947330177705, 0, 30.6994596440236941, 0, -73.6787031456568658, 0, 42.1021160832324947, 0, -4.67801289813694386, 0,
-        // j = 21/2, mj = 3/2
+        
         0, 0, 0, 0, -2.52221798253769413, 0, 0, 0, 0, 0, 0, -10.0888719301507765, 0, 33.6295731005025884, 0, 0, 0, 0, 0, 0, 0, 0, -15.1333078952261648, 0, 100.888719301507765, 0, -80.7109754412062121, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -10.0888719301507765, 0, 100.888719301507765, 0, -161.421950882412424, 0, 46.1205573949749784, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.52221798253769413, 0, 33.6295731005025884, 0, -80.7109754412062121, 0, 46.1205573949749784, 0, -5.12450637721944204, 0,
         0, 0.420369663756282355, 0, 0, 0, 0, 1.68147865502512942, 0, -20.177743860301553, 0, 0, 0, 0, 0, 0, 2.52221798253769413, 0, -60.5332315809046591, 0, 100.888719301507765, 0, 0, 0, 0, 0, 0, 0, 0, 1.68147865502512942, 0, -60.5332315809046591, 0, 201.77743860301553, 0, -107.614633921608283, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.420369663756282355, 0, -20.177743860301553, 0, 100.888719301507765, 0, -107.614633921608283, 0, 23.0602786974874892, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = 5/2
+        
         0, 0.505221459107610719, 0, 0, 0, 0, 2.02088583643044288, 0, -24.2506300371653145, 0, 0, 0, 0, 0, 0, 3.03132875464566431, 0, -72.7518901114959435, 0, 121.253150185826573, 0, 0, 0, 0, 0, 0, 0, 0, 2.02088583643044288, 0, -72.7518901114959435, 0, 242.506300371653145, 0, -129.336693531548344, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.505221459107610719, 0, -24.2506300371653145, 0, 121.253150185826573, 0, -129.336693531548344, 0, 27.7150057567603594, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 6.06265750929132863, 0, 0, 0, 0, 0, 0, 16.167086691443543, 0, -72.7518901114959435, 0, 0, 0, 0, 0, 0, 0, 0, 12.1253150185826573, 0, -121.253150185826573, 0, 145.503780222991887, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -24.2506300371653145, 0, 97.0025201486612581, 0, -55.4300115135207189, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.02088583643044288, 0, 24.2506300371653145, 0, -48.501260074330629, 0, 18.4766705045069063, 0, 0, 0,
-        // j = 21/2, mj = 7/2
+        
         0, 0, 0, 0, 8.02014202687155901, 0, 0, 0, 0, 0, 0, 21.387045404990824, 0, -96.2417043224587082, 0, 0, 0, 0, 0, 0, 0, 0, 16.040284053743118, 0, -160.40284053743118, 0, 192.483408644917416, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -32.0805681074862361, 0, 128.322272429944944, 0, -73.3270128171113967, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.673380675623853, 0, 32.0805681074862361, 0, -64.1611362149724721, 0, 24.4423376057037989, 0, 0, 0,
         0, -0.763823050178243716, 0, 0, 0, 0, -1.52764610035648743, 0, 32.0805681074862361, 0, 0, 0, 0, 0, 0, 0, 0, 32.0805681074862361, 0, -128.322272429944944, 0, 0, 0, 0, 0, 0, 0, 0, 1.52764610035648743, 0, -32.0805681074862361, 0, 0, 0, 85.5481816199632961, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.763823050178243716, 0, -32.0805681074862361, 0, 128.322272429944944, 0, -85.5481816199632961, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = 9/2
+        
         0, -1.11812245558307874, 0, 0, 0, 0, -2.23624491116615748, 0, 46.9611431344893072, 0, 0, 0, 0, 0, 0, 0, 0, 46.9611431344893072, 0, -187.844572537957229, 0, 0, 0, 0, 0, 0, 0, 0, 2.23624491116615748, 0, -46.9611431344893072, 0, 0, 0, 125.229715025304819, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.11812245558307874, 0, -46.9611431344893072, 0, 187.844572537957229, 0, -125.229715025304819, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -8.38591841687309056, 0, 0, 0, 0, 0, 0, 0, 0, 78.2685718908155119, 0, 0, 0, 0, 0, 0, 0, 0, 23.4805715672446536, 0, -78.2685718908155119, 0, -93.9222862689786143, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13.4174694669969449, 0, -140.883429403467921, 0, 187.844572537957229, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.67718368337461811, 0, 15.6537143781631024, 0, -18.7844572537957229, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = 11/2
+        
         0, 0, 0, 0, -13.6941474306314551, 0, 0, 0, 0, 0, 0, 0, 0, 127.812042685893581, 0, 0, 0, 0, 0, 0, 0, 0, 38.3436128057680743, 0, -127.812042685893581, 0, -153.374451223072297, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 21.9106358890103282, 0, -230.061676834608446, 0, 306.748902446144595, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.73882948612629102, 0, 25.5624085371787162, 0, -30.6748902446144595, 0, 0, 0, 0, 0,
         0, 1.02706105729735913, 0, 0, 0, 0, -1.36941474306314551, 0, -32.8659538335154923, 0, 0, 0, 0, 0, 0, -4.79295160072100929, 0, 76.6872256115361487, 0, 76.6872256115361487, 0, 0, 0, 0, 0, 0, 0, 0, -1.36941474306314551, 0, 76.6872256115361487, 0, -255.624085371787162, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.02706105729735913, 0, -32.8659538335154923, 0, 76.6872256115361487, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = 13/2
+        
         0, 1.89380701562144799, 0, 0, 0, 0, -2.52507602082859732, 0, -60.6018244998863357, 0, 0, 0, 0, 0, 0, -8.83776607290009063, 0, 141.40425716640145, 0, 141.40425716640145, 0, 0, 0, 0, 0, 0, 0, 0, -2.52507602082859732, 0, 141.40425716640145, 0, -471.347523888004833, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.89380701562144799, 0, -60.6018244998863357, 0, 141.40425716640145, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 8.83776607290009063, 0, 0, 0, 0, 0, 0, -35.3510642916003625, 0, -47.1347523888004833, 0, 0, 0, 0, 0, 0, 0, 0, -17.6755321458001813, 0, 235.673761944002417, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 25.2507602082859732, 0, -141.40425716640145, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.26253801041429866, 0, 6.73353605554292619, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = 15/2
+        
         0, 0, 0, 0, 18.7477329620641734, 0, 0, 0, 0, 0, 0, -74.9909318482566936, 0, -99.9879091310089248, 0, 0, 0, 0, 0, 0, 0, 0, -37.4954659241283468, 0, 499.939545655044624, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 53.5649513201833526, 0, -299.963727393026774, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.67824756600916763, 0, 14.2839870187155607, 0, 0, 0, 0, 0, 0, 0,
         0, -1.19033225155963006, 0, 0, 0, 0, 7.14199350935778034, 0, 21.425980528073341, 0, 0, 0, 0, 0, 0, 0, 0, -149.981863696513387, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -7.14199350935778034, 0, 149.981863696513387, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.19033225155963006, 0, -21.425980528073341, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = 17/2
+        
         0, -2.99560380741275319, 0, 0, 0, 0, 17.9736228444765191, 0, 53.9208685334295574, 0, 0, 0, 0, 0, 0, 0, 0, -377.446079734006901, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -17.9736228444765191, 0, 377.446079734006901, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.99560380741275319, 0, -53.9208685334295574, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -6.74010856667869467, 0, 0, 0, 0, 0, 0, 62.9076799556678169, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -94.3615199335017254, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 26.9604342667147787, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.748900951853188297, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = 19/2
+        
         0, 0, 0, 0, -21.3140947475175515, 0, 0, 0, 0, 0, 0, 198.931550976830481, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -298.397326465245721, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 85.2563789900702061, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.36823274972417239, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 1.1841163748620862, 0, 0, 0, 0, -14.2093964983450344, 0, 0, 0, 0, 0, 0, 0, 0, 29.8397326465245721, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -14.2093964983450344, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.1841163748620862, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = 21/2
+        
         0, 5.42630291944221461, 0, 0, 0, 0, -65.1156350333065753, 0, 0, 0, 0, 0, 0, 0, 0, 136.742833569943808, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -65.1156350333065753, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5.42630291944221461, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -21/2
+        
         0, 5.96893321138643607, 0, 0, 0, 0, -89.533998170796541, 0, 0, 0, 0, 0, 0, 0, 0, 250.695194878230315, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -179.067996341593082, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 29.8446660569321803, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.542630291944221461, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -5.42630291944221461, 0, 0, 0, 0, 0, 0, 65.1156350333065753, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -136.742833569943808, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 65.1156350333065753, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -5.42630291944221461, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -19/2
+        
         0, 0, 0, 0, 24.8664438721038101, 0, 0, 0, 0, 0, 0, -298.397326465245721, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 626.634385577016015, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -298.397326465245721, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24.8664438721038101, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 1.06570473737587758, 0, 0, 0, 0, -8.88087281146564647, 0, -21.3140947475175515, 0, 0, 0, 0, 0, 0, 4.97328877442076202, 0, 198.931550976830481, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10.6570473737587758, 0, -298.397326465245721, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -4.14440731201730169, 0, 85.2563789900702061, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.11841163748620862, 0, -2.36823274972417239, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -17/2
+        
         0, -3.37005428333934733, 0, 0, 0, 0, 28.0837856944945611, 0, 67.4010856667869467, 0, 0, 0, 0, 0, 0, -15.7269199889169542, 0, -629.076799556678169, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -33.7005428333934733, 0, 943.615199335017254, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13.1057666574307952, 0, -269.604342667147787, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.374450475926594148, 0, 7.48900951853188297, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 8.98681142223825956, 0, 0, 0, 0, 0, 0, -53.9208685334295574, 0, -53.9208685334295574, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 377.446079734006901, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 53.9208685334295574, 0, -377.446079734006901, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -8.98681142223825956, 0, 53.9208685334295574, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -15/2
+        
         0, 0, 0, 0, -22.6163127796329711, 0, 0, 0, 0, 0, 0, 135.697876677797827, 0, 135.697876677797827, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -949.885136744584786, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -135.697876677797827, 0, 949.885136744584786, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 22.6163127796329711, 0, -135.697876677797827, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -1.0415407201146763, 0, 0, 0, 0, 3.1246221603440289, 0, 37.4954659241283468, 0, 0, 0, 0, 0, 0, 6.2492443206880578, 0, -149.981863696513387, 0, -99.9879091310089248, 0, 0, 0, 0, 0, 0, 0, 0, -0.892749188669722543, 0, -74.9909318482566936, 0, 499.939545655044624, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.82703909745412139, 0, 107.129902640366705, 0, -299.963727393026774, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.148791531444953757, 0, -5.35649513201833526, 0, 14.2839870187155607, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -13/2
+        
         0, 2.20944151822502266, 0, 0, 0, 0, -6.62832455467506797, 0, -79.5398946561008156, 0, 0, 0, 0, 0, 0, -13.2566491093501359, 0, 318.159578624403263, 0, 212.106385749602175, 0, 0, 0, 0, 0, 0, 0, 0, 1.89380701562144799, 0, 159.079789312201631, 0, -1060.53192874801088, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5.99705554946791864, 0, -227.256841874573759, 0, 636.319157248806525, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.315634502603574665, 0, 11.3628420937286879, 0, -30.3009122499431679, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -9.46903507810723996, 0, 0, 0, 0, 0, 0, 12.6253801041429866, 0, 101.003040833143893, 0, 0, 0, 0, 0, 0, 0, 0, 44.1888303645004531, 0, -235.673761944002417, 0, -141.40425716640145, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12.6253801041429866, 0, -235.673761944002417, 0, 471.347523888004833, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -9.46903507810723996, 0, 101.003040833143893, 0, -141.40425716640145, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -11/2
+        
         0, 0, 0, 0, 17.4600379740551053, 0, 0, 0, 0, 0, 0, -23.2800506320734737, 0, -186.24040505658779, 0, 0, 0, 0, 0, 0, 0, 0, -81.480177212257158, 0, 434.560945132038176, 0, 260.736567079222906, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -23.2800506320734737, 0, 434.560945132038176, 0, -869.121890264076352, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 17.4600379740551053, 0, -186.24040505658779, 0, 260.736567079222906, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0.855884214414465945, 0, 0, 0, 0, 0.855884214414465945, 0, -41.0824422918943654, 0, 0, 0, 0, 0, 0, -2.39647580036050465, 0, 0, 0, 191.718064028840372, 0, 0, 0, 0, 0, 0, 0, 0, -3.76589054342365016, 0, 115.030838417304223, 0, -191.718064028840372, 0, -153.374451223072297, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.19823790018025232, 0, 65.7319076670309846, 0, -345.092515251912669, 0, 306.748902446144595, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.171176842882893189, 0, -8.21648845837887307, 0, 38.3436128057680743, 0, -30.6748902446144595, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -9/2
+        
         0, -1.39765306947884843, 0, 0, 0, 0, -1.39765306947884843, 0, 67.0873473349847245, 0, 0, 0, 0, 0, 0, 3.9134285945407756, 0, 0, 0, -313.074287563262048, 0, 0, 0, 0, 0, 0, 0, 0, 6.14967350570693308, 0, -187.844572537957229, 0, 313.074287563262048, 0, 250.459430050609638, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.9567142972703878, 0, -107.339755735975559, 0, 563.533717613871686, 0, -500.918860101219276, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.279530613895769685, 0, 13.4174694669969449, 0, -62.6148575126524095, 0, 50.0918860101219276, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 7.82685718908155119, 0, 0, 0, 0, 0, 0, 15.6537143781631024, 0, -109.576000647141717, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -109.576000647141717, 0, 262.98240155314012, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -15.6537143781631024, 0, 109.576000647141717, 0, 0, 0, -125.229715025304819, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -7.82685718908155119, 0, 109.576000647141717, 0, -262.98240155314012, 0, 125.229715025304819, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -7/2
+        
         0, 0, 0, 0, -11.4573457526736557, 0, 0, 0, 0, 0, 0, -22.9146915053473115, 0, 160.40284053743118, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 160.40284053743118, 0, -384.966817289834833, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 22.9146915053473115, 0, -160.40284053743118, 0, 0, 0, 183.317532042778492, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11.4573457526736557, 0, -160.40284053743118, 0, 384.966817289834833, 0, -183.317532042778492, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -0.572867287633682787, 0, 0, 0, 0, -2.10051338799017022, 0, 32.0805681074862361, 0, 0, 0, 0, 0, 0, -2.673380675623853, 0, 85.5481816199632961, 0, -192.483408644917416, 0, 0, 0, 0, 0, 0, 0, 0, -1.14573457526736557, 0, 64.1611362149724721, 0, -320.805681074862361, 0, 256.644544859889888, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.190955762544560929, 0, 0, 0, -64.1611362149724721, 0, 171.096363239926592, 0, -73.3270128171113967, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.190955762544560929, 0, -10.693522702495412, 0, 64.1611362149724721, 0, -85.5481816199632961, 0, 24.4423376057037989, 0, 0, 0,
-        // j = 21/2, mj = -5/2
+        
         0, 0.757832188661416079, 0, 0, 0, 0, 2.77871802509185895, 0, -42.4386025650393004, 0, 0, 0, 0, 0, 0, 3.53655021375327503, 0, -113.169606840104801, 0, 254.631615390235802, 0, 0, 0, 0, 0, 0, 0, 0, 1.51566437732283216, 0, -84.8772051300786008, 0, 424.386025650393004, 0, -339.508820520314403, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.25261072955380536, 0, 0, 0, 84.8772051300786008, 0, -226.339213680209602, 0, 97.0025201486612581, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.25261072955380536, 0, 14.1462008550131001, 0, -84.8772051300786008, 0, 113.169606840104801, 0, -32.334173382887086, 0, 0, 0,
         0, 0, 0, 0, -4.54699313196849647, 0, 0, 0, 0, 0, 0, -18.1879725278739859, 0, 72.7518901114959435, 0, 0, 0, 0, 0, 0, 0, 0, -27.2819587918109788, 0, 218.255670334487831, 0, -218.255670334487831, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -18.1879725278739859, 0, 218.255670334487831, 0, -436.511340668975661, 0, 166.290034540562157, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -4.54699313196849647, 0, 72.7518901114959435, 0, -218.255670334487831, 0, 166.290034540562157, 0, -27.7150057567603594, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = -3/2
+        
         0, 0, 0, 0, 5.46480562883167061, 0, 0, 0, 0, 0, 0, 21.8592225153266825, 0, -87.4368900613067298, 0, 0, 0, 0, 0, 0, 0, 0, 32.7888337729900237, 0, -262.310670183920189, 0, 262.310670183920189, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 21.8592225153266825, 0, -262.310670183920189, 0, 524.621340367840379, 0, -199.85574871155824, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5.46480562883167061, 0, -87.4368900613067298, 0, 262.310670183920189, 0, -199.85574871155824, 0, 33.3092914519263733, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0.210184831878141177, 0, 0, 0, 0, 1.05092415939070589, 0, -12.6110899126884706, 0, 0, 0, 0, 0, 0, 2.10184831878141177, 0, -50.4443596507538826, 0, 84.073932751256471, 0, 0, 0, 0, 0, 0, 0, 0, 2.10184831878141177, 0, -75.6665394761308239, 0, 252.221798253769413, 0, -134.518292402010354, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.05092415939070589, 0, -50.4443596507538826, 0, 252.221798253769413, 0, -269.036584804020707, 0, 57.650696743718723, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.210184831878141177, 0, -12.6110899126884706, 0, 84.073932751256471, 0, -134.518292402010354, 0, 57.650696743718723, 0, -5.12450637721944204, 0,
-        // j = 21/2, mj = -1/2
+        
         0, -0.230245947330177705, 0, 0, 0, 0, -1.15122973665088853, 0, 13.8147568398106623, 0, 0, 0, 0, 0, 0, -2.30245947330177705, 0, 55.2590273592426493, 0, -92.0983789320710822, 0, 0, 0, 0, 0, 0, 0, 0, -2.30245947330177705, 0, 82.888541038863974, 0, -276.295136796213247, 0, 147.357406291313732, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.15122973665088853, 0, 55.2590273592426493, 0, -276.295136796213247, 0, 294.714812582627463, 0, -63.1531741248487421, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.230245947330177705, 0, 13.8147568398106623, 0, -92.0983789320710822, 0, 147.357406291313732, 0, -63.1531741248487421, 0, 5.61361547776433263, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = 1/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0.230245947330177705, 0, 0, 0, 0, 1.15122973665088853, 0, -13.8147568398106623, 0, 0, 0, 0, 0, 0, 2.30245947330177705, 0, -55.2590273592426493, 0, 92.0983789320710822, 0, 0, 0, 0, 0, 0, 0, 0, 2.30245947330177705, 0, -82.888541038863974, 0, 276.295136796213247, 0, -147.357406291313732, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.15122973665088853, 0, -55.2590273592426493, 0, 276.295136796213247, 0, -294.714812582627463, 0, 63.1531741248487421, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.230245947330177705, 0, -13.8147568398106623, 0, 92.0983789320710822, 0, -147.357406291313732, 0, 63.1531741248487421, 0, -5.61361547776433263, 0,
-        // j = 21/2, mj = 3/2
+        
         0, -0.210184831878141177, 0, 0, 0, 0, -1.05092415939070589, 0, 12.6110899126884706, 0, 0, 0, 0, 0, 0, -2.10184831878141177, 0, 50.4443596507538826, 0, -84.073932751256471, 0, 0, 0, 0, 0, 0, 0, 0, -2.10184831878141177, 0, 75.6665394761308239, 0, -252.221798253769413, 0, 134.518292402010354, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.05092415939070589, 0, 50.4443596507538826, 0, -252.221798253769413, 0, 269.036584804020707, 0, -57.650696743718723, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.210184831878141177, 0, 12.6110899126884706, 0, -84.073932751256471, 0, 134.518292402010354, 0, -57.650696743718723, 0, 5.12450637721944204, 0,
         0, 0, 0, 0, 5.46480562883167061, 0, 0, 0, 0, 0, 0, 21.8592225153266825, 0, -87.4368900613067298, 0, 0, 0, 0, 0, 0, 0, 0, 32.7888337729900237, 0, -262.310670183920189, 0, 262.310670183920189, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 21.8592225153266825, 0, -262.310670183920189, 0, 524.621340367840379, 0, -199.85574871155824, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5.46480562883167061, 0, -87.4368900613067298, 0, 262.310670183920189, 0, -199.85574871155824, 0, 33.3092914519263733, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = 5/2
+        
         0, 0, 0, 0, -4.54699313196849647, 0, 0, 0, 0, 0, 0, -18.1879725278739859, 0, 72.7518901114959435, 0, 0, 0, 0, 0, 0, 0, 0, -27.2819587918109788, 0, 218.255670334487831, 0, -218.255670334487831, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -18.1879725278739859, 0, 218.255670334487831, 0, -436.511340668975661, 0, 166.290034540562157, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -4.54699313196849647, 0, 72.7518901114959435, 0, -218.255670334487831, 0, 166.290034540562157, 0, -27.7150057567603594, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -0.757832188661416079, 0, 0, 0, 0, -2.77871802509185895, 0, 42.4386025650393004, 0, 0, 0, 0, 0, 0, -3.53655021375327503, 0, 113.169606840104801, 0, -254.631615390235802, 0, 0, 0, 0, 0, 0, 0, 0, -1.51566437732283216, 0, 84.8772051300786008, 0, -424.386025650393004, 0, 339.508820520314403, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.25261072955380536, 0, 0, 0, -84.8772051300786008, 0, 226.339213680209602, 0, -97.0025201486612581, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.25261072955380536, 0, -14.1462008550131001, 0, 84.8772051300786008, 0, -113.169606840104801, 0, 32.334173382887086, 0, 0, 0,
-        // j = 21/2, mj = 7/2
+        
         0, 0.572867287633682787, 0, 0, 0, 0, 2.10051338799017022, 0, -32.0805681074862361, 0, 0, 0, 0, 0, 0, 2.673380675623853, 0, -85.5481816199632961, 0, 192.483408644917416, 0, 0, 0, 0, 0, 0, 0, 0, 1.14573457526736557, 0, -64.1611362149724721, 0, 320.805681074862361, 0, -256.644544859889888, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.190955762544560929, 0, 0, 0, 64.1611362149724721, 0, -171.096363239926592, 0, 73.3270128171113967, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.190955762544560929, 0, 10.693522702495412, 0, -64.1611362149724721, 0, 85.5481816199632961, 0, -24.4423376057037989, 0, 0, 0,
         0, 0, 0, 0, -11.4573457526736557, 0, 0, 0, 0, 0, 0, -22.9146915053473115, 0, 160.40284053743118, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 160.40284053743118, 0, -384.966817289834833, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 22.9146915053473115, 0, -160.40284053743118, 0, 0, 0, 183.317532042778492, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11.4573457526736557, 0, -160.40284053743118, 0, 384.966817289834833, 0, -183.317532042778492, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = 9/2
+        
         0, 0, 0, 0, 7.82685718908155119, 0, 0, 0, 0, 0, 0, 15.6537143781631024, 0, -109.576000647141717, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -109.576000647141717, 0, 262.98240155314012, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -15.6537143781631024, 0, 109.576000647141717, 0, 0, 0, -125.229715025304819, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -7.82685718908155119, 0, 109.576000647141717, 0, -262.98240155314012, 0, 125.229715025304819, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 1.39765306947884843, 0, 0, 0, 0, 1.39765306947884843, 0, -67.0873473349847245, 0, 0, 0, 0, 0, 0, -3.9134285945407756, 0, 0, 0, 313.074287563262048, 0, 0, 0, 0, 0, 0, 0, 0, -6.14967350570693308, 0, 187.844572537957229, 0, -313.074287563262048, 0, -250.459430050609638, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.9567142972703878, 0, 107.339755735975559, 0, -563.533717613871686, 0, 500.918860101219276, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.279530613895769685, 0, -13.4174694669969449, 0, 62.6148575126524095, 0, -50.0918860101219276, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = 11/2
+        
         0, -0.855884214414465945, 0, 0, 0, 0, -0.855884214414465945, 0, 41.0824422918943654, 0, 0, 0, 0, 0, 0, 2.39647580036050465, 0, 0, 0, -191.718064028840372, 0, 0, 0, 0, 0, 0, 0, 0, 3.76589054342365016, 0, -115.030838417304223, 0, 191.718064028840372, 0, 153.374451223072297, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.19823790018025232, 0, -65.7319076670309846, 0, 345.092515251912669, 0, -306.748902446144595, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.171176842882893189, 0, 8.21648845837887307, 0, -38.3436128057680743, 0, 30.6748902446144595, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 17.4600379740551053, 0, 0, 0, 0, 0, 0, -23.2800506320734737, 0, -186.24040505658779, 0, 0, 0, 0, 0, 0, 0, 0, -81.480177212257158, 0, 434.560945132038176, 0, 260.736567079222906, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -23.2800506320734737, 0, 434.560945132038176, 0, -869.121890264076352, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 17.4600379740551053, 0, -186.24040505658779, 0, 260.736567079222906, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = 13/2
+        
         0, 0, 0, 0, -9.46903507810723996, 0, 0, 0, 0, 0, 0, 12.6253801041429866, 0, 101.003040833143893, 0, 0, 0, 0, 0, 0, 0, 0, 44.1888303645004531, 0, -235.673761944002417, 0, -141.40425716640145, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12.6253801041429866, 0, -235.673761944002417, 0, 471.347523888004833, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -9.46903507810723996, 0, 101.003040833143893, 0, -141.40425716640145, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -2.20944151822502266, 0, 0, 0, 0, 6.62832455467506797, 0, 79.5398946561008156, 0, 0, 0, 0, 0, 0, 13.2566491093501359, 0, -318.159578624403263, 0, -212.106385749602175, 0, 0, 0, 0, 0, 0, 0, 0, -1.89380701562144799, 0, -159.079789312201631, 0, 1060.53192874801088, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -5.99705554946791864, 0, 227.256841874573759, 0, -636.319157248806525, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.315634502603574665, 0, -11.3628420937286879, 0, 30.3009122499431679, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = 15/2
+        
         0, 1.0415407201146763, 0, 0, 0, 0, -3.1246221603440289, 0, -37.4954659241283468, 0, 0, 0, 0, 0, 0, -6.2492443206880578, 0, 149.981863696513387, 0, 99.9879091310089248, 0, 0, 0, 0, 0, 0, 0, 0, 0.892749188669722543, 0, 74.9909318482566936, 0, -499.939545655044624, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.82703909745412139, 0, -107.129902640366705, 0, 299.963727393026774, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.148791531444953757, 0, 5.35649513201833526, 0, -14.2839870187155607, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -22.6163127796329711, 0, 0, 0, 0, 0, 0, 135.697876677797827, 0, 135.697876677797827, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -949.885136744584786, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -135.697876677797827, 0, 949.885136744584786, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 22.6163127796329711, 0, -135.697876677797827, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = 17/2
+        
         0, 0, 0, 0, 8.98681142223825956, 0, 0, 0, 0, 0, 0, -53.9208685334295574, 0, -53.9208685334295574, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 377.446079734006901, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 53.9208685334295574, 0, -377.446079734006901, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -8.98681142223825956, 0, 53.9208685334295574, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 3.37005428333934733, 0, 0, 0, 0, -28.0837856944945611, 0, -67.4010856667869467, 0, 0, 0, 0, 0, 0, 15.7269199889169542, 0, 629.076799556678169, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33.7005428333934733, 0, -943.615199335017254, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -13.1057666574307952, 0, 269.604342667147787, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.374450475926594148, 0, -7.48900951853188297, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = 19/2
+        
         0, -1.06570473737587758, 0, 0, 0, 0, 8.88087281146564647, 0, 21.3140947475175515, 0, 0, 0, 0, 0, 0, -4.97328877442076202, 0, -198.931550976830481, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -10.6570473737587758, 0, 298.397326465245721, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4.14440731201730169, 0, -85.2563789900702061, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.11841163748620862, 0, 2.36823274972417239, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 24.8664438721038101, 0, 0, 0, 0, 0, 0, -298.397326465245721, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 626.634385577016015, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -298.397326465245721, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24.8664438721038101, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 21/2, mj = 21/2
+        
         0, 0, 0, 0, -5.42630291944221461, 0, 0, 0, 0, 0, 0, 65.1156350333065753, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -136.742833569943808, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 65.1156350333065753, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -5.42630291944221461, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -5.96893321138643607, 0, 0, 0, 0, 89.533998170796541, 0, 0, 0, 0, 0, 0, 0, 0, -250.695194878230315, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 179.067996341593082, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -29.8446660569321803, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.542630291944221461, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -23/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -6.10308329187281232, 0, 0, 0, 0, 91.5462493780921848, 0, 0, 0, 0, 0, 0, 0, 0, -256.329498258658117, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 183.09249875618437, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -30.5154164593640616, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.554825753806619302, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -21/2
+        
         0, -1.27258083654638245, 0, 0, 0, 0, 19.0887125481957368, 0, 0, 0, 0, 0, 0, 0, 0, -53.4483951349480631, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 38.1774250963914736, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -6.36290418273191227, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.115689166958762041, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -25.4516167309276491, 0, 0, 0, 0, 0, 0, 305.419400771131789, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -641.380741619376757, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 305.419400771131789, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -25.4516167309276491, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -19/2
+        
         0, 0, 0, 0, -7.67395118221990013, 0, 0, 0, 0, 0, 0, 92.0874141866388015, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -193.383569791941483, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 92.0874141866388015, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -7.67395118221990013, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 3.45327803199895506, 0, 0, 0, 0, -28.7773169333246255, 0, -69.0655606399791011, 0, 0, 0, 0, 0, 0, 16.1152974826617903, 0, 644.611899306471611, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 34.5327803199895506, 0, -966.917848959707416, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -13.4294145688848252, 0, 276.262242559916405, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.383697559110995006, 0, -7.67395118221990013, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -17/2
+        
         0, 1.30521641151882637, 0, 0, 0, 0, -10.876803429323553, 0, -26.1043282303765273, 0, 0, 0, 0, 0, 0, 6.09100992042118971, 0, 243.640396816847588, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13.0521641151882637, 0, -365.460595225271382, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -5.07584160035099142, 0, 104.417312921506109, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.145024045724314041, 0, -2.90048091448628081, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 23.2038473158902465, 0, 0, 0, 0, 0, 0, -139.223083895341479, 0, -139.223083895341479, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 974.561587267390353, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 139.223083895341479, 0, -974.561587267390353, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -23.2038473158902465, 0, 139.223083895341479, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -15/2
+        
         0, 0, 0, 0, 10.3770759875713254, 0, 0, 0, 0, 0, 0, -62.2624559254279527, 0, -62.2624559254279527, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 435.837191477995669, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 62.2624559254279527, 0, -435.837191477995669, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -10.3770759875713254, 0, 62.2624559254279527, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -2.26998537228122744, 0, 0, 0, 0, 6.80995611684368233, 0, 81.7194734021241879, 0, 0, 0, 0, 0, 0, 13.6199122336873647, 0, -326.877893608496752, 0, -217.918595738997834, 0, 0, 0, 0, 0, 0, 0, 0, -1.94570174766962352, 0, -163.438946804248376, 0, 1089.59297869498917, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -6.16138886762047449, 0, 233.484209720354823, 0, -653.755787216993503, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.32428362461160392, 0, -11.6742104860177411, 0, 31.1312279627139763, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -13/2
+        
         0, -1.16447792575524938, 0, 0, 0, 0, 3.49343377726574814, 0, 41.9212053271889777, 0, 0, 0, 0, 0, 0, 6.98686755453149629, 0, -167.684821308755911, 0, -111.789880872503941, 0, 0, 0, 0, 0, 0, 0, 0, -0.998123936361642327, 0, -83.8424106543779555, 0, 558.949404362519703, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -3.16072579847853403, 0, 119.774872363397079, 0, -335.369642617511822, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.166353989393607054, 0, -5.98874361816985396, 0, 15.9699829817862772, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -17.9662308545095619, 0, 0, 0, 0, 0, 0, 23.9549744726794158, 0, 191.639795781435327, 0, 0, 0, 0, 0, 0, 0, 0, 83.8424106543779555, 0, -447.159523490015762, 0, -268.295714094009457, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 23.9549744726794158, 0, -447.159523490015762, 0, 894.319046980031525, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -17.9662308545095619, 0, 191.639795781435327, 0, -268.295714094009457, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -11/2
+        
         0, 0, 0, 0, -10.3728082201740557, 0, 0, 0, 0, 0, 0, 13.8304109602320742, 0, 110.643287681856594, 0, 0, 0, 0, 0, 0, 0, 0, 48.4064383608122598, 0, -258.167671257665386, 0, -154.900602754599231, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13.8304109602320742, 0, -258.167671257665386, 0, 516.335342515330771, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -10.3728082201740557, 0, 110.643287681856594, 0, -154.900602754599231, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 1.44066780835750773, 0, 0, 0, 0, 1.44066780835750773, 0, -69.1520548011603712, 0, 0, 0, 0, 0, 0, -4.03386986340102165, 0, 0, 0, 322.709589072081732, 0, 0, 0, 0, 0, 0, 0, 0, -6.33893835677303403, 0, 193.625753443249039, 0, -322.709589072081732, 0, -258.167671257665386, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.01693493170051083, 0, 110.643287681856594, 0, -580.877260329747118, 0, 516.335342515330771, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.288133561671501547, 0, -13.8304109602320742, 0, 64.5419178144163464, 0, -51.6335342515330771, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -9/2
+        
         0, 0.924460610246778137, 0, 0, 0, 0, 0.924460610246778137, 0, -44.3741092918453506, 0, 0, 0, 0, 0, 0, -2.58848970869097878, 0, 0, 0, 207.079176695278303, 0, 0, 0, 0, 0, 0, 0, 0, -4.0676266850858238, 0, 124.247506017166982, 0, -207.079176695278303, 0, -165.663341356222642, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.29424485434548939, 0, 70.998574866952561, 0, -372.742518051500945, 0, 331.326682712445284, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.184892122049355627, 0, -8.87482185836907012, 0, 41.4158353390556606, 0, -33.1326682712445284, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 11.8330958111587602, 0, 0, 0, 0, 0, 0, 23.6661916223175203, 0, -165.663341356222642, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -165.663341356222642, 0, 397.592019254934341, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -23.6661916223175203, 0, 165.663341356222642, 0, 0, 0, -189.329532978540163, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -11.8330958111587602, 0, 165.663341356222642, 0, -397.592019254934341, 0, 189.329532978540163, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -7/2
+        
         0, 0, 0, 0, 8.36726229050048951, 0, 0, 0, 0, 0, 0, 16.734524581000979, 0, -117.141672067006853, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -117.141672067006853, 0, 281.140012960816447, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -16.734524581000979, 0, 117.141672067006853, 0, 0, 0, -133.876196648007832, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -8.36726229050048951, 0, 117.141672067006853, 0, -281.140012960816447, 0, 133.876196648007832, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -0.784430839734420891, 0, 0, 0, 0, -2.87624641235954327, 0, 43.9281270251275699, 0, 0, 0, 0, 0, 0, -3.66067725209396416, 0, 117.141672067006853, 0, -263.568762150765419, 0, 0, 0, 0, 0, 0, 0, 0, -1.56886167946884178, 0, 87.8562540502551398, 0, -439.281270251275699, 0, 351.425016201020559, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.261476946578140297, 0, 0, 0, -87.8562540502551398, 0, 234.283344134013706, 0, -100.407147486005874, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.261476946578140297, 0, -14.6427090083758566, 0, 87.8562540502551398, 0, -117.141672067006853, 0, 33.469049162001958, 0, 0, 0,
-        // j = 23/2, mj = -5/2
+        
         0, -0.607617515708582275, 0, 0, 0, 0, -2.22793089093146834, 0, 34.0265808796806074, 0, 0, 0, 0, 0, 0, -2.83554840664005062, 0, 90.7375490124816198, 0, -204.159485278083644, 0, 0, 0, 0, 0, 0, 0, 0, -1.21523503141716455, 0, 68.0531617593612148, 0, -340.265808796806074, 0, 272.212647037444859, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.202539171902860758, 0, 0, 0, -68.0531617593612148, 0, 181.47509802496324, 0, -77.7750420106985312, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.202539171902860758, 0, -11.3421936265602025, 0, 68.0531617593612148, 0, -90.7375490124816198, 0, 25.9250140035661771, 0, 0, 0,
         0, 0, 0, 0, -5.67109681328010124, 0, 0, 0, 0, 0, 0, -22.6843872531204049, 0, 90.7375490124816198, 0, 0, 0, 0, 0, 0, 0, 0, -34.0265808796806074, 0, 272.212647037444859, 0, -272.212647037444859, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -22.6843872531204049, 0, 272.212647037444859, 0, -544.425294074889719, 0, 207.400112028529417, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -5.67109681328010124, 0, 90.7375490124816198, 0, -272.212647037444859, 0, 207.400112028529417, 0, -34.5666853380882361, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -3/2
+        
         0, 0, 0, 0, -4.79295160072100929, 0, 0, 0, 0, 0, 0, -19.1718064028840372, 0, 76.6872256115361487, 0, 0, 0, 0, 0, 0, 0, 0, -28.7577096043260558, 0, 230.061676834608446, 0, -230.061676834608446, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -19.1718064028840372, 0, 230.061676834608446, 0, -460.123353669216892, 0, 175.285087112082626, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -4.79295160072100929, 0, 76.6872256115361487, 0, -230.061676834608446, 0, 175.285087112082626, 0, -29.2141811853471043, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0.239647580036050465, 0, 0, 0, 0, 1.19823790018025232, 0, -14.3788548021630279, 0, 0, 0, 0, 0, 0, 2.39647580036050465, 0, -57.5154192086521115, 0, 95.8590320144201859, 0, 0, 0, 0, 0, 0, 0, 0, 2.39647580036050465, 0, -86.2731288129781673, 0, 287.577096043260558, 0, -153.374451223072297, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.19823790018025232, 0, -57.5154192086521115, 0, 287.577096043260558, 0, -306.748902446144595, 0, 65.7319076670309846, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.239647580036050465, 0, -14.3788548021630279, 0, 95.8590320144201859, 0, -153.374451223072297, 0, 65.7319076670309846, 0, -5.84283623706942085, 0,
-        // j = 23/2, mj = -1/2
+        
         0, 0.220443711424950199, 0, 0, 0, 0, 1.10221855712475099, 0, -13.2266226854970119, 0, 0, 0, 0, 0, 0, 2.20443711424950199, 0, -52.9064907419880478, 0, 88.1774845699800796, 0, 0, 0, 0, 0, 0, 0, 0, 2.20443711424950199, 0, -79.3597361129820716, 0, 264.532453709940239, 0, -141.083975311968127, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.10221855712475099, 0, -52.9064907419880478, 0, 264.532453709940239, 0, -282.167950623936255, 0, 60.4645608479863403, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.220443711424950199, 0, -13.2266226854970119, 0, 88.1774845699800796, 0, -141.083975311968127, 0, 60.4645608479863403, 0, -5.37462763093211914, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 1/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0.220443711424950199, 0, 0, 0, 0, 1.10221855712475099, 0, -13.2266226854970119, 0, 0, 0, 0, 0, 0, 2.20443711424950199, 0, -52.9064907419880478, 0, 88.1774845699800796, 0, 0, 0, 0, 0, 0, 0, 0, 2.20443711424950199, 0, -79.3597361129820716, 0, 264.532453709940239, 0, -141.083975311968127, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.10221855712475099, 0, -52.9064907419880478, 0, 264.532453709940239, 0, -282.167950623936255, 0, 60.4645608479863403, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.220443711424950199, 0, -13.2266226854970119, 0, 88.1774845699800796, 0, -141.083975311968127, 0, 60.4645608479863403, 0, -5.37462763093211914, 0,
-        // j = 23/2, mj = 3/2
+        
         0, 0.239647580036050465, 0, 0, 0, 0, 1.19823790018025232, 0, -14.3788548021630279, 0, 0, 0, 0, 0, 0, 2.39647580036050465, 0, -57.5154192086521115, 0, 95.8590320144201859, 0, 0, 0, 0, 0, 0, 0, 0, 2.39647580036050465, 0, -86.2731288129781673, 0, 287.577096043260558, 0, -153.374451223072297, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.19823790018025232, 0, -57.5154192086521115, 0, 287.577096043260558, 0, -306.748902446144595, 0, 65.7319076670309846, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.239647580036050465, 0, -14.3788548021630279, 0, 95.8590320144201859, 0, -153.374451223072297, 0, 65.7319076670309846, 0, -5.84283623706942085, 0,
         0, 0, 0, 0, 4.79295160072100929, 0, 0, 0, 0, 0, 0, 19.1718064028840372, 0, -76.6872256115361487, 0, 0, 0, 0, 0, 0, 0, 0, 28.7577096043260558, 0, -230.061676834608446, 0, 230.061676834608446, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19.1718064028840372, 0, -230.061676834608446, 0, 460.123353669216892, 0, -175.285087112082626, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4.79295160072100929, 0, -76.6872256115361487, 0, 230.061676834608446, 0, -175.285087112082626, 0, 29.2141811853471043, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 5/2
+        
         0, 0, 0, 0, 5.67109681328010124, 0, 0, 0, 0, 0, 0, 22.6843872531204049, 0, -90.7375490124816198, 0, 0, 0, 0, 0, 0, 0, 0, 34.0265808796806074, 0, -272.212647037444859, 0, 272.212647037444859, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 22.6843872531204049, 0, -272.212647037444859, 0, 544.425294074889719, 0, -207.400112028529417, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5.67109681328010124, 0, -90.7375490124816198, 0, 272.212647037444859, 0, -207.400112028529417, 0, 34.5666853380882361, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -0.607617515708582275, 0, 0, 0, 0, -2.22793089093146834, 0, 34.0265808796806074, 0, 0, 0, 0, 0, 0, -2.83554840664005062, 0, 90.7375490124816198, 0, -204.159485278083644, 0, 0, 0, 0, 0, 0, 0, 0, -1.21523503141716455, 0, 68.0531617593612148, 0, -340.265808796806074, 0, 272.212647037444859, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.202539171902860758, 0, 0, 0, -68.0531617593612148, 0, 181.47509802496324, 0, -77.7750420106985312, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.202539171902860758, 0, -11.3421936265602025, 0, 68.0531617593612148, 0, -90.7375490124816198, 0, 25.9250140035661771, 0, 0, 0,
-        // j = 23/2, mj = 7/2
+        
         0, -0.784430839734420891, 0, 0, 0, 0, -2.87624641235954327, 0, 43.9281270251275699, 0, 0, 0, 0, 0, 0, -3.66067725209396416, 0, 117.141672067006853, 0, -263.568762150765419, 0, 0, 0, 0, 0, 0, 0, 0, -1.56886167946884178, 0, 87.8562540502551398, 0, -439.281270251275699, 0, 351.425016201020559, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.261476946578140297, 0, 0, 0, -87.8562540502551398, 0, 234.283344134013706, 0, -100.407147486005874, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.261476946578140297, 0, -14.6427090083758566, 0, 87.8562540502551398, 0, -117.141672067006853, 0, 33.469049162001958, 0, 0, 0,
         0, 0, 0, 0, -8.36726229050048951, 0, 0, 0, 0, 0, 0, -16.734524581000979, 0, 117.141672067006853, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 117.141672067006853, 0, -281.140012960816447, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16.734524581000979, 0, -117.141672067006853, 0, 0, 0, 133.876196648007832, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.36726229050048951, 0, -117.141672067006853, 0, 281.140012960816447, 0, -133.876196648007832, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 9/2
+        
         0, 0, 0, 0, -11.8330958111587602, 0, 0, 0, 0, 0, 0, -23.6661916223175203, 0, 165.663341356222642, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 165.663341356222642, 0, -397.592019254934341, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 23.6661916223175203, 0, -165.663341356222642, 0, 0, 0, 189.329532978540163, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11.8330958111587602, 0, -165.663341356222642, 0, 397.592019254934341, 0, -189.329532978540163, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0.924460610246778137, 0, 0, 0, 0, 0.924460610246778137, 0, -44.3741092918453506, 0, 0, 0, 0, 0, 0, -2.58848970869097878, 0, 0, 0, 207.079176695278303, 0, 0, 0, 0, 0, 0, 0, 0, -4.0676266850858238, 0, 124.247506017166982, 0, -207.079176695278303, 0, -165.663341356222642, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.29424485434548939, 0, 70.998574866952561, 0, -372.742518051500945, 0, 331.326682712445284, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.184892122049355627, 0, -8.87482185836907012, 0, 41.4158353390556606, 0, -33.1326682712445284, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 11/2
+        
         0, 1.44066780835750773, 0, 0, 0, 0, 1.44066780835750773, 0, -69.1520548011603712, 0, 0, 0, 0, 0, 0, -4.03386986340102165, 0, 0, 0, 322.709589072081732, 0, 0, 0, 0, 0, 0, 0, 0, -6.33893835677303403, 0, 193.625753443249039, 0, -322.709589072081732, 0, -258.167671257665386, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.01693493170051083, 0, 110.643287681856594, 0, -580.877260329747118, 0, 516.335342515330771, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.288133561671501547, 0, -13.8304109602320742, 0, 64.5419178144163464, 0, -51.6335342515330771, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 10.3728082201740557, 0, 0, 0, 0, 0, 0, -13.8304109602320742, 0, -110.643287681856594, 0, 0, 0, 0, 0, 0, 0, 0, -48.4064383608122598, 0, 258.167671257665386, 0, 154.900602754599231, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -13.8304109602320742, 0, 258.167671257665386, 0, -516.335342515330771, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10.3728082201740557, 0, -110.643287681856594, 0, 154.900602754599231, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 13/2
+        
         0, 0, 0, 0, 17.9662308545095619, 0, 0, 0, 0, 0, 0, -23.9549744726794158, 0, -191.639795781435327, 0, 0, 0, 0, 0, 0, 0, 0, -83.8424106543779555, 0, 447.159523490015762, 0, 268.295714094009457, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -23.9549744726794158, 0, 447.159523490015762, 0, -894.319046980031525, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 17.9662308545095619, 0, -191.639795781435327, 0, 268.295714094009457, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -1.16447792575524938, 0, 0, 0, 0, 3.49343377726574814, 0, 41.9212053271889777, 0, 0, 0, 0, 0, 0, 6.98686755453149629, 0, -167.684821308755911, 0, -111.789880872503941, 0, 0, 0, 0, 0, 0, 0, 0, -0.998123936361642327, 0, -83.8424106543779555, 0, 558.949404362519703, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -3.16072579847853403, 0, 119.774872363397079, 0, -335.369642617511822, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.166353989393607054, 0, -5.98874361816985396, 0, 15.9699829817862772, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 15/2
+        
         0, -2.26998537228122744, 0, 0, 0, 0, 6.80995611684368233, 0, 81.7194734021241879, 0, 0, 0, 0, 0, 0, 13.6199122336873647, 0, -326.877893608496752, 0, -217.918595738997834, 0, 0, 0, 0, 0, 0, 0, 0, -1.94570174766962352, 0, -163.438946804248376, 0, 1089.59297869498917, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -6.16138886762047449, 0, 233.484209720354823, 0, -653.755787216993503, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.32428362461160392, 0, -11.6742104860177411, 0, 31.1312279627139763, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -10.3770759875713254, 0, 0, 0, 0, 0, 0, 62.2624559254279527, 0, 62.2624559254279527, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -435.837191477995669, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -62.2624559254279527, 0, 435.837191477995669, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10.3770759875713254, 0, -62.2624559254279527, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 17/2
+        
         0, 0, 0, 0, -23.2038473158902465, 0, 0, 0, 0, 0, 0, 139.223083895341479, 0, 139.223083895341479, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -974.561587267390353, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -139.223083895341479, 0, 974.561587267390353, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 23.2038473158902465, 0, -139.223083895341479, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 1.30521641151882637, 0, 0, 0, 0, -10.876803429323553, 0, -26.1043282303765273, 0, 0, 0, 0, 0, 0, 6.09100992042118971, 0, 243.640396816847588, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13.0521641151882637, 0, -365.460595225271382, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -5.07584160035099142, 0, 104.417312921506109, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.145024045724314041, 0, -2.90048091448628081, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 19/2
+        
         0, 3.45327803199895506, 0, 0, 0, 0, -28.7773169333246255, 0, -69.0655606399791011, 0, 0, 0, 0, 0, 0, 16.1152974826617903, 0, 644.611899306471611, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 34.5327803199895506, 0, -966.917848959707416, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -13.4294145688848252, 0, 276.262242559916405, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.383697559110995006, 0, -7.67395118221990013, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 7.67395118221990013, 0, 0, 0, 0, 0, 0, -92.0874141866388015, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 193.383569791941483, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -92.0874141866388015, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7.67395118221990013, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 21/2
+        
         0, 0, 0, 0, 25.4516167309276491, 0, 0, 0, 0, 0, 0, -305.419400771131789, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 641.380741619376757, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -305.419400771131789, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 25.4516167309276491, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -1.27258083654638245, 0, 0, 0, 0, 19.0887125481957368, 0, 0, 0, 0, 0, 0, 0, 0, -53.4483951349480631, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 38.1774250963914736, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -6.36290418273191227, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.115689166958762041, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 23/2
+        
         0, -6.10308329187281232, 0, 0, 0, 0, 91.5462493780921848, 0, 0, 0, 0, 0, 0, 0, 0, -256.329498258658117, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 183.09249875618437, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -30.5154164593640616, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.554825753806619302, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -23/2
+        
         0, 6.65790904567943162, 0, 0, 0, 0, -122.061665837456246, 0, 0, 0, 0, 0, 0, 0, 0, 439.421997014842487, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -439.421997014842487, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 122.061665837456246, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -6.65790904567943162, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -6.10308329187281232, 0, 0, 0, 0, 0, 0, 91.5462493780921848, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -256.329498258658117, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 183.09249875618437, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -30.5154164593640616, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.554825753806619302, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -21/2
+        
         0, 0, 0, 0, 29.2693592405667964, 0, 0, 0, 0, 0, 0, -439.040388608501947, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1229.31308810380545, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -878.080777217003893, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 146.346796202833982, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.66085084005152695, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 1.15689166958762041, 0, 0, 0, 0, -12.7258083654638245, 0, -25.4516167309276491, 0, 0, 0, 0, 0, 0, 15.2709700385565894, 0, 305.419400771131789, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15.2709700385565894, 0, -641.380741619376757, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -12.7258083654638245, 0, 305.419400771131789, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.15689166958762041, 0, -25.4516167309276491, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -19/2
+        
         0, -3.83697559110995006, 0, 0, 0, 0, 42.2067315022094507, 0, 84.4134630044189014, 0, 0, 0, 0, 0, 0, -50.6480778026513408, 0, -1012.96155605302682, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -50.6480778026513408, 0, 2127.21926771135631, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 42.2067315022094507, 0, -1012.96155605302682, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -3.83697559110995006, 0, 84.4134630044189014, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 10.3598340959968652, 0, 0, 0, 0, 0, 0, -86.3319507999738764, 0, -69.0655606399791011, 0, 0, 0, 0, 0, 0, 0, 0, 48.3458924479853708, 0, 644.611899306471611, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 103.598340959968652, 0, -966.917848959707416, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -40.2882437066544757, 0, 276.262242559916405, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.15109267733298502, 0, -7.67395118221990013, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -17/2
+        
         0, 0, 0, 0, -27.4095446418953537, 0, 0, 0, 0, 0, 0, 228.412872015794614, 0, 182.730297612635691, 0, 0, 0, 0, 0, 0, 0, 0, -127.911208328844984, 0, -1705.48277771793312, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -274.095446418953537, 0, 2558.22416657689968, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 106.59267360737082, 0, -730.921190450542765, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -3.04550496021059485, 0, 20.3033664014039657, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -1.16019236579451232, 0, 0, 0, 0, 5.80096182897256162, 0, 46.407694631780493, 0, 0, 0, 0, 0, 0, 6.96115419476707395, 0, -278.446167790682958, 0, -139.223083895341479, 0, 0, 0, 0, 0, 0, 0, 0, -6.96115419476707395, 0, 0, 0, 974.561587267390353, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -5.80096182897256162, 0, 278.446167790682958, 0, -974.561587267390353, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.16019236579451232, 0, -46.407694631780493, 0, 139.223083895341479, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -15/2
+        
         0, 2.59426899689283136, 0, 0, 0, 0, -12.9713449844641568, 0, -103.770759875713254, 0, 0, 0, 0, 0, 0, -15.5656139813569882, 0, 622.624559254279527, 0, 311.312279627139763, 0, 0, 0, 0, 0, 0, 0, 0, 15.5656139813569882, 0, 0, 0, -2179.18595738997834, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12.9713449844641568, 0, -622.624559254279527, 0, 2179.18595738997834, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.59426899689283136, 0, 103.770759875713254, 0, -311.312279627139763, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -11.3499268614061372, 0, 0, 0, 0, 0, 0, 34.0497805842184116, 0, 136.199122336873647, 0, 0, 0, 0, 0, 0, 0, 0, 68.0995611684368233, 0, -544.796489347494586, 0, -217.918595738997834, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -9.72850873834811761, 0, -272.398244673747293, 0, 1089.59297869498917, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -30.8069443381023724, 0, 389.140349533924704, 0, -653.755787216993503, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.6214181230580196, 0, -19.4570174766962352, 0, 31.1312279627139763, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -13/2
+        
         0, 0, 0, 0, 22.1250805893497382, 0, 0, 0, 0, 0, 0, -66.3752417680492147, 0, -265.500967072196859, 0, 0, 0, 0, 0, 0, 0, 0, -132.750483536098429, 0, 1062.00386828878744, 0, 424.801547315514974, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 18.9643547908712042, 0, 531.001934144393718, 0, -2124.00773657757487, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 60.0537901710921467, 0, -758.574191634848168, 0, 1274.40464194654492, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -3.16072579847853403, 0, 37.9287095817424084, 0, -60.6859353307878535, 0, 0, 0, 0, 0, 0, 0,
         0, 0.998123936361642327, 0, 0, 0, 0, -0.332707978787214109, 0, -53.8986925635286856, 0, 0, 0, 0, 0, 0, -5.98874361816985396, 0, 71.8649234180382475, 0, 287.45969367215299, 0, 0, 0, 0, 0, 0, 0, 0, -5.98874361816985396, 0, 251.527231963133866, 0, -670.739285235023644, 0, -268.295714094009457, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.332707978787214109, 0, 71.8649234180382475, 0, -670.739285235023644, 0, 894.319046980031525, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.998123936361642327, 0, -53.8986925635286856, 0, 287.45969367215299, 0, -268.295714094009457, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -11/2
+        
         0, -1.72880137002900928, 0, 0, 0, 0, 0.576267123343003093, 0, 93.3552739815665011, 0, 0, 0, 0, 0, 0, 10.3728082201740557, 0, -124.473698642088668, 0, -497.894794568354673, 0, 0, 0, 0, 0, 0, 0, 0, 10.3728082201740557, 0, -435.657945247310338, 0, 1161.75452065949424, 0, 464.701808263797694, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.576267123343003093, 0, -124.473698642088668, 0, 1161.75452065949424, 0, -1549.00602754599231, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.72880137002900928, 0, 93.3552739815665011, 0, -497.894794568354673, 0, 464.701808263797694, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 10.0846746585025541, 0, 0, 0, 0, 0, 0, 10.0846746585025541, 0, -161.354794536040866, 0, 0, 0, 0, 0, 0, 0, 0, -28.2370890438071516, 0, 0, 0, 451.793424700914425, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -44.3725684974112382, 0, 451.793424700914425, 0, -451.793424700914425, 0, -258.167671257665386, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -14.1185445219035758, 0, 258.167671257665386, 0, -813.228164461645965, 0, 516.335342515330771, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.01693493170051083, 0, -32.2709589072081732, 0, 90.358684940182885, 0, -51.6335342515330771, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -9/2
+        
         0, 0, 0, 0, -15.7158303741952283, 0, 0, 0, 0, 0, 0, -15.7158303741952283, 0, 251.453285987123653, 0, 0, 0, 0, 0, 0, 0, 0, 44.0043250477466393, 0, 0, 0, -704.06920076394623, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 69.1496536464590047, 0, -704.06920076394623, 0, 704.06920076394623, 0, 402.325257579397845, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 22.0021625238733197, 0, -402.325257579397845, 0, 1267.32456137510321, 0, -804.650515158795691, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -3.14316607483904567, 0, 50.2906571974247307, 0, -140.813840152789246, 0, 80.4650515158795691, 0, 0, 0, 0, 0,
         0, -0.73956848819742251, 0, 0, 0, 0, -2.21870546459226753, 0, 47.3323832446350406, 0, 0, 0, 0, 0, 0, -1.47913697639484502, 0, 94.6647664892700813, 0, -331.326682712445284, 0, 0, 0, 0, 0, 0, 0, 0, 1.47913697639484502, 0, 0, 0, -331.326682712445284, 0, 530.122692339912455, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.21870546459226753, 0, -94.6647664892700813, 0, 331.326682712445284, 0, 0, 0, -189.329532978540163, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.73956848819742251, 0, -47.3323832446350406, 0, 331.326682712445284, 0, -530.122692339912455, 0, 189.329532978540163, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -7/2
+        
         0, 1.04590778631256119, 0, 0, 0, 0, 3.13772335893768356, 0, -66.938098324003916, 0, 0, 0, 0, 0, 0, 2.09181557262512238, 0, -133.876196648007832, 0, 468.566688268027412, 0, 0, 0, 0, 0, 0, 0, 0, -2.09181557262512238, 0, 0, 0, 468.566688268027412, 0, -749.70670122884386, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -3.13772335893768356, 0, 133.876196648007832, 0, -468.566688268027412, 0, 0, 0, 267.752393296015664, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.04590778631256119, 0, 66.938098324003916, 0, -468.566688268027412, 0, 749.70670122884386, 0, -267.752393296015664, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -7.05987755760978802, 0, 0, 0, 0, 0, 0, -25.8862177112358894, 0, 131.78438107538271, 0, 0, 0, 0, 0, 0, 0, 0, -32.9460952688456774, 0, 351.425016201020559, 0, -474.423771871377755, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -14.119755115219576, 0, 263.568762150765419, 0, -790.706286452296258, 0, 451.832163687026433, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.35329251920326267, 0, 0, 0, -158.141257290459252, 0, 301.221442458017622, 0, -100.407147486005874, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.35329251920326267, 0, -43.9281270251275699, 0, 158.141257290459252, 0, -150.610721229008811, 0, 33.469049162001958, 0, 0, 0,
-        // j = 23/2, mj = -5/2
+        
         0, 0, 0, 0, 9.11426273562873413, 0, 0, 0, 0, 0, 0, 33.4189633639720251, 0, -170.132904398403037, 0, 0, 0, 0, 0, 0, 0, 0, 42.5332260996007593, 0, -453.687745062408099, 0, 612.478455834250933, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 18.2285254712574683, 0, -340.265808796806074, 0, 1020.79742639041822, 0, -583.312815080238984, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -3.03808757854291138, 0, 0, 0, 204.159485278083644, 0, -388.875210053492656, 0, 129.625070017830885, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -3.03808757854291138, 0, 56.7109681328010124, 0, -204.159485278083644, 0, 194.437605026746328, 0, -43.2083566726102951, 0, 0, 0,
         0, 0.405078343805721517, 0, 0, 0, 0, 2.02539171902860758, 0, -28.3554840664005062, 0, 0, 0, 0, 0, 0, 4.05078343805721517, 0, -113.421936265602025, 0, 226.843872531204049, 0, 0, 0, 0, 0, 0, 0, 0, 4.05078343805721517, 0, -170.132904398403037, 0, 680.531617593612148, 0, -453.687745062408099, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.02539171902860758, 0, -113.421936265602025, 0, 680.531617593612148, 0, -907.375490124816198, 0, 259.250140035661771, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.405078343805721517, 0, -28.3554840664005062, 0, 226.843872531204049, 0, -453.687745062408099, 0, 259.250140035661771, 0, -34.5666853380882361, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = -3/2
+        
         0, -0.479295160072100929, 0, 0, 0, 0, -2.39647580036050465, 0, 33.5506612050470651, 0, 0, 0, 0, 0, 0, -4.79295160072100929, 0, 134.20264482018826, 0, -268.40528964037652, 0, 0, 0, 0, 0, 0, 0, 0, -4.79295160072100929, 0, 201.30396723028239, 0, -805.215868921129561, 0, 536.810579280753041, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.39647580036050465, 0, 134.20264482018826, 0, -805.215868921129561, 0, 1073.62115856150608, 0, -306.748902446144595, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.479295160072100929, 0, 33.5506612050470651, 0, -268.40528964037652, 0, 536.810579280753041, 0, -306.748902446144595, 0, 40.899853659485946, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 2.63612338039655511, 0, 0, 0, 0, 0, 0, 13.1806169019827756, 0, -52.7224676079311022, 0, 0, 0, 0, 0, 0, 0, 0, 26.3612338039655511, 0, -210.889870431724409, 0, 210.889870431724409, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 26.3612338039655511, 0, -316.334805647586613, 0, 632.669611295173227, 0, -241.01699477911361, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13.1806169019827756, 0, -210.889870431724409, 0, 632.669611295173227, 0, -482.03398955822722, 0, 80.3389982597045367, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.63612338039655511, 0, -52.7224676079311022, 0, 210.889870431724409, 0, -241.01699477911361, 0, 80.3389982597045367, 0, -5.84283623706942085, 0,
-        // j = 23/2, mj = -1/2
+        
         0, 0, 0, 0, -2.86576824852435259, 0, 0, 0, 0, 0, 0, -14.3288412426217629, 0, 57.3153649704870517, 0, 0, 0, 0, 0, 0, 0, 0, -28.6576824852435259, 0, 229.261459881948207, 0, -229.261459881948207, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -28.6576824852435259, 0, 343.89218982292231, 0, -687.784379645844621, 0, 262.013097007940808, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -14.3288412426217629, 0, 229.261459881948207, 0, -687.784379645844621, 0, 524.026194015881616, 0, -87.337699002646936, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.86576824852435259, 0, 57.3153649704870517, 0, -229.261459881948207, 0, 262.013097007940808, 0, -87.337699002646936, 0, 6.35183265473795898, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 1/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 2.86576824852435259, 0, 0, 0, 0, 0, 0, 14.3288412426217629, 0, -57.3153649704870517, 0, 0, 0, 0, 0, 0, 0, 0, 28.6576824852435259, 0, -229.261459881948207, 0, 229.261459881948207, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 28.6576824852435259, 0, -343.89218982292231, 0, 687.784379645844621, 0, -262.013097007940808, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14.3288412426217629, 0, -229.261459881948207, 0, 687.784379645844621, 0, -524.026194015881616, 0, 87.337699002646936, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.86576824852435259, 0, -57.3153649704870517, 0, 229.261459881948207, 0, -262.013097007940808, 0, 87.337699002646936, 0, -6.35183265473795898, 0,
-        // j = 23/2, mj = 3/2
+        
         0, 0, 0, 0, -2.63612338039655511, 0, 0, 0, 0, 0, 0, -13.1806169019827756, 0, 52.7224676079311022, 0, 0, 0, 0, 0, 0, 0, 0, -26.3612338039655511, 0, 210.889870431724409, 0, -210.889870431724409, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -26.3612338039655511, 0, 316.334805647586613, 0, -632.669611295173227, 0, 241.01699477911361, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -13.1806169019827756, 0, 210.889870431724409, 0, -632.669611295173227, 0, 482.03398955822722, 0, -80.3389982597045367, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.63612338039655511, 0, 52.7224676079311022, 0, -210.889870431724409, 0, 241.01699477911361, 0, -80.3389982597045367, 0, 5.84283623706942085, 0,
         0, -0.479295160072100929, 0, 0, 0, 0, -2.39647580036050465, 0, 33.5506612050470651, 0, 0, 0, 0, 0, 0, -4.79295160072100929, 0, 134.20264482018826, 0, -268.40528964037652, 0, 0, 0, 0, 0, 0, 0, 0, -4.79295160072100929, 0, 201.30396723028239, 0, -805.215868921129561, 0, 536.810579280753041, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.39647580036050465, 0, 134.20264482018826, 0, -805.215868921129561, 0, 1073.62115856150608, 0, -306.748902446144595, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.479295160072100929, 0, 33.5506612050470651, 0, -268.40528964037652, 0, 536.810579280753041, 0, -306.748902446144595, 0, 40.899853659485946, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 5/2
+        
         0, 0.405078343805721517, 0, 0, 0, 0, 2.02539171902860758, 0, -28.3554840664005062, 0, 0, 0, 0, 0, 0, 4.05078343805721517, 0, -113.421936265602025, 0, 226.843872531204049, 0, 0, 0, 0, 0, 0, 0, 0, 4.05078343805721517, 0, -170.132904398403037, 0, 680.531617593612148, 0, -453.687745062408099, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.02539171902860758, 0, -113.421936265602025, 0, 680.531617593612148, 0, -907.375490124816198, 0, 259.250140035661771, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.405078343805721517, 0, -28.3554840664005062, 0, 226.843872531204049, 0, -453.687745062408099, 0, 259.250140035661771, 0, -34.5666853380882361, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -9.11426273562873413, 0, 0, 0, 0, 0, 0, -33.4189633639720251, 0, 170.132904398403037, 0, 0, 0, 0, 0, 0, 0, 0, -42.5332260996007593, 0, 453.687745062408099, 0, -612.478455834250933, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -18.2285254712574683, 0, 340.265808796806074, 0, -1020.79742639041822, 0, 583.312815080238984, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.03808757854291138, 0, 0, 0, -204.159485278083644, 0, 388.875210053492656, 0, -129.625070017830885, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.03808757854291138, 0, -56.7109681328010124, 0, 204.159485278083644, 0, -194.437605026746328, 0, 43.2083566726102951, 0, 0, 0,
-        // j = 23/2, mj = 7/2
+        
         0, 0, 0, 0, 7.05987755760978802, 0, 0, 0, 0, 0, 0, 25.8862177112358894, 0, -131.78438107538271, 0, 0, 0, 0, 0, 0, 0, 0, 32.9460952688456774, 0, -351.425016201020559, 0, 474.423771871377755, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14.119755115219576, 0, -263.568762150765419, 0, 790.706286452296258, 0, -451.832163687026433, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.35329251920326267, 0, 0, 0, 158.141257290459252, 0, -301.221442458017622, 0, 100.407147486005874, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.35329251920326267, 0, 43.9281270251275699, 0, -158.141257290459252, 0, 150.610721229008811, 0, -33.469049162001958, 0, 0, 0,
         0, 1.04590778631256119, 0, 0, 0, 0, 3.13772335893768356, 0, -66.938098324003916, 0, 0, 0, 0, 0, 0, 2.09181557262512238, 0, -133.876196648007832, 0, 468.566688268027412, 0, 0, 0, 0, 0, 0, 0, 0, -2.09181557262512238, 0, 0, 0, 468.566688268027412, 0, -749.70670122884386, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -3.13772335893768356, 0, 133.876196648007832, 0, -468.566688268027412, 0, 0, 0, 267.752393296015664, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.04590778631256119, 0, 66.938098324003916, 0, -468.566688268027412, 0, 749.70670122884386, 0, -267.752393296015664, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 9/2
+        
         0, -0.73956848819742251, 0, 0, 0, 0, -2.21870546459226753, 0, 47.3323832446350406, 0, 0, 0, 0, 0, 0, -1.47913697639484502, 0, 94.6647664892700813, 0, -331.326682712445284, 0, 0, 0, 0, 0, 0, 0, 0, 1.47913697639484502, 0, 0, 0, -331.326682712445284, 0, 530.122692339912455, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.21870546459226753, 0, -94.6647664892700813, 0, 331.326682712445284, 0, 0, 0, -189.329532978540163, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.73956848819742251, 0, -47.3323832446350406, 0, 331.326682712445284, 0, -530.122692339912455, 0, 189.329532978540163, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 15.7158303741952283, 0, 0, 0, 0, 0, 0, 15.7158303741952283, 0, -251.453285987123653, 0, 0, 0, 0, 0, 0, 0, 0, -44.0043250477466393, 0, 0, 0, 704.06920076394623, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -69.1496536464590047, 0, 704.06920076394623, 0, -704.06920076394623, 0, -402.325257579397845, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -22.0021625238733197, 0, 402.325257579397845, 0, -1267.32456137510321, 0, 804.650515158795691, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.14316607483904567, 0, -50.2906571974247307, 0, 140.813840152789246, 0, -80.4650515158795691, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 11/2
+        
         0, 0, 0, 0, -10.0846746585025541, 0, 0, 0, 0, 0, 0, -10.0846746585025541, 0, 161.354794536040866, 0, 0, 0, 0, 0, 0, 0, 0, 28.2370890438071516, 0, 0, 0, -451.793424700914425, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 44.3725684974112382, 0, -451.793424700914425, 0, 451.793424700914425, 0, 258.167671257665386, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14.1185445219035758, 0, -258.167671257665386, 0, 813.228164461645965, 0, -516.335342515330771, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.01693493170051083, 0, 32.2709589072081732, 0, -90.358684940182885, 0, 51.6335342515330771, 0, 0, 0, 0, 0,
         0, -1.72880137002900928, 0, 0, 0, 0, 0.576267123343003093, 0, 93.3552739815665011, 0, 0, 0, 0, 0, 0, 10.3728082201740557, 0, -124.473698642088668, 0, -497.894794568354673, 0, 0, 0, 0, 0, 0, 0, 0, 10.3728082201740557, 0, -435.657945247310338, 0, 1161.75452065949424, 0, 464.701808263797694, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.576267123343003093, 0, -124.473698642088668, 0, 1161.75452065949424, 0, -1549.00602754599231, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.72880137002900928, 0, 93.3552739815665011, 0, -497.894794568354673, 0, 464.701808263797694, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 13/2
+        
         0, 0.998123936361642327, 0, 0, 0, 0, -0.332707978787214109, 0, -53.8986925635286856, 0, 0, 0, 0, 0, 0, -5.98874361816985396, 0, 71.8649234180382475, 0, 287.45969367215299, 0, 0, 0, 0, 0, 0, 0, 0, -5.98874361816985396, 0, 251.527231963133866, 0, -670.739285235023644, 0, -268.295714094009457, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.332707978787214109, 0, 71.8649234180382475, 0, -670.739285235023644, 0, 894.319046980031525, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.998123936361642327, 0, -53.8986925635286856, 0, 287.45969367215299, 0, -268.295714094009457, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -22.1250805893497382, 0, 0, 0, 0, 0, 0, 66.3752417680492147, 0, 265.500967072196859, 0, 0, 0, 0, 0, 0, 0, 0, 132.750483536098429, 0, -1062.00386828878744, 0, -424.801547315514974, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -18.9643547908712042, 0, -531.001934144393718, 0, 2124.00773657757487, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -60.0537901710921467, 0, 758.574191634848168, 0, -1274.40464194654492, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.16072579847853403, 0, -37.9287095817424084, 0, 60.6859353307878535, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 15/2
+        
         0, 0, 0, 0, 11.3499268614061372, 0, 0, 0, 0, 0, 0, -34.0497805842184116, 0, -136.199122336873647, 0, 0, 0, 0, 0, 0, 0, 0, -68.0995611684368233, 0, 544.796489347494586, 0, 217.918595738997834, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9.72850873834811761, 0, 272.398244673747293, 0, -1089.59297869498917, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 30.8069443381023724, 0, -389.140349533924704, 0, 653.755787216993503, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.6214181230580196, 0, 19.4570174766962352, 0, -31.1312279627139763, 0, 0, 0, 0, 0, 0, 0,
         0, 2.59426899689283136, 0, 0, 0, 0, -12.9713449844641568, 0, -103.770759875713254, 0, 0, 0, 0, 0, 0, -15.5656139813569882, 0, 622.624559254279527, 0, 311.312279627139763, 0, 0, 0, 0, 0, 0, 0, 0, 15.5656139813569882, 0, 0, 0, -2179.18595738997834, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12.9713449844641568, 0, -622.624559254279527, 0, 2179.18595738997834, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.59426899689283136, 0, 103.770759875713254, 0, -311.312279627139763, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 17/2
+        
         0, -1.16019236579451232, 0, 0, 0, 0, 5.80096182897256162, 0, 46.407694631780493, 0, 0, 0, 0, 0, 0, 6.96115419476707395, 0, -278.446167790682958, 0, -139.223083895341479, 0, 0, 0, 0, 0, 0, 0, 0, -6.96115419476707395, 0, 0, 0, 974.561587267390353, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -5.80096182897256162, 0, 278.446167790682958, 0, -974.561587267390353, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.16019236579451232, 0, -46.407694631780493, 0, 139.223083895341479, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 27.4095446418953537, 0, 0, 0, 0, 0, 0, -228.412872015794614, 0, -182.730297612635691, 0, 0, 0, 0, 0, 0, 0, 0, 127.911208328844984, 0, 1705.48277771793312, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 274.095446418953537, 0, -2558.22416657689968, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -106.59267360737082, 0, 730.921190450542765, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.04550496021059485, 0, -20.3033664014039657, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 19/2
+        
         0, 0, 0, 0, -10.3598340959968652, 0, 0, 0, 0, 0, 0, 86.3319507999738764, 0, 69.0655606399791011, 0, 0, 0, 0, 0, 0, 0, 0, -48.3458924479853708, 0, -644.611899306471611, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -103.598340959968652, 0, 966.917848959707416, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 40.2882437066544757, 0, -276.262242559916405, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.15109267733298502, 0, 7.67395118221990013, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -3.83697559110995006, 0, 0, 0, 0, 42.2067315022094507, 0, 84.4134630044189014, 0, 0, 0, 0, 0, 0, -50.6480778026513408, 0, -1012.96155605302682, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -50.6480778026513408, 0, 2127.21926771135631, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 42.2067315022094507, 0, -1012.96155605302682, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -3.83697559110995006, 0, 84.4134630044189014, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 21/2
+        
         0, 1.15689166958762041, 0, 0, 0, 0, -12.7258083654638245, 0, -25.4516167309276491, 0, 0, 0, 0, 0, 0, 15.2709700385565894, 0, 305.419400771131789, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15.2709700385565894, 0, -641.380741619376757, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -12.7258083654638245, 0, 305.419400771131789, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.15689166958762041, 0, -25.4516167309276491, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -29.2693592405667964, 0, 0, 0, 0, 0, 0, 439.040388608501947, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1229.31308810380545, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 878.080777217003893, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -146.346796202833982, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.66085084005152695, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 23/2, mj = 23/2
+        
         0, 0, 0, 0, 6.10308329187281232, 0, 0, 0, 0, 0, 0, -91.5462493780921848, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 256.329498258658117, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -183.09249875618437, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 30.5154164593640616, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.554825753806619302, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 6.65790904567943162, 0, 0, 0, 0, -122.061665837456246, 0, 0, 0, 0, 0, 0, 0, 0, 439.421997014842487, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -439.421997014842487, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 122.061665837456246, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -6.65790904567943162, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = -25/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -6.79519996490629405, 0, 0, 0, 0, 124.578666023282058, 0, 0, 0, 0, 0, 0, 0, 0, -448.483197683815407, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 448.483197683815407, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -124.578666023282058, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6.79519996490629405, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = -23/2
+        
         0, -1.35903999298125881, 0, 0, 0, 0, 24.9157332046564115, 0, 0, 0, 0, 0, 0, 0, 0, -89.6966395367630815, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 89.6966395367630815, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -24.9157332046564115, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.35903999298125881, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -29.8988798455876938, 0, 0, 0, 0, 0, 0, 448.483197683815407, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1255.75295351468314, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 896.966395367630815, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -149.494399227938469, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.71807998596251762, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = -21/2
+        
         0, 0, 0, 0, -8.63106316365916572, 0, 0, 0, 0, 0, 0, 129.465947454887486, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -362.50465287368496, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 258.931894909774972, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -43.1553158182958286, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.784642105787196884, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 3.92321052893598442, 0, 0, 0, 0, -43.1553158182958286, 0, -86.3106316365916572, 0, 0, 0, 0, 0, 0, 51.7863789819549943, 0, 1035.72757963909989, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 51.7863789819549943, 0, -2175.02791724210976, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -43.1553158182958286, 0, 1035.72757963909989, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.92321052893598442, 0, -86.3106316365916572, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = -19/2
+        
         0, 1.41689713908309089, 0, 0, 0, 0, -15.5858685299139998, 0, -31.1717370598279997, 0, 0, 0, 0, 0, 0, 18.7030422358967998, 0, 374.060844717935996, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 18.7030422358967998, 0, -785.527773907665592, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -15.5858685299139998, 0, 374.060844717935996, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.41689713908309089, 0, -31.1717370598279997, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 28.0545633538451997, 0, 0, 0, 0, 0, 0, -233.788027948709998, 0, -187.030422358967998, 0, 0, 0, 0, 0, 0, 0, 0, 130.921295651277599, 0, 1745.61727535036798, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 280.545633538451997, 0, -2618.42591302555197, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -109.101079709397999, 0, 748.121689435871992, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.11717370598279997, 0, -20.7811580398853331, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = -17/2
+        
         0, 0, 0, 0, 11.9625060081673068, 0, 0, 0, 0, 0, 0, -99.6875500680608898, 0, -79.7500400544487119, 0, 0, 0, 0, 0, 0, 0, 0, 55.8250280381140983, 0, 744.333707174854644, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 119.625060081673068, 0, -1116.50056076228197, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -46.5208566984284153, 0, 319.000160217794847, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.32916733424081186, 0, -8.86111556160541243, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -2.65833466848162373, 0, 0, 0, 0, 13.2916733424081186, 0, 106.333386739264949, 0, 0, 0, 0, 0, 0, 15.9500080108897424, 0, -638.000320435589695, 0, -319.000160217794847, 0, 0, 0, 0, 0, 0, 0, 0, -15.9500080108897424, 0, 0, 0, 2233.00112152456393, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -13.2916733424081186, 0, 638.000320435589695, 0, -2233.00112152456393, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.65833466848162373, 0, -106.333386739264949, 0, 319.000160217794847, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = -15/2
+        
         0, -1.29713449844641568, 0, 0, 0, 0, 6.48567249223207841, 0, 51.8853799378566272, 0, 0, 0, 0, 0, 0, 7.78280699067849409, 0, -311.312279627139763, 0, -155.656139813569882, 0, 0, 0, 0, 0, 0, 0, 0, -7.78280699067849409, 0, 0, 0, 1089.59297869498917, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -6.48567249223207841, 0, 311.312279627139763, 0, -1089.59297869498917, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.29713449844641568, 0, -51.8853799378566272, 0, 155.656139813569882, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -22.6998537228122744, 0, 0, 0, 0, 0, 0, 68.0995611684368233, 0, 272.398244673747293, 0, 0, 0, 0, 0, 0, 0, 0, 136.199122336873647, 0, -1089.59297869498917, 0, -435.837191477995669, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -19.4570174766962352, 0, -544.796489347494586, 0, 2179.18595738997834, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -61.6138886762047449, 0, 778.280699067849409, 0, -1307.51157443398701, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.2428362461160392, 0, -38.9140349533924704, 0, 62.2624559254279527, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = -13/2
+        
         0, 0, 0, 0, -12.4332219360519051, 0, 0, 0, 0, 0, 0, 37.2996658081557152, 0, 149.198663232622861, 0, 0, 0, 0, 0, 0, 0, 0, 74.5993316163114303, 0, -596.794652930491443, 0, -238.717861172196577, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -10.6570473737587758, 0, -298.397326465245721, 0, 1193.58930586098289, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -33.7473166835694566, 0, 426.281894950351031, 0, -716.153583516589731, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.77617456229312929, 0, -21.3140947475175515, 0, 34.1025515960280824, 0, 0, 0, 0, 0, 0, 0,
         0, 1.77617456229312929, 0, 0, 0, 0, -0.592058187431043098, 0, -95.9134263638289819, 0, 0, 0, 0, 0, 0, -10.6570473737587758, 0, 127.884568485105309, 0, 511.538273940421237, 0, 0, 0, 0, 0, 0, 0, 0, -10.6570473737587758, 0, 447.595989697868582, 0, -1193.58930586098289, 0, -477.435722344393154, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.592058187431043098, 0, 127.884568485105309, 0, -1193.58930586098289, 0, 1591.45240781464385, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.77617456229312929, 0, -95.9134263638289819, 0, 511.538273940421237, 0, -477.435722344393154, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = -11/2
+        
         0, 1.07809706940565876, 0, 0, 0, 0, -0.359365689801886252, 0, -58.2172417479055728, 0, 0, 0, 0, 0, 0, -6.46858241643395253, 0, 77.6229889972074304, 0, 310.491955988829722, 0, 0, 0, 0, 0, 0, 0, 0, -6.46858241643395253, 0, 271.680461490226006, 0, -724.481230640602684, 0, -289.792492256241073, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.359365689801886252, 0, 77.6229889972074304, 0, -724.481230640602684, 0, 965.974974187470245, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.07809706940565876, 0, -58.2172417479055728, 0, 310.491955988829722, 0, -289.792492256241073, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 16.1714560410848813, 0, 0, 0, 0, 0, 0, 16.1714560410848813, 0, -258.743296657358101, 0, 0, 0, 0, 0, 0, 0, 0, -45.2800769150376677, 0, 0, 0, 724.481230640602684, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -71.1544065807734779, 0, 724.481230640602684, 0, -724.481230640602684, 0, -413.989274651772962, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -22.6400384575188339, 0, 413.989274651772962, 0, -1304.06621515308483, 0, 827.978549303545924, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.23429120821697627, 0, -51.7486593314716203, 0, 144.896246128120537, 0, -82.7978549303545924, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = -9/2
+        
         0, 0, 0, 0, 10.7809706940565876, 0, 0, 0, 0, 0, 0, 10.7809706940565876, 0, -172.495531104905401, 0, 0, 0, 0, 0, 0, 0, 0, -30.1867179433584452, 0, 0, 0, 482.987487093735122, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -47.4362710538489852, 0, 482.987487093735122, 0, -482.987487093735122, 0, -275.992849767848641, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -15.0933589716792226, 0, 275.992849767848641, 0, -869.37747676872322, 0, 551.985699535697283, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.15619413881131751, 0, -34.4991062209810802, 0, 96.5974974187470245, 0, -55.1985699535697283, 0, 0, 0, 0, 0,
         0, -1.07809706940565876, 0, 0, 0, 0, -3.23429120821697627, 0, 68.9982124419621604, 0, 0, 0, 0, 0, 0, -2.15619413881131751, 0, 137.996424883924321, 0, -482.987487093735122, 0, 0, 0, 0, 0, 0, 0, 0, 2.15619413881131751, 0, 0, 0, -482.987487093735122, 0, 772.779979349976196, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.23429120821697627, 0, -137.996424883924321, 0, 482.987487093735122, 0, 0, 0, -275.992849767848641, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.07809706940565876, 0, -68.9982124419621604, 0, 482.987487093735122, 0, -772.779979349976196, 0, 275.992849767848641, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = -7/2
+        
         0, -0.784430839734420891, 0, 0, 0, 0, -2.35329251920326267, 0, 50.203573743002937, 0, 0, 0, 0, 0, 0, -1.56886167946884178, 0, 100.407147486005874, 0, -351.425016201020559, 0, 0, 0, 0, 0, 0, 0, 0, 1.56886167946884178, 0, 0, 0, -351.425016201020559, 0, 562.280025921632895, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.35329251920326267, 0, -100.407147486005874, 0, 351.425016201020559, 0, 0, 0, -200.814294972011748, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.784430839734420891, 0, -50.203573743002937, 0, 351.425016201020559, 0, -562.280025921632895, 0, 200.814294972011748, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -9.41317007681305069, 0, 0, 0, 0, 0, 0, -34.5149569483145192, 0, 175.71250810051028, 0, 0, 0, 0, 0, 0, 0, 0, -43.9281270251275699, 0, 468.566688268027412, 0, -632.565029161837007, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -18.8263401536261014, 0, 351.425016201020559, 0, -1054.27504860306168, 0, 602.442884916035244, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.13772335893768356, 0, 0, 0, -210.855009720612336, 0, 401.628589944023496, 0, -133.876196648007832, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.13772335893768356, 0, -58.5708360335034265, 0, 210.855009720612336, 0, -200.814294972011748, 0, 44.6253988826692774, 0, 0, 0,
-        // j = 25/2, mj = -5/2
+        
         0, 0, 0, 0, -7.44176436131784437, 0, 0, 0, 0, 0, 0, -27.286469324832096, 0, 138.912934744599762, 0, 0, 0, 0, 0, 0, 0, 0, -34.7282336861499404, 0, 370.434492652266031, 0, -500.086565080559142, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -14.8835287226356887, 0, 277.825869489199523, 0, -833.47760846759857, 0, 476.27291912434204, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.48058812043928146, 0, 0, 0, -166.695521693519714, 0, 317.515279416228027, 0, -105.838426472076009, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.48058812043928146, 0, -46.3043115815332539, 0, 166.695521693519714, 0, -158.757639708114013, 0, 35.279475490692003, 0, 0, 0,
         0, 0.496117624087856292, 0, 0, 0, 0, 2.48058812043928146, 0, -34.7282336861499404, 0, 0, 0, 0, 0, 0, 4.96117624087856292, 0, -138.912934744599762, 0, 277.825869489199523, 0, 0, 0, 0, 0, 0, 0, 0, 4.96117624087856292, 0, -208.369402116899642, 0, 833.47760846759857, 0, -555.651738978399047, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.48058812043928146, 0, -138.912934744599762, 0, 833.47760846759857, 0, -1111.30347795679809, 0, 317.515279416228027, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.496117624087856292, 0, -34.7282336861499404, 0, 277.825869489199523, 0, -555.651738978399047, 0, 317.515279416228027, 0, -42.3353705888304036, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = -3/2
+        
         0, 0.424849751185551427, 0, 0, 0, 0, 2.12424875592775713, 0, -29.7394825829885999, 0, 0, 0, 0, 0, 0, 4.24849751185551427, 0, -118.957930331954399, 0, 237.915860663908799, 0, 0, 0, 0, 0, 0, 0, 0, 4.24849751185551427, 0, -178.436895497931599, 0, 713.747581991726397, 0, -475.831721327817598, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.12424875592775713, 0, -118.957930331954399, 0, 713.747581991726397, 0, -951.663442655635196, 0, 271.903840758752913, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.424849751185551427, 0, -29.7394825829885999, 0, 237.915860663908799, 0, -475.831721327817598, 0, 271.903840758752913, 0, -36.2538454345003884, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 2.97394825829885999, 0, 0, 0, 0, 0, 0, 14.8697412914942999, 0, -59.4789651659771997, 0, 0, 0, 0, 0, 0, 0, 0, 29.7394825829885999, 0, -237.915860663908799, 0, 237.915860663908799, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 29.7394825829885999, 0, -356.873790995863198, 0, 713.747581991726397, 0, -271.903840758752913, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14.8697412914942999, 0, -237.915860663908799, 0, 713.747581991726397, 0, -543.807681517505826, 0, 90.634613586250971, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.97394825829885999, 0, -59.4789651659771997, 0, 237.915860663908799, 0, -271.903840758752913, 0, 90.634613586250971, 0, -6.59160826081825244, 0,
-        // j = 25/2, mj = -1/2
+        
         0, 0, 0, 0, 2.7533410732166562, 0, 0, 0, 0, 0, 0, 13.766705366083281, 0, -55.066821464333124, 0, 0, 0, 0, 0, 0, 0, 0, 27.533410732166562, 0, -220.267285857332496, 0, 220.267285857332496, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 27.533410732166562, 0, -330.400928785998744, 0, 660.801857571997488, 0, -251.734040979808567, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13.766705366083281, 0, -220.267285857332496, 0, 660.801857571997488, 0, -503.468081959617133, 0, 83.9113469932695222, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.7533410732166562, 0, -55.066821464333124, 0, 220.267285857332496, 0, -251.734040979808567, 0, 83.9113469932695222, 0, -6.10264341769232889, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = 1/2
+        
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 2.7533410732166562, 0, 0, 0, 0, 0, 0, 13.766705366083281, 0, -55.066821464333124, 0, 0, 0, 0, 0, 0, 0, 0, 27.533410732166562, 0, -220.267285857332496, 0, 220.267285857332496, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 27.533410732166562, 0, -330.400928785998744, 0, 660.801857571997488, 0, -251.734040979808567, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13.766705366083281, 0, -220.267285857332496, 0, 660.801857571997488, 0, -503.468081959617133, 0, 83.9113469932695222, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.7533410732166562, 0, -55.066821464333124, 0, 220.267285857332496, 0, -251.734040979808567, 0, 83.9113469932695222, 0, -6.10264341769232889, 0,
-        // j = 25/2, mj = 3/2
+        
         0, 0, 0, 0, 2.97394825829885999, 0, 0, 0, 0, 0, 0, 14.8697412914942999, 0, -59.4789651659771997, 0, 0, 0, 0, 0, 0, 0, 0, 29.7394825829885999, 0, -237.915860663908799, 0, 237.915860663908799, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 29.7394825829885999, 0, -356.873790995863198, 0, 713.747581991726397, 0, -271.903840758752913, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14.8697412914942999, 0, -237.915860663908799, 0, 713.747581991726397, 0, -543.807681517505826, 0, 90.634613586250971, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.97394825829885999, 0, -59.4789651659771997, 0, 237.915860663908799, 0, -271.903840758752913, 0, 90.634613586250971, 0, -6.59160826081825244, 0,
         0, -0.424849751185551427, 0, 0, 0, 0, -2.12424875592775713, 0, 29.7394825829885999, 0, 0, 0, 0, 0, 0, -4.24849751185551427, 0, 118.957930331954399, 0, -237.915860663908799, 0, 0, 0, 0, 0, 0, 0, 0, -4.24849751185551427, 0, 178.436895497931599, 0, -713.747581991726397, 0, 475.831721327817598, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.12424875592775713, 0, 118.957930331954399, 0, -713.747581991726397, 0, 951.663442655635196, 0, -271.903840758752913, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.424849751185551427, 0, 29.7394825829885999, 0, -237.915860663908799, 0, 475.831721327817598, 0, -271.903840758752913, 0, 36.2538454345003884, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = 5/2
+        
         0, -0.496117624087856292, 0, 0, 0, 0, -2.48058812043928146, 0, 34.7282336861499404, 0, 0, 0, 0, 0, 0, -4.96117624087856292, 0, 138.912934744599762, 0, -277.825869489199523, 0, 0, 0, 0, 0, 0, 0, 0, -4.96117624087856292, 0, 208.369402116899642, 0, -833.47760846759857, 0, 555.651738978399047, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.48058812043928146, 0, 138.912934744599762, 0, -833.47760846759857, 0, 1111.30347795679809, 0, -317.515279416228027, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.496117624087856292, 0, 34.7282336861499404, 0, -277.825869489199523, 0, 555.651738978399047, 0, -317.515279416228027, 0, 42.3353705888304036, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -7.44176436131784437, 0, 0, 0, 0, 0, 0, -27.286469324832096, 0, 138.912934744599762, 0, 0, 0, 0, 0, 0, 0, 0, -34.7282336861499404, 0, 370.434492652266031, 0, -500.086565080559142, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -14.8835287226356887, 0, 277.825869489199523, 0, -833.47760846759857, 0, 476.27291912434204, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.48058812043928146, 0, 0, 0, -166.695521693519714, 0, 317.515279416228027, 0, -105.838426472076009, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.48058812043928146, 0, -46.3043115815332539, 0, 166.695521693519714, 0, -158.757639708114013, 0, 35.279475490692003, 0, 0, 0,
-        // j = 25/2, mj = 7/2
+        
         0, 0, 0, 0, -9.41317007681305069, 0, 0, 0, 0, 0, 0, -34.5149569483145192, 0, 175.71250810051028, 0, 0, 0, 0, 0, 0, 0, 0, -43.9281270251275699, 0, 468.566688268027412, 0, -632.565029161837007, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -18.8263401536261014, 0, 351.425016201020559, 0, -1054.27504860306168, 0, 602.442884916035244, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.13772335893768356, 0, 0, 0, -210.855009720612336, 0, 401.628589944023496, 0, -133.876196648007832, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.13772335893768356, 0, -58.5708360335034265, 0, 210.855009720612336, 0, -200.814294972011748, 0, 44.6253988826692774, 0, 0, 0,
         0, 0.784430839734420891, 0, 0, 0, 0, 2.35329251920326267, 0, -50.203573743002937, 0, 0, 0, 0, 0, 0, 1.56886167946884178, 0, -100.407147486005874, 0, 351.425016201020559, 0, 0, 0, 0, 0, 0, 0, 0, -1.56886167946884178, 0, 0, 0, 351.425016201020559, 0, -562.280025921632895, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.35329251920326267, 0, 100.407147486005874, 0, -351.425016201020559, 0, 0, 0, 200.814294972011748, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.784430839734420891, 0, 50.203573743002937, 0, -351.425016201020559, 0, 562.280025921632895, 0, -200.814294972011748, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = 9/2
+        
         0, 1.07809706940565876, 0, 0, 0, 0, 3.23429120821697627, 0, -68.9982124419621604, 0, 0, 0, 0, 0, 0, 2.15619413881131751, 0, -137.996424883924321, 0, 482.987487093735122, 0, 0, 0, 0, 0, 0, 0, 0, -2.15619413881131751, 0, 0, 0, 482.987487093735122, 0, -772.779979349976196, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -3.23429120821697627, 0, 137.996424883924321, 0, -482.987487093735122, 0, 0, 0, 275.992849767848641, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.07809706940565876, 0, 68.9982124419621604, 0, -482.987487093735122, 0, 772.779979349976196, 0, -275.992849767848641, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 10.7809706940565876, 0, 0, 0, 0, 0, 0, 10.7809706940565876, 0, -172.495531104905401, 0, 0, 0, 0, 0, 0, 0, 0, -30.1867179433584452, 0, 0, 0, 482.987487093735122, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -47.4362710538489852, 0, 482.987487093735122, 0, -482.987487093735122, 0, -275.992849767848641, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -15.0933589716792226, 0, 275.992849767848641, 0, -869.37747676872322, 0, 551.985699535697283, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.15619413881131751, 0, -34.4991062209810802, 0, 96.5974974187470245, 0, -55.1985699535697283, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = 11/2
+        
         0, 0, 0, 0, 16.1714560410848813, 0, 0, 0, 0, 0, 0, 16.1714560410848813, 0, -258.743296657358101, 0, 0, 0, 0, 0, 0, 0, 0, -45.2800769150376677, 0, 0, 0, 724.481230640602684, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -71.1544065807734779, 0, 724.481230640602684, 0, -724.481230640602684, 0, -413.989274651772962, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -22.6400384575188339, 0, 413.989274651772962, 0, -1304.06621515308483, 0, 827.978549303545924, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.23429120821697627, 0, -51.7486593314716203, 0, 144.896246128120537, 0, -82.7978549303545924, 0, 0, 0, 0, 0,
         0, -1.07809706940565876, 0, 0, 0, 0, 0.359365689801886252, 0, 58.2172417479055728, 0, 0, 0, 0, 0, 0, 6.46858241643395253, 0, -77.6229889972074304, 0, -310.491955988829722, 0, 0, 0, 0, 0, 0, 0, 0, 6.46858241643395253, 0, -271.680461490226006, 0, 724.481230640602684, 0, 289.792492256241073, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.359365689801886252, 0, -77.6229889972074304, 0, 724.481230640602684, 0, -965.974974187470245, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.07809706940565876, 0, 58.2172417479055728, 0, -310.491955988829722, 0, 289.792492256241073, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = 13/2
+        
         0, -1.77617456229312929, 0, 0, 0, 0, 0.592058187431043098, 0, 95.9134263638289819, 0, 0, 0, 0, 0, 0, 10.6570473737587758, 0, -127.884568485105309, 0, -511.538273940421237, 0, 0, 0, 0, 0, 0, 0, 0, 10.6570473737587758, 0, -447.595989697868582, 0, 1193.58930586098289, 0, 477.435722344393154, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.592058187431043098, 0, -127.884568485105309, 0, 1193.58930586098289, 0, -1591.45240781464385, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.77617456229312929, 0, 95.9134263638289819, 0, -511.538273940421237, 0, 477.435722344393154, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -12.4332219360519051, 0, 0, 0, 0, 0, 0, 37.2996658081557152, 0, 149.198663232622861, 0, 0, 0, 0, 0, 0, 0, 0, 74.5993316163114303, 0, -596.794652930491443, 0, -238.717861172196577, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -10.6570473737587758, 0, -298.397326465245721, 0, 1193.58930586098289, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -33.7473166835694566, 0, 426.281894950351031, 0, -716.153583516589731, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.77617456229312929, 0, -21.3140947475175515, 0, 34.1025515960280824, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = 15/2
+        
         0, 0, 0, 0, -22.6998537228122744, 0, 0, 0, 0, 0, 0, 68.0995611684368233, 0, 272.398244673747293, 0, 0, 0, 0, 0, 0, 0, 0, 136.199122336873647, 0, -1089.59297869498917, 0, -435.837191477995669, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -19.4570174766962352, 0, -544.796489347494586, 0, 2179.18595738997834, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -61.6138886762047449, 0, 778.280699067849409, 0, -1307.51157443398701, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.2428362461160392, 0, -38.9140349533924704, 0, 62.2624559254279527, 0, 0, 0, 0, 0, 0, 0,
         0, 1.29713449844641568, 0, 0, 0, 0, -6.48567249223207841, 0, -51.8853799378566272, 0, 0, 0, 0, 0, 0, -7.78280699067849409, 0, 311.312279627139763, 0, 155.656139813569882, 0, 0, 0, 0, 0, 0, 0, 0, 7.78280699067849409, 0, 0, 0, -1089.59297869498917, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6.48567249223207841, 0, -311.312279627139763, 0, 1089.59297869498917, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.29713449844641568, 0, 51.8853799378566272, 0, -155.656139813569882, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = 17/2
+        
         0, 2.65833466848162373, 0, 0, 0, 0, -13.2916733424081186, 0, -106.333386739264949, 0, 0, 0, 0, 0, 0, -15.9500080108897424, 0, 638.000320435589695, 0, 319.000160217794847, 0, 0, 0, 0, 0, 0, 0, 0, 15.9500080108897424, 0, 0, 0, -2233.00112152456393, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13.2916733424081186, 0, -638.000320435589695, 0, 2233.00112152456393, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.65833466848162373, 0, 106.333386739264949, 0, -319.000160217794847, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 11.9625060081673068, 0, 0, 0, 0, 0, 0, -99.6875500680608898, 0, -79.7500400544487119, 0, 0, 0, 0, 0, 0, 0, 0, 55.8250280381140983, 0, 744.333707174854644, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 119.625060081673068, 0, -1116.50056076228197, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -46.5208566984284153, 0, 319.000160217794847, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.32916733424081186, 0, -8.86111556160541243, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = 19/2
+        
         0, 0, 0, 0, 28.0545633538451997, 0, 0, 0, 0, 0, 0, -233.788027948709998, 0, -187.030422358967998, 0, 0, 0, 0, 0, 0, 0, 0, 130.921295651277599, 0, 1745.61727535036798, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 280.545633538451997, 0, -2618.42591302555197, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -109.101079709397999, 0, 748.121689435871992, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.11717370598279997, 0, -20.7811580398853331, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, -1.41689713908309089, 0, 0, 0, 0, 15.5858685299139998, 0, 31.1717370598279997, 0, 0, 0, 0, 0, 0, -18.7030422358967998, 0, -374.060844717935996, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -18.7030422358967998, 0, 785.527773907665592, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15.5858685299139998, 0, -374.060844717935996, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.41689713908309089, 0, 31.1717370598279997, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = 21/2
+        
         0, -3.92321052893598442, 0, 0, 0, 0, 43.1553158182958286, 0, 86.3106316365916572, 0, 0, 0, 0, 0, 0, -51.7863789819549943, 0, -1035.72757963909989, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -51.7863789819549943, 0, 2175.02791724210976, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 43.1553158182958286, 0, -1035.72757963909989, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -3.92321052893598442, 0, 86.3106316365916572, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, -8.63106316365916572, 0, 0, 0, 0, 0, 0, 129.465947454887486, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -362.50465287368496, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 258.931894909774972, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -43.1553158182958286, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.784642105787196884, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = 23/2
+        
         0, 0, 0, 0, -29.8988798455876938, 0, 0, 0, 0, 0, 0, 448.483197683815407, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1255.75295351468314, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 896.966395367630815, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -149.494399227938469, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.71807998596251762, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 1.35903999298125881, 0, 0, 0, 0, -24.9157332046564115, 0, 0, 0, 0, 0, 0, 0, 0, 89.6966395367630815, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -89.6966395367630815, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24.9157332046564115, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.35903999298125881, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        // j = 25/2, mj = 25/2
+        
         0, 6.79519996490629405, 0, 0, 0, 0, -124.578666023282058, 0, 0, 0, 0, 0, 0, 0, 0, 448.483197683815407, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -448.483197683815407, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 124.578666023282058, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -6.79519996490629405, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 };
@@ -12671,13 +12657,13 @@ static int _len_cart[] = {
 
 struct cart2sp_t {
         double *cart2sph;
-        double *cart2j_lt_lR; // j < kappa, l > 0
-        double *cart2j_lt_lI; // j < kappa, l > 0
-        double *cart2j_gt_lR; // j > kappa, l < 0
-        double *cart2j_gt_lI; // j > kappa, l < 0
+        double *cart2j_lt_lR; 
+        double *cart2j_lt_lI; 
+        double *cart2j_gt_lR; 
+        double *cart2j_gt_lI; 
 };
 
-// [*] = n(n+1)(n+2)(n+3)/4+(n+1)(n+2)(n+3)/6
+
 static struct cart2sp_t g_c2s[] = {
         {g_trans_cart2sph     ,g_trans_cart2jR      , g_trans_cart2jI      , g_trans_cart2jR      , g_trans_cart2jI      },
         {g_trans_cart2sph+1   ,g_trans_cart2jR+4    , g_trans_cart2jI+4    , g_trans_cart2jR+16   , g_trans_cart2jI+16   },
@@ -12697,7 +12683,7 @@ static struct cart2sp_t g_c2s[] = {
         {g_trans_cart2sph+14960, NULL, NULL, NULL, NULL},
 };
 
-// transform integrals from cartesian to spheric
+
 static double *a_bra_cart2spheric(double *gsph, FINT nket, double *gcart, FINT l)
 {
         FINT nf = _len_cart[l];
@@ -12715,24 +12701,16 @@ static double *a_ket_cart2spheric(double *gsph, double *gcart,
         return gsph;
 }
 
-// transform s function from cartesian to spheric
+
 static double *s_bra_cart2spheric(double *gsph, FINT nket, double *gcart, FINT l)
 {
-        /*
-        FINT i;
-        for (i = 0; i < nket; i++) {
-                *gsph = gcart[i];
-        }*/
+        
         return gcart;
 }
 static double *s_ket_cart2spheric(double *gsph, double *gcart,
                                   FINT lds, FINT nbra, FINT l)
 {
-        /*
-        FINT i;
-        for (i = 0; i < nbra; i++) {
-                gsph[i] = gcart[i];
-        }*/
+        
         return gcart;
 }
 static double *s_ket_cart2spheric_copy(double *gsph, double *gcart,
@@ -12745,15 +12723,15 @@ static double *s_ket_cart2spheric_copy(double *gsph, double *gcart,
         return gsph;
 }
 
-// transform p function from cartesian to spheric
+
 static double *p_bra_cart2spheric(double *gsph, FINT nket, double *gcart, FINT l)
 {
 #ifdef PYPZPX
         FINT i;
         for (i = 0; i < nket; i++) {
-                gsph[i*3+0] = gcart[i*3+1];  // py
-                gsph[i*3+1] = gcart[i*3+2];  // pz
-                gsph[i*3+2] = gcart[i*3+0];  // px
+                gsph[i*3+0] = gcart[i*3+1];  
+                gsph[i*3+1] = gcart[i*3+2];  
+                gsph[i*3+2] = gcart[i*3+0];  
         }
         return gsph;
 #else
@@ -12766,9 +12744,9 @@ static double *p_ket_cart2spheric(double *gsph, double *gcart,
 #ifdef PYPZPX
         FINT i;
         for (i = 0; i < nbra; i++) {
-                gsph[0*nbra+i] = gcart[1*nbra+i];  // py
-                gsph[1*nbra+i] = gcart[2*nbra+i];  // pz
-                gsph[2*nbra+i] = gcart[0*nbra+i];  // px
+                gsph[0*nbra+i] = gcart[1*nbra+i];  
+                gsph[1*nbra+i] = gcart[2*nbra+i];  
+                gsph[2*nbra+i] = gcart[0*nbra+i];  
         }
         return gsph;
 #else
@@ -12781,9 +12759,9 @@ static double *p_ket_cart2spheric_copy(double *gsph, double *gcart,
         FINT i;
 #ifdef PYPZPX
         for (i = 0; i < nbra; i++) {
-                gsph[0*nbra+i] = gcart[1*nbra+i];  // py
-                gsph[1*nbra+i] = gcart[2*nbra+i];  // pz
-                gsph[2*nbra+i] = gcart[0*nbra+i];  // px
+                gsph[0*nbra+i] = gcart[1*nbra+i];  
+                gsph[1*nbra+i] = gcart[2*nbra+i];  
+                gsph[2*nbra+i] = gcart[0*nbra+i];  
         }
 #else
         for (i = 0; i < nbra; i++) {
@@ -12795,7 +12773,7 @@ static double *p_ket_cart2spheric_copy(double *gsph, double *gcart,
         return gsph;
 }
 
-// transform d function from cartesian to spheric
+
 static double *d_bra_cart2spheric(double *gsph, FINT nket, double *gcart, FINT l)
 {
         double *coeff_c2s = g_c2s[2].cart2sph;
@@ -12842,7 +12820,7 @@ static double *d_ket_cart2spheric(double *gsph, double *gcart,
         return pgsph;
 }
 
-// transform f function from cartesian to spheric
+
 static double *f_bra_cart2spheric(double *gsph, FINT nket, double *gcart, FINT l)
 {
         double *coeff_c2s = g_c2s[3].cart2sph;
@@ -12909,7 +12887,7 @@ static double *f_ket_cart2spheric(double *gsph, double *gcart,
         return pgsph;
 }
 
-// transform g function from cartesian to spheric
+
 static double *g_bra_cart2spheric(double *gsph, FINT nket, double *gcart, FINT l)
 {
         double *coeff_c2s = g_c2s[4].cart2sph;
@@ -13004,11 +12982,14 @@ static double *g_ket_cart2spheric(double *gsph, double *gcart,
         return pgsph;
 }
 
-/*
- * return the address of gemm results, for s,p function, results ==
- * input, so return the input address optimize
- */
+
+#ifdef __cplusplus
+//double *(*c2s_bra_sph[16])(...) = {
+typedef double *(*Funcs) (double *gsph, int nket, double *gcart, int l);
+Funcs c2s_bra_sph[16] = {
+#else
 double *(*c2s_bra_sph[])() = {
+#endif
         s_bra_cart2spheric,
         p_bra_cart2spheric,
         d_bra_cart2spheric,
@@ -13067,8 +13048,8 @@ double *(*c2s_ket_sph1[])(double *gsph, double *gcart,
         a_ket_cart2spheric,
 };
 
-// [ca, cb] * [ 1+1j*z, y+1j*x]
-//            [-y+1j*x, 1-1j*z]
+
+
 static void a_bra_cart2spinor_si(double *gspR, double *gspI,
                                  double *gx, double *gy, double *gz, double *g1,
                                  FINT nket, FINT kappa, FINT l)
@@ -13080,7 +13061,7 @@ static void a_bra_cart2spinor_si(double *gspR, double *gspI,
         double *gspbR = gspR + nket * nd;
         double *gspbI = gspI + nket * nd;
         double *coeffR, *coeffI;
-        if (kappa < 0) { // j = l + 1/2
+        if (kappa < 0) { 
                 coeffR = g_c2s[l].cart2j_gt_lR;
                 coeffI = g_c2s[l].cart2j_gt_lI;
         } else {
@@ -13130,7 +13111,7 @@ static void a_bra_cart2spinor_sf(double *gspR, double *gspI,
         double *gspbR = gspR + nket * nd;
         double *gspbI = gspI + nket * nd;
         double *coeffR, *coeffI;
-        if (kappa < 0) { // j = l + 1/2
+        if (kappa < 0) { 
                 coeffR = g_c2s[l].cart2j_gt_lR;
                 coeffI = g_c2s[l].cart2j_gt_lI;
         } else {
@@ -13178,7 +13159,7 @@ static void a_bra1_cart2spinor_si(double *gspR, double *gspI,
         double *gspbR = gspR + nket * ndg;
         double *gspbI = gspI + nket * ndg;
         double *coeffR, *coeffI;
-        if (kappa < 0) { // j = l + 1/2
+        if (kappa < 0) { 
                 coeffR = g_c2s[l].cart2j_gt_lR;
                 coeffI = g_c2s[l].cart2j_gt_lI;
         } else {
@@ -13230,7 +13211,7 @@ static void a_bra1_cart2spinor_sf(double *gspR, double *gspI,
         double *gspbR = gspR + nket * ndg;
         double *gspbI = gspI + nket * ndg;
         double *coeffR, *coeffI;
-        if (kappa < 0) { // j = l + 1/2
+        if (kappa < 0) { 
                 coeffR = g_c2s[l].cart2j_gt_lR;
                 coeffI = g_c2s[l].cart2j_gt_lI;
         } else {
@@ -13287,7 +13268,7 @@ static void a_bra1_cart2spinor_zi(double *gspR, double *gspI,
         double *gzI = gz + nket * nf * ngrids;
         double *g1I = g1 + nket * nf * ngrids;
         double *coeffR, *coeffI;
-        if (kappa < 0) { // j = l + 1/2
+        if (kappa < 0) { 
                 coeffR = g_c2s[l].cart2j_gt_lR;
                 coeffI = g_c2s[l].cart2j_gt_lI;
         } else {
@@ -13318,8 +13299,8 @@ static void a_bra1_cart2spinor_zi(double *gspR, double *gspI,
                         cbI = coeffI[i*nf*2+nf+n];
 #pragma GCC ivdep
                         for (m = 0; m < ngrids; m++) {
-                                // [ 1+1j*z, y+1j*x]
-                                // [-y+1j*x, 1-1j*z]
+                                
+                                
                                 v11R = g1R[(j*nf+n)*ngrids+m] - gzI[(j*nf+n)*ngrids+m];
                                 v11I = g1I[(j*nf+n)*ngrids+m] + gzR[(j*nf+n)*ngrids+m];
                                 v12R = gyR[(j*nf+n)*ngrids+m] - gxI[(j*nf+n)*ngrids+m];
@@ -13351,7 +13332,7 @@ static void a_bra1_cart2spinor_zf(double *gspR, double *gspI,
         double *g1R = g1;
         double *g1I = g1 + nket * nf * ngrids;
         double *coeffR, *coeffI;
-        if (kappa < 0) { // j = l + 1/2
+        if (kappa < 0) { 
                 coeffR = g_c2s[l].cart2j_gt_lR;
                 coeffI = g_c2s[l].cart2j_gt_lI;
         } else {
@@ -13390,8 +13371,8 @@ static void a_bra1_cart2spinor_zf(double *gspR, double *gspI,
 }
 
 #if 0
-// [ 1+1j*z, y+1j*x] * [ca]
-// [-y+1j*x, 1-1j*z]   [cb]
+
+
 static void a_ket_cart2spinor_si(double *gspR, double *gspI,
                                  double *gx, double *gy, double *gz, double *g1,
                                  FINT lds, FINT nbra, FINT kappa, FINT l)
@@ -13403,7 +13384,7 @@ static void a_ket_cart2spinor_si(double *gspR, double *gspI,
         double *gspbR = gspR + lds * nd;
         double *gspbI = gspI + lds * nd;
         double *coeffR, *coeffI;
-        if (kappa < 0) { // j = l + 1/2
+        if (kappa < 0) { 
                 coeffR = g_c2s[l].cart2j_gt_lR;
                 coeffI = g_c2s[l].cart2j_gt_lI;
         } else {
@@ -13433,8 +13414,8 @@ static void a_ket_cart2spinor_si(double *gspR, double *gspI,
                                 vx = gx[j+n*nbra];
                                 vy = gy[j+n*nbra];
                                 vz = gz[j+n*nbra];
-// [ 1+1j*z, y+1j*x] * [ca]
-// [-y+1j*x, 1-1j*z]   [cb]
+
+
                                 gspaR[j+i*lds] += caR * v1 - caI * vz + cbR * vy - cbI * vx;
                                 gspaI[j+i*lds] += caI * v1 + caR * vz + cbI * vy + cbR * vx;
                                 gspbR[j+i*lds] += cbR * v1 + cbI * vz - caR * vy - caI * vx;
@@ -13455,7 +13436,7 @@ static void a_ket_cart2spinor_sf(double *gspR, double *gspI,
         double *gspbR = gspR + lds * nd;
         double *gspbI = gspI + lds * nd;
         double *coeffR, *coeffI;
-        if (kappa < 0) { // j = l + 1/2
+        if (kappa < 0) { 
                 coeffR = g_c2s[l].cart2j_gt_lR;
                 coeffI = g_c2s[l].cart2j_gt_lI;
         } else {
@@ -13500,7 +13481,7 @@ static void a_ket_cart2spinor(double *gspR, double *gspI,
         FINT nf2 = nf * 2;
         FINT nd = _len_spinor(kappa, l);
         double *coeffR, *coeffI;
-        if (kappa < 0) { // j = l + 1/2
+        if (kappa < 0) { 
                 coeffR = g_c2s[l].cart2j_gt_lR;
                 coeffI = g_c2s[l].cart2j_gt_lI;
         } else {
@@ -13553,7 +13534,7 @@ static void a_ket_cart2spinor(double *gspR, double *gspI,
         }
 }
 
-// with phase "i"
+
 static void a_iket_cart2spinor(double *gspR, double *gspI,
                                double *gcartR, double *gcartI,
                                FINT nbra, FINT kappa, FINT l)
@@ -13580,7 +13561,7 @@ static void a_ket1_cart2spinor(double *gspR, double *gspI,
         double *gcartbR = gcartaR + nfs * counts;
         double *gcartbI = gcartaI + nfs * counts;
         double *coeffR, *coeffI;
-        if (kappa < 0) { // j = l + 1/2
+        if (kappa < 0) { 
                 coeffR = g_c2s[l].cart2j_gt_lR;
                 coeffI = g_c2s[l].cart2j_gt_lI;
         } else {
@@ -13617,7 +13598,7 @@ static void a_ket1_cart2spinor(double *gspR, double *gspI,
         }
 }
 
-// with phase "i"
+
 static void a_iket1_cart2spinor(double *gspR, double *gspI,
                                 double *gcartR, double *gcartI,
                                 FINT nbra, FINT counts, FINT kappa, FINT l)
@@ -13630,11 +13611,7 @@ static void a_iket1_cart2spinor(double *gspR, double *gspI,
         }
 }
 
-/*************************************************
- *
- * transform matrices
- *
- *************************************************/
+
 
 static void dcopy_ij(double *out, double *gctr,
                      const FINT ni, const FINT nj, const FINT mi, const FINT mj)
@@ -13647,7 +13624,7 @@ static void dcopy_ij(double *out, double *gctr,
         } }
 }
 
-static void zcopy_ij(double complex *out, double *gctrR, double *gctrI,
+static void zcopy_ij(double *out, double *gctrR, double *gctrI,
                      const FINT ni, const FINT nj, const FINT mi, const FINT mj)
 {
         double *dout = (double *)out;
@@ -13679,7 +13656,7 @@ static void dcopy_grids_ij(double *out, const double *gctr,
         }
 }
 
-static void zcopy_grids_ij(double complex *out, double *gctrR, double *gctrI,
+static void zcopy_grids_ij(double *out, double *gctrR, double *gctrI,
                            const FINT ngrids, const FINT ni, const FINT nj,
                            const FINT mgrids, const FINT mi, const FINT mj)
 {
@@ -13701,11 +13678,7 @@ static void zcopy_grids_ij(double complex *out, double *gctrR, double *gctrI,
         }
 }
 
-/*
- * gctr(i,k,l,j) -> fijkl(i,j,k,l)
- * fijkl(ic:ic-1+di,jc:jc-1+dj,kc:kc-1+dk,lc:lc-1+dl)
- * fijkl(ni,nj,nk,nl), gctr(mi,mk,ml,mj)
- */
+
 static void dcopy_iklj(double *fijkl, const double *gctr,
                        const FINT ni, const FINT nj, const FINT nk, const FINT nl,
                        const FINT mi, const FINT mj, const FINT mk, const FINT ml)
@@ -13824,7 +13797,7 @@ static void dcopy_iklj(double *fijkl, const double *gctr,
         }
 }
 
-static void zcopy_iklj(double complex *fijkl, double *gctrR, double *gctrI,
+static void zcopy_iklj(double *fijkl, double *gctrR, double *gctrI,
                        const FINT ni, const FINT nj, const FINT nk, const FINT nl,
                        const FINT mi, const FINT mj, const FINT mk, const FINT ml)
 {
@@ -13885,7 +13858,7 @@ void c2s_dset0(double *out, FINT *dims, FINT *counts)
                 out += nijk;
         }
 }
-void c2s_zset0(double complex *out, FINT *dims, FINT *counts)
+void c2s_zset0(double *out, FINT *dims, FINT *counts)
 {
         FINT ni = dims[0];
         FINT nj = dims[1];
@@ -13903,7 +13876,7 @@ void c2s_zset0(double complex *out, FINT *dims, FINT *counts)
         FINT dj = counts[1];
         FINT dk = counts[2];
         FINT dl = counts[3];
-        double complex *pout;
+        double *pout;
         for (l = 0; l < dl; l++) {
                 for (k = 0; k < dk; k++) {
                         pout = out + k * nij;
@@ -13923,19 +13896,14 @@ void c2s_grids_dset0(double *out, FINT *dims, FINT *counts)
         c2s_dset0(out, dims1, counts1);
 }
 
-void c2s_grids_zset0(double complex *out, FINT *dims, FINT *counts)
+void c2s_grids_zset0(double *out, FINT *dims, FINT *counts)
 {
         FINT counts1[4] = {counts[2], counts[0], counts[1], counts[3]};
         FINT dims1[4] = {dims[2], dims[0], dims[1],dims [3]};
         c2s_zset0(out, dims1, counts1);
 }
 
-/*
- * use f_ket to transform k,l for gctr(i,j,k,l), where
- * sizsph = nbra * (2*l+1)
- * sizcart = nbra * (l*(l+1)/2)
- * and return the pointer to the buffer which holds the transformed gctr
- */
+
 static double *sph2e_inner(double *gsph, double *gcart,
                            FINT l, FINT nbra, FINT ncall, FINT sizsph, FINT sizcart)
 {
@@ -13976,9 +13944,7 @@ static double *sph2e_inner(double *gsph, double *gcart,
         return gsph;
 }
 
-/*
- * 1e integrals, cartesian to real spheric.
- */
+
 void c2s_sph_1e(double *opij, double *gctr, FINT *dims,
                 CINTEnvVars *envs, double *cache)
 {
@@ -14011,10 +13977,8 @@ void c2s_sph_1e(double *opij, double *gctr, FINT *dims,
         } }
 }
 
-/*
- * 1e integrals, cartesian to spin-free spinor.
- */
-void c2s_sf_1e(double complex *opij, double *gctr, FINT *dims,
+
+void c2s_sf_1e(double *opij, double *gctr, FINT *dims,
                CINTEnvVars *envs, double *cache)
 {
         FINT *shls = envs->shls;
@@ -14051,7 +14015,7 @@ void c2s_sf_1e(double complex *opij, double *gctr, FINT *dims,
         } }
 }
 
-void c2s_sf_1ei(double complex *opij, double *gctr, FINT *dims,
+void c2s_sf_1ei(double *opij, double *gctr, FINT *dims,
                 CINTEnvVars *envs, double *cache)
 {
         FINT *shls = envs->shls;
@@ -14088,10 +14052,8 @@ void c2s_sf_1ei(double complex *opij, double *gctr, FINT *dims,
         } }
 }
 
-/*
- * 1e integrals, cartesian to spinor.
- */
-void c2s_si_1e(double complex *opij, double *gctr, FINT *dims,
+
+void c2s_si_1e(double *opij, double *gctr, FINT *dims,
                CINTEnvVars *envs, double *cache)
 {
         FINT *shls = envs->shls;
@@ -14137,7 +14099,7 @@ void c2s_si_1e(double complex *opij, double *gctr, FINT *dims,
                 gc_1 += nf;
         } }
 }
-void c2s_si_1ei(double complex *opij, double *gctr, FINT *dims,
+void c2s_si_1ei(double *opij, double *gctr, FINT *dims,
                 CINTEnvVars *envs, double *cache)
 {
         FINT *shls = envs->shls;
@@ -14252,10 +14214,8 @@ void c2s_cart_1e_grids(double *out, double *gctr, FINT *dims,
         }
 }
 
-/*
- * 1e-grids integrals, cartesian to spin-free spinor.
- */
-void c2s_sf_1e_grids(double complex *out, double *gctr, FINT *dims,
+
+void c2s_sf_1e_grids(double *out, double *gctr, FINT *dims,
                      CINTEnvVars *envs, double *cache)
 {
         FINT ngrids = envs->ngrids;
@@ -14287,7 +14247,7 @@ void c2s_sf_1e_grids(double complex *out, double *gctr, FINT *dims,
         MALLOC_ALIGN8_INSTACK(tmp1I, buflen);
         MALLOC_ALIGN8_INSTACK(tmp2R, buflen);
         MALLOC_ALIGN8_INSTACK(tmp2I, buflen);
-        double complex *pij;
+        double *pij;
 
         for (grids_offset = 0; grids_offset < ngrids; grids_offset += GRID_BLKSIZE) {
                 bgrids = MIN(ngrids - grids_offset, GRID_BLKSIZE);
@@ -14302,7 +14262,7 @@ void c2s_sf_1e_grids(double complex *out, double *gctr, FINT *dims,
                 } }
         }
 }
-void c2s_sf_1e_gridsi(double complex *out, double *gctr, FINT *dims,
+void c2s_sf_1e_gridsi(double *out, double *gctr, FINT *dims,
                       CINTEnvVars *envs, double *cache)
 {
         FINT ngrids = envs->ngrids;
@@ -14334,7 +14294,7 @@ void c2s_sf_1e_gridsi(double complex *out, double *gctr, FINT *dims,
         MALLOC_ALIGN8_INSTACK(tmp1I, buflen);
         MALLOC_ALIGN8_INSTACK(tmp2R, buflen);
         MALLOC_ALIGN8_INSTACK(tmp2I, buflen);
-        double complex *pij;
+        double *pij;
 
         for (grids_offset = 0; grids_offset < ngrids; grids_offset += GRID_BLKSIZE) {
                 bgrids = MIN(ngrids - grids_offset, GRID_BLKSIZE);
@@ -14349,7 +14309,7 @@ void c2s_sf_1e_gridsi(double complex *out, double *gctr, FINT *dims,
                 } }
         }
 }
-void c2s_si_1e_grids(double complex *out, double *gctr, FINT *dims,
+void c2s_si_1e_grids(double *out, double *gctr, FINT *dims,
                      CINTEnvVars *envs, double *cache)
 {
         FINT ngrids = envs->ngrids;
@@ -14386,7 +14346,7 @@ void c2s_si_1e_grids(double complex *out, double *gctr, FINT *dims,
         MALLOC_ALIGN8_INSTACK(tmp1I, buflen);
         MALLOC_ALIGN8_INSTACK(tmp2R, buflen);
         MALLOC_ALIGN8_INSTACK(tmp2I, buflen);
-        double complex *pij;
+        double *pij;
 
         for (grids_offset = 0; grids_offset < ngrids; grids_offset += GRID_BLKSIZE) {
                 bgrids = MIN(ngrids - grids_offset, GRID_BLKSIZE);
@@ -14405,7 +14365,7 @@ void c2s_si_1e_grids(double complex *out, double *gctr, FINT *dims,
                 } }
         }
 }
-void c2s_si_1e_gridsi(double complex *out, double *gctr, FINT *dims,
+void c2s_si_1e_gridsi(double *out, double *gctr, FINT *dims,
                       CINTEnvVars *envs, double *cache)
 {
         FINT ngrids = envs->ngrids;
@@ -14442,7 +14402,7 @@ void c2s_si_1e_gridsi(double complex *out, double *gctr, FINT *dims,
         MALLOC_ALIGN8_INSTACK(tmp1I, buflen);
         MALLOC_ALIGN8_INSTACK(tmp2R, buflen);
         MALLOC_ALIGN8_INSTACK(tmp2I, buflen);
-        double complex *pij;
+        double *pij;
 
         for (grids_offset = 0; grids_offset < ngrids; grids_offset += GRID_BLKSIZE) {
                 bgrids = MIN(ngrids - grids_offset, GRID_BLKSIZE);
@@ -14462,11 +14422,7 @@ void c2s_si_1e_gridsi(double complex *out, double *gctr, FINT *dims,
         }
 }
 
-/*
- * 2e integrals, cartesian to real spherical functions.
- *
- * gctr: Cartesian GTO integrals, ordered as <ik|lj>
- */
+
 void c2s_sph_2e1(double *out, double *gctr, FINT *dims,
                  CINTEnvVars *envs, double *cache)
 {
@@ -14521,12 +14477,7 @@ void c2s_sph_2e1(double *out, double *gctr, FINT *dims,
         } } } }
 }
 
-/*
- * 2e integrals, cartesian to spin-free spinor for electron 1.
- *
- * gctr: Cartesian GTO integrals, ordered as <ik|lj>
- * opij: partially transformed GTO integrals, ordered as <ik|lj>
- */
+
 void c2s_sf_2e1(double *opij, double *gctr, FINT *dims,
                 CINTEnvVars *envs, double *cache)
 {
@@ -14605,12 +14556,8 @@ void c2s_sf_2e1i(double *opij, double *gctr, FINT *dims,
         }
 }
 
-/*
- * 2e integrals, cartesian to spin-free spinor for electron 2.
- *
- * opij: partial transformed GTO integrals, ordered as <ik|lj>
- */
-void c2s_sf_2e2(double complex *fijkl, double *opij, FINT *dims,
+
+void c2s_sf_2e2(double *fijkl, double *opij, FINT *dims,
                 CINTEnvVars *envs, double *cache)
 {
         FINT *shls = envs->shls;
@@ -14655,7 +14602,7 @@ void c2s_sf_2e2(double complex *fijkl, double *opij, FINT *dims,
         MALLOC_INSTACK(tmp1I, len1);
         MALLOC_INSTACK(tmp2R, len2);
         MALLOC_INSTACK(tmp2I, len2);
-        double complex *pfijkl;
+        double *pfijkl;
 
         for (lc = 0; lc < l_ctr; lc++) {
         for (kc = 0; kc < k_ctr; kc++) {
@@ -14668,7 +14615,7 @@ void c2s_sf_2e2(double complex *fijkl, double *opij, FINT *dims,
                 opij += nop * OF_CMPLX;
         } } } }
 }
-void c2s_sf_2e2i(double complex *fijkl, double *opij, FINT *dims,
+void c2s_sf_2e2i(double *fijkl, double *opij, FINT *dims,
                  CINTEnvVars *envs, double *cache)
 {
         FINT *shls = envs->shls;
@@ -14713,7 +14660,7 @@ void c2s_sf_2e2i(double complex *fijkl, double *opij, FINT *dims,
         MALLOC_INSTACK(tmp1I, len1);
         MALLOC_INSTACK(tmp2R, len2);
         MALLOC_INSTACK(tmp2I, len2);
-        double complex *pfijkl;
+        double *pfijkl;
 
         for (lc = 0; lc < l_ctr; lc++) {
         for (kc = 0; kc < k_ctr; kc++) {
@@ -14727,12 +14674,7 @@ void c2s_sf_2e2i(double complex *fijkl, double *opij, FINT *dims,
         } } } }
 }
 
-/*
- * 2e integrals, cartesian to spinor for electron 1.
- *
- * gctr: Cartesian GTO integrals, ordered as <ik|lj>
- * opij: partial transformed GTO integrals, ordered as <ik|lj>
- */
+
 void c2s_si_2e1(double *opij, double *gctr, FINT *dims,
                 CINTEnvVars *envs, double *cache)
 {
@@ -14828,7 +14770,7 @@ void c2s_si_2e1i(double *opij, double *gctr, FINT *dims,
         }
 }
 
-void c2s_si_2e2(double complex *fijkl, double *opij, FINT *dims,
+void c2s_si_2e2(double *fijkl, double *opij, FINT *dims,
                 CINTEnvVars *envs, double *cache)
 {
         FINT *shls = envs->shls;
@@ -14866,7 +14808,7 @@ void c2s_si_2e2(double complex *fijkl, double *opij, FINT *dims,
         FINT ofk = ni * nj * dk;
         FINT ofl = ni * nj * nk * dl;
         FINT ic, jc, kc, lc;
-        double complex *pfijkl;
+        double *pfijkl;
         double *ox = opij;
         double *oy = ox + nop * OF_CMPLX * i_ctr * j_ctr * k_ctr * l_ctr;
         double *oz = oy + nop * OF_CMPLX * i_ctr * j_ctr * k_ctr * l_ctr;
@@ -14893,7 +14835,7 @@ void c2s_si_2e2(double complex *fijkl, double *opij, FINT *dims,
         } } } }
 }
 
-void c2s_si_2e2i(double complex *fijkl, double *opij, FINT *dims,
+void c2s_si_2e2i(double *fijkl, double *opij, FINT *dims,
                  CINTEnvVars *envs, double *cache)
 {
         FINT *shls = envs->shls;
@@ -14931,7 +14873,7 @@ void c2s_si_2e2i(double complex *fijkl, double *opij, FINT *dims,
         FINT ofk = ni * nj * dk;
         FINT ofl = ni * nj * nk * dl;
         FINT ic, jc, kc, lc;
-        double complex *pfijkl;
+        double *pfijkl;
         double *ox = opij;
         double *oy = ox + nop * OF_CMPLX * i_ctr * j_ctr * k_ctr * l_ctr;
         double *oz = oy + nop * OF_CMPLX * i_ctr * j_ctr * k_ctr * l_ctr;
@@ -14958,9 +14900,7 @@ void c2s_si_2e2i(double complex *fijkl, double *opij, FINT *dims,
         } } } }
 }
 
-/*
- * 1e integrals, reorder cartesian integrals.
- */
+
 void c2s_cart_1e(double *opij, double *gctr, FINT *dims,
                  CINTEnvVars *envs, double *cache)
 {
@@ -14983,9 +14923,7 @@ void c2s_cart_1e(double *opij, double *gctr, FINT *dims,
         } }
 }
 
-/*
- * 2e integrals, reorder cartesian integrals.
- */
+
 void c2s_cart_2e1(double *fijkl, double *gctr, FINT *dims, CINTEnvVars *envs,
                   double *cache)
 {
@@ -15019,11 +14957,7 @@ void c2s_cart_2e1(double *fijkl, double *gctr, FINT *dims, CINTEnvVars *envs,
 }
 void c2s_cart_2e2() {};
 
-/*************************************************
- *
- * 3-center 2-electron integral transformation
- *
- *************************************************/
+
 void c2s_sph_3c2e1(double *bufijk, double *gctr, FINT *dims,
                    CINTEnvVars *envs, double *cache)
 {
@@ -15093,9 +15027,7 @@ void c2s_cart_3c2e1(double *bufijk, double *gctr, FINT *dims,
         } } }
 }
 
-/*
- * ssc ~ (spheric,spheric|cartesian)
- */
+
 void c2s_sph_3c2e1_ssc(double *bufijk, double *gctr, FINT *dims,
                        CINTEnvVars *envs, double *cache)
 {
@@ -15134,10 +15066,8 @@ void c2s_sph_3c2e1_ssc(double *bufijk, double *gctr, FINT *dims,
         } } }
 }
 
-/*
- * 3c2e spinor integrals, cartesian to spin-free spinor for electron 1.
- */
-void c2s_sf_3c2e1(double complex *opijk, double *gctr, FINT *dims,
+
+void c2s_sf_3c2e1(double *opijk, double *gctr, FINT *dims,
                   CINTEnvVars *envs, double *cache)
 {
         FINT *shls = envs->shls;
@@ -15177,7 +15107,7 @@ void c2s_sf_3c2e1(double complex *opijk, double *gctr, FINT *dims,
         MALLOC_INSTACK(tmp1I, len1);
         MALLOC_INSTACK(tmp2R, len2);
         MALLOC_INSTACK(tmp2I, len2);
-        double complex *pijk;
+        double *pijk;
 
         for (kc = 0; kc < k_ctr; kc++) {
         for (jc = 0; jc < j_ctr; jc++) {
@@ -15190,7 +15120,7 @@ void c2s_sf_3c2e1(double complex *opijk, double *gctr, FINT *dims,
                 gctr += nf;
         } } }
 }
-void c2s_sf_3c2e1i(double complex *opijk, double *gctr, FINT *dims,
+void c2s_sf_3c2e1i(double *opijk, double *gctr, FINT *dims,
                    CINTEnvVars *envs, double *cache)
 {
         FINT *shls = envs->shls;
@@ -15232,7 +15162,7 @@ void c2s_sf_3c2e1i(double complex *opijk, double *gctr, FINT *dims,
         MALLOC_INSTACK(tmp1I, len1);
         MALLOC_INSTACK(tmp2R, len2);
         MALLOC_INSTACK(tmp2I, len2);
-        double complex *pijk;
+        double *pijk;
 
         for (kc = 0; kc < k_ctr; kc++) {
         for (jc = 0; jc < j_ctr; jc++) {
@@ -15245,10 +15175,8 @@ void c2s_sf_3c2e1i(double complex *opijk, double *gctr, FINT *dims,
                 gctr += nf;
         } } }
 }
-/*
- * 3c2e integrals, cartesian to spinor for electron 1.
- */
-void c2s_si_3c2e1(double complex *opijk, double *gctr, FINT *dims,
+
+void c2s_si_3c2e1(double *opijk, double *gctr, FINT *dims,
                   CINTEnvVars *envs, double *cache)
 {
         FINT *shls = envs->shls;
@@ -15300,7 +15228,7 @@ void c2s_si_3c2e1(double complex *opijk, double *gctr, FINT *dims,
         MALLOC_INSTACK(tmp1I, len1);
         MALLOC_INSTACK(tmp2R, len2);
         MALLOC_INSTACK(tmp2I, len2);
-        double complex *pijk;
+        double *pijk;
 
         for (kc = 0; kc < k_ctr; kc++) {
         for (jc = 0; jc < j_ctr; jc++) {
@@ -15320,7 +15248,7 @@ void c2s_si_3c2e1(double complex *opijk, double *gctr, FINT *dims,
         } } }
 }
 
-void c2s_si_3c2e1i(double complex *opijk, double *gctr, FINT *dims,
+void c2s_si_3c2e1i(double *opijk, double *gctr, FINT *dims,
                    CINTEnvVars *envs, double *cache)
 {
         FINT *shls = envs->shls;
@@ -15370,7 +15298,7 @@ void c2s_si_3c2e1i(double complex *opijk, double *gctr, FINT *dims,
         MALLOC_INSTACK(tmp1I, len1);
         MALLOC_INSTACK(tmp2R, len2);
         MALLOC_INSTACK(tmp2I, len2);
-        double complex *pijk;
+        double *pijk;
 
         for (kc = 0; kc < k_ctr; kc++) {
         for (jc = 0; jc < j_ctr; jc++) {
@@ -15390,7 +15318,7 @@ void c2s_si_3c2e1i(double complex *opijk, double *gctr, FINT *dims,
         } } }
 }
 
-void c2s_sf_3c2e1_ssc(double complex *opijk, double *gctr, FINT *dims,
+void c2s_sf_3c2e1_ssc(double *opijk, double *gctr, FINT *dims,
                       CINTEnvVars *envs, double *cache)
 {
         FINT *shls = envs->shls;
@@ -15423,7 +15351,7 @@ void c2s_sf_3c2e1_ssc(double complex *opijk, double *gctr, FINT *dims,
         MALLOC_INSTACK(tmp1I, len1);
         MALLOC_INSTACK(tmp2R, len2);
         MALLOC_INSTACK(tmp2I, len2);
-        double complex *pijk;
+        double *pijk;
 
         for (kc = 0; kc < k_ctr; kc++) {
         for (jc = 0; jc < j_ctr; jc++) {
@@ -15436,7 +15364,7 @@ void c2s_sf_3c2e1_ssc(double complex *opijk, double *gctr, FINT *dims,
         } } }
 }
 
-void c2s_sf_3c2e1i_ssc(double complex *opijk, double *gctr, FINT *dims,
+void c2s_sf_3c2e1i_ssc(double *opijk, double *gctr, FINT *dims,
                        CINTEnvVars *envs, double *cache)
 {
         FINT *shls = envs->shls;
@@ -15469,7 +15397,7 @@ void c2s_sf_3c2e1i_ssc(double complex *opijk, double *gctr, FINT *dims,
         MALLOC_INSTACK(tmp1I, len1);
         MALLOC_INSTACK(tmp2R, len2);
         MALLOC_INSTACK(tmp2I, len2);
-        double complex *pijk;
+        double *pijk;
 
         for (kc = 0; kc < k_ctr; kc++) {
         for (jc = 0; jc < j_ctr; jc++) {
@@ -15481,7 +15409,7 @@ void c2s_sf_3c2e1i_ssc(double complex *opijk, double *gctr, FINT *dims,
                 gctr += nf;
         } } }
 }
-void c2s_si_3c2e1_ssc(double complex *opijk, double *gctr, FINT *dims,
+void c2s_si_3c2e1_ssc(double *opijk, double *gctr, FINT *dims,
                       CINTEnvVars *envs, double *cache)
 {
         FINT *shls = envs->shls;
@@ -15521,7 +15449,7 @@ void c2s_si_3c2e1_ssc(double complex *opijk, double *gctr, FINT *dims,
         MALLOC_INSTACK(tmp1I, len1);
         MALLOC_INSTACK(tmp2R, len2);
         MALLOC_INSTACK(tmp2I, len2);
-        double complex *pijk;
+        double *pijk;
 
         for (kc = 0; kc < k_ctr; kc++) {
         for (jc = 0; jc < j_ctr; jc++) {
@@ -15536,7 +15464,7 @@ void c2s_si_3c2e1_ssc(double complex *opijk, double *gctr, FINT *dims,
                 gc_1 += nf;
         } } }
 }
-void c2s_si_3c2e1i_ssc(double complex *opijk, double *gctr, FINT *dims,
+void c2s_si_3c2e1i_ssc(double *opijk, double *gctr, FINT *dims,
                        CINTEnvVars *envs, double *cache)
 {
         FINT *shls = envs->shls;
@@ -15576,7 +15504,7 @@ void c2s_si_3c2e1i_ssc(double complex *opijk, double *gctr, FINT *dims,
         MALLOC_INSTACK(tmp1I, len1);
         MALLOC_INSTACK(tmp2R, len2);
         MALLOC_INSTACK(tmp2I, len2);
-        double complex *pijk;
+        double *pijk;
 
         for (kc = 0; kc < k_ctr; kc++) {
         for (jc = 0; jc < j_ctr; jc++) {
@@ -15592,11 +15520,7 @@ void c2s_si_3c2e1i_ssc(double complex *opijk, double *gctr, FINT *dims,
         } } }
 }
 
-/*************************************************
- *
- * 3-center 1-electron integral transformation
- *
- *************************************************/
+
 void c2s_sph_3c1e(double *out, double *gctr, FINT *dims,
                   CINTEnvVars *envs, double *cache)
 {
@@ -15609,11 +15533,7 @@ void c2s_cart_3c1e(double *out, double *gctr, FINT *dims,
         c2s_cart_3c2e1(out, gctr, dims, envs, cache);
 }
 
-/*************************************************
- *
- * transform vectors
- *
- *************************************************/
+
 double *CINTc2s_bra_sph(double *gsph, FINT nket, double *gcart, FINT l)
 {
         return (c2s_bra_sph[l])(gsph, nket, gcart, l);
@@ -15627,7 +15547,7 @@ double *CINTc2s_ket_sph1(double *sph, double *cart, FINT lds, FINT ldc, FINT l)
         return (c2s_ket_sph1[l])(sph, cart, lds, ldc, l);
 }
 
-void CINTc2s_bra_spinor_e1sf(double complex *gsp, FINT nket,
+void CINTc2s_bra_spinor_e1sf(double *gsp, FINT nket,
                              double *gcart, FINT kappa, FINT l)
 {
         FINT nf = _len_cart[l];
@@ -15635,7 +15555,7 @@ void CINTc2s_bra_spinor_e1sf(double complex *gsp, FINT nket,
         double *gspa = (double *)gsp;
         double *gspb = gspa + nket * nd * OF_CMPLX;
         double *coeffR, *coeffI;
-        if (kappa < 0) { // j = l + 1/2
+        if (kappa < 0) { 
                 coeffR = g_c2s[l].cart2j_gt_lR;
                 coeffI = g_c2s[l].cart2j_gt_lI;
         } else {
@@ -15671,15 +15591,15 @@ void CINTc2s_bra_spinor_e1sf(double complex *gsp, FINT nket,
         } }
 }
 
-void CINTc2s_bra_spinor_sf(double complex *gsp, FINT nket,
-                           double complex *gcart, FINT kappa, FINT l)
+/*void CINTc2s_bra_spinor_sf(double *gsp, FINT nket,
+                           double *gcart, FINT kappa, FINT l)
 {
         FINT nf = _len_cart[l];
         FINT nd = _len_spinor(kappa, l);
         double *gspa = (double *)gsp;
         double *gspb = gspa + nket * nd * OF_CMPLX;
         double *coeffR, *coeffI;
-        if (kappa < 0) { // j = l + 1/2
+        if (kappa < 0) { 
                 coeffR = g_c2s[l].cart2j_gt_lR;
                 coeffI = g_c2s[l].cart2j_gt_lI;
         } else {
@@ -15714,134 +15634,20 @@ void CINTc2s_bra_spinor_sf(double complex *gsp, FINT nket,
                 gspb[(j*nd+i)*OF_CMPLX  ] = sbR;
                 gspb[(j*nd+i)*OF_CMPLX+1] = sbI;
         } }
-}
+}*/
 
-void CINTc2s_ket_spinor(double complex *gsp, FINT nbra,
-                        double complex *gcart, FINT kappa, FINT l)
-{
-        FINT nf = _len_cart[l];
-        FINT nf2 = nf * 2;
-        FINT nd = _len_spinor(kappa, l);
-        double *coeffR, *coeffI;
-        double *gspz = (double *)gsp;
-        if (kappa < 0) { // j = l + 1/2
-                coeffR = g_c2s[l].cart2j_gt_lR;
-                coeffI = g_c2s[l].cart2j_gt_lI;
-        } else {
-                coeffR = g_c2s[l].cart2j_lt_lR;
-                coeffI = g_c2s[l].cart2j_lt_lI;
-        }
 
-        FINT i, j, n;
-        double cR, cI, gR, gI;
-
-        for (i = 0; i < nd; i++) {
-#pragma GCC ivdep
-                for (j = 0; j < nbra; j++) {
-                        gspz[(j+i*nbra)*OF_CMPLX  ] = 0;
-                        gspz[(j+i*nbra)*OF_CMPLX+1] = 0;
-                }
-                for (n = 0; n < nf2; n++) {
-                        cR = coeffR[i*nf2+n];
-                        cI = coeffI[i*nf2+n];
-#pragma GCC ivdep
-                        for (j = 0; j < nbra; j++) {
-                                gR = creal(gcart[j+n*nbra]);
-                                gI = cimag(gcart[j+n*nbra]);
-                                gspz[(j+i*nbra)*OF_CMPLX  ] += cR * gR - cI * gI;
-                                gspz[(j+i*nbra)*OF_CMPLX+1] += cI * gR + cR * gI;
-                        }
-                }
-        }
-}
-
-void CINTc2s_iket_spinor(double complex *gsp, FINT nbra,
-                         double complex *gcart, FINT kappa, FINT l)
-{
-        FINT nf = _len_cart[l];
-        FINT nf2 = nf * 2;
-        FINT nd = _len_spinor(kappa, l);
-        double *coeffR, *coeffI;
-        double *gspz = (double *)gsp;
-        if (kappa < 0) { // j = l + 1/2
-                coeffR = g_c2s[l].cart2j_gt_lR;
-                coeffI = g_c2s[l].cart2j_gt_lI;
-        } else {
-                coeffR = g_c2s[l].cart2j_lt_lR;
-                coeffI = g_c2s[l].cart2j_lt_lI;
-        }
-
-        FINT i, j, n;
-        double cR, cI, gR, gI;
-
-        for (i = 0; i < nd; i++) {
-#pragma GCC ivdep
-                for (j = 0; j < nbra; j++) {
-                        gspz[(j+i*nbra)*OF_CMPLX  ] = 0;
-                        gspz[(j+i*nbra)*OF_CMPLX+1] = 0;
-                }
-                for (n = 0; n < nf2; n++) {
-                        cR = coeffR[i*nf2+n];
-                        cI = coeffI[i*nf2+n];
-#pragma GCC ivdep
-                        for (j = 0; j < nbra; j++) {
-                                gR = creal(gcart[j+n*nbra]);
-                                gI = cimag(gcart[j+n*nbra]);
-                                gspz[(j+i*nbra)*OF_CMPLX  ] -= cI * gR + cR * gI;
-                                gspz[(j+i*nbra)*OF_CMPLX+1] += cR * gR - cI * gI;
-                        }
-                }
-        }
-}
-
-void CINTc2s_bra_spinor(double complex *gsp, FINT nket,
-                        double complex *gcart, FINT kappa, FINT l)
+/*void CINTc2s_bra_spinor_si(double *gsp, FINT nket,
+                           double *gcart, FINT kappa, FINT l)
 {
         FINT nf = _len_cart[l];
         FINT nf2 = nf * 2;
         FINT nd = _len_spinor(kappa, l);
         double *gspz = (double *)gsp;
+        double *gcarta = gcart;
+        double *gcartb = gcarta + nf * nket;
         double *coeffR, *coeffI;
-        if (kappa < 0) { // j = l + 1/2
-                coeffR = g_c2s[l].cart2j_gt_lR;
-                coeffI = g_c2s[l].cart2j_gt_lI;
-        } else {
-                coeffR = g_c2s[l].cart2j_lt_lR;
-                coeffI = g_c2s[l].cart2j_lt_lI;
-        }
-
-        FINT i, j, n;
-        double sR, sI, cR, cI, gR, gI;
-
-        for (j = 0; j < nket; j++) {
-        for (i = 0; i < nd; i++) {
-                sR = 0;
-                sI = 0;
-#pragma GCC ivdep
-                for (n = 0; n < nf2; n++) {
-                        gR = creal(gcart[j*nf2+n]);
-                        gI = cimag(gcart[j*nf2+n]);
-                        cR = coeffR[i*nf2+n];
-                        cI = coeffI[i*nf2+n];
-                        sR += cR * gR + cI * gI;
-                        sI += cR * gI - cI * gR;
-                }
-                gspz[(j*nd+i)*OF_CMPLX  ] = sR;
-                gspz[(j*nd+i)*OF_CMPLX+1] = sI;
-        } }
-}
-
-void CINTc2s_bra_spinor_si(double complex *gsp, FINT nket,
-                           double complex *gcart, FINT kappa, FINT l)
-{
-        FINT nf = _len_cart[l];
-        FINT nf2 = nf * 2;
-        FINT nd = _len_spinor(kappa, l);
-        double *gspz = (double *)gsp;
-        double complex *gcarta = gcart;
-        double complex *gcartb = gcarta + nf * nket;
-        double *coeffR, *coeffI;
-        if (kappa < 0) { // j = l + 1/2
+        if (kappa < 0) { 
                 coeffR = g_c2s[l].cart2j_gt_lR;
                 coeffI = g_c2s[l].cart2j_gt_lI;
         } else {
@@ -15872,13 +15678,10 @@ void CINTc2s_bra_spinor_si(double complex *gsp, FINT nket,
                 gspz[(j*nd+i)*OF_CMPLX  ] = sR;
                 gspz[(j*nd+i)*OF_CMPLX+1] = sI;
         } }
-}
+}*/
 
-/*
- * vectors gspa and gspb are the upper and lower components of the
- * two-component vector
- */
-void CINTc2s_ket_spinor_sf1(double complex *gspa, double complex *gspb, double *gcart,
+
+void CINTc2s_ket_spinor_sf1(double *gspa, double *gspb, double *gcart,
                             FINT lds, FINT ldc, FINT nctr, FINT kappa, FINT l)
 {
         FINT nf = _len_cart[l];
@@ -15886,7 +15689,7 @@ void CINTc2s_ket_spinor_sf1(double complex *gspa, double complex *gspb, double *
         double *gspaz = (double *)gspa;
         double *gspbz = (double *)gspb;
         double *coeffR, *coeffI;
-        if (kappa < 0) { // j = l + 1/2
+        if (kappa < 0) { 
                 coeffR = g_c2s[l].cart2j_gt_lR;
                 coeffI = g_c2s[l].cart2j_gt_lI;
         } else {
@@ -15927,7 +15730,7 @@ void CINTc2s_ket_spinor_sf1(double complex *gspa, double complex *gspb, double *
         }
 }
 
-void CINTc2s_iket_spinor_sf1(double complex *gspa, double complex *gspb, double *gcart,
+void CINTc2s_iket_spinor_sf1(double *gspa, double *gspb, double *gcart,
                              FINT lds, FINT ldc, FINT nctr, FINT kappa, FINT l)
 {
         FINT nf = _len_cart[l];
@@ -15935,7 +15738,7 @@ void CINTc2s_iket_spinor_sf1(double complex *gspa, double complex *gspb, double 
         double *gspaz = (double *)gspa;
         double *gspbz = (double *)gspb;
         double *coeffR, *coeffI;
-        if (kappa < 0) { // j = l + 1/2
+        if (kappa < 0) { 
                 coeffR = g_c2s[l].cart2j_gt_lR;
                 coeffI = g_c2s[l].cart2j_gt_lI;
         } else {
@@ -15976,7 +15779,7 @@ void CINTc2s_iket_spinor_sf1(double complex *gspa, double complex *gspb, double 
         }
 }
 
-void CINTc2s_ket_spinor_si1(double complex *gspa, double complex *gspb, double *gcart,
+void CINTc2s_ket_spinor_si1(double *gspa, double *gspb, double *gcart,
                             FINT lds, FINT ldc, FINT nctr, FINT kappa, FINT l)
 {
         FINT nf = _len_cart[l];
@@ -15989,7 +15792,7 @@ void CINTc2s_ket_spinor_si1(double complex *gspa, double complex *gspb, double *
         double *gspaz = (double *)gspa;
         double *gspbz = (double *)gspb;
         double *coeffR, *coeffI;
-        if (kappa < 0) { // j = l + 1/2
+        if (kappa < 0) { 
                 coeffR = g_c2s[l].cart2j_gt_lR;
                 coeffI = g_c2s[l].cart2j_gt_lI;
         } else {
@@ -16036,7 +15839,7 @@ void CINTc2s_ket_spinor_si1(double complex *gspa, double complex *gspb, double *
         }
 }
 
-void CINTc2s_iket_spinor_si1(double complex *gspa, double complex *gspb, double *gcart,
+void CINTc2s_iket_spinor_si1(double *gspa, double *gspb, double *gcart,
                              FINT lds, FINT ldc, FINT nctr, FINT kappa, FINT l)
 {
         FINT nf = _len_cart[l];
@@ -16049,7 +15852,7 @@ void CINTc2s_iket_spinor_si1(double complex *gspa, double complex *gspb, double 
         double *gspaz = (double *)gspa;
         double *gspbz = (double *)gspb;
         double *coeffR, *coeffI;
-        if (kappa < 0) { // j = l + 1/2
+        if (kappa < 0) { 
                 coeffR = g_c2s[l].cart2j_gt_lR;
                 coeffI = g_c2s[l].cart2j_gt_lI;
         } else {
@@ -16097,11 +15900,7 @@ void CINTc2s_iket_spinor_si1(double complex *gspa, double complex *gspb, double 
         }
 }
 
-/*
- * Spherical to Cartesian back transformation
- * The input gsph (Fortran contiguous) has l*2+1 rows
- * The output gcart (Fortran contiguous) has (l+1)*(l+2)/2 rows
- */
+
 double *CINTs2c_bra_sph(double *gsph, FINT nket, double *gcart, FINT l)
 {
         FINT nf = (l+1)*(l+2)/2;
@@ -16116,20 +15915,13 @@ double *CINTs2c_ket_sph(double *gsph, FINT nbra, double *gcart, FINT l)
         CINTdgemm_NT(nbra, nf, nd, gsph, g_c2s[l].cart2sph, gcart);
         return gcart;
 }
-/*
- * Copyright (C) 2013  Qiming Sun <osirpt.sun@gmail.com>
- *
- * c to fortran interface
- */
+
 
 #ifdef WITH_FORTRAN
 #include <stdlib.h>
 #include <math.h>
 
-/*
- * * * * * * * * * * * * * * * * * * * * *
- * for cint_bas.c
- */
+
 
 FINT cintlen_spinor_(const FINT *bas_id, const FINT *bas)
 {
@@ -16163,65 +15955,49 @@ FINT cintcgto_spinor_(const FINT *bas_id, const FINT *bas)
         return CINTcgto_spinor(*bas_id, bas);
 }
 
-/* 
- * tot. primitive atomic spheric GTOs in a shell
- */
+
 FINT cinttot_pgto_spheric_(const FINT *bas, const FINT *nbas)
 {
         return CINTtot_pgto_spheric(bas, *nbas);
 }
 
-/* 
- * tot. primitive atomic spinors in a shell
- */
+
 FINT cinttot_pgto_spinor_(const FINT *bas, const FINT *nbas)
 {
         return CINTtot_pgto_spinor(bas, *nbas);
 }
 
-/* 
- * tot. contracted atomic cartesian GTOs in a shell
- */
+
 FINT cinttot_cgto_cart_(const FINT *bas, const FINT *nbas)
 {
         return CINTtot_cgto_cart(bas, *nbas);
 }
 
-/* 
- * tot. contracted atomic spheric GTOs in a shell
- */
+
 FINT cinttot_cgto_spheric_(const FINT *bas, const FINT *nbas)
 {
         return CINTtot_cgto_spheric(bas, *nbas);
 }
 
-/* 
- * tot. contracted atomic spinors in a shell
- */
+
 FINT cinttot_cgto_spinor_(const FINT *bas, const FINT *nbas)
 {
         return CINTtot_cgto_spinor(bas, *nbas);
 }
 
-/* 
- * offset of each shell for cartesian GTOs
- */
+
 void cintshells_cart_offset_(FINT ao_loc[], const FINT *bas, const FINT *nbas)
 {
         CINTshells_cart_offset(ao_loc, bas, *nbas);
 }
 
-/* 
- * offset of each shell for real spheric GTOs
- */
+
 void cintshells_spheric_offset_(FINT ao_loc[], const FINT *bas, const FINT *nbas)
 {
         CINTshells_spheric_offset(ao_loc, bas, *nbas);
 }
 
-/* 
- * offset of each shell for AO spinors
- */
+
 void cintshells_spinor_offset_(FINT ao_loc[], const FINT *bas, const FINT *nbas)
 {
         CINTshells_spinor_offset(ao_loc, bas, *nbas);
@@ -16232,12 +16008,9 @@ double cintgto_norm_(FINT *n, double *a)
         return CINTgto_norm(*n, *a);
 }
 
-/*
- * * * * * * * * * * * * * * * * * * * * *
- * let Fortran be able to change CINTOpt
- */
-/* in Fortran, pass an integer(8) to hold the pointer of CINTOpt */
-//typedef int64_t CINTOptPtrAsInteger8;
+
+
+
 void cintinit_2e_optimizer_(CINTOpt **opt,
                             FINT *atm, FINT *natm,
                             FINT *bas, FINT *nbas, double *env)
@@ -16260,10 +16033,7 @@ void cintdel_optimizer_(CINTOpt **opt)
 }
 #endif
 
-/*
- * Copyright (C) 2021  Qiming Sun <osirpt.sun@gmail.com>
- *
- */
+
 
 #include <string.h>
 #include <math.h>
@@ -16362,19 +16132,19 @@ FINT CINTg0_1e_grids(double *g, double cutoff,
                         x = aij * RGSQUARE(rijrg, ig);
                         CINTrys_roots(nroots, x, ubuf, wbuf);
                         for (i = 0; i < nroots; i++) {
-                                // transform to t^2
+                                
                                 u[ig+GRID_BLKSIZE*i] = ubuf[i] / (ubuf[i] + 1);
                                 w[ig+GRID_BLKSIZE*i] = wbuf[i] * fac1;
                         }
                 }
-        } else if (omega < 0.) { // short-range part of range-separated Coulomb
+        } else if (omega < 0.) { 
                 a0 = aij;
                 fac1 = envs->fac[0] / aij;
                 if (zeta == 0.) {
                         tau2 = 1.;
                         omega2 = omega * omega;
                         theta = omega2 / (omega2 + aij);
-                } else { // zeta > 0.
+                } else { 
                         tau2 = zeta / (zeta + aij);
                         a0 *= tau2;
                         fac1 *= sqrt(tau2);
@@ -16382,16 +16152,16 @@ FINT CINTg0_1e_grids(double *g, double cutoff,
                         theta = omega2 / (omega2 + a0);
                 }
                 sqrt_theta = sqrt(theta);
-                // very small erfc() leads to ~0 weights. They can cause
-                // numerical issue in sr_rys_roots. Use this cutoff as a
-                // temporary solution to avoid numerical issues
+                
+                
+                
                 double temp_cutoff = MIN(cutoff, EXPCUTOFF_SR);
                 int rorder = envs->rys_order;
                 double tau_theta, fac_theta;
                 for (ig = 0; ig < bgrids; ig++) {
                         x = a0 * RGSQUARE(rijrg, ig);
                         if (theta * x > temp_cutoff) {
-                                // very small erfc() leads to ~0 weights
+                                
                                 for (i = 0; i < nroots; i++) {
                                         u[ig+GRID_BLKSIZE*i] = 0;
                                         w[ig+GRID_BLKSIZE*i] = 0;
@@ -16416,20 +16186,20 @@ FINT CINTg0_1e_grids(double *g, double cutoff,
                         }
                 }
         } else {
-                // * long-range part of range-separated Coulomb
-                // * or Gaussian charge model, with rho(r) = Norm exp(-zeta*r^2)
+                
+                
                 a0 = aij;
                 fac1 = envs->fac[0] / aij;
-                if (zeta == 0.) { // omega > 0.
+                if (zeta == 0.) { 
                         omega2 = omega * omega;
                         theta = omega2 / (omega2 + aij);
                         a0 *= theta;
                         fac1 *= sqrt(theta);
-                } else if (omega == 0.) { // zeta > 0.
+                } else if (omega == 0.) { 
                         theta = zeta / (zeta + aij);
                         a0 *= theta;
                         fac1 *= sqrt(theta);
-                } else { // omega > 0. && zeta > 0.
+                } else { 
                         omega2 = omega * omega;
                         theta = omega2*zeta / (omega2*zeta + (zeta+omega2)*aij);
                         a0 *= theta;
@@ -16439,7 +16209,7 @@ FINT CINTg0_1e_grids(double *g, double cutoff,
                         x = a0 * RGSQUARE(rijrg, ig);
                         CINTrys_roots(nroots, x, ubuf, wbuf);
                         for (i = 0; i < nroots; i++) {
-                                // u stores t^2 = tau^2 * theta
+                                
                                 u[ig+GRID_BLKSIZE*i] = ubuf[i] / (ubuf[i] + 1) * theta;
                                 w[ig+GRID_BLKSIZE*i] = wbuf[i] * fac1;
                         }
@@ -16454,13 +16224,13 @@ FINT CINTg0_1e_grids(double *g, double cutoff,
         FINT lj, di, dj;
         double *rx;
         if (envs->li_ceil > envs->lj_ceil) {
-                //li = envs->li_ceil;
+                
                 lj = envs->lj_ceil;
                 di = envs->g_stride_i;
                 dj = envs->g_stride_j;
                 rx = envs->ri;
         } else {
-                //li = envs->lj_ceil;
+                
                 lj = envs->li_ceil;
                 di = envs->g_stride_j;
                 dj = envs->g_stride_i;
@@ -16611,7 +16381,7 @@ void CINTnabla1i_grids(double *f, double *g,
         double *fz = f + envs->g_size * 2;
 
         for (j = 0; j <= lj; j++) {
-                //f(...,0,...) = -2*ai*g(...,1,...)
+                
                 for (n = 0; n < nroots; n++) {
                         ptr = dj * j + n * GRID_BLKSIZE;
 #pragma GCC ivdep
@@ -16621,7 +16391,7 @@ void CINTnabla1i_grids(double *f, double *g,
                                 fz[ig] = ai2 * gz[ig+di];
                         }
                 }
-                //f(...,i,...) = i*g(...,i-1,...)-2*ai*g(...,i+1,...)
+                
                 for (i = 1; i <= li; i++) {
                 for (n = 0; n < nroots; n++) {
                         ptr = dj * j + di * i + n * GRID_BLKSIZE;
@@ -16652,7 +16422,7 @@ void CINTnabla1j_grids(double *f, double *g,
         double *fy = f + envs->g_size;
         double *fz = f + envs->g_size * 2;
 
-        //f(...,0,...) = -2*aj*g(...,1,...)
+        
         for (i = 0; i <= li; i++) {
         for (n = 0; n < nroots; n++) {
                 ptr = di * i + n * GRID_BLKSIZE;
@@ -16663,7 +16433,7 @@ void CINTnabla1j_grids(double *f, double *g,
                         fz[ig] = aj2 * gz[ig+dj];
                 }
         } }
-        //f(...,j,...) = j*g(...,j-1,...)-2*aj*g(...,j+1,...)
+        
         for (j = 1; j <= lj; j++) {
         for (i = 0; i <= li; i++) {
         for (n = 0; n < nroots; n++) {
@@ -16734,12 +16504,9 @@ void CINTx1j_grids(double *f, double *g, double *rj,
                 }
         } } }
 }
-/*
- * Copyright (C) 2013-  Qiming Sun <osirpt.sun@gmail.com>
- *
- */
 
-#include <stdio.h>
+
+//#include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include <assert.h>
@@ -16788,7 +16555,7 @@ void CINTinit_int2e_EnvVars(CINTEnvVars *envs, FINT *ng, FINT *shls,
         if (env[PTR_EXPCUTOFF] == 0) {
                 envs->expcutoff = EXPCUTOFF;
         } else {
-                // +1 to ensure accuracy. See comments in function CINT2e_loop_nopt
+                
                 envs->expcutoff = MAX(MIN_EXPCUTOFF, env[PTR_EXPCUTOFF]) + 1;
         }
 
@@ -16881,6 +16648,27 @@ void CINTinit_int2e_EnvVars(CINTEnvVars *envs, FINT *ng, FINT *shls,
                 envs->rirj[2] = envs->rj[2] - envs->ri[2];
         }
 
+        #ifdef __cplusplus
+        if (rys_order <= 2) {
+                envs->f_g0_2d4d = (void (*)(...))&CINTg0_2e_2d4d_unrolled;
+                if (rys_order != nrys_roots) {
+                        envs->f_g0_2d4d = (void (*)(...))&CINTsrg0_2e_2d4d_unrolled;
+                }
+        } else if (kbase) {
+                if (ibase) {
+                        envs->f_g0_2d4d = (void (*)(...))&CINTg0_2e_ik2d4d;
+                } else {
+                        envs->f_g0_2d4d = (void (*)(...))&CINTg0_2e_kj2d4d;
+                }
+        } else {
+                if (ibase) {
+                        envs->f_g0_2d4d = (void (*)(...))&CINTg0_2e_il2d4d;
+                } else {
+                        envs->f_g0_2d4d = (void (*)(...))&CINTg0_2e_lj2d4d;
+                }
+        }
+        envs->f_g0_2e = (int (*)(...))&CINTg0_2e;
+        #else
         if (rys_order <= 2) {
                 envs->f_g0_2d4d = &CINTg0_2e_2d4d_unrolled;
                 if (rys_order != nrys_roots) {
@@ -16900,6 +16688,8 @@ void CINTinit_int2e_EnvVars(CINTEnvVars *envs, FINT *ng, FINT *shls,
                 }
         }
         envs->f_g0_2e = &CINTg0_2e;
+ 
+        #endif
 }
 
 void CINTg2e_index_xyz(FINT *idx, const CINTEnvVars *envs)
@@ -16985,20 +16775,18 @@ void CINTg2e_index_xyz(FINT *idx, const CINTEnvVars *envs)
                                                 break;
                                         default:
                                                 for (i = 0; i < nfi; i++) {
-                                                        idx[n+0] = ofkx + di * i_nx[i]; //(:,ix,kx,lx,jx,1)
-                                                        idx[n+1] = ofky + di * i_ny[i]; //(:,iy,ky,ly,jy,2)
-                                                        idx[n+2] = ofkz + di * i_nz[i]; //(:,iz,kz,lz,jz,3)
+                                                        idx[n+0] = ofkx + di * i_nx[i]; 
+                                                        idx[n+1] = ofky + di * i_ny[i]; 
+                                                        idx[n+2] = ofkz + di * i_nz[i]; 
                                                         n += 3;
-                                                } // i
+                                                } 
                                 }
-                        } // k
-                } // l
-        } // j
+                        } 
+                } 
+        } 
 }
 
-/*
- * g(nroots,0:nmax,0:mmax)
- */
+
 void CINTg0_2e_2d(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         const FINT nroots = envs->nrys_roots;
@@ -17015,7 +16803,7 @@ void CINTg0_2e_2d(double *g, Rys2eT *bc, CINTEnvVars *envs)
         for (i = 0; i < nroots; i++) {
                 gx[i] = 1;
                 gy[i] = 1;
-                //gz[i] = w[i];
+                
         }
 
         double s0x, s1x, s2x, t0x, t1x;
@@ -17033,9 +16821,9 @@ void CINTg0_2e_2d(double *g, Rys2eT *bc, CINTEnvVars *envs)
                 b01 = bc->b01[i];
                 b00 = bc->b00[i];
                 if (nmax > 0) {
-                        // gx(irys,0,1) = c00(irys) * gx(irys,0,0)
-                        // gx(irys,0,n+1) = c00(irys)*gx(irys,0,n)
-                        // + n*b10(irys)*gx(irys,0,n-1)
+                        
+                        
+                        
                         s0x = gx[i];
                         s0y = gy[i];
                         s0z = gz[i];
@@ -17062,9 +16850,9 @@ void CINTg0_2e_2d(double *g, Rys2eT *bc, CINTEnvVars *envs)
                 }
 
                 if (mmax > 0) {
-                        // gx(irys,1,0) = c0p(irys) * gx(irys,0,0)
-                        // gx(irys,m+1,0) = c0p(irys)*gx(irys,m,0)
-                        // + m*b01(irys)*gx(irys,m-1,0)
+                        
+                        
+                        
                         s0x = gx[i];
                         s0y = gy[i];
                         s0z = gz[i];
@@ -17090,10 +16878,10 @@ void CINTg0_2e_2d(double *g, Rys2eT *bc, CINTEnvVars *envs)
                         }
 
                         if (nmax > 0) {
-                                // gx(irys,1,1) = c0p(irys)*gx(irys,0,1) + b00(irys)*gx(irys,0,0)
-                                // gx(irys,m+1,1) = c0p(irys)*gx(irys,m,1)
-                                // + m*b01(irys)*gx(irys,m-1,1)
-                                // + b00(irys)*gx(irys,m,0)
+                                
+                                
+                                
+                                
                                 s0x = gx[i+dn];
                                 s0y = gy[i+dn];
                                 s0z = gz[i+dn];
@@ -17120,9 +16908,9 @@ void CINTg0_2e_2d(double *g, Rys2eT *bc, CINTEnvVars *envs)
                         }
                 }
 
-                // gx(irys,m,n+1) = c00(irys)*gx(irys,m,n)
-                // + n*b10(irys)*gx(irys,m,n-1)
-                // + m*b00(irys)*gx(irys,m-1,n)
+                
+                
+                
                 for (m = 1; m <= mmax; ++m) {
                         off = m * dm;
                         j = off + i;
@@ -17150,11 +16938,10 @@ void CINTg0_2e_2d(double *g, Rys2eT *bc, CINTEnvVars *envs)
         }
 }
 
-/*
- * g0[i,k,l,j] = < ik | lj > = ( i j | k l )
- */
-/* 2d is based on l,j */
-void CINTg0_lj2d_4d(double *restrict g, CINTEnvVars *envs)
+
+
+
+void CINTg0_lj2d_4d(double * g, CINTEnvVars *envs)
 {
         FINT li = envs->li_ceil;
         FINT lk = envs->lk_ceil;
@@ -17163,7 +16950,7 @@ void CINTg0_lj2d_4d(double *restrict g, CINTEnvVars *envs)
         }
         FINT nmax = envs->li_ceil + envs->lj_ceil;
         FINT mmax = envs->lk_ceil + envs->ll_ceil;
-        //FINT ll = envs->ll_ceil;
+        
         FINT lj = envs->lj_ceil;
         FINT nroots = envs->nrys_roots;
         FINT i, j, k, l, ptr, n;
@@ -17177,7 +16964,7 @@ void CINTg0_lj2d_4d(double *restrict g, CINTEnvVars *envs)
         double *p1x, *p1y, *p1z, *p2x, *p2y, *p2z;
         double rx, ry, rz;
 
-        // g(i,...,j) = rirj * g(i-1,...,j) +  g(i-1,...,j+1)
+        
         rx = rirj[0];
         ry = rirj[1];
         rz = rirj[2];
@@ -17198,7 +16985,7 @@ void CINTg0_lj2d_4d(double *restrict g, CINTEnvVars *envs)
                 }
         } } }
 
-        // g(...,k,l,..) = rkrl * g(...,k-1,l,..) + g(...,k-1,l+1,..)
+        
         rx = rkrl[0];
         ry = rkrl[1];
         rz = rkrl[2];
@@ -17219,8 +17006,9 @@ void CINTg0_lj2d_4d(double *restrict g, CINTEnvVars *envs)
                 }
         } } }
 }
-/* 2d is based on k,j */
-void CINTg0_kj2d_4d(double *restrict g, CINTEnvVars *envs)
+
+
+void CINTg0_kj2d_4d(double *g, CINTEnvVars *envs)
 {
         FINT li = envs->li_ceil;
         FINT ll = envs->ll_ceil;
@@ -17229,7 +17017,7 @@ void CINTg0_kj2d_4d(double *restrict g, CINTEnvVars *envs)
         }
         FINT nmax = envs->li_ceil + envs->lj_ceil;
         FINT mmax = envs->lk_ceil + envs->ll_ceil;
-        //FINT lk = envs->lk_ceil;
+        
         FINT lj = envs->lj_ceil;
         FINT nroots = envs->nrys_roots;
         FINT i, j, k, l, ptr, n;
@@ -17243,7 +17031,7 @@ void CINTg0_kj2d_4d(double *restrict g, CINTEnvVars *envs)
         double *p1x, *p1y, *p1z, *p2x, *p2y, *p2z;
         double rx, ry, rz;
 
-        // g(i,...,j) = rirj * g(i-1,...,j) +  g(i-1,...,j+1)
+        
         rx = rirj[0];
         ry = rirj[1];
         rz = rirj[2];
@@ -17264,7 +17052,7 @@ void CINTg0_kj2d_4d(double *restrict g, CINTEnvVars *envs)
                 }
         } } }
 
-        // g(...,k,l,..) = rkrl * g(...,k,l-1,..) + g(...,k+1,l-1,..)
+        
         rx = rkrl[0];
         ry = rkrl[1];
         rz = rkrl[2];
@@ -17285,8 +17073,9 @@ void CINTg0_kj2d_4d(double *restrict g, CINTEnvVars *envs)
                 }
         } } }
 }
-/* 2d is based on i,l */
-void CINTg0_il2d_4d(double *restrict g, CINTEnvVars *envs)
+
+
+void CINTg0_il2d_4d(double *g, CINTEnvVars *envs)
 {
         FINT lk = envs->lk_ceil;
         FINT lj = envs->lj_ceil;
@@ -17295,7 +17084,7 @@ void CINTg0_il2d_4d(double *restrict g, CINTEnvVars *envs)
         }
         FINT nmax = envs->li_ceil + envs->lj_ceil;
         FINT mmax = envs->lk_ceil + envs->ll_ceil;
-        //FINT li = envs->li_ceil;
+        
         FINT ll = envs->ll_ceil;
         FINT nroots = envs->nrys_roots;
         FINT i, j, k, l, ptr, n;
@@ -17309,7 +17098,7 @@ void CINTg0_il2d_4d(double *restrict g, CINTEnvVars *envs)
         double *p1x, *p1y, *p1z, *p2x, *p2y, *p2z;
         double rx, ry, rz;
 
-        // g(...,k,l,..) = rkrl * g(...,k-1,l,..) + g(...,k-1,l+1,..)
+        
         rx = rkrl[0];
         ry = rkrl[1];
         rz = rkrl[2];
@@ -17330,7 +17119,7 @@ void CINTg0_il2d_4d(double *restrict g, CINTEnvVars *envs)
                 }
         } } }
 
-        // g(i,...,j) = rirj * g(i,...,j-1) +  g(i+1,...,j-1)
+        
         rx = rirj[0];
         ry = rirj[1];
         rz = rirj[2];
@@ -17351,8 +17140,9 @@ void CINTg0_il2d_4d(double *restrict g, CINTEnvVars *envs)
                 }
         } } }
 }
-/* 2d is based on i,k */
-void CINTg0_ik2d_4d(double *restrict g, CINTEnvVars *envs)
+
+
+void CINTg0_ik2d_4d(double *g, CINTEnvVars *envs)
 {
         FINT lj = envs->lj_ceil;
         FINT ll = envs->ll_ceil;
@@ -17361,7 +17151,7 @@ void CINTg0_ik2d_4d(double *restrict g, CINTEnvVars *envs)
         }
         FINT nmax = envs->li_ceil + envs->lj_ceil;
         FINT mmax = envs->lk_ceil + envs->ll_ceil;
-        //FINT li = envs->li_ceil;
+        
         FINT lk = envs->lk_ceil;
         FINT nroots = envs->nrys_roots;
         FINT i, j, k, l, ptr, n;
@@ -17375,7 +17165,7 @@ void CINTg0_ik2d_4d(double *restrict g, CINTEnvVars *envs)
         double *p1x, *p1y, *p1z, *p2x, *p2y, *p2z;
         double rx, ry, rz;
 
-        // g(...,k,l,..) = rkrl * g(...,k,l-1,..) + g(...,k+1,l-1,..)
+        
         rx = rkrl[0];
         ry = rkrl[1];
         rz = rkrl[2];
@@ -17386,8 +17176,8 @@ void CINTg0_ik2d_4d(double *restrict g, CINTEnvVars *envs)
         p2y = gy - dl + dk;
         p2z = gz - dl + dk;
         for (l = 1; l <= ll; l++) {
-                // (:,i) is full, so loop:k and loop:n can be merged to
-                // for(n = l*dl; n < ptr+dl-dk*l; n++)
+                
+                
                 for (k = 0; k <= mmax-l; k++) {
                 for (i = 0; i <= nmax; i++) {
                         ptr = l*dl + k*dk + i*di;
@@ -17399,7 +17189,7 @@ void CINTg0_ik2d_4d(double *restrict g, CINTEnvVars *envs)
                 } }
         }
 
-        // g(i,...,j) = rirj * g(i,...,j-1) +  g(i+1,...,j-1)
+        
         rx = rirj[0];
         ry = rirj[1];
         rz = rirj[2];
@@ -17421,14 +17211,16 @@ void CINTg0_ik2d_4d(double *restrict g, CINTEnvVars *envs)
         } } }
 }
 
-static inline void _g0_2d4d_0000(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+
+static inline void _g0_2d4d_0000(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         g[0] = 1;
         g[1] = 1;
-        //g[2] = w[0];
+        
 }
 
-static inline void _g0_2d4d_0001(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+
+static inline void _g0_2d4d_0001(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *cpx = bc->c0px;
         double *cpy = bc->c0py;
@@ -17437,11 +17229,12 @@ static inline void _g0_2d4d_0001(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[1] = cpx[0];
         g[2] = 1;
         g[3] = cpy[0];
-        //g[4] = w[0];
+        
         g[5] = cpz[0] * g[4];
 }
 
-static inline void _g0_2d4d_0002(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+
+static inline void _g0_2d4d_0002(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *cpx = bc->c0px;
         double *cpy = bc->c0py;
@@ -17459,15 +17252,16 @@ static inline void _g0_2d4d_0002(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[9] = cpy[1];
         g[10] = cpy[0] * cpy[0] + b01[0];
         g[11] = cpy[1] * cpy[1] + b01[1];
-        //g[12] = w[0];
-        //g[13] = w[1];
+        
+        
         g[14] = cpz[0] * g[12];
         g[15] = cpz[1] * g[13];
         g[16] = cpz[0] * g[14] + b01[0] * g[12];
         g[17] = cpz[1] * g[15] + b01[1] * g[13];
 }
 
-static inline void _g0_2d4d_0003(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+
+static inline void _g0_2d4d_0003(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *cpx = bc->c0px;
         double *cpy = bc->c0py;
@@ -17489,8 +17283,8 @@ static inline void _g0_2d4d_0003(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[13] = cpy[1] * cpy[1] + b01[1];
         g[14] = cpy[0] * (g[12] + 2 * b01[0]);
         g[15] = cpy[1] * (g[13] + 2 * b01[1]);
-        //g[16] = w[0];
-        //g[17] = w[1];
+        
+        
         g[18] = cpz[0] * g[16];
         g[19] = cpz[1] * g[17];
         g[20] = cpz[0] * g[18] + b01[0] * g[16];
@@ -17499,7 +17293,8 @@ static inline void _g0_2d4d_0003(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[23] = cpz[1] * g[21] + 2 * b01[1] * g[19];
 }
 
-static inline void _g0_2d4d_0010(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+
+static inline void _g0_2d4d_0010(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *cpx = bc->c0px;
         double *cpy = bc->c0py;
@@ -17508,11 +17303,12 @@ static inline void _g0_2d4d_0010(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[1] = cpx[0];
         g[2] = 1;
         g[3] = cpy[0];
-        //g[4] = w[0];
+        
         g[5] = cpz[0] * g[4];
 }
 
-static inline void _g0_2d4d_0011(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+
+static inline void _g0_2d4d_0011(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *cpx = bc->c0px;
         double *cpy = bc->c0py;
@@ -17537,8 +17333,8 @@ static inline void _g0_2d4d_0011(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[19] = cpy[1] * (ykyl + cpy[1]) + b01[1];
         g[14] = ykyl + cpy[0];
         g[15] = ykyl + cpy[1];
-        //g[24] = w[0];
-        //g[25] = w[1];
+        
+        
         g[28] = cpz[0] * g[24];
         g[29] = cpz[1] * g[25];
         g[30] = g[28] * (zkzl + cpz[0]) + b01[0] * g[24];
@@ -17547,7 +17343,7 @@ static inline void _g0_2d4d_0011(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[27] = g[25] * (zkzl + cpz[1]);
 }
 
-static inline void _g0_2d4d_0012(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _g0_2d4d_0012(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *cpx = bc->c0px;
         double *cpy = bc->c0py;
@@ -17580,8 +17376,8 @@ static inline void _g0_2d4d_0012(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[23] = cpy[1] * (ykyl + cpy[1]) + b01[1];
         g[18] = ykyl + cpy[0];
         g[19] = ykyl + cpy[1];
-        //g[32] = w[0];
-        //g[33] = w[1];
+        
+        
         g[36] = cpz[0] * g[32];
         g[37] = cpz[1] * g[33];
         g[40] = cpz[0] * g[36] + b01[0] * g[32];
@@ -17594,7 +17390,7 @@ static inline void _g0_2d4d_0012(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[35] = g[33] * (zkzl + cpz[1]);
 }
 
-static inline void _g0_2d4d_0020(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _g0_2d4d_0020(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *cpx = bc->c0px;
         double *cpy = bc->c0py;
@@ -17612,15 +17408,15 @@ static inline void _g0_2d4d_0020(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[9] = cpy[1];
         g[10] = cpy[0] * cpy[0] + b01[0];
         g[11] = cpy[1] * cpy[1] + b01[1];
-        //g[12] = w[0];
-        //g[13] = w[1];
+        
+        
         g[14] = cpz[0] * g[12];
         g[15] = cpz[1] * g[13];
         g[16] = cpz[0] * g[14] + b01[0] * g[12];
         g[17] = cpz[1] * g[15] + b01[1] * g[13];
 }
 
-static inline void _g0_2d4d_0021(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _g0_2d4d_0021(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *cpx = bc->c0px;
         double *cpy = bc->c0py;
@@ -17653,8 +17449,8 @@ static inline void _g0_2d4d_0021(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[27] = cpy[1] * (ykyl + cpy[1]) + b01[1];
         g[28] = g[20] * (ykyl + cpy[0]) + cpy[0] * 2 * b01[0];
         g[29] = g[21] * (ykyl + cpy[1]) + cpy[1] * 2 * b01[1];
-        //g[32] = w[0];
-        //g[33] = w[1];
+        
+        
         g[34] = cpz[0] * g[32];
         g[35] = cpz[1] * g[33];
         g[36] = cpz[0] * g[34] + b01[0] * g[32];
@@ -17667,7 +17463,7 @@ static inline void _g0_2d4d_0021(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[45] = g[37] * (zkzl + cpz[1]) + 2 * b01[1] * g[35];
 }
 
-static inline void _g0_2d4d_0030(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _g0_2d4d_0030(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *cpx = bc->c0px;
         double *cpy = bc->c0py;
@@ -17689,8 +17485,8 @@ static inline void _g0_2d4d_0030(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[13] = cpy[1] * cpy[1] + b01[1];
         g[14] = cpy[0] * (g[12] + 2 * b01[0]);
         g[15] = cpy[1] * (g[13] + 2 * b01[1]);
-        //g[16] = w[0];
-        //g[17] = w[1];
+        
+        
         g[18] = cpz[0] * g[16];
         g[19] = cpz[1] * g[17];
         g[20] = cpz[0] * g[18] + b01[0] * g[16];
@@ -17699,7 +17495,7 @@ static inline void _g0_2d4d_0030(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[23] = cpz[1] * g[21] + 2 * b01[1] * g[19];
 }
 
-static inline void _g0_2d4d_0100(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _g0_2d4d_0100(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -17708,11 +17504,11 @@ static inline void _g0_2d4d_0100(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[1] = c0x[0];
         g[2] = 1;
         g[3] = c0y[0];
-        //g[4] = w[0];
+        
         g[5] = c0z[0] * g[4];
 }
 
-static inline void _g0_2d4d_0101(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _g0_2d4d_0101(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -17737,8 +17533,8 @@ static inline void _g0_2d4d_0101(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[13] = c0y[1];
         g[14] = cpy[0] * c0y[0] + b00[0];
         g[15] = cpy[1] * c0y[1] + b00[1];
-        //g[16] = w[0];
-        //g[17] = w[1];
+        
+        
         g[18] = cpz[0] * g[16];
         g[19] = cpz[1] * g[17];
         g[20] = c0z[0] * g[16];
@@ -17747,7 +17543,7 @@ static inline void _g0_2d4d_0101(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[23] = cpz[1] * g[21] + b00[1] * g[17];
 }
 
-static inline void _g0_2d4d_0102(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _g0_2d4d_0102(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -17781,8 +17577,8 @@ static inline void _g0_2d4d_0102(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[21] = cpy[1] * c0y[1] + b00[1];
         g[22] = cpy[0] * (g[20] + b00[0]) + b01[0] * c0y[0];
         g[23] = cpy[1] * (g[21] + b00[1]) + b01[1] * c0y[1];
-        //g[24] = w[0];
-        //g[25] = w[1];
+        
+        
         g[26] = cpz[0] * g[24];
         g[27] = cpz[1] * g[25];
         g[30] = c0z[0] * g[24];
@@ -17795,7 +17591,7 @@ static inline void _g0_2d4d_0102(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[35] = cpz[1] * g[33] + b01[1] * g[31] + b00[1] * g[27];
 }
 
-static inline void _g0_2d4d_0110(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _g0_2d4d_0110(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -17820,8 +17616,8 @@ static inline void _g0_2d4d_0110(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[13] = c0y[1];
         g[14] = cpy[0] * c0y[0] + b00[0];
         g[15] = cpy[1] * c0y[1] + b00[1];
-        //g[16] = w[0];
-        //g[17] = w[1];
+        
+        
         g[18] = cpz[0] * g[16];
         g[19] = cpz[1] * g[17];
         g[20] = c0z[0] * g[16];
@@ -17830,7 +17626,7 @@ static inline void _g0_2d4d_0110(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[23] = cpz[1] * g[21] + b00[1] * g[17];
 }
 
-static inline void _g0_2d4d_0111(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _g0_2d4d_0111(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -17875,8 +17671,8 @@ static inline void _g0_2d4d_0111(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[27] = ykyl + cpy[1];
         g[38] = c0y[0] * (ykyl + cpy[0]) + b00[0];
         g[39] = c0y[1] * (ykyl + cpy[1]) + b00[1];
-        //g[48] = w[0];
-        //g[49] = w[1];
+        
+        
         g[60] = c0z[0] * g[48];
         g[61] = c0z[1] * g[49];
         g[52] = cpz[0] * g[48];
@@ -17893,7 +17689,7 @@ static inline void _g0_2d4d_0111(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[63] = g[61] * (zkzl + cpz[1]) + b00[1] * g[49];
 }
 
-static inline void _g0_2d4d_0120(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _g0_2d4d_0120(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -17927,8 +17723,8 @@ static inline void _g0_2d4d_0120(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[21] = cpy[1] * c0y[1] + b00[1];
         g[22] = cpy[0] * (g[20] + b00[0]) + b01[0] * c0y[0];
         g[23] = cpy[1] * (g[21] + b00[1]) + b01[1] * c0y[1];
-        //g[24] = w[0];
-        //g[25] = w[1];
+        
+        
         g[26] = cpz[0] * g[24];
         g[27] = cpz[1] * g[25];
         g[30] = c0z[0] * g[24];
@@ -17941,7 +17737,7 @@ static inline void _g0_2d4d_0120(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[35] = cpz[1] * g[33] + b01[1] * g[31] + b00[1] * g[27];
 }
 
-static inline void _g0_2d4d_0200(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _g0_2d4d_0200(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -17959,15 +17755,15 @@ static inline void _g0_2d4d_0200(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[9] = c0y[1];
         g[10] = c0y[0] * c0y[0] + b10[0];
         g[11] = c0y[1] * c0y[1] + b10[1];
-        //g[12] = w[0];
-        //g[13] = w[1];
+        
+        
         g[14] = c0z[0] * g[12];
         g[15] = c0z[1] * g[13];
         g[16] = c0z[0] * g[14] + b10[0] * g[12];
         g[17] = c0z[1] * g[15] + b10[1] * g[13];
 }
 
-static inline void _g0_2d4d_0201(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _g0_2d4d_0201(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -18001,8 +17797,8 @@ static inline void _g0_2d4d_0201(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[19] = cpy[1] * c0y[1] + b00[1];
         g[22] = c0y[0] * (g[18] + b00[0]) + b10[0] * cpy[0];
         g[23] = c0y[1] * (g[19] + b00[1]) + b10[1] * cpy[1];
-        //g[24] = w[0];
-        //g[25] = w[1];
+        
+        
         g[28] = c0z[0] * g[24];
         g[29] = c0z[1] * g[25];
         g[32] = c0z[0] * g[28] + b10[0] * g[24];
@@ -18015,7 +17811,7 @@ static inline void _g0_2d4d_0201(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[35] = c0z[1] * g[31] + b10[1] * g[27] + b00[1] * g[29];
 }
 
-static inline void _g0_2d4d_0210(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _g0_2d4d_0210(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -18049,8 +17845,8 @@ static inline void _g0_2d4d_0210(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[21] = c0y[1] * c0y[1] + b10[1];
         g[22] = c0y[0] * (g[18] + b00[0]) + b10[0] * cpy[0];
         g[23] = c0y[1] * (g[19] + b00[1]) + b10[1] * cpy[1];
-        //g[24] = w[0];
-        //g[25] = w[1];
+        
+        
         g[26] = cpz[0] * g[24];
         g[27] = cpz[1] * g[25];
         g[28] = c0z[0] * g[24];
@@ -18063,7 +17859,7 @@ static inline void _g0_2d4d_0210(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[35] = c0z[1] * g[31] + b10[1] * g[27] + b00[1] * g[29];
 }
 
-static inline void _g0_2d4d_0300(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _g0_2d4d_0300(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -18085,8 +17881,8 @@ static inline void _g0_2d4d_0300(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[13] = c0y[1] * c0y[1] + b10[1];
         g[14] = c0y[0] * (g[12] + 2 * b10[0]);
         g[15] = c0y[1] * (g[13] + 2 * b10[1]);
-        //g[16] = w[0];
-        //g[17] = w[1];
+        
+        
         g[18] = c0z[0] * g[16];
         g[19] = c0z[1] * g[17];
         g[20] = c0z[0] * g[18] + b10[0] * g[16];
@@ -18095,7 +17891,7 @@ static inline void _g0_2d4d_0300(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[23] = c0z[1] * g[21] + 2 * b10[1] * g[19];
 }
 
-static inline void _g0_2d4d_1000(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _g0_2d4d_1000(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -18104,11 +17900,11 @@ static inline void _g0_2d4d_1000(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[1] = c0x[0];
         g[2] = 1;
         g[3] = c0y[0];
-        //g[4] = w[0];
+        
         g[5] = c0z[0] * g[4];
 }
 
-static inline void _g0_2d4d_1001(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _g0_2d4d_1001(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -18133,8 +17929,8 @@ static inline void _g0_2d4d_1001(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[13] = cpy[1];
         g[14] = cpy[0] * c0y[0] + b00[0];
         g[15] = cpy[1] * c0y[1] + b00[1];
-        //g[16] = w[0];
-        //g[17] = w[1];
+        
+        
         g[18] = c0z[0] * g[16];
         g[19] = c0z[1] * g[17];
         g[20] = cpz[0] * g[16];
@@ -18143,7 +17939,7 @@ static inline void _g0_2d4d_1001(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[23] = cpz[1] * g[19] + b00[1] * g[17];
 }
 
-static inline void _g0_2d4d_1002(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _g0_2d4d_1002(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -18177,8 +17973,8 @@ static inline void _g0_2d4d_1002(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[21] = cpy[1] * cpy[1] + b01[1];
         g[22] = cpy[0] * (g[18] + b00[0]) + b01[0] * c0y[0];
         g[23] = cpy[1] * (g[19] + b00[1]) + b01[1] * c0y[1];
-        //g[24] = w[0];
-        //g[25] = w[1];
+        
+        
         g[26] = c0z[0] * g[24];
         g[27] = c0z[1] * g[25];
         g[28] = cpz[0] * g[24];
@@ -18191,7 +17987,7 @@ static inline void _g0_2d4d_1002(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[35] = cpz[1] * g[31] + b01[1] * g[27] + b00[1] * g[29];
 }
 
-static inline void _g0_2d4d_1010(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _g0_2d4d_1010(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -18216,8 +18012,8 @@ static inline void _g0_2d4d_1010(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[13] = cpy[1];
         g[14] = cpy[0] * c0y[0] + b00[0];
         g[15] = cpy[1] * c0y[1] + b00[1];
-        //g[16] = w[0];
-        //g[17] = w[1];
+        
+        
         g[18] = c0z[0] * g[16];
         g[19] = c0z[1] * g[17];
         g[20] = cpz[0] * g[16];
@@ -18226,7 +18022,7 @@ static inline void _g0_2d4d_1010(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[23] = cpz[1] * g[19] + b00[1] * g[17];
 }
 
-static inline void _g0_2d4d_1011(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _g0_2d4d_1011(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -18271,8 +18067,8 @@ static inline void _g0_2d4d_1011(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[29] = ykyl + cpy[1];
         g[30] = c0y[0] * (ykyl + cpy[0]) + b00[0];
         g[31] = c0y[1] * (ykyl + cpy[1]) + b00[1];
-        //g[48] = w[0];
-        //g[49] = w[1];
+        
+        
         g[50] = c0z[0] * g[48];
         g[51] = c0z[1] * g[49];
         g[56] = cpz[0] * g[48];
@@ -18289,7 +18085,7 @@ static inline void _g0_2d4d_1011(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[55] = g[51] * (zkzl + cpz[1]) + b00[1] * g[49];
 }
 
-static inline void _g0_2d4d_1020(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _g0_2d4d_1020(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -18323,8 +18119,8 @@ static inline void _g0_2d4d_1020(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[21] = cpy[1] * cpy[1] + b01[1];
         g[22] = cpy[0] * (g[18] + b00[0]) + b01[0] * c0y[0];
         g[23] = cpy[1] * (g[19] + b00[1]) + b01[1] * c0y[1];
-        //g[24] = w[0];
-        //g[25] = w[1];
+        
+        
         g[26] = c0z[0] * g[24];
         g[27] = c0z[1] * g[25];
         g[28] = cpz[0] * g[24];
@@ -18337,7 +18133,7 @@ static inline void _g0_2d4d_1020(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[35] = cpz[1] * g[31] + b01[1] * g[27] + b00[1] * g[29];
 }
 
-static inline void _g0_2d4d_1100(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _g0_2d4d_1100(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -18362,8 +18158,8 @@ static inline void _g0_2d4d_1100(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[19] = c0y[1] * (yiyj + c0y[1]) + b10[1];
         g[14] = yiyj + c0y[0];
         g[15] = yiyj + c0y[1];
-        //g[24] = w[0];
-        //g[25] = w[1];
+        
+        
         g[28] = c0z[0] * g[24];
         g[29] = c0z[1] * g[25];
         g[30] = g[28] * (zizj + c0z[0]) + b10[0] * g[24];
@@ -18372,7 +18168,7 @@ static inline void _g0_2d4d_1100(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[27] = g[25] * (zizj + c0z[1]);
 }
 
-static inline void _g0_2d4d_1101(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _g0_2d4d_1101(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -18417,8 +18213,8 @@ static inline void _g0_2d4d_1101(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[39] = g[37] * (yiyj + c0y[1]) + c0y[1] * b00[1] + b10[1] * cpy[1];
         g[30] = cpy[0] * (yiyj + c0y[0]) + b00[0];
         g[31] = cpy[1] * (yiyj + c0y[1]) + b00[1];
-        //g[48] = w[0];
-        //g[49] = w[1];
+        
+        
         g[56] = c0z[0] * g[48];
         g[57] = c0z[1] * g[49];
         g[52] = cpz[0] * g[48];
@@ -18435,7 +18231,7 @@ static inline void _g0_2d4d_1101(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[55] = zizj * g[53] + cpz[1] * g[57] + b00[1] * g[49];
 }
 
-static inline void _g0_2d4d_1110(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _g0_2d4d_1110(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -18480,8 +18276,8 @@ static inline void _g0_2d4d_1110(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[39] = g[37] * (yiyj + c0y[1]) + c0y[1] * b00[1] + b10[1] * cpy[1];
         g[30] = cpy[0] * (yiyj + c0y[0]) + b00[0];
         g[31] = cpy[1] * (yiyj + c0y[1]) + b00[1];
-        //g[48] = w[0];
-        //g[49] = w[1];
+        
+        
         g[56] = c0z[0] * g[48];
         g[57] = c0z[1] * g[49];
         g[52] = cpz[0] * g[48];
@@ -18498,7 +18294,7 @@ static inline void _g0_2d4d_1110(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[55] = zizj * g[53] + cpz[1] * g[57] + b00[1] * g[49];
 }
 
-static inline void _g0_2d4d_1200(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _g0_2d4d_1200(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -18531,8 +18327,8 @@ static inline void _g0_2d4d_1200(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[23] = c0y[1] * (yiyj + c0y[1]) + b10[1];
         g[18] = yiyj + c0y[0];
         g[19] = yiyj + c0y[1];
-        //g[32] = w[0];
-        //g[33] = w[1];
+        
+        
         g[36] = c0z[0] * g[32];
         g[37] = c0z[1] * g[33];
         g[40] = c0z[0] * g[36] + b10[0] * g[32];
@@ -18545,7 +18341,7 @@ static inline void _g0_2d4d_1200(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[35] = g[33] * (zizj + c0z[1]);
 }
 
-static inline void _g0_2d4d_2000(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _g0_2d4d_2000(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -18563,15 +18359,15 @@ static inline void _g0_2d4d_2000(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[9] = c0y[1];
         g[10] = c0y[0] * c0y[0] + b10[0];
         g[11] = c0y[1] * c0y[1] + b10[1];
-        //g[12] = w[0];
-        //g[13] = w[1];
+        
+        
         g[14] = c0z[0] * g[12];
         g[15] = c0z[1] * g[13];
         g[16] = c0z[0] * g[14] + b10[0] * g[12];
         g[17] = c0z[1] * g[15] + b10[1] * g[13];
 }
 
-static inline void _g0_2d4d_2001(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _g0_2d4d_2001(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -18605,8 +18401,8 @@ static inline void _g0_2d4d_2001(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[21] = cpy[1] * c0y[1] + b00[1];
         g[22] = c0y[0] * (g[20] + b00[0]) + b10[0] * cpy[0];
         g[23] = c0y[1] * (g[21] + b00[1]) + b10[1] * cpy[1];
-        //g[24] = w[0];
-        //g[25] = w[1];
+        
+        
         g[26] = c0z[0] * g[24];
         g[27] = c0z[1] * g[25];
         g[28] = c0z[0] * g[26] + b10[0] * g[24];
@@ -18619,7 +18415,7 @@ static inline void _g0_2d4d_2001(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[35] = c0z[1] * g[33] + b10[1] * g[31] + b00[1] * g[27];
 }
 
-static inline void _g0_2d4d_2010(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _g0_2d4d_2010(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -18653,8 +18449,8 @@ static inline void _g0_2d4d_2010(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[21] = cpy[1] * c0y[1] + b00[1];
         g[22] = c0y[0] * (g[20] + b00[0]) + b10[0] * cpy[0];
         g[23] = c0y[1] * (g[21] + b00[1]) + b10[1] * cpy[1];
-        //g[24] = w[0];
-        //g[25] = w[1];
+        
+        
         g[26] = c0z[0] * g[24];
         g[27] = c0z[1] * g[25];
         g[28] = c0z[0] * g[26] + b10[0] * g[24];
@@ -18667,7 +18463,7 @@ static inline void _g0_2d4d_2010(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[35] = c0z[1] * g[33] + b10[1] * g[31] + b00[1] * g[27];
 }
 
-static inline void _g0_2d4d_2100(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _g0_2d4d_2100(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -18700,8 +18496,8 @@ static inline void _g0_2d4d_2100(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[27] = c0y[1] * (yiyj + c0y[1]) + b10[1];
         g[24] = yiyj + c0y[0];
         g[25] = yiyj + c0y[1];
-        //g[32] = w[0];
-        //g[33] = w[1];
+        
+        
         g[34] = c0z[0] * g[32];
         g[35] = c0z[1] * g[33];
         g[36] = c0z[0] * g[34] + b10[0] * g[32];
@@ -18714,7 +18510,7 @@ static inline void _g0_2d4d_2100(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[41] = g[33] * (zizj + c0z[1]);
 }
 
-static inline void _g0_2d4d_3000(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _g0_2d4d_3000(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -18736,8 +18532,8 @@ static inline void _g0_2d4d_3000(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[13] = c0y[1] * c0y[1] + b10[1];
         g[14] = c0y[0] * (g[12] + 2 * b10[0]);
         g[15] = c0y[1] * (g[13] + 2 * b10[1]);
-        //g[16] = w[0];
-        //g[17] = w[1];
+        
+        
         g[18] = c0z[0] * g[16];
         g[19] = c0z[1] * g[17];
         g[20] = c0z[0] * g[18] + b10[0] * g[16];
@@ -18746,7 +18542,7 @@ static inline void _g0_2d4d_3000(double *restrict g, Rys2eT *bc, CINTEnvVars *en
         g[23] = c0z[1] * g[21] + 2 * b10[1] * g[19];
 }
 
-void CINTg0_2e_2d4d_unrolled(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+void CINTg0_2e_2d4d_unrolled(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         int type_ijkl = ((envs->li_ceil << 6) | (envs->lj_ceil << 4) |
                          (envs->lk_ceil << 2) | (envs->ll_ceil));
@@ -18787,22 +18583,22 @@ void CINTg0_2e_2d4d_unrolled(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
                 case 0b10010000: _g0_2d4d_2100(g, bc, envs); return;
                 case 0b11000000: _g0_2d4d_3000(g, bc, envs); return;
         }
-        fprintf(stderr, "Dimension error for CINTg0_2e_lj2d4d: iklj = %d %d %d %d",
-               (int)envs->li_ceil, (int)envs->lk_ceil,
-               (int)envs->ll_ceil, (int)envs->lj_ceil);
+        //fprintf(stderr, "Dimension error for CINTg0_2e_lj2d4d: iklj = %d %d %d %d",
+        //       (int)envs->li_ceil, (int)envs->lk_ceil,
+        //       (int)envs->ll_ceil, (int)envs->lj_ceil);
 }
 
-static inline void _srg0_2d4d_0000(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _srg0_2d4d_0000(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         g[0] = 1;
         g[1] = 1;
         g[2] = 1;
         g[3] = 1;
-        //g[4] = w[0];
-        //g[5] = w[0];
+        
+        
 }
 
-static inline void _srg0_2d4d_0001(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _srg0_2d4d_0001(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *cpx = bc->c0px;
         double *cpy = bc->c0py;
@@ -18815,13 +18611,13 @@ static inline void _srg0_2d4d_0001(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[5] = 1;
         g[6] = cpy[0];
         g[7] = cpy[1];
-        //g[8] = w[0];
-        //g[9] = w[0];
+        
+        
         g[10] = cpz[0] * g[8];
         g[11] = cpz[1] * g[9];
 }
 
-static inline void _srg0_2d4d_0002(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _srg0_2d4d_0002(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *cpx = bc->c0px;
         double *cpy = bc->c0py;
@@ -18851,10 +18647,10 @@ static inline void _srg0_2d4d_0002(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[21] = cpy[1] * cpy[1] + b01[1];
         g[22] = cpy[2] * cpy[2] + b01[2];
         g[23] = cpy[3] * cpy[3] + b01[3];
-        //g[24] = w[0];
-        //g[25] = w[0];
-        //g[26] = w[1];
-        //g[27] = w[1];
+        
+        
+        
+        
         g[28] = cpz[0] * g[24];
         g[29] = cpz[1] * g[25];
         g[30] = cpz[2] * g[26];
@@ -18865,7 +18661,7 @@ static inline void _srg0_2d4d_0002(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[35] = cpz[3] * g[31] + b01[3] * g[27];
 }
 
-static inline void _srg0_2d4d_0003(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _srg0_2d4d_0003(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *cpx = bc->c0px;
         double *cpy = bc->c0py;
@@ -18903,10 +18699,10 @@ static inline void _srg0_2d4d_0003(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[29] = cpy[1] * (g[25] + 2 * b01[1]);
         g[30] = cpy[2] * (g[26] + 2 * b01[2]);
         g[31] = cpy[3] * (g[27] + 2 * b01[3]);
-        //g[32] = w[0];
-        //g[33] = w[0];
-        //g[34] = w[1];
-        //g[35] = w[1];
+        
+        
+        
+        
         g[36] = cpz[0] * g[32];
         g[37] = cpz[1] * g[33];
         g[38] = cpz[2] * g[34];
@@ -18921,7 +18717,7 @@ static inline void _srg0_2d4d_0003(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[47] = cpz[3] * g[43] + 2 * b01[3] * g[39];
 }
 
-static inline void _srg0_2d4d_0010(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _srg0_2d4d_0010(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *cpx = bc->c0px;
         double *cpy = bc->c0py;
@@ -18934,13 +18730,13 @@ static inline void _srg0_2d4d_0010(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[5] = 1;
         g[6] = cpy[0];
         g[7] = cpy[1];
-        //g[8] = w[0];
-        //g[9] = w[0];
+        
+        
         g[10] = cpz[0] * g[8];
         g[11] = cpz[1] * g[9];
 }
 
-static inline void _srg0_2d4d_0011(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _srg0_2d4d_0011(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *cpx = bc->c0px;
         double *cpy = bc->c0py;
@@ -18981,10 +18777,10 @@ static inline void _srg0_2d4d_0011(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[29] = ykyl + cpy[1];
         g[30] = ykyl + cpy[2];
         g[31] = ykyl + cpy[3];
-        //g[48] = w[0];
-        //g[49] = w[0];
-        //g[50] = w[1];
-        //g[51] = w[1];
+        
+        
+        
+        
         g[56] = cpz[0] * g[48];
         g[57] = cpz[1] * g[49];
         g[58] = cpz[2] * g[50];
@@ -18999,7 +18795,7 @@ static inline void _srg0_2d4d_0011(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[55] = g[51] * (zkzl + cpz[3]);
 }
 
-static inline void _srg0_2d4d_0012(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _srg0_2d4d_0012(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *cpx = bc->c0px;
         double *cpy = bc->c0py;
@@ -19056,10 +18852,10 @@ static inline void _srg0_2d4d_0012(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[37] = ykyl + cpy[1];
         g[38] = ykyl + cpy[2];
         g[39] = ykyl + cpy[3];
-        //g[64] = w[0];
-        //g[65] = w[0];
-        //g[66] = w[1];
-        //g[67] = w[1];
+        
+        
+        
+        
         g[72] = cpz[0] * g[64];
         g[73] = cpz[1] * g[65];
         g[74] = cpz[2] * g[66];
@@ -19082,7 +18878,7 @@ static inline void _srg0_2d4d_0012(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[71] = g[67] * (zkzl + cpz[3]);
 }
 
-static inline void _srg0_2d4d_0020(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _srg0_2d4d_0020(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *cpx = bc->c0px;
         double *cpy = bc->c0py;
@@ -19112,10 +18908,10 @@ static inline void _srg0_2d4d_0020(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[21] = cpy[1] * cpy[1] + b01[1];
         g[22] = cpy[2] * cpy[2] + b01[2];
         g[23] = cpy[3] * cpy[3] + b01[3];
-        //g[24] = w[0];
-        //g[25] = w[0];
-        //g[26] = w[1];
-        //g[27] = w[1];
+        
+        
+        
+        
         g[28] = cpz[0] * g[24];
         g[29] = cpz[1] * g[25];
         g[30] = cpz[2] * g[26];
@@ -19126,7 +18922,7 @@ static inline void _srg0_2d4d_0020(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[35] = cpz[3] * g[31] + b01[3] * g[27];
 }
 
-static inline void _srg0_2d4d_0021(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _srg0_2d4d_0021(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *cpx = bc->c0px;
         double *cpy = bc->c0py;
@@ -19183,10 +18979,10 @@ static inline void _srg0_2d4d_0021(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[57] = g[41] * (ykyl + cpy[1]) + cpy[1] * 2 * b01[1];
         g[58] = g[42] * (ykyl + cpy[2]) + cpy[2] * 2 * b01[2];
         g[59] = g[43] * (ykyl + cpy[3]) + cpy[3] * 2 * b01[3];
-        //g[64] = w[0];
-        //g[65] = w[0];
-        //g[66] = w[1];
-        //g[67] = w[1];
+        
+        
+        
+        
         g[68] = cpz[0] * g[64];
         g[69] = cpz[1] * g[65];
         g[70] = cpz[2] * g[66];
@@ -19209,7 +19005,7 @@ static inline void _srg0_2d4d_0021(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[91] = g[75] * (zkzl + cpz[3]) + 2 * b01[3] * g[71];
 }
 
-static inline void _srg0_2d4d_0030(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _srg0_2d4d_0030(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *cpx = bc->c0px;
         double *cpy = bc->c0py;
@@ -19247,10 +19043,10 @@ static inline void _srg0_2d4d_0030(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[29] = cpy[1] * (g[25] + 2 * b01[1]);
         g[30] = cpy[2] * (g[26] + 2 * b01[2]);
         g[31] = cpy[3] * (g[27] + 2 * b01[3]);
-        //g[32] = w[0];
-        //g[33] = w[0];
-        //g[34] = w[1];
-        //g[35] = w[1];
+        
+        
+        
+        
         g[36] = cpz[0] * g[32];
         g[37] = cpz[1] * g[33];
         g[38] = cpz[2] * g[34];
@@ -19265,7 +19061,7 @@ static inline void _srg0_2d4d_0030(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[47] = cpz[3] * g[43] + 2 * b01[3] * g[39];
 }
 
-static inline void _srg0_2d4d_0100(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _srg0_2d4d_0100(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -19278,13 +19074,13 @@ static inline void _srg0_2d4d_0100(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[5] = 1;
         g[6] = c0y[0];
         g[7] = c0y[1];
-        //g[8] = w[0];
-        //g[9] = w[0];
+        
+        
         g[10] = c0z[0] * g[8];
         g[11] = c0z[1] * g[9];
 }
 
-static inline void _srg0_2d4d_0101(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _srg0_2d4d_0101(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -19325,10 +19121,10 @@ static inline void _srg0_2d4d_0101(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[29] = cpy[1] * c0y[1] + b00[1];
         g[30] = cpy[2] * c0y[2] + b00[2];
         g[31] = cpy[3] * c0y[3] + b00[3];
-        //g[32] = w[0];
-        //g[33] = w[0];
-        //g[34] = w[1];
-        //g[35] = w[1];
+        
+        
+        
+        
         g[36] = cpz[0] * g[32];
         g[37] = cpz[1] * g[33];
         g[38] = cpz[2] * g[34];
@@ -19343,7 +19139,7 @@ static inline void _srg0_2d4d_0101(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[47] = cpz[3] * g[43] + b00[3] * g[35];
 }
 
-static inline void _srg0_2d4d_0102(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _srg0_2d4d_0102(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -19401,10 +19197,10 @@ static inline void _srg0_2d4d_0102(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[45] = cpy[1] * (g[41] + b00[1]) + b01[1] * c0y[1];
         g[46] = cpy[2] * (g[42] + b00[2]) + b01[2] * c0y[2];
         g[47] = cpy[3] * (g[43] + b00[3]) + b01[3] * c0y[3];
-        //g[48] = w[0];
-        //g[49] = w[0];
-        //g[50] = w[1];
-        //g[51] = w[1];
+        
+        
+        
+        
         g[52] = cpz[0] * g[48];
         g[53] = cpz[1] * g[49];
         g[54] = cpz[2] * g[50];
@@ -19427,7 +19223,7 @@ static inline void _srg0_2d4d_0102(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[71] = cpz[3] * g[67] + b01[3] * g[63] + b00[3] * g[55];
 }
 
-static inline void _srg0_2d4d_0110(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _srg0_2d4d_0110(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -19468,10 +19264,10 @@ static inline void _srg0_2d4d_0110(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[29] = cpy[1] * c0y[1] + b00[1];
         g[30] = cpy[2] * c0y[2] + b00[2];
         g[31] = cpy[3] * c0y[3] + b00[3];
-        //g[32] = w[0];
-        //g[33] = w[0];
-        //g[34] = w[1];
-        //g[35] = w[1];
+        
+        
+        
+        
         g[36] = cpz[0] * g[32];
         g[37] = cpz[1] * g[33];
         g[38] = cpz[2] * g[34];
@@ -19486,7 +19282,7 @@ static inline void _srg0_2d4d_0110(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[47] = cpz[3] * g[43] + b00[3] * g[35];
 }
 
-static inline void _srg0_2d4d_0111(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _srg0_2d4d_0111(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -19563,10 +19359,10 @@ static inline void _srg0_2d4d_0111(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[77] = c0y[1] * (ykyl + cpy[1]) + b00[1];
         g[78] = c0y[2] * (ykyl + cpy[2]) + b00[2];
         g[79] = c0y[3] * (ykyl + cpy[3]) + b00[3];
-        //g[96] = w[0];
-        //g[97] = w[0];
-        //g[98] = w[1];
-        //g[99] = w[1];
+        
+        
+        
+        
         g[120] = c0z[0] * g[96];
         g[121] = c0z[1] * g[97];
         g[122] = c0z[2] * g[98];
@@ -19597,7 +19393,7 @@ static inline void _srg0_2d4d_0111(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[127] = g[123] * (zkzl + cpz[3]) + b00[3] * g[99];
 }
 
-static inline void _srg0_2d4d_0120(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _srg0_2d4d_0120(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -19655,10 +19451,10 @@ static inline void _srg0_2d4d_0120(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[45] = cpy[1] * (g[41] + b00[1]) + b01[1] * c0y[1];
         g[46] = cpy[2] * (g[42] + b00[2]) + b01[2] * c0y[2];
         g[47] = cpy[3] * (g[43] + b00[3]) + b01[3] * c0y[3];
-        //g[48] = w[0];
-        //g[49] = w[0];
-        //g[50] = w[1];
-        //g[51] = w[1];
+        
+        
+        
+        
         g[52] = cpz[0] * g[48];
         g[53] = cpz[1] * g[49];
         g[54] = cpz[2] * g[50];
@@ -19681,7 +19477,7 @@ static inline void _srg0_2d4d_0120(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[71] = cpz[3] * g[67] + b01[3] * g[63] + b00[3] * g[55];
 }
 
-static inline void _srg0_2d4d_0200(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _srg0_2d4d_0200(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -19711,10 +19507,10 @@ static inline void _srg0_2d4d_0200(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[21] = c0y[1] * c0y[1] + b10[1];
         g[22] = c0y[2] * c0y[2] + b10[2];
         g[23] = c0y[3] * c0y[3] + b10[3];
-        //g[24] = w[0];
-        //g[25] = w[0];
-        //g[26] = w[1];
-        //g[27] = w[1];
+        
+        
+        
+        
         g[28] = c0z[0] * g[24];
         g[29] = c0z[1] * g[25];
         g[30] = c0z[2] * g[26];
@@ -19725,7 +19521,7 @@ static inline void _srg0_2d4d_0200(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[35] = c0z[3] * g[31] + b10[3] * g[27];
 }
 
-static inline void _srg0_2d4d_0201(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _srg0_2d4d_0201(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -19783,10 +19579,10 @@ static inline void _srg0_2d4d_0201(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[45] = c0y[1] * (g[37] + b00[1]) + b10[1] * cpy[1];
         g[46] = c0y[2] * (g[38] + b00[2]) + b10[2] * cpy[2];
         g[47] = c0y[3] * (g[39] + b00[3]) + b10[3] * cpy[3];
-        //g[48] = w[0];
-        //g[49] = w[0];
-        //g[50] = w[1];
-        //g[51] = w[1];
+        
+        
+        
+        
         g[56] = c0z[0] * g[48];
         g[57] = c0z[1] * g[49];
         g[58] = c0z[2] * g[50];
@@ -19809,7 +19605,7 @@ static inline void _srg0_2d4d_0201(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[71] = c0z[3] * g[63] + b10[3] * g[55] + b00[3] * g[59];
 }
 
-static inline void _srg0_2d4d_0210(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _srg0_2d4d_0210(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -19867,10 +19663,10 @@ static inline void _srg0_2d4d_0210(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[45] = c0y[1] * (g[37] + b00[1]) + b10[1] * cpy[1];
         g[46] = c0y[2] * (g[38] + b00[2]) + b10[2] * cpy[2];
         g[47] = c0y[3] * (g[39] + b00[3]) + b10[3] * cpy[3];
-        //g[48] = w[0];
-        //g[49] = w[0];
-        //g[50] = w[1];
-        //g[51] = w[1];
+        
+        
+        
+        
         g[52] = cpz[0] * g[48];
         g[53] = cpz[1] * g[49];
         g[54] = cpz[2] * g[50];
@@ -19893,7 +19689,7 @@ static inline void _srg0_2d4d_0210(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[71] = c0z[3] * g[63] + b10[3] * g[55] + b00[3] * g[59];
 }
 
-static inline void _srg0_2d4d_0300(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _srg0_2d4d_0300(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -19931,10 +19727,10 @@ static inline void _srg0_2d4d_0300(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[29] = c0y[1] * (g[25] + 2 * b10[1]);
         g[30] = c0y[2] * (g[26] + 2 * b10[2]);
         g[31] = c0y[3] * (g[27] + 2 * b10[3]);
-        //g[32] = w[0];
-        //g[33] = w[0];
-        //g[34] = w[1];
-        //g[35] = w[1];
+        
+        
+        
+        
         g[36] = c0z[0] * g[32];
         g[37] = c0z[1] * g[33];
         g[38] = c0z[2] * g[34];
@@ -19949,7 +19745,7 @@ static inline void _srg0_2d4d_0300(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[47] = c0z[3] * g[43] + 2 * b10[3] * g[39];
 }
 
-static inline void _srg0_2d4d_1000(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _srg0_2d4d_1000(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -19962,13 +19758,13 @@ static inline void _srg0_2d4d_1000(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[5] = 1;
         g[6] = c0y[0];
         g[7] = c0y[1];
-        //g[8] = w[0];
-        //g[9] = w[0];
+        
+        
         g[10] = c0z[0] * g[8];
         g[11] = c0z[1] * g[9];
 }
 
-static inline void _srg0_2d4d_1001(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _srg0_2d4d_1001(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -20009,10 +19805,10 @@ static inline void _srg0_2d4d_1001(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[29] = cpy[1] * c0y[1] + b00[1];
         g[30] = cpy[2] * c0y[2] + b00[2];
         g[31] = cpy[3] * c0y[3] + b00[3];
-        //g[32] = w[0];
-        //g[33] = w[0];
-        //g[34] = w[1];
-        //g[35] = w[1];
+        
+        
+        
+        
         g[36] = c0z[0] * g[32];
         g[37] = c0z[1] * g[33];
         g[38] = c0z[2] * g[34];
@@ -20027,7 +19823,7 @@ static inline void _srg0_2d4d_1001(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[47] = cpz[3] * g[39] + b00[3] * g[35];
 }
 
-static inline void _srg0_2d4d_1002(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _srg0_2d4d_1002(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -20085,10 +19881,10 @@ static inline void _srg0_2d4d_1002(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[45] = cpy[1] * (g[37] + b00[1]) + b01[1] * c0y[1];
         g[46] = cpy[2] * (g[38] + b00[2]) + b01[2] * c0y[2];
         g[47] = cpy[3] * (g[39] + b00[3]) + b01[3] * c0y[3];
-        //g[48] = w[0];
-        //g[49] = w[0];
-        //g[50] = w[1];
-        //g[51] = w[1];
+        
+        
+        
+        
         g[52] = c0z[0] * g[48];
         g[53] = c0z[1] * g[49];
         g[54] = c0z[2] * g[50];
@@ -20111,7 +19907,7 @@ static inline void _srg0_2d4d_1002(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[71] = cpz[3] * g[63] + b01[3] * g[55] + b00[3] * g[59];
 }
 
-static inline void _srg0_2d4d_1010(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _srg0_2d4d_1010(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -20152,10 +19948,10 @@ static inline void _srg0_2d4d_1010(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[29] = cpy[1] * c0y[1] + b00[1];
         g[30] = cpy[2] * c0y[2] + b00[2];
         g[31] = cpy[3] * c0y[3] + b00[3];
-        //g[32] = w[0];
-        //g[33] = w[0];
-        //g[34] = w[1];
-        //g[35] = w[1];
+        
+        
+        
+        
         g[36] = c0z[0] * g[32];
         g[37] = c0z[1] * g[33];
         g[38] = c0z[2] * g[34];
@@ -20170,7 +19966,7 @@ static inline void _srg0_2d4d_1010(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[47] = cpz[3] * g[39] + b00[3] * g[35];
 }
 
-static inline void _srg0_2d4d_1011(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _srg0_2d4d_1011(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -20247,10 +20043,10 @@ static inline void _srg0_2d4d_1011(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[61] = c0y[1] * (ykyl + cpy[1]) + b00[1];
         g[62] = c0y[2] * (ykyl + cpy[2]) + b00[2];
         g[63] = c0y[3] * (ykyl + cpy[3]) + b00[3];
-        //g[96] = w[0];
-        //g[97] = w[0];
-        //g[98] = w[1];
-        //g[99] = w[1];
+        
+        
+        
+        
         g[100] = c0z[0] * g[96];
         g[101] = c0z[1] * g[97];
         g[102] = c0z[2] * g[98];
@@ -20281,7 +20077,7 @@ static inline void _srg0_2d4d_1011(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[111] = g[103] * (zkzl + cpz[3]) + b00[3] * g[99];
 }
 
-static inline void _srg0_2d4d_1020(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _srg0_2d4d_1020(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -20339,10 +20135,10 @@ static inline void _srg0_2d4d_1020(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[45] = cpy[1] * (g[37] + b00[1]) + b01[1] * c0y[1];
         g[46] = cpy[2] * (g[38] + b00[2]) + b01[2] * c0y[2];
         g[47] = cpy[3] * (g[39] + b00[3]) + b01[3] * c0y[3];
-        //g[48] = w[0];
-        //g[49] = w[0];
-        //g[50] = w[1];
-        //g[51] = w[1];
+        
+        
+        
+        
         g[52] = c0z[0] * g[48];
         g[53] = c0z[1] * g[49];
         g[54] = c0z[2] * g[50];
@@ -20365,7 +20161,7 @@ static inline void _srg0_2d4d_1020(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[71] = cpz[3] * g[63] + b01[3] * g[55] + b00[3] * g[59];
 }
 
-static inline void _srg0_2d4d_1100(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _srg0_2d4d_1100(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -20406,10 +20202,10 @@ static inline void _srg0_2d4d_1100(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[29] = yiyj + c0y[1];
         g[30] = yiyj + c0y[2];
         g[31] = yiyj + c0y[3];
-        //g[48] = w[0];
-        //g[49] = w[0];
-        //g[50] = w[1];
-        //g[51] = w[1];
+        
+        
+        
+        
         g[56] = c0z[0] * g[48];
         g[57] = c0z[1] * g[49];
         g[58] = c0z[2] * g[50];
@@ -20424,7 +20220,7 @@ static inline void _srg0_2d4d_1100(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[55] = g[51] * (zizj + c0z[3]);
 }
 
-static inline void _srg0_2d4d_1101(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _srg0_2d4d_1101(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -20501,10 +20297,10 @@ static inline void _srg0_2d4d_1101(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[61] = cpy[1] * (yiyj + c0y[1]) + b00[1];
         g[62] = cpy[2] * (yiyj + c0y[2]) + b00[2];
         g[63] = cpy[3] * (yiyj + c0y[3]) + b00[3];
-        //g[96] = w[0];
-        //g[97] = w[0];
-        //g[98] = w[1];
-        //g[99] = w[1];
+        
+        
+        
+        
         g[112] = c0z[0] * g[96];
         g[113] = c0z[1] * g[97];
         g[114] = c0z[2] * g[98];
@@ -20535,7 +20331,7 @@ static inline void _srg0_2d4d_1101(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[111] = zizj * g[107] + cpz[3] * g[115] + b00[3] * g[99];
 }
 
-static inline void _srg0_2d4d_1110(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _srg0_2d4d_1110(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -20612,10 +20408,10 @@ static inline void _srg0_2d4d_1110(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[61] = cpy[1] * (yiyj + c0y[1]) + b00[1];
         g[62] = cpy[2] * (yiyj + c0y[2]) + b00[2];
         g[63] = cpy[3] * (yiyj + c0y[3]) + b00[3];
-        //g[96] = w[0];
-        //g[97] = w[0];
-        //g[98] = w[1];
-        //g[99] = w[1];
+        
+        
+        
+        
         g[112] = c0z[0] * g[96];
         g[113] = c0z[1] * g[97];
         g[114] = c0z[2] * g[98];
@@ -20646,7 +20442,7 @@ static inline void _srg0_2d4d_1110(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[111] = zizj * g[107] + cpz[3] * g[115] + b00[3] * g[99];
 }
 
-static inline void _srg0_2d4d_1200(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _srg0_2d4d_1200(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -20703,10 +20499,10 @@ static inline void _srg0_2d4d_1200(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[37] = yiyj + c0y[1];
         g[38] = yiyj + c0y[2];
         g[39] = yiyj + c0y[3];
-        //g[64] = w[0];
-        //g[65] = w[0];
-        //g[66] = w[1];
-        //g[67] = w[1];
+        
+        
+        
+        
         g[72] = c0z[0] * g[64];
         g[73] = c0z[1] * g[65];
         g[74] = c0z[2] * g[66];
@@ -20729,7 +20525,7 @@ static inline void _srg0_2d4d_1200(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[71] = g[67] * (zizj + c0z[3]);
 }
 
-static inline void _srg0_2d4d_2000(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _srg0_2d4d_2000(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -20759,10 +20555,10 @@ static inline void _srg0_2d4d_2000(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[21] = c0y[1] * c0y[1] + b10[1];
         g[22] = c0y[2] * c0y[2] + b10[2];
         g[23] = c0y[3] * c0y[3] + b10[3];
-        //g[24] = w[0];
-        //g[25] = w[0];
-        //g[26] = w[1];
-        //g[27] = w[1];
+        
+        
+        
+        
         g[28] = c0z[0] * g[24];
         g[29] = c0z[1] * g[25];
         g[30] = c0z[2] * g[26];
@@ -20773,7 +20569,7 @@ static inline void _srg0_2d4d_2000(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[35] = c0z[3] * g[31] + b10[3] * g[27];
 }
 
-static inline void _srg0_2d4d_2001(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _srg0_2d4d_2001(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -20831,10 +20627,10 @@ static inline void _srg0_2d4d_2001(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[45] = c0y[1] * (g[41] + b00[1]) + b10[1] * cpy[1];
         g[46] = c0y[2] * (g[42] + b00[2]) + b10[2] * cpy[2];
         g[47] = c0y[3] * (g[43] + b00[3]) + b10[3] * cpy[3];
-        //g[48] = w[0];
-        //g[49] = w[0];
-        //g[50] = w[1];
-        //g[51] = w[1];
+        
+        
+        
+        
         g[52] = c0z[0] * g[48];
         g[53] = c0z[1] * g[49];
         g[54] = c0z[2] * g[50];
@@ -20857,7 +20653,7 @@ static inline void _srg0_2d4d_2001(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[71] = c0z[3] * g[67] + b10[3] * g[63] + b00[3] * g[55];
 }
 
-static inline void _srg0_2d4d_2010(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _srg0_2d4d_2010(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -20915,10 +20711,10 @@ static inline void _srg0_2d4d_2010(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[45] = c0y[1] * (g[41] + b00[1]) + b10[1] * cpy[1];
         g[46] = c0y[2] * (g[42] + b00[2]) + b10[2] * cpy[2];
         g[47] = c0y[3] * (g[43] + b00[3]) + b10[3] * cpy[3];
-        //g[48] = w[0];
-        //g[49] = w[0];
-        //g[50] = w[1];
-        //g[51] = w[1];
+        
+        
+        
+        
         g[52] = c0z[0] * g[48];
         g[53] = c0z[1] * g[49];
         g[54] = c0z[2] * g[50];
@@ -20941,7 +20737,7 @@ static inline void _srg0_2d4d_2010(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[71] = c0z[3] * g[67] + b10[3] * g[63] + b00[3] * g[55];
 }
 
-static inline void _srg0_2d4d_2100(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _srg0_2d4d_2100(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -20998,10 +20794,10 @@ static inline void _srg0_2d4d_2100(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[49] = yiyj + c0y[1];
         g[50] = yiyj + c0y[2];
         g[51] = yiyj + c0y[3];
-        //g[64] = w[0];
-        //g[65] = w[0];
-        //g[66] = w[1];
-        //g[67] = w[1];
+        
+        
+        
+        
         g[68] = c0z[0] * g[64];
         g[69] = c0z[1] * g[65];
         g[70] = c0z[2] * g[66];
@@ -21024,7 +20820,7 @@ static inline void _srg0_2d4d_2100(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[83] = g[67] * (zizj + c0z[3]);
 }
 
-static inline void _srg0_2d4d_3000(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+static inline void _srg0_2d4d_3000(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         double *c0x = bc->c00x;
         double *c0y = bc->c00y;
@@ -21062,10 +20858,10 @@ static inline void _srg0_2d4d_3000(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[29] = c0y[1] * (g[25] + 2 * b10[1]);
         g[30] = c0y[2] * (g[26] + 2 * b10[2]);
         g[31] = c0y[3] * (g[27] + 2 * b10[3]);
-        //g[32] = w[0];
-        //g[33] = w[0];
-        //g[34] = w[1];
-        //g[35] = w[1];
+        
+        
+        
+        
         g[36] = c0z[0] * g[32];
         g[37] = c0z[1] * g[33];
         g[38] = c0z[2] * g[34];
@@ -21080,7 +20876,7 @@ static inline void _srg0_2d4d_3000(double *restrict g, Rys2eT *bc, CINTEnvVars *
         g[47] = c0z[3] * g[43] + 2 * b10[3] * g[39];
 }
 
-void CINTsrg0_2e_2d4d_unrolled(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+void CINTsrg0_2e_2d4d_unrolled(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         int type_ijkl = ((envs->li_ceil << 6) | (envs->lj_ceil << 4) |
                          (envs->lk_ceil << 2) | (envs->ll_ceil));
@@ -21121,36 +20917,34 @@ void CINTsrg0_2e_2d4d_unrolled(double *restrict g, Rys2eT *bc, CINTEnvVars *envs
                 case 0b10010000: _srg0_2d4d_2100(g, bc, envs); return;
                 case 0b11000000: _srg0_2d4d_3000(g, bc, envs); return;
         }
-        fprintf(stderr, "Dimension error for CINTg0_2e_lj2d4d: iklj = %d %d %d %d",
-               (int)envs->li_ceil, (int)envs->lk_ceil,
-               (int)envs->ll_ceil, (int)envs->lj_ceil);
+        //fprintf(stderr, "Dimension error for CINTg0_2e_lj2d4d: iklj = %d %d %d %d",
+        //       (int)envs->li_ceil, (int)envs->lk_ceil,
+        //       (int)envs->ll_ceil, (int)envs->lj_ceil);
 }
 
-void CINTg0_2e_lj2d4d(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+void CINTg0_2e_lj2d4d(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         CINTg0_2e_2d(g, bc, envs);
         CINTg0_lj2d_4d(g, envs);
 }
 
-void CINTg0_2e_kj2d4d(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+void CINTg0_2e_kj2d4d(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         CINTg0_2e_2d(g, bc, envs);
         CINTg0_kj2d_4d(g, envs);
 }
-void CINTg0_2e_ik2d4d(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+void CINTg0_2e_ik2d4d(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         CINTg0_2e_2d(g, bc, envs);
         CINTg0_ik2d_4d(g, envs);
 }
-void CINTg0_2e_il2d4d(double *restrict g, Rys2eT *bc, CINTEnvVars *envs)
+void CINTg0_2e_il2d4d(double *g, Rys2eT *bc, CINTEnvVars *envs)
 {
         CINTg0_2e_2d(g, bc, envs);
         CINTg0_il2d_4d(g, envs);
 }
 
-/*
- * g[i,k,l,j] = < ik | lj > = ( i j | k l )
- */
+
 FINT CINTg0_2e(double *g, double *rij, double *rkl, double cutoff, CINTEnvVars *envs)
 {
         FINT irys;
@@ -21159,7 +20953,7 @@ FINT CINTg0_2e(double *g, double *rij, double *rkl, double cutoff, CINTEnvVars *
         double akl = envs->ak[0] + envs->al[0];
         double a0, a1, fac1, x;
         double u[MXRYSROOTS];
-        double *w = g + envs->g_size * 2; // ~ gz
+        double *w = g + envs->g_size * 2; 
         double xij_kl = rij[0] - rkl[0];
         double yij_kl = rij[1] - rkl[1];
         double zij_kl = rij[2] - rkl[2];
@@ -21174,10 +20968,10 @@ FINT CINTg0_2e(double *g, double *rij, double *rkl, double cutoff, CINTEnvVars *
         if (omega == 0.) {
                 CINTrys_roots(nroots, x, u, w);
         } else if (omega < 0.) {
-                // short-range part of range-separated Coulomb
+                
                 theta = omega * omega / (omega * omega + a0);
-                // very small erfc() leads to ~0 weights. They can cause
-                // numerical issue in sr_rys_roots.
+                
+                
                 if (theta * x > cutoff || theta * x > EXPCUTOFF_SR) {
                         return 0;
                 }
@@ -21203,17 +20997,13 @@ FINT CINTg0_2e(double *g, double *rij, double *rkl, double cutoff, CINTEnvVars *
                                 w[irys] *= sqrt_theta;
                         }
                 }
-        } else { // omega > 0.
-                // long-range part of range-separated Coulomb
+        } else { 
+                
                 theta = omega * omega / (omega * omega + a0);
                 x *= theta;
                 fac1 *= sqrt(theta);
                 CINTrys_roots(nroots, x, u, w);
-                /* u[:] = tau^2 / (1 - tau^2)
-                 * omega^2u^2 = a0 * tau^2 / (theta^-1 - tau^2)
-                 * transform u[:] to theta^-1 tau^2 / (theta^-1 - tau^2)
-                 * so the rest code can be reused.
-                 */
+                
                 for (irys = 0; irys < nroots; irys++) {
                         double ut = u[irys] * theta;
                         u[irys] = ut / (u[irys]+1.-ut);
@@ -21245,11 +21035,7 @@ FINT CINTg0_2e(double *g, double *rij, double *rkl, double cutoff, CINTEnvVars *
         double *c0pz = bc.c0pz;
 
         for (irys = 0; irys < nroots; irys++) {
-                /*
-                 *u(irys) = t2/(1-t2)
-                 *t2 = u(irys)/(1+u(irys))
-                 *u2 = aij*akl/(aij+akl)*t2/(1-t2)
-                 */
+                
                 u2 = a0 * u[irys];
                 tmp4 = .5 / (u2 * (aij + akl) + a1);
                 tmp5 = u2 * tmp4;
@@ -21273,9 +21059,7 @@ FINT CINTg0_2e(double *g, double *rij, double *rkl, double cutoff, CINTEnvVars *
         return 1;
 }
 
-/*
- * ( \nabla i j | kl )
- */
+
 void CINTnabla1i_2e(double *f, const double *g,
                     const FINT li, const FINT lj, const FINT lk, const FINT ll,
                     const CINTEnvVars *envs)
@@ -21300,14 +21084,14 @@ void CINTnabla1i_2e(double *f, const double *g,
         for (l = 0; l <= ll; l++)
         for (k = 0; k <= lk; k++) {
                 ptr = dj * j + dl * l + dk * k;
-                //f(...,0,...) = -2*ai*g(...,1,...)
+                
                 for (n = ptr; n < ptr+nroots; n++) {
                         fx[n] = ai2 * p2x[n];
                         fy[n] = ai2 * p2y[n];
                         fz[n] = ai2 * p2z[n];
                 }
                 ptr += di;
-                //f(...,i,...) = i*g(...,i-1,...)-2*ai*g(...,i+1,...)
+                
                 for (i = 1; i <= li; i++) {
                         for (n = ptr; n < ptr+nroots; n++) {
                                 fx[n] = i*p1x[n] + ai2*p2x[n];
@@ -21319,9 +21103,7 @@ void CINTnabla1i_2e(double *f, const double *g,
         }
 }
 
-/*
- * ( i \nabla j | kl )
- */
+
 void CINTnabla1j_2e(double *f, const double *g,
                     const FINT li, const FINT lj, const FINT lk, const FINT ll,
                     const CINTEnvVars *envs)
@@ -21342,7 +21124,7 @@ void CINTnabla1j_2e(double *f, const double *g,
         const double *p2x = gx + dj;
         const double *p2y = gy + dj;
         const double *p2z = gz + dj;
-        //f(...,0,...) = -2*aj*g(...,1,...)
+        
         for (l = 0; l <= ll; l++) {
         for (k = 0; k <= lk; k++) {
                 ptr = dl * l + dk * k;
@@ -21355,7 +21137,7 @@ void CINTnabla1j_2e(double *f, const double *g,
                         ptr += di;
                 }
         } }
-        //f(...,j,...) = j*g(...,j-1,...)-2*aj*g(...,j+1,...)
+        
         for (j = 1; j <= lj; j++) {
                 for (l = 0; l <= ll; l++) {
                 for (k = 0; k <= lk; k++) {
@@ -21372,9 +21154,7 @@ void CINTnabla1j_2e(double *f, const double *g,
         }
 }
 
-/*
- * ( ij | \nabla k l )
- */
+
 void CINTnabla1k_2e(double *f, const double *g,
                     const FINT li, const FINT lj, const FINT lk, const FINT ll,
                     const CINTEnvVars *envs)
@@ -21398,7 +21178,7 @@ void CINTnabla1k_2e(double *f, const double *g,
         for (j = 0; j <= lj; j++)
         for (l = 0; l <= ll; l++) {
                 ptr = dj * j + dl * l;
-                //f(...,0,...) = -2*ak*g(...,1,...)
+                
                 for (i = 0; i <= li; i++) {
                         for (n = ptr; n < ptr+nroots; n++) {
                                 fx[n] = ak2 * p2x[n];
@@ -21407,7 +21187,7 @@ void CINTnabla1k_2e(double *f, const double *g,
                         }
                         ptr += di;
                 }
-                //f(...,k,...) = k*g(...,k-1,...)-2*ak*g(...,k+1,...)
+                
                 for (k = 1; k <= lk; k++) {
                         ptr = dj * j + dl * l + dk * k;
                         for (i = 0; i <= li; i++) {
@@ -21422,9 +21202,7 @@ void CINTnabla1k_2e(double *f, const double *g,
         }
 }
 
-/*
- * ( ij | k \nabla l )
- */
+
 void CINTnabla1l_2e(double *f, const double *g,
                     const FINT li, const FINT lj, const FINT lk, const FINT ll,
                     const CINTEnvVars *envs)
@@ -21446,7 +21224,7 @@ void CINTnabla1l_2e(double *f, const double *g,
         const double *p2y = gy + dl;
         const double *p2z = gz + dl;
         for (j = 0; j <= lj; j++) {
-                //f(...,0,...) = -2*al*g(...,1,...)
+                
                 for (k = 0; k <= lk; k++) {
                         ptr = dj * j + dk * k;
                         for (i = 0; i <= li; i++) {
@@ -21458,7 +21236,7 @@ void CINTnabla1l_2e(double *f, const double *g,
                                 ptr += di;
                         }
                 }
-                //f(...,l,...) = l*g(...,l-1,...)-2*al*g(...,l+1,...)
+                
                 for (l = 1; l <= ll; l++) {
                         for (k = 0; k <= lk; k++) {
                                 ptr = dj * j + dl * l + dk * k;
@@ -21473,11 +21251,7 @@ void CINTnabla1l_2e(double *f, const double *g,
         }
 }
 
-/*
- * ( x^1 i j | kl )
- * ri is the shift from the center R_O to the center of |i>
- * r - R_O = (r-R_i) + ri, ri = R_i - R_O
- */
+
 void CINTx1i_2e(double *f, const double *g, const double *ri,
                 const FINT li, const FINT lj, const FINT lk, const FINT ll,
                 const CINTEnvVars *envs)
@@ -21497,7 +21271,7 @@ void CINTx1i_2e(double *f, const double *g, const double *ri,
         for (j = 0; j <= lj; j++)
         for (l = 0; l <= ll; l++) {
         for (k = 0; k <= lk; k++) {
-                //f(...,0:li,...) = g(...,1:li+1,...) + ri(1)*g(...,0:li,...)
+                
                 ptr = dj * j + dl * l + dk * k;
                 for (i = 0; i <= li; i++) {
                         for (n = ptr; n < ptr+nroots; n++) {
@@ -21510,9 +21284,7 @@ void CINTx1i_2e(double *f, const double *g, const double *ri,
         } }
 }
 
-/*
- * ( i x^1 j | kl )
- */
+
 void CINTx1j_2e(double *f, const double *g, const double *rj,
                 const FINT li, const FINT lj, const FINT lk, const FINT ll,
                 const CINTEnvVars *envs)
@@ -21532,7 +21304,7 @@ void CINTx1j_2e(double *f, const double *g, const double *rj,
         for (j = 0; j <= lj; j++)
         for (l = 0; l <= ll; l++) {
         for (k = 0; k <= lk; k++) {
-                // f(...,0:lj,...) = g(...,1:lj+1,...) + rj(1)*g(...,0:lj,...)
+                
                 ptr = dj * j + dl * l + dk * k;
                 for (i = 0; i <= li; i++) {
                         for (n = ptr; n < ptr+nroots; n++) {
@@ -21545,9 +21317,7 @@ void CINTx1j_2e(double *f, const double *g, const double *rj,
         } }
 }
 
-/*
- * ( ij | x^1 k l )
- */
+
 void CINTx1k_2e(double *f, const double *g, const double *rk,
                 const FINT li, const FINT lj, const FINT lk, const FINT ll,
                 const CINTEnvVars *envs)
@@ -21567,7 +21337,7 @@ void CINTx1k_2e(double *f, const double *g, const double *rk,
         for (j = 0; j <= lj; j++)
         for (l = 0; l <= ll; l++) {
         for (k = 0; k <= lk; k++) {
-                // f(...,0:lk,...) = g(...,1:lk+1,...) + rk(1)*g(...,0:lk,...)
+                
                 ptr = dj * j + dl * l + dk * k;
                 for (i = 0; i <= li; i++) {
                         for (n = ptr; n < ptr+nroots; n++) {
@@ -21580,9 +21350,7 @@ void CINTx1k_2e(double *f, const double *g, const double *rk,
         } }
 }
 
-/*
- * ( i j | x^1 kl )
- */
+
 void CINTx1l_2e(double *f, const double *g, const double *rl,
                 const FINT li, const FINT lj, const FINT lk, const FINT ll,
                 const CINTEnvVars *envs)
@@ -21602,7 +21370,7 @@ void CINTx1l_2e(double *f, const double *g, const double *rl,
         for (j = 0; j <= lj; j++)
         for (l = 0; l <= ll; l++) {
         for (k = 0; k <= lk; k++) {
-                // f(...,0:ll,...) = g(...,1:ll+1,...) + rl(1)*g(...,0:ll,...)
+                
                 ptr = dj * j + dl * l + dk * k;
                 for (i = 0; i <= li; i++) {
                         for (n = ptr; n < ptr+nroots; n++) {
@@ -21615,14 +21383,10 @@ void CINTx1l_2e(double *f, const double *g, const double *rl,
         } }
 }
 
-/*
- * Copyright (C) 2013-  Qiming Sun <osirpt.sun@gmail.com>
- *
- * basic cGTO integrals
- */
+
 
 #include <stdlib.h>
-#include <stdio.h>
+//#include <stdio.h>
 #include <stdint.h>
 #include <math.h>
 
@@ -21665,7 +21429,7 @@ void CINTx1l_2e(double *f, const double *g, const double *rl,
 
 FINT CINT2e_loop_nopt(double *gctr, CINTEnvVars *envs, double *cache, FINT *empty)
 {
-        /* COMMON_ENVS_AND_DECLARE */
+        
         FINT *shls  = envs->shls;
         FINT *bas = envs->bas;
         double *env = envs->env;
@@ -21681,8 +21445,8 @@ FINT CINT2e_loop_nopt(double *gctr, CINTEnvVars *envs, double *cache, FINT *empt
         FINT j_prim = bas(NPRIM_OF, j_sh);
         FINT k_prim = bas(NPRIM_OF, k_sh);
         FINT l_prim = bas(NPRIM_OF, l_sh);
-        //double *ri = envs->ri;
-        //double *rj = envs->rj;
+        
+        
         double *rk = envs->rk;
         double *rl = envs->rl;
         double *ai = env + bas(PTR_EXP, i_sh);
@@ -21723,7 +21487,7 @@ FINT CINT2e_loop_nopt(double *gctr, CINTEnvVars *envs, double *cache, FINT *empt
         FINT *kempty = _empty + 2;
         FINT *lempty = _empty + 3;
         FINT *gempty = _empty + 4;
-        /* COMMON_ENVS_AND_DECLARE end */
+        
 
         int lkl = envs->lk_ceil + envs->ll_ceil;
         double akl, ekl, expijkl, ccekl, log_rr_kl, eijcutoff, cutoff;
@@ -21733,11 +21497,11 @@ FINT CINT2e_loop_nopt(double *gctr, CINTEnvVars *envs, double *cache, FINT *empt
         log_rr_kl = 1.7 - 1.5 * approx_log(akl);
         double omega = env[PTR_RANGE_OMEGA];
         if (omega < 0) {
-                // Normally the factor
-                //    (aj*d/aij+theta*R)^li * (ai*d/aij+theta*R)^lj * pi^1.5/aij^{(li+lj+3)/2}
-                // is a good approximation for polynomial parts in SR-ERIs.
-                //    <~ (aj*d/aij+theta*R)^li * (ai*d/aij+theta*R)^lj * (pi/aij)^1.5
-                //    <~ (d+theta*R)^li * (d+theta*R)^lj * (pi/aij)^1.5
+                
+                
+                
+                
+                
                 if (envs->rys_order > 1) {
                         double r_guess = 8.;
                         double omega2 = omega * omega;
@@ -21781,16 +21545,16 @@ FINT CINT2e_loop_nopt(double *gctr, CINTEnvVars *envs, double *cache, FINT *empt
         CINTOpt_non0coeff_byshell(non0idxl, non0ctrl, cl, l_prim, l_ctr);
 
         FINT nc = i_ctr * j_ctr * k_ctr * l_ctr;
-        // (irys,i,j,k,l,coord,0:1); +1 for nabla-r12
+        
         size_t leng = envs->g_size * 3 * ((1<<envs->gbits)+1);
-        size_t lenl = nf * nc * n_comp; // gctrl
-        size_t lenk = nf * i_ctr * j_ctr * k_ctr * n_comp; // gctrk
-        size_t lenj = nf * i_ctr * j_ctr * n_comp; // gctrj
-        size_t leni = nf * i_ctr * n_comp; // gctri
-        size_t len0 = nf * n_comp; // gout
+        size_t lenl = nf * nc * n_comp; 
+        size_t lenk = nf * i_ctr * j_ctr * k_ctr * n_comp; 
+        size_t lenj = nf * i_ctr * j_ctr * n_comp; 
+        size_t leni = nf * i_ctr * n_comp; 
+        size_t len0 = nf * n_comp; 
         size_t len = leng + lenl + lenk + lenj + leni + len0;
         double *g;
-        MALLOC_INSTACK(g, len);  // must be allocated last in this function
+        MALLOC_INSTACK(g, len);  
         double *g1 = g + leng;
         double *gout, *gctri, *gctrj, *gctrk, *gctrl;
         ALIAS_ADDR_IF_EQUAL(l, m);
@@ -21856,20 +21620,20 @@ FINT CINT2e_loop_nopt(double *gctr, CINTEnvVars *envs, double *cache, FINT *empt
                                                 PRIM2CTR(i, gout, len0);
                                         }
 i_contracted: ;
-                                } // end loop i_prim
+                                } 
                                 if (!*iempty) {
                                         PRIM2CTR(j, gctri, leni);
                                 }
-                        } // end loop j_prim
+                        } 
                         if (!*jempty) {
                                 PRIM2CTR(k, gctrj, lenj);
                         }
 k_contracted: ;
-                } // end loop k_prim
+                } 
                 if (!*kempty) {
                         PRIM2CTR(l, gctrk, lenk);
                 }
-        } // end loop l_prim
+        } 
 
         if (n_comp > 1 && !*lempty) {
                 TRANSPOSE(gctrl);
@@ -21992,7 +21756,7 @@ k_contracted: ;
         exp##I##J = pdata_##I##J->eij; \
         r##I##J = pdata_##I##J->rij;
 
-// i_ctr = j_ctr = k_ctr = l_ctr = 1;
+
 FINT CINT2e_1111_loop(double *gctr, CINTEnvVars *envs, double *cache, FINT *empty)
 {
         COMMON_ENVS_AND_DECLARE;
@@ -22033,11 +21797,11 @@ FINT CINT2e_1111_loop(double *gctr, CINTEnvVars *envs, double *cache, FINT *empt
                                                 *gempty = 0;
                                         }
 i_contracted: ;
-                                } // end loop i_prim
-                        } // end loop j_prim
+                                } 
+                        } 
 k_contracted: ;
-                } // end loop k_prim
-        } // end loop l_prim
+                } 
+        } 
 
         if (n_comp > 1 && !*gempty) {
                 TRANSPOSE(gout);
@@ -22045,15 +21809,15 @@ k_contracted: ;
         return !*empty;
 }
 
-// i_ctr = n; j_ctr = k_ctr = l_ctr = 1;
+
 FINT CINT2e_n111_loop(double *gctr, CINTEnvVars *envs, double *cache, FINT *empty)
 {
         COMMON_ENVS_AND_DECLARE;
         ADJUST_CUTOFF;
         FINT nc = i_ctr;
         size_t leng = envs->g_size * 3 * ((1<<envs->gbits)+1);
-        size_t leni = nf * i_ctr * n_comp; // gctri
-        size_t len0 = nf * n_comp; // gout
+        size_t leni = nf * i_ctr * n_comp; 
+        size_t len0 = nf * n_comp; 
         size_t len = leng + leni + len0;
         double *g;
         MALLOC_INSTACK(g, len);
@@ -22087,11 +21851,11 @@ FINT CINT2e_n111_loop(double *gctr, CINTEnvVars *envs, double *cache, FINT *empt
                                                 PRIM2CTR(i, gout, len0);
                                         }
 i_contracted: ;
-                                } // end loop i_prim
-                        } // end loop j_prim
+                                } 
+                        } 
 k_contracted: ;
-                } // end loop k_prim
-        } // end loop l_prim
+                } 
+        } 
 
         if (n_comp > 1 && !*iempty) {
                 TRANSPOSE(gctri);
@@ -22099,15 +21863,15 @@ k_contracted: ;
         return !*empty;
 }
 
-// j_ctr = n; i_ctr = k_ctr = l_ctr = 1;
+
 FINT CINT2e_1n11_loop(double *gctr, CINTEnvVars *envs, double *cache, FINT *empty)
 {
         COMMON_ENVS_AND_DECLARE;
         ADJUST_CUTOFF;
         FINT nc = j_ctr;
         size_t leng = envs->g_size * 3 * ((1<<envs->gbits)+1);
-        size_t lenj = nf * j_ctr * n_comp; // gctrj
-        size_t len0 = nf * n_comp; // gout
+        size_t lenj = nf * j_ctr * n_comp; 
+        size_t len0 = nf * n_comp; 
         size_t len = leng + lenj + len0;
         double *g;
         MALLOC_INSTACK(g, len);
@@ -22139,14 +21903,14 @@ FINT CINT2e_1n11_loop(double *gctr, CINTEnvVars *envs, double *cache, FINT *empt
                                                 *iempty = 0;
                                         }
 i_contracted: ;
-                                } // end loop i_prim
+                                } 
                                 if (!*iempty) {
                                         PRIM2CTR(j, gout, len0);
                                 }
-                        } // end loop j_prim
+                        } 
 k_contracted: ;
-                } // end loop k_prim
-        } // end loop l_prim
+                } 
+        } 
 
         if (n_comp > 1 && !*jempty) {
                 TRANSPOSE(gctrj);
@@ -22154,15 +21918,15 @@ k_contracted: ;
         return !*empty;
 }
 
-// k_ctr = n; i_ctr = j_ctr = l_ctr = 1;
+
 FINT CINT2e_11n1_loop(double *gctr, CINTEnvVars *envs, double *cache, FINT *empty)
 {
         COMMON_ENVS_AND_DECLARE;
         ADJUST_CUTOFF;
         FINT nc = k_ctr;
         size_t leng = envs->g_size * 3 * ((1<<envs->gbits)+1);
-        size_t lenk = nf * k_ctr * n_comp; // gctrk
-        size_t len0 = nf * n_comp; // gout
+        size_t lenk = nf * k_ctr * n_comp; 
+        size_t len0 = nf * n_comp; 
         size_t len = leng + lenk + len0;
         double *g;
         MALLOC_INSTACK(g, len);
@@ -22194,14 +21958,14 @@ FINT CINT2e_11n1_loop(double *gctr, CINTEnvVars *envs, double *cache, FINT *empt
                                                 *jempty = 0;
                                         }
 i_contracted: ;
-                                } // end loop i_prim
-                        } // end loop j_prim
+                                } 
+                        } 
                         if (!*jempty) {
                                 PRIM2CTR(k, gout, len0);
                         }
 k_contracted: ;
-                } // end loop k_prim
-        } // end loop l_prim
+                } 
+        } 
 
         if (n_comp > 1 && !*kempty) {
                 TRANSPOSE(gctrk);
@@ -22209,15 +21973,15 @@ k_contracted: ;
         return !*empty;
 }
 
-// l_ctr = n; i_ctr = j_ctr = k_ctr = 1;
+
 FINT CINT2e_111n_loop(double *gctr, CINTEnvVars *envs, double *cache, FINT *empty)
 {
         COMMON_ENVS_AND_DECLARE;
         ADJUST_CUTOFF;
         FINT nc = l_ctr;
         size_t leng = envs->g_size * 3 * ((1<<envs->gbits)+1);
-        size_t lenl = nf * l_ctr * n_comp; // gctrl
-        size_t len0 = nf * n_comp; // gout
+        size_t lenl = nf * l_ctr * n_comp; 
+        size_t len0 = nf * n_comp; 
         size_t len = leng + lenl + len0;
         double *g;
         MALLOC_INSTACK(g, len);
@@ -22249,14 +22013,14 @@ FINT CINT2e_111n_loop(double *gctr, CINTEnvVars *envs, double *cache, FINT *empt
                                                 *kempty = 0;
                                         }
 i_contracted: ;
-                                } // end loop i_prim
-                        } // end loop j_prim
+                                } 
+                        } 
 k_contracted: ;
-                } // end loop k_prim
+                } 
                 if (!*kempty) {
                         PRIM2CTR(l, gout, len0);
                 }
-        } // end loop l_prim
+        } 
 
         if (n_comp > 1 && !*lempty) {
                 TRANSPOSE(gctrl);
@@ -22269,12 +22033,12 @@ FINT CINT2e_loop(double *gctr, CINTEnvVars *envs, double *cache, FINT *empty)
         COMMON_ENVS_AND_DECLARE;
         ADJUST_CUTOFF;
         FINT nc = i_ctr * j_ctr * k_ctr * l_ctr;
-        size_t leng = envs->g_size * 3 * ((1<<envs->gbits)+1); // (irys,i,j,k,l,coord,0:1);
-        size_t lenl = nf * nc * n_comp; // gctrl
-        size_t lenk = nf * i_ctr * j_ctr * k_ctr * n_comp; // gctrk
-        size_t lenj = nf * i_ctr * j_ctr * n_comp; // gctrj
-        size_t leni = nf * i_ctr * n_comp; // gctri
-        size_t len0 = nf * n_comp; // gout
+        size_t leng = envs->g_size * 3 * ((1<<envs->gbits)+1); 
+        size_t lenl = nf * nc * n_comp; 
+        size_t lenk = nf * i_ctr * j_ctr * k_ctr * n_comp; 
+        size_t lenj = nf * i_ctr * j_ctr * n_comp; 
+        size_t leni = nf * i_ctr * n_comp; 
+        size_t len0 = nf * n_comp; 
         size_t len = leng + lenl + lenk + lenj + leni + len0;
         double *g;
         MALLOC_INSTACK(g, len);
@@ -22297,7 +22061,7 @@ FINT CINT2e_loop(double *gctr, CINTEnvVars *envs, double *cache, FINT *empty)
                         *kempty = 1;
                 }
                 for (kp = 0; kp < k_prim; kp++, pdata_kl++) {
-                        /* SET_RIJ(k, l); */
+                        
                         if (pdata_kl->cceij > eklcutoff) {
                                 goto k_contracted;
                         }
@@ -22305,7 +22069,7 @@ FINT CINT2e_loop(double *gctr, CINTEnvVars *envs, double *cache, FINT *empty)
                         expkl = pdata_kl->eij;
                         rkl = pdata_kl->rij;
                         eijcutoff = eklcutoff - pdata_kl->cceij;
-                        /* SET_RIJ(k, l); end */
+                        
                         if (k_ctr == 1) {
                                 fac1k = fac1l * ck[kp];
                         } else {
@@ -22323,14 +22087,14 @@ FINT CINT2e_loop(double *gctr, CINTEnvVars *envs, double *cache, FINT *empty)
                                         *iempty = 1;
                                 }
                                 for (ip = 0; ip < i_prim; ip++, pdata_ij++) {
-                                        /* SET_RIJ(i, j); */
+                                        
                                         if (pdata_ij->cceij > eijcutoff) {
                                                 goto i_contracted;
                                         }
                                         envs->ai[0] = ai[ip];
                                         expij = pdata_ij->eij;
                                         rij = pdata_ij->rij;
-                                        /* SET_RIJ(i, j); end */
+                                        
                                         cutoff = eijcutoff - pdata_ij->cceij;
                                         if (i_ctr == 1) {
                                                 fac1i = fac1j*ci[ip] * expij*expkl;
@@ -22343,20 +22107,20 @@ FINT CINT2e_loop(double *gctr, CINTEnvVars *envs, double *cache, FINT *empty)
                                                 PRIM2CTR(i, gout, len0);
                                         }
 i_contracted: ;
-                                } // end loop i_prim
+                                } 
                                 if (!*iempty) {
                                         PRIM2CTR(j, gctri, leni);
                                 }
-                        } // end loop j_prim
+                        } 
                         if (!*jempty) {
                                 PRIM2CTR(k, gctrj, lenj);
                         }
 k_contracted: ;
-                } // end loop k_prim
+                } 
                 if (!*kempty) {
                         PRIM2CTR(l, gctrk, lenk);
                 }
-        } // end loop l_prim
+        } 
 
         if (n_comp > 1 && !*lempty) {
                 TRANSPOSE(gctrl);
@@ -22398,7 +22162,7 @@ static FINT (*CINTf_2e_loop[16])(double *, CINTEnvVars *, double *, FINT *) = {
                            +(i_prim+j_prim+k_prim+l_prim)*2 + nf*3);
 
 CACHE_SIZE_T CINT2e_drv(double *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt,
-                      double *cache, void (*f_c2s)())
+                      double *cache, void (*f_c2s)(double *opij, double *gctr, FINT *dims, CINTEnvVars *envs, double *cache))
 {
         FINT *x_ctr = envs->x_ctr;
         size_t nf = envs->nf;
@@ -22412,9 +22176,9 @@ CACHE_SIZE_T CINT2e_drv(double *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt
                                         nc*n_comp+nf*4);
 #if !defined(I8) && !defined(CACHE_SIZE_I8)
                 if (cache_size >= INT32_MAX) {
-                        fprintf(stderr, "CINT2e_drv cache_size overflow: "
-                                "cache_size %zu > %d, nf %zu, nc %zu, n_comp %d\n",
-                                cache_size, INT32_MAX, nf, nc, (int)n_comp);
+                        //fprintf(stderr, "CINT2e_drv cache_size overflow: "
+                        //        "cache_size %zu > %d, nf %zu, nc %zu, n_comp %d\n",
+                        //        cache_size, INT32_MAX, nf, nc, (int)n_comp);
                         cache_size = 0;
                 }
 #endif
@@ -22427,7 +22191,13 @@ CACHE_SIZE_T CINT2e_drv(double *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt
                 size_t len0 = nf*n_comp;
                 size_t cache_size = MAX(leng+len0+nc*n_comp*3 + pdata_size,
                                         nc*n_comp+nf*4);
+
+
+                #ifdef __cplusplus 
+                stack = new double[1024];
+                #else
                 stack = malloc(sizeof(double)*cache_size);
+                #endif 
                 cache = stack;
         }
         double *gctr;
@@ -22470,12 +22240,18 @@ CACHE_SIZE_T CINT2e_drv(double *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt
                 }
         }
         if (stack != NULL) {
-                free(stack);
+                //free(stack);
         }
         return !empty;
 }
-CACHE_SIZE_T CINT2e_spinor_drv(double complex *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt,
+
+#ifdef __cplusplus
+CACHE_SIZE_T CINT2e_spinor_drv(double *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt,
+                      double *cache, void (*f_e1_c2s)(...), void (*f_e2_c2s)(...))
+#else
+CACHE_SIZE_T CINT2e_spinor_drv(double *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt,
                       double *cache, void (*f_e1_c2s)(), void (*f_e2_c2s)())
+#endif
 {
         FINT *shls = envs->shls;
         FINT *bas = envs->bas;
@@ -22499,9 +22275,9 @@ CACHE_SIZE_T CINT2e_spinor_drv(double complex *out, FINT *dims, CINTEnvVars *env
                                      + nf*32*OF_CMPLX);
 #if !defined(I8) && !defined(CACHE_SIZE_I8)
                 if (cache_size >= INT32_MAX) {
-                        fprintf(stderr, "CINT2e_drv cache_size overflow: "
-                                "cache_size %zu > %d, nf %zu, nc %zu, n_comp %d\n",
-                                cache_size, INT32_MAX, nf, nc, (int)n_comp);
+                        //fprintf(stderr, "CINT2e_drv cache_size overflow: "
+                        //        "cache_size %zu > %d, nf %zu, nc %zu, n_comp %d\n",
+                        //        cache_size, INT32_MAX, nf, nc, (int)n_comp);
                         cache_size = 0;
                 }
 #endif
@@ -22515,7 +22291,11 @@ CACHE_SIZE_T CINT2e_spinor_drv(double complex *out, FINT *dims, CINTEnvVars *env
                 size_t cache_size = MAX(leng+len0+nc*n_comp*3 + pdata_size,
                                      nc*n_comp + n1*envs->ncomp_e2*OF_CMPLX
                                      + nf*32*OF_CMPLX);
+                #ifdef __cplusplus 
+                stack = new double[1024];
+                #else 
                 stack = malloc(sizeof(double)*cache_size);
+                #endif 
                 cache = stack;
         }
         double *gctr;
@@ -22537,7 +22317,7 @@ CACHE_SIZE_T CINT2e_spinor_drv(double complex *out, FINT *dims, CINTEnvVars *env
         }
         FINT nout = dims[0] * dims[1] * dims[2] * dims[3];
         if (!empty) {
-                double complex *opij;
+                double *opij;
                 MALLOC_INSTACK(opij, n1*envs->ncomp_e2);
                 for (n = 0; n < envs->ncomp_tensor; n++) {
                         for (m = 0; m < envs->ncomp_e2; m++) {
@@ -22552,14 +22332,12 @@ CACHE_SIZE_T CINT2e_spinor_drv(double complex *out, FINT *dims, CINTEnvVars *env
                 }
         }
         if (stack != NULL) {
-                free(stack);
+                //free(stack);
         }
         return !empty;
 }
 
-/*
- * <ki|jl> = (ij|kl); i,j\in electron 1; k,l\in electron 2
- */
+
 void CINTgout2e(double *gout, double *g, FINT *idx,
                 CINTEnvVars *envs, FINT gout_empty)
 {
@@ -22673,8 +22451,8 @@ void CINTgout2e(double *gout, double *g, FINT *idx,
                                         gout[n] = s;
                                 }
                                 break;
-                } // end switch nroots
-        } else { // not flag_acc
+                } 
+        } else { 
                 switch (envs->nrys_roots) {
                         case 1:
                                 for (n = 0; n < nf; n++, idx+=3) {
@@ -22780,7 +22558,7 @@ void CINTgout2e(double *gout, double *g, FINT *idx,
                                         gout[n] += s;
                                 }
                                 break;
-                } // end switch nroots
+                } 
         }
 }
 
@@ -22790,7 +22568,11 @@ CACHE_SIZE_T int2e_sph(double *out, FINT *dims, FINT *shls, FINT *atm, FINT natm
         FINT ng[] = {0, 0, 0, 0, 0, 1, 1, 1};
         CINTEnvVars envs;
         CINTinit_int2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
+        #ifdef __cplusplus
+        envs.f_gout = (void (*)(...))&CINTgout2e;
+        #else
         envs.f_gout = &CINTgout2e;
+        #endif
         return CINT2e_drv(out, dims, &envs, opt, cache, &c2s_sph_2e1);
 }
 void int2e_optimizer(CINTOpt **opt, FINT *atm, FINT natm,
@@ -22806,31 +22588,20 @@ CACHE_SIZE_T int2e_cart(double *out, FINT *dims, FINT *shls, FINT *atm, FINT nat
         FINT ng[] = {0, 0, 0, 0, 0, 1, 1, 1};
         CINTEnvVars envs;
         CINTinit_int2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
+        #ifdef __cplusplus
+        envs.f_gout = (void (*)(...))&CINTgout2e;
+        #else
         envs.f_gout = &CINTgout2e;
+        #endif
         return CINT2e_drv(out, dims, &envs, opt, cache, &c2s_cart_2e1);
 }
 
-/*
- * spinor <ki|jl> = (ij|kl); i,j\in electron 1; k,l\in electron 2
- */
-CACHE_SIZE_T int2e_spinor(double complex *out, FINT *dims, FINT *shls, FINT *atm, FINT natm,
-                 FINT *bas, FINT nbas, double *env, CINTOpt *opt, double *cache)
-{
-        FINT ng[] = {0, 0, 0, 0, 0, 1, 1, 1};
-        CINTEnvVars envs;
-        CINTinit_int2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
-        envs.f_gout = &CINTgout2e;
-        return CINT2e_spinor_drv(out, dims, &envs, opt, cache,
-                                 &c2s_sf_2e1, &c2s_sf_2e2);
-}
+
 
 ALL_CINT(int2e)
 ALL_CINT_FORTRAN_(int2e)
 
-/*
- * Copyright (C) 2013-  Qiming Sun <osirpt.sun@gmail.com>
- *
- */
+
 
 #include <string.h>
 #include <math.h>
@@ -22995,7 +22766,7 @@ void CINTg3c1e_nuc(double *g, double ai, double aj, double ak, double *rijk,
         }
 
         for (i = 1; i <= li; i++) {
-                for (j = 0; j <= nmax-i; j++) { // upper limit lj+lk
+                for (j = 0; j <= nmax-i; j++) { 
                         gx[i+j*dj] = gx[i-1+(j+1)*dj] - rirj[0] * gx[i-1+j*dj];
                         gy[i+j*dj] = gy[i-1+(j+1)*dj] - rirj[1] * gy[i-1+j*dj];
                         gz[i+j*dj] = gz[i-1+(j+1)*dj] - rirj[2] * gz[i-1+j*dj];
@@ -23015,9 +22786,7 @@ void CINTg3c1e_nuc(double *g, double ai, double aj, double ak, double *rijk,
         }
 }
 
-/*
- * ( \nabla i j | k )
- */
+
 void CINTnabla1i_3c1e(double *f, const double *g,
                       const FINT li, const FINT lj, const FINT lk,
                       const CINTEnvVars *envs)
@@ -23036,11 +22805,11 @@ void CINTnabla1i_3c1e(double *f, const double *g,
         for (k = 0; k <= lk; k++) {
         for (j = 0; j <= lj; j++) {
                 ptr = dj * j + dk * k;
-                //f(...,0,...) = -2*ai*g(...,1,...)
+                
                 fx[ptr] = ai2 * gx[ptr+1];
                 fy[ptr] = ai2 * gy[ptr+1];
                 fz[ptr] = ai2 * gz[ptr+1];
-                //f(...,i,...) = i*g(...,i-1,...)-2*ai*g(...,i+1,...)
+                
                 for (i = 1; i <= li; i++) {
                         fx[ptr+i] = i * gx[ptr+i-1] + ai2 * gx[ptr+i+1];
                         fy[ptr+i] = i * gy[ptr+i-1] + ai2 * gy[ptr+i+1];
@@ -23049,9 +22818,7 @@ void CINTnabla1i_3c1e(double *f, const double *g,
         } }
 }
 
-/*
- * ( i \nabla j | k )
- */
+
 void CINTnabla1j_3c1e(double *f, const double *g,
                       const FINT li, const FINT lj, const FINT lk,
                       const CINTEnvVars *envs)
@@ -23069,13 +22836,13 @@ void CINTnabla1j_3c1e(double *f, const double *g,
 
         for (k = 0; k <= lk; k++) {
                 ptr = dk * k;
-                //f(...,0,...) = -2*aj*g(...,1,...)
+                
                 for (i = ptr; i <= ptr+li; i++) {
                         fx[i] = aj2 * gx[i+dj];
                         fy[i] = aj2 * gy[i+dj];
                         fz[i] = aj2 * gz[i+dj];
                 }
-                //f(...,j,...) = j*g(...,j-1,...)-2*aj*g(...,j+1,...)
+                
                 for (j = 1; j <= lj; j++) {
                         ptr = dj * j + dk * k;
                         for (i = ptr; i <= ptr+li; i++) {
@@ -23087,9 +22854,7 @@ void CINTnabla1j_3c1e(double *f, const double *g,
         }
 }
 
-/*
- * ( ij | \nabla k )
- */
+
 void CINTnabla1k_3c1e(double *f, const double *g,
                       const FINT li, const FINT lj, const FINT lk,
                       const CINTEnvVars *envs)
@@ -23125,11 +22890,7 @@ void CINTnabla1k_3c1e(double *f, const double *g,
         }
 }
 
-/*
- * ( x^1 i j | k )
- * ri is the shift from the center R_O to the center of |i>
- * r - R_O = (r-R_i) + ri, ri = R_i - R_O
- */
+
 void CINTx1i_3c1e(double *f, const double *g, const double *ri,
                   const FINT li, const FINT lj, const FINT lk,
                   const CINTEnvVars *envs)
@@ -23155,9 +22916,7 @@ void CINTx1i_3c1e(double *f, const double *g, const double *ri,
         } }
 }
 
-/*
- * ( i x^1 j | k )
- */
+
 void CINTx1j_3c1e(double *f, const double *g, const double *rj,
                   const FINT li, const FINT lj, const FINT lk,
                   const CINTEnvVars *envs)
@@ -23183,9 +22942,7 @@ void CINTx1j_3c1e(double *f, const double *g, const double *rj,
         } }
 }
 
-/*
- * ( ij | x^1 k )
- */
+
 void CINTx1k_3c1e(double *f, const double *g, const double *rk,
                   const FINT li, const FINT lj, const FINT lk,
                   const CINTEnvVars *envs)
@@ -23211,52 +22968,43 @@ void CINTx1k_3c1e(double *f, const double *g, const double *rk,
         } }
 }
 
-/*
- * Rys quadrature
 
- Code is edited based on
- * PyQuante quantum chemistry program suite http://pyquante.sourceforge.net
- * BDF program package
 
- Coefficients of Chebyshev polynomials are generated based on Toru Shiozaki's
- integral project libslater
- */
-
-#include <stdio.h>
+//#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <float.h>
 #include <math.h>
 
 static double POLY_SMALLX_R0[] = {
-// nroots = 1
+
 5.0000000000000000e-01,
-// nroots = 2
+
 1.3069360623708470e-01,
 2.8693063937629151e+00,
-// nroots = 3
+
 6.0376924683279896e-02,
 7.7682335593104601e-01,
 6.6627997193856743e+00,
-// nroots = 4
+
 3.4819897306147152e-02,
 3.8156718508004406e-01,
 1.7373072694588976e+00,
 1.1846305648154912e+01,
-// nroots = 5
+
 2.2665926631698637e-02,
 2.3127169214090557e-01,
 8.5734602411883609e-01,
 2.9735303812034606e+00,
 1.8415185975905100e+01,
-// nroots = 6
+
 1.5933294950708051e-02,
 1.5647046776795465e-01,
 5.2658326320347937e-01,
 1.4554949383527416e+00,
 4.4772915489042244e+00,
 2.6368226486820891e+01,
-// nroots = 7
+
 1.1813808454790223e-02,
 1.1337832545962978e-01,
 3.6143546199827142e-01,
@@ -23264,7 +23012,7 @@ static double POLY_SMALLX_R0[] = {
 2.1671830744997034e+00,
 6.2459217468839974e+00,
 3.5704994544697506e+01,
-// nroots = 8
+
 9.1096129361797583e-03,
 8.6130778786234360e-02,
 2.6546936423055723e-01,
@@ -23273,7 +23021,7 @@ static double POLY_SMALLX_R0[] = {
 2.9891077977621077e+00,
 8.2783291650163164e+00,
 4.6425304325782918e+01,
-// nroots = 9
+
 7.2388268576176690e-03,
 6.7744856280706228e-02,
 2.0415049332589749e-01,
@@ -23283,7 +23031,7 @@ static double POLY_SMALLX_R0[] = {
 3.9197868892557834e+00,
 1.0573996723107014e+01,
 5.8529065180664020e+01,
-// nroots = 10
+
 5.8908068184661301e-03,
 5.4725924879562259e-02,
 1.6232609261161096e-01,
@@ -23294,7 +23042,7 @@ static double POLY_SMALLX_R0[] = {
 4.9584689501831161e+00,
 1.3132652926121416e+01,
 7.2016228580573340e+01,
-// nroots = 11
+
 4.8873361261651269e-03,
 4.5157008761019399e-02,
 1.3240037096506918e-01,
@@ -23306,7 +23054,7 @@ static double POLY_SMALLX_R0[] = {
 6.1047380665207358e+00,
 1.5954143802284950e+01,
 8.6886766630657462e+01,
-// nroots = 12
+
 4.1201918467690364e-03,
 3.7911181291998906e-02,
 1.1018828563899001e-01,
@@ -23319,7 +23067,7 @@ static double POLY_SMALLX_R0[] = {
 7.3583481234816475e+00,
 1.9038376627614220e+01,
 1.0314066236793083e+02,
-// nroots = 13
+
 3.5205547919345487e-03,
 3.2289011702114359e-02,
 9.3214971024566495e-02,
@@ -23333,7 +23081,7 @@ static double POLY_SMALLX_R0[] = {
 8.7191456120517863e+00,
 2.2385292804867444e+01,
 1.2077790499430500e+02,
-// nroots = 14
+
 3.0429596866636517e-03,
 2.7836958317494689e-02,
 7.9934050123079720e-02,
@@ -23348,7 +23096,7 @@ static double POLY_SMALLX_R0[] = {
 1.0187030609882370e+01,
 2.5994853806516272e+01,
 1.3979848737030667e+02,
-// nroots = 15
+
 2.6563882798588422e-03,
 2.4250094342677907e-02,
 6.9335687672495691e-02,
@@ -23364,7 +23112,7 @@ static double POLY_SMALLX_R0[] = {
 1.1761935734646896e+01,
 2.9867033445944998e+01,
 1.6020240462202361e+02,
-// nroots = 16
+
 2.3390891340939958e-03,
 2.1317080945253201e-02,
 6.0736095944339923e-02,
@@ -23381,7 +23129,7 @@ static double POLY_SMALLX_R0[] = {
 1.3443814172272431e+01,
 3.4001813414873574e+01,
 1.8198965332991693e+02,
-// nroots = 17
+
 2.0754424341283091e-03,
 1.8887592459816600e-02,
 5.3658014548213083e-02,
@@ -23399,7 +23147,7 @@ static double POLY_SMALLX_R0[] = {
 1.5232632558400770e+01,
 3.8399180598022653e+01,
 2.0516023103739158e+02,
-// nroots = 18
+
 1.8539963414043730e-03,
 1.6852276947378890e-02,
 4.7759641118871647e-02,
@@ -23418,7 +23166,7 @@ static double POLY_SMALLX_R0[] = {
 1.7128366583322400e+01,
 4.3059125399051126e+01,
 2.2971413594275947e+02,
-// nroots = 19
+
 1.6661998936375252e-03,
 1.5130014686433138e-02,
 4.2790695960997299e-02,
@@ -23438,7 +23186,7 @@ static double POLY_SMALLX_R0[] = {
 1.9130998189134935e+01,
 4.7981640664446111e+01,
 2.5565136670034096e+02,
-// nroots = 20
+
 1.5055636736750460e-03,
 1.3659581309068787e-02,
 3.8564342567293824e-02,
@@ -23459,7 +23207,7 @@ static double POLY_SMALLX_R0[] = {
 2.1240513731235975e+01,
 5.3166720972969635e+01,
 2.8297192228864293e+02,
-// nroots = 21
+
 1.3670907867368810e-03,
 1.2394054047073586e-02,
 3.4938717738704779e-02,
@@ -23481,7 +23229,7 @@ static double POLY_SMALLX_R0[] = {
 2.3456902742141821e+01,
 5.8614362155227504e+01,
 3.1167580192095022e+02,
-// nroots = 22
+
 1.2468830266566071e-03,
 1.1296974077260939e-02,
 3.1804472951472436e-02,
@@ -23504,7 +23252,7 @@ static double POLY_SMALLX_R0[] = {
 2.5780157081866051e+01,
 6.4324560961905945e+01,
 3.4176300498341982e+02,
-// nroots = 23
+
 1.1418631828867911e-03,
 1.0339660911653800e-02,
 2.9076181798097987e-02,
@@ -23528,7 +23276,7 @@ static double POLY_SMALLX_R0[] = {
 2.8210270342431137e+01,
 7.0297314830298916e+01,
 3.7323353099141679e+02,
-// nroots = 24
+
 1.0495759261988334e-03,
 9.4992992354385325e-03,
 2.6686295586583197e-02,
@@ -23553,7 +23301,7 @@ static double POLY_SMALLX_R0[] = {
 3.0747237423089796e+01,
 7.6532621717181570e+01,
 4.0608737955819714e+02,
-// nroots = 25
+
 9.6804284738431225e-04,
 8.7575539343254932e-03,
 2.4580815547761405e-02,
@@ -23579,7 +23327,7 @@ static double POLY_SMALLX_R0[] = {
 3.3391054222461705e+01,
 8.3030479977314329e+01,
 4.4032455037210190e+02,
-// nroots = 26
+
 8.9565544579415254e-04,
 8.0995527542570573e-03,
 2.2716144347385257e-02,
@@ -23606,7 +23354,7 @@ static double POLY_SMALLX_R0[] = {
 3.6141717412159579e+01,
 8.9790888273867822e+01,
 4.7594504317971854e+02,
-// nroots = 27
+
 8.3109512231001499e-04,
 7.5131289999639658e-03,
 2.1056762228657960e-02,
@@ -23634,7 +23382,7 @@ static double POLY_SMALLX_R0[] = {
 3.8999224268126255e+01,
 9.6813845511527404e+01,
 5.1294885777328875e+02,
-// nroots = 28
+
 7.7327265934614168e-04,
 6.9882508946790788e-03,
 1.9573489101087662e-02,
@@ -23663,7 +23411,7 @@ static double POLY_SMALLX_R0[] = {
 4.1963572543442723e+01,
 1.0409935078594111e+02,
 5.5133599398118213e+02,
-// nroots = 29
+
 7.2128194564740754e-04,
 6.5165867490334173e-03,
 1.8242169108187746e-02,
@@ -23693,7 +23441,7 @@ static double POLY_SMALLX_R0[] = {
 4.5034760371338379e+01,
 1.1164740334510041e+02,
 5.9110645166061056e+02,
-// nroots = 30
+
 6.7436423858690424e-04,
 6.0911701752723131e-03,
 1.7042663914726686e-02,
@@ -23724,7 +23472,7 @@ static double POLY_SMALLX_R0[] = {
 4.8212786190469124e+01,
 1.1945800255953849e+02,
 6.3226023069200130e+02,
-// nroots = 31
+
 6.3188030795311258e-04,
 5.7061398509158142e-03,
 1.5958074377719466e-02,
@@ -23759,34 +23507,34 @@ static double POLY_SMALLX_R0[] = {
 };
 
 static double POLY_SMALLX_R1[] = {
-// nroots = 1
+
 -2.0000000000000001e-01,
-// nroots = 2
+
 -2.9043023608241049e-02,
 -6.3762364305842567e-01,
-// nroots = 3
+
 -9.2887576435815231e-03,
 -1.1951128552785324e-01,
 -1.0250461106747191e+00,
-// nroots = 4
+
 -4.0964585066055473e-03,
 -4.4890257068240479e-02,
 -2.0438909052457618e-01,
 -1.3936830174299895e+00,
-// nroots = 5
+
 -2.1586596792093939e-03,
 -2.2025875441991007e-02,
 -8.1652002297032011e-02,
 -2.8319336963842484e-01,
 -1.7538272358004856e+00,
-// nroots = 6
+
 -1.2746635960566440e-03,
 -1.2517637421436372e-02,
 -4.2126661056278353e-02,
 -1.1643959506821934e-01,
 -3.5818332391233798e-01,
 -2.1094581189456711e+00,
-// nroots = 7
+
 -8.1474541067518772e-04,
 -7.8191948592848132e-03,
 -2.4926583586087684e-02,
@@ -23794,7 +23542,7 @@ static double POLY_SMALLX_R1[] = {
 -1.4946090168963472e-01,
 -4.3075322392303428e-01,
 -2.4624134168756902e+00,
-// nroots = 8
+
 -5.5209775370786412e-04,
 -5.2200471991657189e-03,
 -1.6089052377609530e-02,
@@ -23803,7 +23551,7 @@ static double POLY_SMALLX_R1[] = {
 -1.8115804834921864e-01,
 -5.0171691909189797e-01,
 -2.8136548076232071e+00,
-// nroots = 9
+
 -3.9128793824960370e-04,
 -3.6618841232814174e-03,
 -1.1035161801399865e-02,
@@ -23813,7 +23561,7 @@ static double POLY_SMALLX_R1[] = {
 -2.1188037239220453e-01,
 -5.7156739043821692e-01,
 -3.1637332530088660e+00,
-// nroots = 10
+
 -2.8735643016907951e-04,
 -2.6695573111981587e-03,
 -7.9183459810541930e-03,
@@ -23824,7 +23572,7 @@ static double POLY_SMALLX_R1[] = {
 -2.4187653415527396e-01,
 -6.4061721590836185e-01,
 -3.5129867600279674e+00,
-// nroots = 11
+
 -2.1721493894067231e-04,
 -2.0069781671564176e-03,
 -5.8844609317808515e-03,
@@ -23836,7 +23584,7 @@ static double POLY_SMALLX_R1[] = {
 -2.7132169184536603e-01,
 -7.0907305787933106e-01,
 -3.8616340724736649e+00,
-// nroots = 12
+
 -1.6817109578649129e-04,
 -1.5473951547754655e-03,
 -4.4974810464893881e-03,
@@ -23849,7 +23597,7 @@ static double POLY_SMALLX_R1[] = {
 -3.0034073973394482e-01,
 -7.7707659704547827e-01,
 -4.2098229537930951e+00,
-// nroots = 13
+
 -1.3285112422394522e-04,
 -1.2184532717779003e-03,
 -3.5175460763987357e-03,
@@ -23863,7 +23611,7 @@ static double POLY_SMALLX_R1[] = {
 -3.2902436271893531e-01,
 -8.4472803037235644e-01,
 -4.5576567922379247e+00,
-// nroots = 14
+
 -1.0677051532153163e-04,
 -9.7673537956121715e-04,
 -2.8047035130905162e-03,
@@ -23878,7 +23626,7 @@ static double POLY_SMALLX_R1[] = {
 -3.5743967052218845e-01,
 -9.1210013356197439e-01,
 -4.9052100831686554e+00,
-// nroots = 15
+
 -8.7094697700289907e-05,
 -7.9508506041566917e-04,
 -2.2733012351637931e-03,
@@ -23894,7 +23642,7 @@ static double POLY_SMALLX_R1[] = {
 -3.8563723720153753e-01,
 -9.7924699822770489e-01,
 -5.2525378564597904e+00,
-// nroots = 16
+
 -7.1971973356738328e-05,
 -6.5591018293086772e-04,
 -1.8688029521335360e-03,
@@ -23911,7 +23659,7 @@ static double POLY_SMALLX_R1[] = {
 -4.1365582068530554e-01,
 -1.0462096435345716e+00,
 -5.5996816409205206e+00,
-// nroots = 17
+
 -6.0157751713864028e-05,
 -5.4746644811062611e-04,
 -1.5553047695134228e-03,
@@ -23929,7 +23677,7 @@ static double POLY_SMALLX_R1[] = {
 -4.4152558140292086e-01,
 -1.1130197274789173e+00,
 -5.9466733634026543e+00,
-// nroots = 18
+
 -5.0794420312448578e-05,
 -4.6170621773640794e-04,
 -1.3084833183252507e-03,
@@ -23948,7 +23696,7 @@ static double POLY_SMALLX_R1[] = {
 -4.6927031735129865e-01,
 -1.1797020657274282e+00,
 -6.2935379710345059e+00,
-// nroots = 19
+
 -4.3277919315260391e-05,
 -3.9298739445280882e-04,
 -1.1114466483375923e-03,
@@ -23968,7 +23716,7 @@ static double POLY_SMALLX_R1[] = {
 -4.9690904387363471e-01,
 -1.2462763808947042e+00,
 -6.6402952389698946e+00,
-// nroots = 20
+
 -3.7174411695680151e-05,
 -3.3727361256959967e-04,
 -9.5220598931589691e-04,
@@ -23989,7 +23737,7 @@ static double POLY_SMALLX_R1[] = {
 -5.2445712916632037e-01,
 -1.3127585425424602e+00,
 -6.9869610441640235e+00,
-// nroots = 21
+
 -3.2166842040867788e-05,
 -2.9162480110761377e-04,
 -8.2208747620481830e-04,
@@ -24011,7 +23759,7 @@ static double POLY_SMALLX_R1[] = {
 -5.5192712334451344e-01,
 -1.3791614624759412e+00,
 -7.3335482804929466e+00,
-// nroots = 22
+
 -2.8019843295654089e-05,
 -2.5386458600586381e-04,
 -7.1470725733645919e-04,
@@ -24034,7 +23782,7 @@ static double POLY_SMALLX_R1[] = {
 -5.7932937262620343e-01,
 -1.4454957519529426e+00,
 -7.6800675277172985e+00,
-// nroots = 23
+
 -2.4556197481436369e-05,
 -2.2235829917535054e-04,
 -6.2529423221716106e-04,
@@ -24058,7 +23806,7 @@ static double POLY_SMALLX_R1[] = {
 -6.0667248048238998e-01,
 -1.5117702114042777e+00,
 -8.0265275482025125e+00,
-// nroots = 24
+
 -2.1640740746367700e-05,
 -1.9586183990594915e-04,
 -5.5023289869243698e-04,
@@ -24083,7 +23831,7 @@ static double POLY_SMALLX_R1[] = {
 -6.3396365820803702e-01,
 -1.5779922003542592e+00,
 -8.3729356609937557e+00,
-// nroots = 25
+
 -1.9169165294738857e-05,
 -1.7341690959060381e-04,
 -4.8674882272794860e-04,
@@ -24109,7 +23857,7 @@ static double POLY_SMALLX_R1[] = {
 -6.6120899450419213e-01,
 -1.6441679203428579e+00,
 -8.7192980271703355e+00,
-// nroots = 26
+
 -1.7060103729412429e-05,
 -1.5427719531918205e-04,
 -4.3268846375971913e-04,
@@ -24136,7 +23884,7 @@ static double POLY_SMALLX_R1[] = {
 -6.8841366499351586e-01,
 -1.7103026337879585e+00,
 -9.0656198700898774e+00,
-// nroots = 27
+
 -1.5249451785504861e-05,
 -1.3785557798099020e-04,
 -3.8636260970014607e-04,
@@ -24164,7 +23912,7 @@ static double POLY_SMALLX_R1[] = {
 -7.1558209666286710e-01,
 -1.7764008350738973e+00,
 -9.4119056472163081e+00,
-// nroots = 28
+
 -1.3686241758338792e-05,
 -1.2368585654299255e-04,
 -3.4643343541748077e-04,
@@ -24193,7 +23941,7 @@ static double POLY_SMALLX_R1[] = {
 -7.4271809811403044e-01,
 -1.8424663855918781e+00,
 -9.7581591855076493e+00,
-// nroots = 29
+
 -1.2329605908502692e-05,
 -1.1139464528262253e-04,
 -3.1183195056731187e-04,
@@ -24223,7 +23971,7 @@ static double POLY_SMALLX_R1[] = {
 -7.6982496361262176e-01,
 -1.9085026212837679e+00,
 -1.0104383789070267e+01,
-// nroots = 30
+
 -1.1146516340279409e-05,
 -1.0068049876483163e-04,
 -2.8169692421035848e-04,
@@ -24254,7 +24002,7 @@ static double POLY_SMALLX_R1[] = {
 -7.9690555686725828e-01,
 -1.9745124390006361e+00,
 -1.0450582325487625e+01,
-// nroots = 31
+
 -1.0110084927249801e-05,
 -9.1298237614653030e-05,
 -2.5532919004351141e-04,
@@ -24289,34 +24037,34 @@ static double POLY_SMALLX_R1[] = {
 };
 
 static double POLY_SMALLX_W0[] = {
-// nroots = 1
+
 1.0000000000000000e+00,
-// nroots = 2
+
 6.5214515486254609e-01,
 3.4785484513745385e-01,
-// nroots = 3
+
 4.6791393457269104e-01,
 3.6076157304813861e-01,
 1.7132449237917036e-01,
-// nroots = 4
+
 3.6268378337836199e-01,
 3.1370664587788727e-01,
 2.2238103445337448e-01,
 1.0122853629037626e-01,
-// nroots = 5
+
 2.9552422471475287e-01,
 2.6926671930999635e-01,
 2.1908636251598204e-01,
 1.4945134915058059e-01,
 6.6671344308688138e-02,
-// nroots = 6
+
 2.4914704581340277e-01,
 2.3349253653835481e-01,
 2.0316742672306592e-01,
 1.6007832854334622e-01,
 1.0693932599531843e-01,
 4.7175336386511828e-02,
-// nroots = 7
+
 2.1526385346315779e-01,
 2.0519846372129560e-01,
 1.8553839747793782e-01,
@@ -24324,7 +24072,7 @@ static double POLY_SMALLX_W0[] = {
 1.2151857068790319e-01,
 8.0158087159760208e-02,
 3.5119460331751860e-02,
-// nroots = 8
+
 1.8945061045506850e-01,
 1.8260341504492358e-01,
 1.6915651939500254e-01,
@@ -24333,7 +24081,7 @@ static double POLY_SMALLX_W0[] = {
 9.5158511682492786e-02,
 6.2253523938647894e-02,
 2.7152459411754096e-02,
-// nroots = 9
+
 1.6914238296314360e-01,
 1.6427648374583273e-01,
 1.5468467512626524e-01,
@@ -24343,7 +24091,7 @@ static double POLY_SMALLX_W0[] = {
 7.6425730254889052e-02,
 4.9714548894969797e-02,
 2.1616013526483312e-02,
-// nroots = 10
+
 1.5275338713072584e-01,
 1.4917298647260374e-01,
 1.4209610931838204e-01,
@@ -24354,7 +24102,7 @@ static double POLY_SMALLX_W0[] = {
 6.2672048334109068e-02,
 4.0601429800386939e-02,
 1.7614007139152118e-02,
-// nroots = 11
+
 1.3925187285563198e-01,
 1.3654149834601517e-01,
 1.3117350478706238e-01,
@@ -24366,7 +24114,7 @@ static double POLY_SMALLX_W0[] = {
 5.2293335152683286e-02,
 3.3774901584814152e-02,
 1.4627995298272200e-02,
-// nroots = 12
+
 1.2793819534675216e-01,
 1.2583745634682830e-01,
 1.2167047292780339e-01,
@@ -24379,7 +24127,7 @@ static double POLY_SMALLX_W0[] = {
 4.4277438817419808e-02,
 2.8531388628933663e-02,
 1.2341229799987200e-02,
-// nroots = 13
+
 1.1832141527926228e-01,
 1.1666044348529658e-01,
 1.1336181654631966e-01,
@@ -24393,7 +24141,7 @@ static double POLY_SMALLX_W0[] = {
 3.7962383294362766e-02,
 2.4417851092631910e-02,
 1.0551372617343006e-02,
-// nroots = 14
+
 1.1004701301647520e-01,
 1.0871119225829413e-01,
 1.0605576592284642e-01,
@@ -24408,7 +24156,7 @@ static double POLY_SMALLX_W0[] = {
 3.2901427782304378e-02,
 2.1132112592771261e-02,
 9.1242825930945171e-03,
-// nroots = 15
+
 1.0285265289355884e-01,
 1.0176238974840550e-01,
 9.9593420586795267e-02,
@@ -24424,7 +24172,7 @@ static double POLY_SMALLX_W0[] = {
 2.8784707883323369e-02,
 1.8466468311090958e-02,
 7.9681924961666050e-03,
-// nroots = 16
+
 9.6540088514727798e-02,
 9.5638720079274861e-02,
 9.3844399080804566e-02,
@@ -24441,7 +24189,7 @@ static double POLY_SMALLX_W0[] = {
 2.5392065309262059e-02,
 1.6274394730905670e-02,
 7.0186100094700964e-03,
-// nroots = 17
+
 9.0956740330259869e-02,
 9.0203044370640736e-02,
 8.8701897835693863e-02,
@@ -24459,7 +24207,7 @@ static double POLY_SMALLX_W0[] = {
 2.2563721985494969e-02,
 1.4450162748595036e-02,
 6.2291405559086847e-03,
-// nroots = 18
+
 8.5983275670394751e-02,
 8.5346685739338624e-02,
 8.4078218979661931e-02,
@@ -24478,7 +24226,7 @@ static double POLY_SMALLX_W0[] = {
 2.0181515297735472e-02,
 1.2915947284065574e-02,
 5.5657196642450455e-03,
-// nroots = 19
+
 8.1525029280385783e-02,
 8.0982493770597103e-02,
 7.9901033243527819e-02,
@@ -24498,7 +24246,7 @@ static double POLY_SMALLX_W0[] = {
 1.8156577709613236e-02,
 1.1613444716468675e-02,
 5.0028807496393457e-03,
-// nroots = 20
+
 7.7505947978424805e-02,
 7.7039818164247972e-02,
 7.6110361900626242e-02,
@@ -24519,7 +24267,7 @@ static double POLY_SMALLX_W0[] = {
 1.6421058381907890e-02,
 1.0498284531152813e-02,
 4.5212770985331909e-03,
-// nroots = 21
+
 7.3864234232172879e-02,
 7.3460813453467527e-02,
 7.2656175243804105e-02,
@@ -24541,7 +24289,7 @@ static double POLY_SMALLX_W0[] = {
 1.4922443697357493e-02,
 9.5362203017485027e-03,
 4.1059986046490847e-03,
-// nroots = 22
+
 7.0549157789354069e-02,
 7.0197685473558216e-02,
 6.9496491861572585e-02,
@@ -24564,7 +24312,7 @@ static double POLY_SMALLX_W0[] = {
 1.3619586755579985e-02,
 8.7004813675248434e-03,
 3.7454048031127776e-03,
-// nroots = 23
+
 6.7518685849036461e-02,
 6.7210613600678176e-02,
 6.6595874768454882e-02,
@@ -24588,7 +24336,7 @@ static double POLY_SMALLX_W0[] = {
 1.2479883770988685e-02,
 7.9698982297246226e-03,
 3.4303008681070483e-03,
-// nroots = 24
+
 6.4737696812683918e-02,
 6.4466164435950088e-02,
 6.3924238584648185e-02,
@@ -24613,7 +24361,7 @@ static double POLY_SMALLX_W0[] = {
 1.1477234579234540e-02,
 7.3275539012762625e-03,
 3.1533460523058385e-03,
-// nroots = 25
+
 6.2176616655347260e-02,
 6.1936067420683243e-02,
 6.1455899590316665e-02,
@@ -24639,7 +24387,7 @@ static double POLY_SMALLX_W0[] = {
 1.0590548383650969e-02,
 6.7597991957454012e-03,
 2.9086225531551411e-03,
-// nroots = 26
+
 5.9810365745291860e-02,
 5.9596260171248160e-02,
 5.9168815466042968e-02,
@@ -24666,7 +24414,7 @@ static double POLY_SMALLX_W0[] = {
 9.8026345794627514e-03,
 6.2555239629732773e-03,
 2.6913169500471113e-03,
-// nroots = 27
+
 5.7617536707147025e-02,
 5.7426137054112113e-02,
 5.7043973558794599e-02,
@@ -24694,7 +24442,7 @@ static double POLY_SMALLX_W0[] = {
 9.0993694555093971e-03,
 5.8056110152399851e-03,
 2.4974818357615860e-03,
-// nroots = 28
+
 5.5579746306514397e-02,
 5.5407952503245123e-02,
 5.5064895901762424e-02,
@@ -24723,7 +24471,7 @@ static double POLY_SMALLX_W0[] = {
 8.4690631633078869e-03,
 5.4025222460153382e-03,
 2.3238553757732156e-03,
-// nroots = 29
+
 5.3681119863334847e-02,
 5.3526343304058255e-02,
 5.3217236446579011e-02,
@@ -24753,7 +24501,7 @@ static double POLY_SMALLX_W0[] = {
 7.9019738499986752e-03,
 5.0399816126502428e-03,
 2.1677232496274501e-03,
-// nroots = 30
+
 5.1907877631220636e-02,
 5.1767943174910187e-02,
 5.1488451500980935e-02,
@@ -24784,7 +24532,7 @@ static double POLY_SMALLX_W0[] = {
 7.3899311633454558e-03,
 4.7127299269535683e-03,
 2.0268119688737585e-03,
-// nroots = 31
+
 5.0248000375256278e-02,
 5.0121069569043289e-02,
 4.9867528594952394e-02,
@@ -24819,34 +24567,34 @@ static double POLY_SMALLX_W0[] = {
 };
 
 static double POLY_SMALLX_W1[] = {
-// nroots = 1
+
 -3.3333333333333331e-01,
-// nroots = 2
+
 -1.2271362192859778e-01,
 -2.1061971140473557e-01,
-// nroots = 3
+
 -5.6487691723447885e-02,
 -1.4907718645889767e-01,
 -1.2776845515098778e-01,
-// nroots = 4
+
 -3.1384430571429409e-02,
 -8.9804624256712817e-02,
 -1.2931437096375242e-01,
 -8.2829907541438680e-02,
-// nroots = 5
+
 -1.9686757690986864e-02,
 -5.6173759018728280e-02,
 -9.7115272681211257e-02,
 -1.0297926219357020e-01,
 -5.7378281748836732e-02,
-// nroots = 6
+
 -1.3404459326117429e-02,
 -3.7140259226780728e-02,
 -6.9798025993402457e-02,
 -8.9903208869919593e-02,
 -8.1202949733650345e-02,
 -4.1884430183462780e-02,
-// nroots = 7
+
 -9.6762784934135981e-03,
 -2.5810077192692869e-02,
 -5.0559277860857933e-02,
@@ -24854,7 +24602,7 @@ static double POLY_SMALLX_W1[] = {
 -7.8739057440032886e-02,
 -6.4711830138776669e-02,
 -3.1839604926079998e-02,
-// nroots = 8
+
 -7.2956931243810877e-03,
 -1.8697575943681034e-02,
 -3.7385544074891822e-02,
@@ -24863,7 +24611,7 @@ static double POLY_SMALLX_W1[] = {
 -6.7705342645285799e-02,
 -5.2380981359025407e-02,
 -2.4986373035831237e-02,
-// nroots = 9
+
 -5.6884471222090364e-03,
 -1.4017609368068548e-02,
 -2.8279396473125228e-02,
@@ -24873,7 +24621,7 @@ static double POLY_SMALLX_W1[] = {
 -5.8019794346925377e-02,
 -4.3080183147849817e-02,
 -2.0113905313217502e-02,
-// nroots = 10
+
 -4.5548069078836916e-03,
 -1.0812068870036251e-02,
 -2.1858322694621932e-02,
@@ -24884,7 +24632,7 @@ static double POLY_SMALLX_W1[] = {
 -4.9866349375738916e-02,
 -3.5958202071776788e-02,
 -1.6531204416842745e-02,
-// nroots = 11
+
 -3.7265960577018311e-03,
 -8.5403678824716809e-03,
 -1.7229332137015666e-02,
@@ -24896,7 +24644,7 @@ static double POLY_SMALLX_W1[] = {
 -4.3099530033836778e-02,
 -3.0414471142145506e-02,
 -1.3822516879781982e-02,
-// nroots = 12
+
 -3.1038096899801901e-03,
 -6.8830915722212487e-03,
 -1.3819746842434521e-02,
@@ -24909,7 +24657,7 @@ static double POLY_SMALLX_W1[] = {
 -3.7497135400073503e-02,
 -2.6030178540522940e-02,
 -1.1726256176801588e-02,
-// nroots = 13
+
 -2.6240792114390053e-03,
 -5.6436186987320449e-03,
 -1.1257772310878891e-02,
@@ -24923,7 +24671,7 @@ static double POLY_SMALLX_W1[] = {
 -3.2844993055811733e-02,
 -2.2511371641957784e-02,
 -1.0071467619841788e-02,
-// nroots = 14
+
 -2.2469308790401127e-03,
 -4.6964849046452917e-03,
 -9.2974560817277799e-03,
@@ -24938,7 +24686,7 @@ static double POLY_SMALLX_W1[] = {
 -2.8960749795930670e-02,
 -1.9649015970703121e-02,
 -8.7427392154592037e-03,
-// nroots = 15
+
 -1.9452005169610048e-03,
 -3.9590659703587971e-03,
 -7.7727242996177151e-03,
@@ -24954,7 +24702,7 @@ static double POLY_SMALLX_W1[] = {
 -2.5696361141300823e-02,
 -1.7292174284832689e-02,
 -7.6599415166613213e-03,
-// nroots = 16
+
 -1.7001230829367258e-03,
 -3.3754187760707522e-03,
 -6.5691417015674332e-03,
@@ -24971,7 +24719,7 @@ static double POLY_SMALLX_W1[] = {
 -2.2933920020103322e-02,
 -1.5330145136012663e-02,
 -6.7660677910014247e-03,
-// nroots = 17
+
 -1.4984074950259089e-03,
 -2.9067246676076157e-03,
 -5.6063199913378228e-03,
@@ -24989,7 +24737,7 @@ static double POLY_SMALLX_W1[] = {
 -2.0580114466852976e-02,
 -1.3680500642828962e-02,
 -6.0196844102690869e-03,
-// nroots = 18
+
 -1.3304316837717016e-03,
 -2.5254539216072332e-03,
 -4.8267625926033710e-03,
@@ -25008,7 +24756,7 @@ static double POLY_SMALLX_W1[] = {
 -1.8561091188511476e-02,
 -1.2280982655562224e-02,
 -5.3901017082554287e-03,
-// nroots = 19
+
 -1.1890941070327255e-03,
 -2.2116988826134500e-03,
 -4.1886553631745567e-03,
@@ -25028,7 +24776,7 @@ static double POLY_SMALLX_W1[] = {
 -1.6818196700600894e-02,
 -1.1083936470966001e-02,
 -4.8542023537830386e-03,
-// nroots = 20
+
 -1.0690629147509234e-03,
 -1.9508097838309760e-03,
 -3.6611187853273588e-03,
@@ -25049,7 +24797,7 @@ static double POLY_SMALLX_W1[] = {
 -1.5304606185569621e-02,
 -1.0052431646823436e-02,
 -4.3943087506434211e-03,
-// nroots = 21
+
 -9.6627314278892426e-04,
 -1.7318347083541976e-03,
 -3.2210239526491015e-03,
@@ -25071,7 +24819,7 @@ static double POLY_SMALLX_W1[] = {
 -1.3982709537162180e-02,
 -9.1575193277493756e-03,
 -3.9967185403280816e-03,
-// nroots = 22
+
 -8.7758269425313210e-04,
 -1.5464683528524546e-03,
 -2.8508202714467739e-03,
@@ -25094,7 +24842,7 @@ static double POLY_SMALLX_W1[] = {
 -1.2822101353378577e-02,
 -8.3762659163262396e-03,
 -3.6506796345923557e-03,
-// nroots = 23
+
 -8.0053237561891213e-04,
 -1.3883300247785086e-03,
 -2.5370292953011361e-03,
@@ -25118,7 +24866,7 @@ static double POLY_SMALLX_W1[] = {
 -1.1798038198100505e-02,
 -7.6903245153657745e-03,
 -3.3476604370182329e-03,
-// nroots = 24
+
 -7.3317556916507529e-04,
 -1.2524590747887223e-03,
 -2.2691845462950136e-03,
@@ -25143,7 +24891,7 @@ static double POLY_SMALLX_W1[] = {
 -1.0890252413042244e-02,
 -7.0848839825290218e-03,
 -3.0808220625546364e-03,
-// nroots = 25
+
 -6.7395540337246787e-04,
 -1.1349566358644543e-03,
 -2.0390746801447687e-03,
@@ -25169,7 +24917,7 @@ static double POLY_SMALLX_W1[] = {
 -1.0082036571136040e-02,
 -6.5478866197224098e-03,
 -2.8446311636533511e-03,
-// nroots = 26
+
 -6.2161488689990480e-04,
 -1.0327275086083386e-03,
 -1.8401960580889394e-03,
@@ -25196,7 +24944,7 @@ static double POLY_SMALLX_W1[] = {
 -9.3595332664645377e-03,
 -6.0694393571820810e-03,
 -2.6345721695611437e-03,
-// nroots = 27
+
 -5.7513028408902322e-04,
 -9.4329168430796887e-04,
 -1.6673519036875177e-03,
@@ -25224,7 +24972,7 @@ static double POLY_SMALLX_W1[] = {
 -8.7111810553797079e-03,
 -5.6413659566756039e-03,
 -2.4469308282843898e-03,
-// nroots = 28
+
 -5.3366111684094713e-04,
 -8.6464500025246356e-04,
 -1.5163554162466518e-03,
@@ -25253,7 +25001,7 @@ static double POLY_SMALLX_W1[] = {
 -8.1272796169722730e-03,
 -5.2568631355084626e-03,
 -2.2786295689508269e-03,
-// nroots = 29
+
 -4.9651222051138092e-04,
 -7.9515492910924588e-04,
 -1.3838075161188327e-03,
@@ -25283,7 +25031,7 @@ static double POLY_SMALLX_W1[] = {
 -7.5996463863333523e-03,
 -4.9102340771396448e-03,
 -2.1271009877085771e-03,
-// nroots = 30
+
 -4.6310464738128133e-04,
 -7.3348180776671226e-04,
 -1.2669287870492598e-03,
@@ -25314,7 +25062,7 @@ static double POLY_SMALLX_W1[] = {
 -7.1213437578314283e-03,
 -4.5966801393834151e-03,
 -1.9901896994310832e-03,
-// nroots = 31
+
 -4.3295313883927794e-04,
 -6.7851870107199454e-04,
 -1.1634312017740312e-03,
@@ -25349,34 +25097,34 @@ static double POLY_SMALLX_W1[] = {
 };
 
 static double POLY_LARGEX_RT[] = {
-// nroots = 1
+
 5.0000000000000000e-01,
-// nroots = 2
+
 2.7525512860841095e-01,
 2.7247448713915889e+00,
-// nroots = 3
+
 1.9016350919348812e-01,
 1.7844927485432516e+00,
 5.5253437422632601e+00,
-// nroots = 4
+
 1.4530352150331710e-01,
 1.3390972881263614e+00,
 3.9269635013582871e+00,
 8.5886356890120350e+00,
-// nroots = 5
+
 1.1758132021177814e-01,
 1.0745620124369040e+00,
 3.0859374437175502e+00,
 6.4147297336620301e+00,
 1.1807189489971737e+01,
-// nroots = 6
+
 9.8747014068481187e-02,
 8.9830283456961768e-01,
 2.5525898026681713e+00,
 5.1961525300544658e+00,
 9.1242480375311796e+00,
 1.5129959781108086e+01,
-// nroots = 7
+
 8.5115442997594035e-02,
 7.7213792004277704e-01,
 2.1805918884504591e+00,
@@ -25384,7 +25132,7 @@ static double POLY_LARGEX_RT[] = {
 7.5540913261017844e+00,
 1.1989993039823879e+01,
 1.8528277495852493e+01,
-// nroots = 8
+
 7.4791882596818265e-02,
 6.7724908764928915e-01,
 1.9051136350314284e+00,
@@ -25393,7 +25141,7 @@ static double POLY_LARGEX_RT[] = {
 1.0093323675221344e+01,
 1.4972627088426393e+01,
 2.1984272840962650e+01,
-// nroots = 9
+
 6.6702230958194400e-02,
 6.0323635708174872e-01,
 1.6923950797931788e+00,
@@ -25403,7 +25151,7 @@ static double POLY_LARGEX_RT[] = {
 1.2771825354869193e+01,
 1.8046505467728981e+01,
 2.5485979166099078e+01,
-// nroots = 10
+
 6.0192063149587915e-02,
 5.4386750029464603e-01,
 1.5229441054044437e+00,
@@ -25414,7 +25162,7 @@ static double POLY_LARGEX_RT[] = {
 1.5561163332189350e+01,
 2.1193892096301543e+01,
 2.9024950340236227e+01,
-// nroots = 11
+
 5.4839869578818493e-02,
 4.9517412335035643e-01,
 1.3846557400845998e+00,
@@ -25426,7 +25174,7 @@ static double POLY_LARGEX_RT[] = {
 1.8441119680978193e+01,
 2.4401961242387042e+01,
 3.2594980091440817e+01,
-// nroots = 12
+
 5.0361889117293952e-02,
 4.5450668156378027e-01,
 1.2695899401039614e+00,
@@ -25439,7 +25187,7 @@ static double POLY_LARGEX_RT[] = {
 2.1396755936166109e+01,
 2.7661108779846089e+01,
 3.6191360360615604e+01,
-// nroots = 13
+
 4.6560083245024773e-02,
 4.2002740640121355e-01,
 1.1723107732777798e+00,
@@ -25453,7 +25201,7 @@ static double POLY_LARGEX_RT[] = {
 2.4416692333056517e+01,
 3.0963938274746795e+01,
 3.9810426068749337e+01,
-// nroots = 14
+
 4.3292035739773548e-02,
 3.9042092604203149e-01,
 1.0889658675692704e+00,
@@ -25468,7 +25216,7 @@ static double POLY_LARGEX_RT[] = {
 2.7492041504843851e+01,
 3.4304620509373080e+01,
 4.3449262307852045e+01,
-// nroots = 15
+
 4.0452704304575260e-02,
 3.6472064505140778e-01,
 1.0167460688574956e+00,
@@ -25484,7 +25232,7 @@ static double POLY_LARGEX_RT[] = {
 3.0615717400899491e+01,
 3.7678471784205300e+01,
 4.7105508618218913e+01,
-// nroots = 16
+
 3.7962914575313457e-02,
 3.4220015601094766e-01,
 9.5355315539086549e-01,
@@ -25501,7 +25249,7 @@ static double POLY_LARGEX_RT[] = {
 3.3781970488226165e+01,
 4.1081666525491201e+01,
 5.0777223877537082e+01,
-// nroots = 17
+
 3.5761858556337386e-02,
 3.2230289701540760e-01,
 8.9778743824424956e-01,
@@ -25519,7 +25267,7 @@ static double POLY_LARGEX_RT[] = {
 3.6986065260934993e+01,
 4.4511035627908562e+01,
 5.4462790440994993e+01,
-// nroots = 18
+
 3.3802060596144767e-02,
 3.0459519206802305e-01,
 8.4820747882451009e-01,
@@ -25538,7 +25286,7 @@ static double POLY_LARGEX_RT[] = {
 4.0224050469543094e+01,
 4.7963921373889526e+01,
 5.8160844506183068e+01,
-// nroots = 19
+
 3.2045913128252994e-02,
 2.8873407234686432e-01,
 8.0383479939549507e-01,
@@ -25558,7 +25306,7 @@ static double POLY_LARGEX_RT[] = {
 4.3492591618441629e+01,
 5.1438070769382129e+01,
 6.1870224479037041e+01,
-// nroots = 20
+
 3.0463239279482524e-02,
 2.7444471579285035e-01,
 7.6388755844391321e-01,
@@ -25579,7 +25327,7 @@ static double POLY_LARGEX_RT[] = {
 4.6788846392124967e+01,
 5.4931555621020550e+01,
 6.5589931990639727e+01,
-// nroots = 21
+
 2.9029543936387635e-02,
 2.6150430708215294e-01,
 7.2773338834365031e-01,
@@ -25601,7 +25349,7 @@ static double POLY_LARGEX_RT[] = {
 5.0110370364086812e+01,
 5.8442711638286255e+01,
 6.9319101991400871e+01,
-// nroots = 22
+
 2.7724736591276774e-02,
 2.4973028108823533e-01,
 6.9485521795227390e-01,
@@ -25624,7 +25372,7 @@ static double POLY_LARGEX_RT[] = {
 5.3455044504540616e+01,
 6.1970091334807094e+01,
 7.3056979479728611e+01,
-// nroots = 23
+
 2.6532183876098379e-02,
 2.3897161999933406e-01,
 6.6482608325629022e-01,
@@ -25648,7 +25396,7 @@ static double POLY_LARGEX_RT[] = {
 5.6821018665012517e+01,
 6.5512427112270117e+01,
 7.6802901160312700e+01,
-// nroots = 24
+
 2.5437996585689359e-02,
 2.2910231649262433e-01,
 6.3729027873266875e-01,
@@ -25673,7 +25421,7 @@ static double POLY_LARGEX_RT[] = {
 6.0206666963057224e+01,
 6.9068601975304375e+01,
 8.0556280819950402e+01,
-// nroots = 25
+
 2.4430486164134554e-02,
 2.2001639865187669e-01,
 6.1194905886035600e-01,
@@ -25699,7 +25447,7 @@ static double POLY_LARGEX_RT[] = {
 6.3610552160222085e+01,
 7.2637626045451725e+01,
 8.4316597544701708e+01,
-// nroots = 26
+
 2.3499745451748166e-02,
 2.1162409772850768e-01,
 5.8854965565640838e-01,
@@ -25726,7 +25474,7 @@ static double POLY_LARGEX_RT[] = {
 6.7031396926394294e+01,
 7.6218617538242384e+01,
 8.8083386135303101e+01,
-// nroots = 27
+
 2.2637321764490403e-02,
 2.0384886358910115e-01,
 5.6687674698997592e-01,
@@ -25754,7 +25502,7 @@ static double POLY_LARGEX_RT[] = {
 7.0468060440696945e+01,
 7.9810787215031667e+01,
 9.1856229242335857e+01,
-// nroots = 28
+
 2.1835959421664289e-02,
 1.9662501675605398e-01,
 5.4674575955457738e-01,
@@ -25783,7 +25531,7 @@ static double POLY_LARGEX_RT[] = {
 7.3919519173353009e+01,
 8.3413425568839060e+01,
 9.5634750860588284e+01,
-// nroots = 29
+
 2.1089395098205156e-02,
 1.8989588398975638e-01,
 5.2799756150380650e-01,
@@ -25813,7 +25561,7 @@ static double POLY_LARGEX_RT[] = {
 7.7384850976179521e+01,
 8.7025892182318486e+01,
 9.9418610907768539e+01,
-// nroots = 30
+
 2.0392193775236527e-02,
 1.8361230503708192e-01,
 5.1049421913596571e-01,
@@ -25844,7 +25592,7 @@ static double POLY_LARGEX_RT[] = {
 8.0863221815671636e+01,
 9.0647606826965728e+01,
 1.0320750067582173e+02,
-// nroots = 31
+
 1.9739616193178225e-02,
 1.7773142707141706e-01,
 4.9411557648940696e-01,
@@ -25879,34 +25627,34 @@ static double POLY_LARGEX_RT[] = {
 };
 
 static double POLY_LARGEX_WW[] = {
-// nroots = 1
+
 1.0000000000000000e+00,
-// nroots = 2
+
 9.0824829046386302e-01,
 9.1751709536136983e-02,
-// nroots = 3
+
 8.1765693911205850e-01,
 1.7723149208382905e-01,
 5.1115688041124931e-03,
-// nroots = 4
+
 7.4602451535815473e-01,
 2.3447981532351803e-01,
 1.9270440241576533e-02,
 2.2522907675073554e-04,
-// nroots = 5
+
 6.8928466986403814e-01,
 2.7096740596053548e-01,
 3.8223161001540572e-02,
 1.5161418686244353e-03,
 8.6213052614365738e-06,
-// nroots = 6
+
 6.4332872302566002e-01,
 2.9393409609065996e-01,
 5.8233375824728303e-02,
 4.4067613750663976e-03,
 9.6743698451812559e-05,
 2.9998543352743358e-07,
-// nroots = 7
+
 6.0526925362603901e-01,
 3.0816667968502726e-01,
 7.7300217648506794e-02,
@@ -25914,7 +25662,7 @@ static double POLY_LARGEX_WW[] = {
 4.0067910752148827e-04,
 5.3219826881352609e-06,
 9.7363225154967611e-09,
-// nroots = 8
+
 5.7313704247602426e-01,
 3.1667674550189923e-01,
 9.4569504708028052e-02,
@@ -25923,7 +25671,7 @@ static double POLY_LARGEX_WW[] = {
 3.0600064324974545e-05,
 2.6189464325736453e-07,
 2.9956294463236794e-10,
-// nroots = 9
+
 5.4556646930857577e-01,
 3.2137060778702525e-01,
 1.0979326496044525e-01,
@@ -25933,7 +25681,7 @@ static double POLY_LARGEX_WW[] = {
 2.0431047952739623e-06,
 1.1810976957673191e-08,
 8.8331775387174107e-12,
-// nroots = 10
+
 5.2158612689910977e-01,
 3.2347866796799990e-01,
 1.2301274412795381e-01,
@@ -25944,7 +25692,7 @@ static double POLY_LARGEX_WW[] = {
 1.2254980519965896e-07,
 4.9641247246303573e-10,
 2.5156013448758539e-13,
-// nroots = 11
+
 5.0048719317386992e-01,
 3.2381258682735053e-01,
 1.3439262285778006e-01,
@@ -25956,7 +25704,7 @@ static double POLY_LARGEX_WW[] = {
 6.7330283189164226e-09,
 1.9682757964692173e-11,
 6.9589212957542919e-15,
-// nroots = 12
+
 4.8174023109328062e-01,
 3.2291902573400016e-01,
 1.4413872803435665e-01,
@@ -25969,7 +25717,7 @@ static double POLY_LARGEX_WW[] = {
 3.4373298559297163e-10,
 7.4299483055247976e-13,
 1.8780387378083912e-16,
-// nroots = 13
+
 4.6494147126015534e-01,
 3.2117309122758919e-01,
 1.5245906441260604e-01,
@@ -25983,7 +25731,7 @@ static double POLY_LARGEX_WW[] = {
 1.6485618886327706e-11,
 2.6890952993271460e-14,
 4.9613885207872613e-18,
-// nroots = 14
+
 4.4977725950135311e-01,
 3.1883638732261832e-01,
 1.5954673202319922e-01,
@@ -25998,7 +25746,7 @@ static double POLY_LARGEX_WW[] = {
 7.4918020703531324e-13,
 9.3835311390007269e-16,
 1.2865094877603708e-19,
-// nroots = 15
+
 4.3599994363115452e-01,
 3.1609390641804141e-01,
 1.6557367343124368e-01,
@@ -26014,7 +25762,7 @@ static double POLY_LARGEX_WW[] = {
 3.2481602599447942e-14,
 3.1711218899325956e-17,
 3.2816140162356828e-21,
-// nroots = 16
+
 4.2341113976095862e-01,
 3.1307798751519689e-01,
 1.7068961654416151e-01,
@@ -26031,7 +25779,7 @@ static double POLY_LARGEX_WW[] = {
 1.3510580447340238e-15,
 1.0416899183921723e-18,
 8.2492149780365387e-23,
-// nroots = 17
+
 4.1184987333822709e-01,
 3.0988419302971959e-01,
 1.7502336271724780e-01,
@@ -26049,7 +25797,7 @@ static double POLY_LARGEX_WW[] = {
 5.4161094185246469e-17,
 3.3362887511570735e-20,
 2.0466542596109164e-24,
-// nroots = 18
+
 4.0118401287804417e-01,
 3.0658202679942276e-01,
 1.7868499500877333e-01,
@@ -26068,7 +25816,7 @@ static double POLY_LARGEX_WW[] = {
 2.1005883869494762e-18,
 1.0444732401725871e-21,
 5.0180752692698952e-26,
-// nroots = 19
+
 3.9130397408272694e-01,
 3.0322229252021565e-01,
 1.8176831110517649e-01,
@@ -26088,7 +25836,7 @@ static double POLY_LARGEX_WW[] = {
 7.9075044204715010e-20,
 3.2031736699482299e-23,
 1.2172039136849715e-27,
-// nroots = 20
+
 3.8211801932398098e-01,
 2.9984222352714129e-01,
 1.8435315834012161e-01,
@@ -26109,7 +25857,7 @@ static double POLY_LARGEX_WW[] = {
 2.8972188631031838e-21,
 9.6409358804016256e-25,
 2.9236797477388334e-29,
-// nroots = 21
+
 3.7354869772403904e-01,
 2.9646910879859129e-01,
 1.8650753720919128e-01,
@@ -26131,7 +25879,7 @@ static double POLY_LARGEX_WW[] = {
 1.0356140658899054e-22,
 2.8523956917266094e-26,
 6.9596835174689164e-31,
-// nroots = 22
+
 3.6553011371946231e-01,
 2.9312288834281841e-01,
 1.8828943358993128e-01,
@@ -26154,7 +25902,7 @@ static double POLY_LARGEX_WW[] = {
 3.6189621414024282e-24,
 8.3072697216188933e-28,
 1.6430501786349221e-32,
-// nroots = 23
+
 3.5800580619470224e-01,
 2.8981803207491413e-01,
 1.8974838445154743e-01,
@@ -26178,7 +25926,7 @@ static double POLY_LARGEX_WW[] = {
 1.2385719396147015e-25,
 2.3844925442657878e-29,
 3.8493292540923028e-34,
-// nroots = 24
+
 3.5092708362373221e-01,
 2.8656491398635237e-01,
 1.9092680112285854e-01,
@@ -26203,7 +25951,7 @@ static double POLY_LARGEX_WW[] = {
 4.1581179428373256e-27,
 6.7529122862707464e-31,
 8.9543109477517401e-36,
-// nroots = 25
+
 3.4425170398488636e-01,
 2.8337082649988776e-01,
 1.9186108071620300e-01,
@@ -26229,7 +25977,7 @@ static double POLY_LARGEX_WW[] = {
 1.3712561517848866e-28,
 1.8886829319168770e-32,
 2.0692150011539962e-37,
-// nroots = 26
+
 3.3794281831211437e-01,
 2.8024073546098432e-01,
 1.9258253664230973e-01,
@@ -26256,7 +26004,7 @@ static double POLY_LARGEX_WW[] = {
 4.4476138376213146e-30,
 5.2211960259687506e-34,
 4.7522163234420851e-39,
-// nroots = 27
+
 3.3196811795916797e-01,
 2.7717784627086350e-01,
 1.9311817671143119e-01,
@@ -26284,7 +26032,7 @@ static double POLY_LARGEX_WW[] = {
 1.4203821086453334e-31,
 1.4277608134851950e-35,
 1.0851136987196605e-40,
-// nroots = 28
+
 3.2629914080686934e-01,
 2.7418403121591522e-01,
 1.9349135384672128e-01,
@@ -26313,7 +26061,7 @@ static double POLY_LARGEX_WW[] = {
 4.4708121318609240e-33,
 3.8646806884574510e-37,
 2.4643207251964564e-42,
-// nroots = 29
+
 3.2091070260471899e-01,
 2.7126015390759434e-01,
 1.9372231080136831e-01,
@@ -26343,7 +26091,7 @@ static double POLY_LARGEX_WW[] = {
 1.3882300680633443e-34,
 1.0361288228040763e-38,
 5.5680352918588278e-44,
-// nroots = 30
+
 3.1578042765949238e-01,
 2.6840631685517313e-01,
 1.9382863687099960e-01,
@@ -26374,7 +26122,7 @@ static double POLY_LARGEX_WW[] = {
 4.2558250249436302e-36,
 2.7529603514345679e-40,
 1.2520351346822822e-45,
-// nroots = 31
+
 3.1088835901770417e-01,
 2.6562205119893828e-01,
 1.9382565158599319e-01,
@@ -26409,7 +26157,7 @@ static double POLY_LARGEX_WW[] = {
 };
 
 #ifdef HAVE_QUADMATH_H
-#include <quadmath.h>
+//#include <quadmath.h>
 #endif
 #define PIE4        0.78539816339744827900
 #define THRESHOLD_ZERO  (DBL_EPSILON * 8)
@@ -26503,17 +26251,15 @@ void CINTrys_roots(int nroots, double x, double *u, double *w)
                 err = segment_solve(nroots, x, 0., u, w, 50, CINTqrys_jacobi, CINTqrys_laguerre);
         }
         if (err) {
-                fprintf(stderr, "rys_roots fails: nroots=%d x=%g\n",
-                        nroots, x);
+                //fprintf(stderr, "rys_roots fails: nroots=%d x=%g\n",
+                //       nroots, x);
 #ifndef KEEP_GOING
                 exit(err);
 #endif
         }
 }
 
-/*
- * lower is the lower bound of the sr integral
- */
+
 static int segment_solve1(int n, double x, double lower, double *u, double *w,
                           double lower_bp1, double lower_bp2, double breakpoint,
                           QuadratureFunction fn1, QuadratureFunction fn2, QuadratureFunction fn3)
@@ -26614,7 +26360,7 @@ void CINTsr_rys_roots(int nroots, double x, double lower, double *u, double *w)
                 err = segment_solve1(nroots, x, lower, u, w, 0.5, 1., 60, CINTlrys_jacobi, CINTlrys_laguerre, CINTqrys_jacobi);
                 break;
         case 8: case 9: case 10:
-                //CINTqrys_jacobi(nroots, x, lower, u, w);
+                
                 err = segment_solve1(nroots, x, lower, u, w, 0.15, 1., 60, CINTqrys_jacobi, CINTqrys_laguerre, CINTqrys_jacobi);
                 break;
         case 11: case 12:
@@ -26642,14 +26388,14 @@ void CINTsr_rys_roots(int nroots, double x, double lower, double *u, double *w)
                 err = segment_solve1(nroots, x, lower, u, w, 0.25, 0.35, 60, CINTqrys_jacobi, CINTqrys_laguerre, CINTqrys_jacobi);
                 break;
         default:
-                fprintf(stderr, "libcint SR-rys_roots does not support nroots=%d\n", nroots);
+                //fprintf(stderr, "libcint SR-rys_roots does not support nroots=%d\n", nroots);
 #ifndef KEEP_GOING
                 exit(1);
 #endif
         }
         if (err) {
-                fprintf(stderr, "sr_rys_roots fails: nroots=%d x=%.15g lower=%.15g\n",
-                        nroots, x, lower);
+                //fprintf(stderr, "sr_rys_roots fails: nroots=%d x=%.15g lower=%.15g\n",
+                //        nroots, x, lower);
 #ifndef KEEP_GOING
                 exit(err);
 #endif
@@ -28041,7 +27787,7 @@ static int R_dsmit(double *cs, double *fmt_ints, int n)
         fac = -fmt_ints[1] / fmt_ints[0];
         tmp = fmt_ints[2] + fac * fmt_ints[1];
         if (tmp <= 0) {
-                fprintf(stderr, "libcint::rys_roots negative value in sqrt for roots %d (j=1)\n", n-1);
+                //fprintf(stderr, "libcint::rys_roots negative value in sqrt for roots %d (j=1)\n", n-1);
                 SET_ZERO(cs, n, 1);
                 return 1;
         }
@@ -28067,12 +27813,12 @@ static int R_dsmit(double *cs, double *fmt_ints, int n)
                 }
 
                 if (fac <= 0) {
-                        // set rest coefficients to 0
+                        
                         SET_ZERO(cs, n, j);
                         if (fac == 0) {
                                 return 0;
                         }
-                        fprintf(stderr, "libcint::rys_roots negative value in sqrt for roots %d (j=%d)\n", n-1, j);
+                        //fprintf(stderr, "libcint::rys_roots negative value in sqrt for roots %d (j=%d)\n", n-1, j);
                         return j;
                 }
                 fac = 1 / sqrt(fac);
@@ -28084,10 +27830,7 @@ static int R_dsmit(double *cs, double *fmt_ints, int n)
         return 0;
 }
 
-/*
- * Using RDK algorithm (based on Schmidt orthogonalization to search rys roots
- * and weights
- */
+
 static int _rdk_rys_roots(int nroots, double *fmt_ints,
                           double *roots, double *weights)
 {
@@ -28098,7 +27841,7 @@ static int _rdk_rys_roots(int nroots, double *fmt_ints,
         double *a;
         double root, poly, dum;
 
-        // to avoid numerical instability for very small fmt integrals
+        
         if (fmt_ints[0] == 0) {
                 for (k = 0; k < nroots; ++k) {
                         roots[k] = 0;
@@ -28123,10 +27866,10 @@ static int _rdk_rys_roots(int nroots, double *fmt_ints,
 
         for (k = 0; k < nroots; ++k) {
                 root = rt[k];
-                // When singularity was caught in R_dsmit, they are typically
-                // caused by high order Rys polynomials. We assume the contributions
-                // from these high order Rys polynomials are negligible. Only the
-                // roots obtained from lower polynomials are used.
+                
+                
+                
+                
                 if (root == 1) {
                         roots[k] = 0;
                         weights[k] = 0;
@@ -28137,7 +27880,7 @@ static int _rdk_rys_roots(int nroots, double *fmt_ints,
                 for (j = 1; j < nroots; ++j) {
                         order = j;
                         a = cs + j * nroots1;
-                        // poly = poly_value1(cs[:order+1,j], order, root);
+                        
                         POLYNOMIAL_VALUE1(poly, a, order, root);
                         dum += poly * poly;
                 }
@@ -28158,19 +27901,16 @@ int CINTrys_schmidt(int nroots, double x, double lower, double *roots, double *w
         return _rdk_rys_roots(nroots, fmt_ints, roots, weights);
 }
 
-/*
- ******************************************************
- * 80 bit double
- */
+
 #ifdef HAVE_SQRTL
 #define SQRTL   sqrtl
 #else
 static long double c99_sqrtl(long double x)
 {
         long double z = sqrt(x);
-// ref. Babylonian method
-// http://en.wikipedia.org/wiki/Methods_of_computing_square_roots
-// An extra update should be enough due to the quadratic convergence
+
+
+
         return (z*z + x)/(z * 2);
 }
 #define SQRTL   c99_sqrtl
@@ -28179,8 +27919,8 @@ static long double c99_sqrtl(long double x)
 #ifdef HAVE_EXPL
 #define EXPL    expl
 #else
-// Does it need to swith to 128 bit expl algorithm?
-// ref https://github.com/JuliaLang/openlibm/ld128/e_expl.c
+
+
 static long double c99_expl(long double x)
 {
         return exp(x);
@@ -28197,14 +27937,25 @@ static int R_lsmit(long double *cs, long double *fmt_ints, int n)
         fac = -fmt_ints[1] / fmt_ints[0];
         tmp = fmt_ints[2] + fac * fmt_ints[1];
         if (tmp <= 0) {
-                fprintf(stderr, "libcint::rys_roots negative value in sqrtl for roots %d (j=1)\n", n-1);
+                //fprintf(stderr, "libcint::rys_roots negative value in sqrtl for roots %d (j=1)\n", n-1);
                 SET_ZERO(cs, n, 1);
                 return 1;
         }
+
+
+        //cs[0+0*n] = 1 / SQRTL(fmt_ints[0]);
+        //p = 1 / sqrt(tmp);
+        tmp = 1 / sqrt(tmp);
+        cs[0+0*n] = 1 / sqrt(fmt_ints[0]);
+        cs[0+1*n] = fac *tmp;
+        cs[1+1*n] = tmp;
+        /*
         tmp = 1 / SQRTL(tmp);
         cs[0+0*n] = 1 / SQRTL(fmt_ints[0]);
         cs[0+1*n] = fac * tmp;
         cs[1+1*n] = tmp;
+
+        */
 
         for (j = 2; j < n; ++j) {
                 for (k = 0; k < j; ++k) {
@@ -28223,19 +27974,21 @@ static int R_lsmit(long double *cs, long double *fmt_ints, int n)
                 }
 
                 if (fac <= 0) {
-                        // set rest coefficients to 0
+                        
                         SET_ZERO(cs, n, j);
                         if (fac == 0) {
                                 return 0;
                         }
-                        fprintf(stderr, "libcint::rys_roots negative value in sqrtl for roots %d (j=%d)\n", n-1, j);
+                        //fprintf(stderr, "libcint::rys_roots negative value in sqrtl for roots %d (j=%d)\n", n-1, j);
                         return j;
                 }
-                fac = 1 / SQRTL(fac);
+                //fac = 1 / SQRTL(fac);
+                fac = 1 / sqrt(fac);
                 cs[j + j * n] = fac;
                 for (k = 0; k < j; ++k) {
                         cs[k + j * n] = fac * v[k];
                 }
+
         }
         return 0;
 }
@@ -28297,7 +28050,7 @@ int CINTlrys_schmidt(int nroots, double x, double lower, double *roots, double *
                 for (j = 1; j < nroots; ++j) {
                         order = j;
                         a = cs + j * nroots1;
-                        // poly = poly_value1(cs[:order+1,j], order, root);
+                        
                         POLYNOMIAL_VALUE1(poly, a, order, root);
                         dum += poly * poly;
                 }
@@ -28308,126 +28061,9 @@ int CINTlrys_schmidt(int nroots, double x, double lower, double *roots, double *
 }
 
 #ifdef HAVE_QUADMATH_H
-static int R_qsmit(__float128 *cs, __float128 *fmt_ints, int n)
-{
-        int i, j, k;
-        __float128 fac, dot, tmp;
-        __float128 v[MXRYSROOTS];
 
-        fac = -fmt_ints[1] / fmt_ints[0];
-        tmp = fmt_ints[2] + fac * fmt_ints[1];
-        if (tmp <= 0) {
-                fprintf(stderr, "libcint::rys_roots negative value in sqrtq for roots %d (j=1)\n", n-1);
-                SET_ZERO(cs, n, 1);
-                return 1;
-        }
-        //tmp = 1 / sqrtq(tmp);
-        //cs[0+0*n] = 1 / sqrtq(fmt_ints[0]);
-        tmp = 1 / sqrt(tmp);
-        cs[0+0*n] = 1 / sqrt(fmt_ints[0]);
-        cs[0+1*n] = fac * tmp;
-        cs[1+1*n] = tmp;
 
-        for (j = 2; j < n; ++j) {
-                for (k = 0; k < j; ++k) {
-                        v[k] = 0;
-                }
-                fac = fmt_ints[j + j];
-                for (k = 0; k < j; ++k) {
-                        dot = 0;
-                        for (i = 0; i <= k; ++i) {
-                                dot += cs[i + k * n] * fmt_ints[i+j];
-                        }
-                        for (i = 0; i <= k; ++i) {
-                                v[i] -= dot * cs[i + k * n];
-                        }
-                        fac -= dot * dot;
-                }
 
-                if (fac <= 0) {
-                        // set rest coefficients to 0
-                        SET_ZERO(cs, n, j);
-                        if (fac == 0) {
-                                return 0;
-                        }
-                        fprintf(stderr, "libcint::rys_roots negative value in sqrtq for roots %d (j=%d)\n", n-1, j);
-                        return j;
-                }
-                //fac = 1.q / sqrtq(fac);
-                fac = 1.q / sqrt(fac);
-                cs[j + j * n] = fac;
-                for (k = 0; k < j; ++k) {
-                        cs[k + j * n] = fac * v[k];
-                }
-        }
-        return 0;
-}
-
-int CINTqrys_schmidt(int nroots, double x, double lower, double *roots, double *weights)
-{
-        int i, k, j, order, error;
-        int nroots1 = nroots + 1;
-        __float128 fmt_ints[MXRYSROOTS * 2 + MXRYSROOTS * MXRYSROOTS];
-        __float128 *qcs = fmt_ints + nroots1 * 2;
-        double rt[MXRYSROOTS + MXRYSROOTS * MXRYSROOTS];
-        double *cs = rt + nroots;
-        double *a;
-        double root, poly, dum, dum0;
-
-        if (lower == 0) {
-                qgamma_inc_like(fmt_ints, x, nroots*2);
-        } else {
-                fmt_qerfc_like(fmt_ints, x, lower, nroots*2);
-        }
-
-        if (fmt_ints[0] == 0) {
-                for (k = 0; k < nroots; ++k) {
-                        roots[k] = 0;
-                        weights[k] = 0;
-                }
-                return 0;
-        }
-
-        if (nroots == 1) {
-                rt[0] = fmt_ints[1] / fmt_ints[0];
-        } else {
-                error = R_qsmit(qcs, fmt_ints, nroots1);
-                if (error) {
-                        return error;
-                }
-                for (k = 1; k < nroots1; k++) {
-                        for (i = 0; i <= k; i++) {
-                                cs[k * nroots1 + i] = qcs[k * nroots1 + i];
-                        }
-                }
-                error = _CINT_polynomial_roots(rt, cs, nroots);
-                if (error) {
-                        return error;
-                }
-        }
-
-        dum0 = 1 / fmt_ints[0];
-        for (k = 0; k < nroots; ++k) {
-                root = rt[k];
-                if (root == 1) {
-                        roots[k] = 0;
-                        weights[k] = 0;
-                        continue;
-                }
-
-                dum = dum0;
-                for (j = 1; j < nroots; ++j) {
-                        order = j;
-                        a = cs + j * nroots1;
-                        // poly = poly_value1(cs[:order+1,j], order, root);
-                        POLYNOMIAL_VALUE1(poly, a, order, root);
-                        dum += poly * poly;
-                }
-                roots[k] = root / (1 - root);
-                weights[k] = 1 / dum;
-        }
-        return 0;
-}
 
 #endif
 
@@ -28452,8 +28088,14 @@ int GTOmax_shell_dim(const int *ao_loc, const int *shls_slice, int ncenter)
         }
         return di;
 }
+
+#ifdef __cplusplus
+int GTOmax_cache_size(int (*intor)(...), int *shls_slice, int ncenter,
+                      int *atm, int natm, int *bas, int nbas, double *env)
+#else
 int GTOmax_cache_size(int (*intor)(), int *shls_slice, int ncenter,
                       int *atm, int natm, int *bas, int nbas, double *env)
+#endif
 {
         int i, n;
         int i0 = shls_slice[0];
@@ -28476,10 +28118,18 @@ int GTOmax_cache_size(int (*intor)(), int *shls_slice, int ncenter,
 }
 
 
+#ifdef __cplusplus
+void GTOnr2e_fill_s1(int (*intor)(...), int (*fprescreen)(...),
+                     double *eri, double *buf, int comp, int ishp, int jshp,
+                     int *shls_slice, int *ao_loc, CINTOpt *cintopt,
+                     int *atm, int natm, int *bas, int nbas, double *env)
+
+#else
 void GTOnr2e_fill_s1(int (*intor)(), int (*fprescreen)(),
                      double *eri, double *buf, int comp, int ishp, int jshp,
                      int *shls_slice, int *ao_loc, CINTOpt *cintopt,
                      int *atm, int natm, int *bas, int nbas, double *env)
+#endif
 {
         int ish0 = shls_slice[0];
         int ish1 = shls_slice[1];
@@ -28561,10 +28211,17 @@ void GTOnr2e_fill_s1(int (*intor)(), int (*fprescreen)(),
         } }
 }
 
+#ifdef __cplusplus 
+void GTOnr2e_fill_s2ij(int (*intor)(...), int (*fprescreen)(...),
+                       double *eri, double *buf, int comp, int ishp, int jshp,
+                       int *shls_slice, int *ao_loc, CINTOpt *cintopt,
+                       int *atm, int natm, int *bas, int nbas, double *env)
+#else
 void GTOnr2e_fill_s2ij(int (*intor)(), int (*fprescreen)(),
                        double *eri, double *buf, int comp, int ishp, int jshp,
                        int *shls_slice, int *ao_loc, CINTOpt *cintopt,
                        int *atm, int natm, int *bas, int nbas, double *env)
+#endif
 {
         if (ishp < jshp) {
                 return;
@@ -28674,10 +28331,17 @@ void GTOnr2e_fill_s2ij(int (*intor)(), int (*fprescreen)(),
         } }
 }
 
+#ifdef __cplusplus
+void GTOnr2e_fill_s2kl(int (*intor)(...), int (*fprescreen)(...),
+                       double *eri, double *buf, int comp, int ishp, int jshp,
+                       int *shls_slice, int *ao_loc, CINTOpt *cintopt,
+                       int *atm, int natm, int *bas, int nbas, double *env)
+#else
 void GTOnr2e_fill_s2kl(int (*intor)(), int (*fprescreen)(),
                        double *eri, double *buf, int comp, int ishp, int jshp,
                        int *shls_slice, int *ao_loc, CINTOpt *cintopt,
                        int *atm, int natm, int *bas, int nbas, double *env)
+#endif
 {
         int ish0 = shls_slice[0];
         int ish1 = shls_slice[1];
@@ -28783,10 +28447,17 @@ void GTOnr2e_fill_s2kl(int (*intor)(), int (*fprescreen)(),
         } }
 }
 
+#ifdef __cplusplus
+void GTOnr2e_fill_s4(int (*intor)(...), int (*fprescreen)(...),
+                     double *eri, double *buf, int comp, int ishp, int jshp,
+                     int *shls_slice, int *ao_loc, CINTOpt *cintopt,
+                     int *atm, int natm, int *bas, int nbas, double *env)
+#else
 void GTOnr2e_fill_s4(int (*intor)(), int (*fprescreen)(),
                      double *eri, double *buf, int comp, int ishp, int jshp,
                      int *shls_slice, int *ao_loc, CINTOpt *cintopt,
                      int *atm, int natm, int *bas, int nbas, double *env)
+#endif
 {
         if (ishp < jshp) {
                 return;
@@ -28937,15 +28608,23 @@ void GTOnr2e_fill_s4(int (*intor)(), int (*fprescreen)(),
         } }
 }
 
+
 static int no_prescreen()
 {
         return 1;
 }
 
+#ifdef __cplusplus
+void GTOnr2e_fill_drv(int (*intor)(...), void (*fill)(...), int (*fprescreen)(...),
+                      double *eri, int comp,
+                      int *shls_slice, int *ao_loc, CINTOpt *cintopt,
+                      int *atm, int natm, int *bas, int nbas, double *env)
+#else
 void GTOnr2e_fill_drv(int (*intor)(), void (*fill)(), int (*fprescreen)(),
                       double *eri, int comp,
                       int *shls_slice, int *ao_loc, CINTOpt *cintopt,
                       int *atm, int natm, int *bas, int nbas, double *env)
+#endif
 {
         if (fprescreen == NULL) {
                 fprescreen = no_prescreen;
@@ -28964,7 +28643,11 @@ void GTOnr2e_fill_drv(int (*intor)(), void (*fill)(), int (*fprescreen)(),
 #pragma omp parallel
 {
         int ij, i, j;
+        #ifdef __cplusplus 
+        double *buf = new double[2048];
+        #else
         double *buf = malloc(sizeof(double) * (di*di*di*di*comp + cache_size));
+        #endif
 #pragma omp for nowait schedule(dynamic)
         for (ij = 0; ij < nish*njsh; ij++) {
                 i = ij / njsh;
@@ -28972,9 +28655,11 @@ void GTOnr2e_fill_drv(int (*intor)(), void (*fill)(), int (*fprescreen)(),
                 (*fill)(intor, fprescreen, eri, buf, comp, i, j, shls_slice,
                         ao_loc, cintopt, atm, natm, bas, nbas, env);
         }
-        free(buf);
+        //free(buf);
 }
 }
+
+
 
 
 #define PLAIN           0
@@ -29005,12 +28690,16 @@ void NPdsymm_triu(int n, double *mat, int hermi)
 }
 
 
-/*
- * mat(naoi,naoj,comp) in F-order
- */
+
+#ifdef __cplusplus
+void GTOint2c(int (*intor)(...), double *mat, int comp, int hermi,
+              int *shls_slice, int *ao_loc, CINTOpt *opt,
+              int *atm, int natm, int *bas, int nbas, double *env)
+#else
 void GTOint2c(int (*intor)(), double *mat, int comp, int hermi,
               int *shls_slice, int *ao_loc, CINTOpt *opt,
               int *atm, int natm, int *bas, int nbas, double *env)
+#endif
 {
         const int ish0 = shls_slice[0];
         const int ish1 = shls_slice[1];
@@ -29024,16 +28713,20 @@ void GTOint2c(int (*intor)(), double *mat, int comp, int hermi,
                                                  atm, natm, bas, nbas, env);
 #pragma omp parallel
 {
-        int dims[] = {naoi, naoj};
+        int dims[] = {(int)naoi, (int)naoj};
         int ish, jsh, ij, i0, j0;
         int shls[2];
+        #ifdef __cplusplus
+        double *cache = new double[1024]; 
+        #else
         double *cache = malloc(sizeof(double) * cache_size);
+        #endif
 #pragma omp for schedule(dynamic, 4)
         for (ij = 0; ij < nish*njsh; ij++) {
                 ish = ij / njsh;
                 jsh = ij % njsh;
                 if (hermi != PLAIN && ish > jsh) {
-                        // fill up only upper triangle of F-array
+                        
                         continue;
                 }
 
@@ -29046,9 +28739,9 @@ void GTOint2c(int (*intor)(), double *mat, int comp, int hermi,
                 (*intor)(mat+j0*naoi+i0, dims, shls,
                          atm, natm, bas, nbas, env, opt, cache);
         }
-        free(cache);
+        //free(cache);
 }
-        if (hermi != PLAIN) { // lower triangle of F-array
+        if (hermi != PLAIN) { 
                 int ic;
                 for (ic = 0; ic < comp; ic++) {
                         NPdsymm_triu(naoi, mat+ic*naoi*naoi, hermi);
@@ -29058,3 +28751,6 @@ void GTOint2c(int (*intor)(), double *mat, int comp, int hermi,
 
 
 
+#ifdef __cplusplus
+}
+#endif
