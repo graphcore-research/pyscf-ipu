@@ -31,7 +31,7 @@ To generate datasets based on the paper __Repurposing Density Functional Theory 
 
 To run the notebook on Graphcore IPU hardware on Paperspace:
 
-[![Run on Gradient](https://assets.paperspace.io/img/gradient-badge.svg)](https://ipu.dev/ipobmC)
+[![Run on Gradient](https://assets.paperspace.io/img/gradient-badge.svg)](https://ipu.dev/YX0jlK)
 
 ### For DFT teaching and learning: nanoDFT
 
@@ -40,7 +40,7 @@ We also provide a lightweight implementation of the SCF algorithm, optimized for
 
 To run the notebook on Graphcore IPU hardware on Paperspace:
 
-[![Run on Gradient](https://assets.paperspace.io/img/gradient-badge.svg)](https://ipu.dev/YX0jlK)
+[![Run on Gradient](https://assets.paperspace.io/img/gradient-badge.svg)](https://ipu.dev/ipobmC)
 
 
 
