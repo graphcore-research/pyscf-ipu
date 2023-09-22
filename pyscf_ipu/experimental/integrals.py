@@ -6,14 +6,14 @@ from typing import Callable
 
 import jax.numpy as jnp
 import numpy as np
-from jax import lax, vmap, jit, tree_map
+from jax import jit, lax, tree_map, vmap
 from jax.ops import segment_sum
 from jax.scipy.special import gammainc, gammaln
 
 from .basis import Basis
 from .orbital import batch_orbitals
 from .primitive import Primitive, product
-from .types import IntN, FloatN, FloatNxN, Float3, FloatNx3
+from .types import Float3, FloatN, FloatNx3, FloatNxN, IntN
 
 # Maximum value an individual component of the angular momentum lmn can take
 # Used for static ahead-of-time compilation of functions involving lmn.
