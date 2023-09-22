@@ -21,6 +21,7 @@ from pyscf_ipu.experimental.integrals import (
 from pyscf_ipu.experimental.interop import to_pyscf
 from pyscf_ipu.experimental.nuclear_gradients import (
     grad_kinetic_basis,
+    grad_nuclear_basis,
     grad_overlap_basis,
 )
 from pyscf_ipu.experimental.primitive import Primitive
@@ -217,6 +218,7 @@ def test_water_eri(sparse):
     actual = eri_basis_sparse(basis) if sparse else eri_basis(basis)
     aosym = "s8" if sparse else "s1"
     expect = to_pyscf(h2o, basis_name=basis_name).intor("int2e_cart", aosym=aosym)
+    print("max |actual - expect|  ={}", np.max(np.abs(actual - expect)))
     assert_allclose(actual, expect, atol=1e-4)
 
 
@@ -271,4 +273,8 @@ def test_nuclear_gradients(basis_name):
 
     actual = grad_kinetic_basis(basis)
     expect = scfmol.intor("int1e_ipkin_cart", comp=3)
+    assert_allclose(actual, expect, atol=1e-6)
+
+    actual = grad_nuclear_basis(basis)
+    expect = scfmol.intor("int1e_ipnuc_cart", comp=3)
     assert_allclose(actual, expect, atol=1e-6)
