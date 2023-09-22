@@ -1,38 +1,26 @@
 repos:
-  - repo: https://github.com/PyCQA/flake8
-    rev: 6.0.0
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
     hooks:
-      - id: flake8
-        name: Copyright Check
-        args: [--select=C]
-        additional_dependencies: [flake8-copyright]
-
-repos:
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.3.0
-    hooks:
-      - id: end-of-file-fixer
+    -   id: end-of-file-fixer
         files: (^pyscf_ipu/experimental/)|(^test/)
-      - id: trailing-whitespace
+    -   id: trailing-whitespace
         files: (^pyscf_ipu/experimental/)|(^test/)
-
-  - repo: https://github.com/psf/black
-    rev: 22.12.0
+-   repo: https://github.com/psf/black
+    rev: 23.9.1
     hooks:
-      - id: black-jupyter
+    -   id: black-jupyter
         files: (^pyscf_ipu/experimental/)|(^test/)
         name: Format code
-
-  - repo: https://github.com/pycqa/isort
+-   repo: https://github.com/pycqa/isort
     rev: 5.12.0
     hooks:
-      - id: isort
+    -   id: isort
         files: (^pyscf_ipu/experimental/)|(^test/)
         name: Sort imports
-
-  - repo: https://github.com/PyCQA/flake8
-    rev: 6.0.0
+-   repo: https://github.com/PyCQA/flake8
+    rev: 6.1.0
     hooks:
-      - id: flake8
+    -   id: flake8
         files: (^pyscf_ipu/experimental/)|(^test/)
         name: Check PEP8
