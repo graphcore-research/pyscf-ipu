@@ -27,3 +27,11 @@ repos:
     -   id: flake8
         files: (^pyscf_ipu/experimental/)|(^test/)
         name: Check PEP8
+
+-   repo: https://github.com/PyCQA/flake8
+    rev: 6.1.0
+    hooks:
+      - id: flake8
+        args: [--select=C]
+        additional_dependencies: [flake8-copyright]
+        name: copyright check
