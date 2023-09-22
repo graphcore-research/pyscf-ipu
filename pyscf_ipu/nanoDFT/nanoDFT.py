@@ -39,8 +39,8 @@ def energy(density_matrix, H_core, diff_JK, E_xc, E_nuc, _np=jax.numpy):
 
 def nanoDFT_iteration(i, vals, opts, mol):
     """Each call updates density_matrix attempting to minimize energy(density_matrix, ... ). """
-    density_matrix, V_xc, diff_JK, O, H_core, L_inv                 = vals[:6]                  # All (N, N) matrices
-    E_nuc, occupancy, ERI, grid_weights, grid_AO, diis_history, log = vals[6:]                  # Varying types/shapes.
+    density_matrix, V_xc, diff_JK, O, H_core, L_inv, prev_eigvects   = vals[:7]                  # All (N, N) matrices
+    E_nuc, occupancy, ERI, grid_weights, grid_AO, diis_history, log  = vals[7:]                  # Varying types/shapes.
 
     if opts.v: 
         print("---------- MEMORY CONSUMPTION ----------")
@@ -66,10 +66,14 @@ def nanoDFT_iteration(i, vals, opts, mol):
     if opts.diis: H, diis_history = DIIS(i, H, density_matrix, O, diis_history, opts)           # H_{i+1}=c_1H_i+...+c9H_{i-9}.
 
     # Step 2: Solve eigh (L_inv turns generalized eigh into eigh).
-    eigvects = L_inv.T @ linalg_eigh(L_inv @ H @ L_inv.T, opts)[1]                              # (N, N)
+    linalg_input = L_inv @ H @ L_inv.T
+    linalg_input_similar =  prev_eigvects.T @ linalg_input @ prev_eigvects
+    eigvects_similar = linalg_eigh(linalg_input_similar, opts)[1]                               # (N, N)
+    eigvects =  prev_eigvects @ eigvects_similar
+    generalized_eigvects = L_inv.T @ eigvects
 
     # Step 3: Use result from eigenproblem to update density_matrix.
-    density_matrix = (eigvects*occupancy*2) @ eigvects.T                                        # (N, N)
+    density_matrix = (generalized_eigvects*occupancy*2) @ generalized_eigvects.T                                        # (N, N)
     E_xc, V_xc     = exchange_correlation(density_matrix, grid_AO, grid_weights)                # float (N, N)
     diff_JK        = get_JK(density_matrix, ERI, opts.dense_ERI, opts.backend)                  # (N, N) (N, N)
 
@@ -80,8 +84,9 @@ def nanoDFT_iteration(i, vals, opts, mol):
     log["matrices"] = jax.lax.dynamic_update_slice(log["matrices"], diff_JK.       reshape(1, 1, N, N), (i, 1, 0, 0))
     log["matrices"] = jax.lax.dynamic_update_slice(log["matrices"], H.             reshape(1, 1, N, N), (i, 2, 0, 0))
     log["energy"]   = log["energy"].at[i].set(energy(density_matrix, H_core, diff_JK, E_xc, E_nuc))  # (iterations, 6)
+    log["eigenvectors"] = log["eigenvectors"].at[i].set(eigvects)
 
-    return [density_matrix, V_xc, diff_JK, O, H_core, L_inv, E_nuc, occupancy, ERI, grid_weights, grid_AO, diis_history, log]
+    return [density_matrix, V_xc, diff_JK, O, H_core, L_inv, eigvects, E_nuc, occupancy, ERI, grid_weights, grid_AO, diis_history, log]
 
 def exchange_correlation(density_matrix, grid_AO, grid_weights):
     """Compute exchange correlation integral using atomic orbitals (AO) evalauted on a grid. """
@@ -132,13 +137,14 @@ def _nanoDFT(state, ERI, grid_AO, grid_weights, opts, mol):
 
     # Log matrices from all DFT iterations (not used by DFT algorithm).
     N = H_core.shape[0]
-    log = {"matrices": np.zeros((opts.its, 4, N, N)), "E_xc": np.zeros((opts.its)), "energy": np.zeros((opts.its, 5))}
+    log = {"matrices": np.zeros((opts.its, 4, N, N)), "E_xc": np.zeros((opts.its)), "energy": np.zeros((opts.its, 5)), "eigenvectors" : np.zeros((opts.its, N, N))}
 
     # Perform DFT iterations.
-    log = jax.lax.fori_loop(0, opts.its, partial(nanoDFT_iteration, opts=opts, mol=mol), [state.density_matrix, V_xc, diff_JK, state.O, H_core, state.L_inv,  # all (N, N) matrices
+    eigvects = np.eye(N)
+    log = jax.lax.fori_loop(0, opts.its, partial(nanoDFT_iteration, opts=opts, mol=mol), [state.density_matrix, V_xc, diff_JK, state.O, H_core, state.L_inv, eigvects, # all (N, N) matrices
                                                             state.E_nuc, state.mask, ERI, grid_weights, grid_AO, state.diis_history, log])[-1]
 
-    return log["matrices"], H_core, log["energy"]
+    return log["matrices"], H_core, log["energy"], log["eigenvectors"]
 
 
 FloatN = Float[Array, "N"]
@@ -293,7 +299,17 @@ def nanoDFT(mol, opts):
                         axis_name="p")
     print(grid_AO.shape, grid_weights.shape)
     vals = jitted_nanoDFT(state, ERI, grid_AO, grid_weights)
-    logged_matrices, H_core, logged_energies = [np.asarray(a[0]).astype(np.float64) for a in vals] # Ensure CPU
+    logged_matrices, H_core, logged_energies, eigenvectors = [np.asarray(a[0]).astype(np.float64) for a in vals] # Ensure CPU
+
+    if opts.visualise_eigvects:
+        import os
+        tmp_dir_name = "./_tmp_eigvects"
+        os.makedirs(tmp_dir_name, exist_ok=True)
+        for i, ev in enumerate(eigenvectors):
+            ev[np.abs(ev)<1e-5]=0
+            np.save("{}/eigvect{}".format(tmp_dir_name, i), ev)
+        from utils import visualise_animated_eigvects
+        visualise_animated_eigvects(tmp_dir_name, opts.its)
 
     # It's cheap to compute energy/hlgap on CPU in float64 from the logged values/matrices.
     logged_E_xc = logged_energies[:, 3].copy()
@@ -350,7 +366,7 @@ def linalg_eigh(x, opts):
             x = jnp.pad(x, [(0, 1), (0, 1)], mode='constant')
             #assert False 
 
-        eigvects, eigvals = ipu_eigh(x, sort_eigenvalues=True, num_iters=12)
+        eigvects, eigvals = ipu_eigh(x, sort_eigenvalues=True, num_iters=opts.ipu_eigh_its)
 
         if pad:
             e1 = eigvects[-1:]
@@ -520,6 +536,7 @@ def build_mol(mol_str, basis_name):
 
 def nanoDFT_options(
         its: int = 20,
+        ipu_eigh_its: int = 12,
         mol_str: str = "benzene",
         float32: bool = False,
         basis: str = "sto-3g",
@@ -538,7 +555,8 @@ def nanoDFT_options(
         ndevices: int = 1, 
         dense_ERI: bool = False,        
         v: bool = False, # verbose 
-        profile: bool = False # if we only want profile exit after IPU finishes. 
+        profile: bool = False, # if we only want profile exit after IPU finishes.
+        visualise_eigvects: bool = False
 ):
     """
     nanoDFT

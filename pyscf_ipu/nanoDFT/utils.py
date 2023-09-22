@@ -143,3 +143,26 @@ def min_interatomic_distance(mol_str):
     coords = map(itemgetter(1), mol_str) 
     distances = map(lambda x: np.linalg.norm(np.array(x[0]) - np.array(x[1])), combinations(coords, 2))
     return min(distances)
+
+import matplotlib.pyplot as plt
+import imageio
+
+def visualise_animated_eigvects(dir_name: str, iterations: int):
+    # Initialize list to store images
+    images = []
+    # Loop through each file to create frames
+    for i in range(iterations):  # Assuming you have files iter0, iter1, ..., iter19
+        file_dir_name = f'{dir_name}/eigvect{i}.npy'
+        data = np.load(file_dir_name)
+
+        plt.imshow(data, cmap='viridis', animated=True)
+        plt.title(f'Iteration {i}')
+        plt.colorbar()
+
+        # Capture the current figure as an image
+        plt.savefig(f'{dir_name}/temp.png')
+        images.append(imageio.imread(f'{dir_name}/temp.png'))
+        plt.clf()
+
+    # Create animated gif
+    imageio.mimsave(f'animated_eigvects.gif', images, duration=0.5, loop=0)
