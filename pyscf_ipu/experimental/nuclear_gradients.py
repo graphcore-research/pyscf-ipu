@@ -1,12 +1,13 @@
 # Copyright (c) 2023 Graphcore Ltd. All rights reserved.
-from typing import Callable
 from functools import partial
+from typing import Callable
+
 import jax.numpy as jnp
 from jax import jit, tree_map, vmap
 from jax.ops import segment_sum
 
 from .basis import Basis
-from .integrals import _overlap_primitives, _kinetic_primitives
+from .integrals import _kinetic_primitives, _overlap_primitives
 from .orbital import batch_orbitals
 from .primitive import Primitive
 from .types import Float3, Float3xNxN
