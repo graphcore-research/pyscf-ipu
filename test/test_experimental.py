@@ -20,7 +20,7 @@ from pyscf_ipu.experimental.integrals import (
 )
 from pyscf_ipu.experimental.mesh import electron_density, uniform_mesh
 from pyscf_ipu.experimental.primitive import Primitive
-from pyscf_ipu.experimental.structure import to_pyscf, molecule
+from pyscf_ipu.experimental.structure import molecule, to_pyscf
 
 
 @pytest.mark.parametrize("basis_name", ["sto-3g", "6-31g**"])

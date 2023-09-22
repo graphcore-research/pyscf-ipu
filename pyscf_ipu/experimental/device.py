@@ -1,5 +1,6 @@
 # Copyright (c) 2023 Graphcore Ltd. All rights reserved.
 from functools import partial, wraps
+
 import numpy as np
 from jax import devices, jit
 

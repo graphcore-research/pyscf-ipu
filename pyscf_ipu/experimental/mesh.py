@@ -1,8 +1,10 @@
 # Copyright (c) 2023 Graphcore Ltd. All rights reserved.
-from typing import Union, Tuple, Optional
+from typing import Optional, Tuple, Union
+
 import jax.numpy as jnp
+
 from .basis import Basis
-from .types import FloatNx3, FloatN, FloatNxN
+from .types import FloatN, FloatNx3, FloatNxN
 
 
 def uniform_mesh(

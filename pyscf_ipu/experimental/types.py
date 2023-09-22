@@ -1,6 +1,5 @@
 # Copyright (c) 2023 Graphcore Ltd. All rights reserved.
-from jaxtyping import Float, Int, Array
-
+from jaxtyping import Array, Float, Int
 
 Float3 = Float[Array, "3"]
 FloatNx3 = Float[Array, "N 3"]
