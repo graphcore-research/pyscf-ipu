@@ -41,7 +41,7 @@ def grad_primitive_integral(
     t1 = 2 * a.alpha * vmap(primitive_op, (0, None))(lhs_p1, b)
 
     lhs_m1 = vmap(a.offset_lmn, (0, None))(axes, -1)
-    t2 = jnp.maximum(a.lmn, 0) * vmap(primitive_op, (0, None))(lhs_m1, b)
+    t2 = a.lmn * vmap(primitive_op, (0, None))(lhs_m1, b)
     grad_out = t1 - t2
     return grad_out
 
@@ -73,7 +73,6 @@ def grad_integrate(basis: Basis, primitive_op: Callable) -> Float3xNxN:
     out = out.reshape(3, basis.num_primitives, basis.num_primitives)
     out = segment_sum(jnp.rollaxis(out, 1), orbital_index)
     out = segment_sum(jnp.rollaxis(out, -1), orbital_index)
-
     return jnp.rollaxis(out, -1)
 
 
