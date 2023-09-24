@@ -218,7 +218,6 @@ def test_water_eri(sparse):
     actual = eri_basis_sparse(basis) if sparse else eri_basis(basis)
     aosym = "s8" if sparse else "s1"
     expect = to_pyscf(h2o, basis_name=basis_name).intor("int2e_cart", aosym=aosym)
-    print("max |actual - expect|  ={}", np.max(np.abs(actual - expect)))
     assert_allclose(actual, expect, atol=1e-4)
 
 
