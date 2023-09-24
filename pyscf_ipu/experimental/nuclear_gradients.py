@@ -46,6 +46,50 @@ def grad_primitive_integral(
     return grad_out
 
 
+def grad_overlap_primitives(a: Primitive, b: Primitive) -> Float3:
+    """Evaluate the gradient of the overlap integral between primitives a and b. The
+    gradient is with respect to a.center.
+
+    Args:
+        a (Primitive): left hand side of the overlap integral.
+        b (Primitive): right hand side of the overlap integral.
+
+    Returns:
+        Float3: Gradient of the overlap integral with respect to cartesian axes.
+    """
+    return grad_primitive_integral(_overlap_primitives, a, b)
+
+
+def grad_kinetic_primitives(a: Primitive, b: Primitive) -> Float3:
+    """Evaluate the gradient of the kinetic energy integral between primitives a and b.
+    The gradient is with respect to a.center.
+
+    Args:
+        a (Primitive): left hand side of the kinetic energy integral.
+        b (Primitive): right hand side of the kinetic energy integral.
+
+    Returns:
+        Float3: Gradient of the kinetic energy integral with respect to cartesian axes.
+    """
+    return grad_primitive_integral(_kinetic_primitives, a, b)
+
+
+def grad_nuclear_primitives(a: Primitive, b: Primitive, c: Float3) -> Float3:
+    """Evaluate the gradient of the nuclear attraction integral between primitives a and
+    b, and the nuclear potential centered on c. Gradient is with respect to a.center.
+
+    Args:
+        a (Primitive): left hand side of the nuclear attraction integral.
+        b (Primitive): right hand side of the nuclear attraction integral.
+        c (Float3): center for the nuclear attraction potential 1/(r - c)
+
+    Returns:
+        Float3: Gradient of the nuclear attraction integral with respect to cartesian
+        axes
+    """
+    return grad_primitive_integral(partial(_nuclear_primitives, c=c), a, b)
+
+
 def grad_integrate(basis: Basis, primitive_op: Callable) -> Float3xNxN:
     """gradient of a one-electron integral over the basis set of atomic orbitals.
 
@@ -55,7 +99,7 @@ def grad_integrate(basis: Basis, primitive_op: Callable) -> Float3xNxN:
 
     Returns:
         Float3xNxN: Gradient of the integral with respect to cartesian axes evaluated
-            over the NxN combinations of atomic orbitals.
+        over the NxN combinations of atomic orbitals.
     """
 
     def take_primitives(indices):
@@ -76,18 +120,43 @@ def grad_integrate(basis: Basis, primitive_op: Callable) -> Float3xNxN:
     return jnp.rollaxis(out, -1)
 
 
-grad_overlap_primitives = partial(grad_primitive_integral, _overlap_primitives)
-grad_kinetic_primitives = partial(grad_primitive_integral, _kinetic_primitives)
+def grad_overlap_basis(basis: Basis) -> Float3xNxN:
+    """gradient of the overlap integral over the basis set of atomic orbitals
 
-grad_overlap_basis = partial(grad_integrate, primitive_op=grad_overlap_primitives)
-grad_kinetic_basis = partial(grad_integrate, primitive_op=grad_kinetic_primitives)
+    Args:
+        basis (Basis): basis set of N atomic orbitals
+
+    Returns:
+        Float3xNxN: Gradient of the overlap integral with respect to cartesian axes
+        evaluated over the NxN combinations of atomic orbitals.
+    """
+    return grad_integrate(basis, grad_overlap_primitives)
 
 
-def grad_nuclear_primitives(a: Primitive, b: Primitive, c: Float3) -> Float3:
-    return grad_primitive_integral(partial(_nuclear_primitives, c=c), a, b)
+def grad_kinetic_basis(basis: Basis) -> Float3xNxN:
+    """gradient of the kinetic energy integral over the basis set of atomic orbitals
+
+    Args:
+        basis (Basis): basis set of N atomic orbitals
+
+    Returns:
+        Float3xNxN: Gradient of the kinetic energy integral with respect to cartesian
+        axes evaluated over the NxN combinations of atomic orbitals.
+    """
+    return grad_integrate(basis, grad_kinetic_primitives)
 
 
-def grad_nuclear_basis(basis: Basis):
+def grad_nuclear_basis(basis: Basis) -> Float3xNxN:
+    """gradient of the nuclear attraction integral over the basis set of atomic orbitals
+
+    Args:
+        basis (Basis): basis set of N atomic orbitals
+
+    Returns:
+        Float3xNxN: Gradient of the nuclear attraction integral with respect to
+        cartesian axes evaluated over the NxN combinations of atomic orbitals.
+    """
+
     def nuclear(c, z):
         op = partial(grad_nuclear_primitives, c=c)
         return z * grad_integrate(basis, op)
