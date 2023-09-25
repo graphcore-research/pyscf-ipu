@@ -34,7 +34,7 @@ def main():
     # sparse
     A_idxs = jnp.nonzero(A)
     A_vals = A[A_idxs] # (100,)
-    A_idxs = jnp.asarray(A_idxs, dtype=jnp.int16) # (3,100)
+    A_idxs = jnp.asarray(A_idxs, dtype=jnp.int32) # (3,100)
 
     # grid_AO_dm = sharded_grid_AO[0] @ density_matrix
     # dense
@@ -43,6 +43,7 @@ def main():
     s = A_idxs[0]==0
     A0_sp = (A_idxs[:,s][1:], A_vals[s]) # ( (2,27), (27,) )
     sp_A0B_mm = _sp_mm(A=A0_sp, B=B, shape=A.shape[1])
+    # compare 
     print(f"{A0B_mm=}")
     print(f"{sp_A0B_mm=}")
     different = jnp.where(sp_A0B_mm!=A0B_mm)
