@@ -1,3 +1,4 @@
+// Copyright (c) 2023 Graphcore Ltd. All rights reserved.
 
 #ifdef __cplusplus
 extern "C" {
@@ -6,8 +7,6 @@ extern "C" {
 
 #include <stdlib.h>
 #include <math.h>
-
-
 
 
 #define CINT_VERSION            6.0.0
@@ -824,8 +823,41 @@ FINT CINT1e_loop(double *gctr, CINTEnvVars *envs, double *cache, FINT int1e_type
         MALLOC_INSTACK(log_maxci, i_prim+j_prim);
         MALLOC_INSTACK(pdata_base, i_prim*j_prim);
         log_maxcj = log_maxci + i_prim;
+
+
+        //#ifdef __cplusplus
+        //void CINTOpt_log_max_pgto_coeff(double *log_maxc, double *coeff, FINT nprim, FINT nctr);
+        /*FINT __i, __ip;
+        double maxc;
+        for (__ip = 0; __ip < i_prim; __ip++) {
+                maxc = 0;
+                for (__i = 0; __i < i_ctr; __i++) {
+                        maxc = MAX(maxc, fabs(ci[__i*i_prim+__ip]));
+                }
+                log_maxci[__ip] = approx_log(maxc);
+        }*/
+
+        /*for (__ip = 0; __ip < j_prim; __ip++) {
+                maxc = 0;
+                for (__i = 0; __i < j_ctr; __i++) {
+                        maxc = MAX(maxc, fabs(cj[__i*j_prim+__ip]));
+                }
+                log_maxcj[__ip] = approx_log(maxc);
+        }*/
+
+        //CINTOpt_log_max_pgto_coeff(log_maxcj, cj, j_prim, j_ctr);
+
+        //#else
+
+        //#endif
+
         CINTOpt_log_max_pgto_coeff(log_maxci, ci, i_prim, i_ctr);
         CINTOpt_log_max_pgto_coeff(log_maxcj, cj, j_prim, j_ctr);
+
+
+
+
+
         if (CINTset_pairdata(pdata_base, ai, aj, envs->ri, envs->rj,
                              log_maxci, log_maxcj, envs->li_ceil, envs->lj_ceil,
                              i_prim, j_prim, SQUARE(envs->rirj), expcutoff, env)) {
@@ -8277,13 +8309,13 @@ int CINTsr_rys_polyfits(int nroots, double x, double lower, double *u, double *w
 int CINTrys_schmidt(int nroots, double x, double lower, double *roots, double *weights);
 int CINTlrys_schmidt(int nroots, double x, double lower, double *roots, double *weights);
 int CINTrys_laguerre(int n, double x, double lower, double *roots, double *weights);
-int CINTlrys_laguerre(int n, double x, double lower, double *roots, double *weights) {};
-int CINTrys_jacobi(int n, double x, double lower, double *roots, double *weights){}
-int CINTlrys_jacobi(int n, double x, double lower, double *roots, double *weights){}
+int CINTlrys_laguerre(int n, double x, double lower, double *roots, double *weights) {return 0; };
+int CINTrys_jacobi(int n, double x, double lower, double *roots, double *weights){ return 0; }
+int CINTlrys_jacobi(int n, double x, double lower, double *roots, double *weights){ return 0; }
 #ifdef HAVE_QUADMATH_H
-int CINTqrys_schmidt(int nroots, double x, double lower, double *roots, double *weights) {};
-int CINTqrys_laguerre(int n, double x, double lower, double *roots, double *weights){};
-int CINTqrys_jacobi(int n, double x, double lower, double *roots, double *weights){};
+int CINTqrys_schmidt(int nroots, double x, double lower, double *roots, double *weights) {return 0; };
+int CINTqrys_laguerre(int n, double x, double lower, double *roots, double *weights){return 0;};
+int CINTqrys_jacobi(int n, double x, double lower, double *roots, double *weights){return 0; };
 #else
 #define CINTqrys_schmidt        CINTlrys_schmidt
 #define CINTqrys_laguerre       CINTlrys_laguerre
@@ -26175,7 +26207,7 @@ typedef int QuadratureFunction(int n, double x, double lower, double *roots, dou
 #define CINTqrys_jacobi         CINTlrys_jacobi
 #endif
 
-int _CINT_polynomial_roots(double *roots, double *cs, int nroots){}
+int _CINT_polynomial_roots(double *roots, double *cs, int nroots){return 0;}
 
 static int segment_solve(int n, double x, double lower, double *u, double *w,
                          double breakpoint, QuadratureFunction fn1, QuadratureFunction fn2)
@@ -28070,8 +28102,8 @@ int CINTlrys_schmidt(int nroots, double x, double lower, double *roots, double *
 
 
 
-#define MAX(I,J)        ((I) > (J) ? (I) : (J))
-#define MIN(I,J)        ((I) < (J) ? (I) : (J))
+//#define MAX(I,J)        ((I) > (J) ? (I) : (J))
+//#define MIN(I,J)        ((I) < (J) ? (I) : (J))
 
 int GTOmax_shell_dim(const int *ao_loc, const int *shls_slice, int ncenter)
 {
@@ -28627,7 +28659,11 @@ void GTOnr2e_fill_drv(int (*intor)(), void (*fill)(), int (*fprescreen)(),
 #endif
 {
         if (fprescreen == NULL) {
+                #ifdef __cplusplus
+                fprescreen = (int (*)(...))no_prescreen;
+                #else
                 fprescreen = no_prescreen;
+                #endif
         }
 
         const int ish0 = shls_slice[0];

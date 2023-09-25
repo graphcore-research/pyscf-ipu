@@ -1,3 +1,4 @@
+# Copyright (c) 2023 Graphcore Ltd. All rights reserved.
 import pyscf
 import numpy as np 
 import ctypes
@@ -53,6 +54,7 @@ def getints2c(intor_name, N, atm, bas, env, shls_slice=None, comp=1, hermi=0,
     cintopt = None 
 
     fn = getattr(libcgto, drv_name)
+    print(intor_name)
     fn(getattr(libcgto, intor_name), mat.ctypes.data_as(ctypes.c_void_p),
         ctypes.c_int(comp), ctypes.c_int(hermi),
         (ctypes.c_int*4)(*(shls_slice[:4])),
@@ -85,7 +87,7 @@ us         = intor1e(mol, 'int1e_ovlp', N, 1)             # (N,N)
 print(np.max(np.abs(truth-us)))
 assert np.allclose(truth, us)
 
-print("one electron backward ")
+print("\none electron backward ")
 truth = - mol.intor('int1e_ipovlp', comp=3)
 us = -intor1e(mol,'int1e_ipovlp', N, comp=3)
 print(np.max(np.abs(truth-us)))
@@ -109,6 +111,7 @@ assert np.allclose(truth, us)
 
 def getints4c(intor_name, atm, bas, env, N, shls_slice=None, comp=1,
               aosym='s1', ao_loc=None, cintopt=None, out=None):
+    print(intor_name)
     c_atm = atm.ctypes.data_as(ctypes.c_void_p)
     c_bas = bas.ctypes.data_as(ctypes.c_void_p)
     c_env = env.ctypes.data_as(ctypes.c_void_p)
@@ -141,7 +144,6 @@ def intor(self, intor, N, comp=None, hermi=0, aosym='s1', out=None, shls_slice=N
 
 truth = mol.intor("int2e_sph")
 us = intor(mol, "int2e_sph", N, 1)
-print(truth.shape, us.shape)
 
 print(np.max(np.abs(truth-us)))
 assert np.allclose(truth, us )
@@ -151,17 +153,8 @@ us = intor(mol, "int2e_ip1_sph", N, 3)
 print(np.max(np.abs(truth-us)))
 assert np.allclose(truth, us )
 
-
 print("PASSED")
 
-
-
-
-
-
-exit()
-
-input()
 
 from functools import partial
 import os.path as osp
