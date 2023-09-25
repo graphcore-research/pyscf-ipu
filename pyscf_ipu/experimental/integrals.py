@@ -24,11 +24,20 @@ Special functions used in integral evaluation
 """
 
 
-def factorial(n: IntN, nmax: int = LMAX) -> IntN:
+def factorial_fori(n: IntN, nmax: int = LMAX) -> IntN:
     def body_fun(i, val):
         return val * jnp.where(i <= n, i, 1)
 
     return lax.fori_loop(1, nmax + 1, body_fun, jnp.ones_like(n))
+
+
+def factorial_gamma(n: IntN) -> IntN:
+    from jax.scipy.special import gammaln
+
+    return jnp.exp(gammaln(n + 1))
+
+
+factorial = factorial_fori
 
 
 def factorial2(n: IntN, nmax: int = 2 * LMAX) -> IntN:
