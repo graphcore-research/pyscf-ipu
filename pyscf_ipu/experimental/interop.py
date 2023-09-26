@@ -12,11 +12,9 @@ from .structure import Structure
 def to_pyscf(
     structure: Structure, basis_name: str = "sto-3g", unit: str = "Bohr"
 ) -> "gto.Mole":
+    position = np.asarray(structure.position)
     mol = gto.Mole(unit=unit, spin=structure.num_electrons % 2, cart=True)
-    mol.atom = [
-        (symbol, pos)
-        for symbol, pos in zip(structure.atomic_symbol, structure.position)
-    ]
+    mol.atom = [(symbol, pos) for symbol, pos in zip(structure.atomic_symbol, position)]
     mol.basis = basis_name
     mol.build(unit=unit)
     return mol

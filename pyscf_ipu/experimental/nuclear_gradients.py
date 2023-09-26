@@ -35,7 +35,6 @@ def grad_primitive_integral(
     Returns:
         Float3: Gradient of the integral with respect to cartesian axes.
     """
-
     t1 = [primitive_op(a.offset_lmn(ax, 1), b) for ax in range(3)]
     t2 = [primitive_op(a.offset_lmn(ax, -1), b) for ax in range(3)]
     grad_out = 2 * a.alpha * jnp.stack(t1) - a.lmn * jnp.stack(t2)
