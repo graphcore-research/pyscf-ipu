@@ -130,7 +130,7 @@ def sparse_symmetric_einsum(nonzero_distinct_ERI, nonzero_indices, dm, backend):
         return diff_JK
 
     diff_JK = jax.lax.fori_loop(0, 16, iteration, diff_JK) 
-    return diff_JK #jax.lax.psum(diff_JK, axis_name="p")
+    return jax.lax.psum(diff_JK, axis_name="p")
 
 
 
@@ -266,7 +266,7 @@ def compute_eri(mol):
 
     return all_outputs, all_indices, ao_loc
 
-def compute_diff_jk(mol, dm, backend):
+def compute_diff_jk(dm, mol, nprog, nbatch, backend):
     dm = dm.reshape(-1)
     diff_JK = jnp.zeros(dm.shape)
     N = int(np.sqrt(dm.shape[0])) 
@@ -337,23 +337,35 @@ def compute_diff_jk(mol, dm, backend):
             comp_distinct_idx_list[comp_list_index] = block_idx.reshape(-1, 4)
             comp_do_list[comp_list_index] = block_do
             comp_list_index += 1
-            
-            
-    comp_distinct_ERI = jnp.concatenate([eri.reshape(-1) for eri in all_eris]).reshape(1, -1)
-    comp_distinct_idx = np.concatenate(comp_distinct_idx_list).reshape(1, -1, 4)
-    comp_do = np.concatenate(comp_do_list).reshape(1, -1)
+    
+    
+    comp_distinct_idx = np.concatenate(comp_distinct_idx_list)
+    comp_do = np.concatenate(comp_do_list)
+    
+    remainder = comp_distinct_idx.shape[0] % (nprog*nbatch)
 
+    if remainder != 0:
+        print('padding', remainder, nprog*nbatch-remainder, comp_distinct_idx.shape)
+        comp_distinct_idx = np.pad(comp_distinct_idx, ((0, nprog*nbatch-remainder), (0, 0)))
+        comp_do = np.pad(comp_do, ((0, nprog*nbatch-remainder)))
+        all_eris.append(jnp.zeros((nprog*nbatch-remainder), dtype=jnp.float32))
+    
+    comp_distinct_ERI = jnp.concatenate([eri.reshape(-1) for eri in all_eris]).reshape(nprog, nbatch, -1)
+    comp_distinct_idx = comp_distinct_idx.reshape(nprog, nbatch, -1, 4)
+    comp_do = comp_do.reshape(nprog, nbatch, -1)
     comp_distinct_ERI *= comp_do
 
     print('comp_distinct_ERI.shape', comp_distinct_ERI.shape)
     print('comp_distinct_idx.shape', comp_distinct_idx.shape)
 
-    comp_distinct_idx = jax.lax.bitcast_convert_type(comp_distinct_idx, jnp.float16)
-    
-    drep                      = num_repetitions_fast_4d(comp_distinct_idx[:, :, 0], comp_distinct_idx[:, :, 1], comp_distinct_idx[:, :, 2], comp_distinct_idx[:, :, 3], xnp=jnp, dtype=jnp.uint32)
+    # compute repetitions caused by 8x symmetry when computing from the distinct_ERI form and scale accordingly
+    drep                      = num_repetitions_fast_4d(comp_distinct_idx[:, :, :, 0], comp_distinct_idx[:, :, :, 1], comp_distinct_idx[:, :, :, 2], comp_distinct_idx[:, :, :, 3], xnp=np, dtype=np.uint32)
     comp_distinct_ERI         = comp_distinct_ERI / drep
 
-    diff_JK = diff_JK + sparse_symmetric_einsum(comp_distinct_ERI, comp_distinct_idx, dm, backend) # batches x erivals // batches x ? x 4
+    # int16 storage supported but not slicing; use conversion trick to enable slicing
+    comp_distinct_idx = jax.lax.bitcast_convert_type(comp_distinct_idx, jnp.float16)
+    
+    diff_JK = jax.pmap(sparse_symmetric_einsum, in_axes=(0,0,None,None), static_broadcasted_argnums=(3,), backend=backend, axis_name="p")(comp_distinct_ERI, comp_distinct_idx, dm, backend)
 
     return diff_JK
 
@@ -365,7 +377,7 @@ if __name__ == "__main__":
     parser.add_argument('-natm', default=3),
     parser.add_argument('-test', action="store_true")
     parser.add_argument('-prof', action="store_true")
-    parser.add_argument('-batches', default=5)
+    parser.add_argument('-batches', default=5, type=int)
     parser.add_argument('-nipu', default=16, type=int)
     parser.add_argument('-skip', action="store_true") 
     
@@ -520,6 +532,7 @@ if __name__ == "__main__":
                                     # print('ijkl', _i, _j, _k, _l, 'c', c, '--', comp_distinct_ERI[c], distinct_ERI[c])
                                     assert np.allclose(comp_distinct_ERI[c], distinct_ERI[c], atol=1e-6)
 
+            print(np.max(np.abs(comp_distinct_ERI.reshape(-1) - distinct_ERI.reshape(-1))))
             assert np.allclose(comp_distinct_ERI, distinct_ERI, atol=1e-6)
             print('PASSED distinct == comp_distinct')
 
@@ -597,7 +610,7 @@ if __name__ == "__main__":
     print('distinct_ERI.shape', distinct_ERI.shape)
     print('distinct_idx.shape', distinct_idx.shape)
 
-    diff_JK = jax.jit(compute_diff_jk, backend=backend, static_argnames=['mol', 'backend'])(mol, dm, args.backend)
+    diff_JK = jax.jit(compute_diff_jk, backend=backend, static_argnames=['mol', 'nprog', 'nbatch', 'backend'])(dm, mol, args.nipu, args.batches, args.backend)
     # diff_JK = jax.jit(compute_diff_jk, backend=backend, static_argnames=['mol', 'backend'])(nonzero_distinct_ERI.reshape(1, -1), nonzero_indices.reshape(1, -1, 4), mol, dm, args.backend)
 
     # exit()
