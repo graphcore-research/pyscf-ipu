@@ -145,25 +145,92 @@ def prepare_integrals_2_inputs(mol):
     cpu_output   = np.zeros((num_calls, n_eri), dtype=np.float32)
     output_sizes = np.zeros((num_calls, 5))
 
+    
+    screened_indices_s8_4d = []
+    
+    # sample complete column as pattern seed
+    ERI = mol.intor('int2e_sph')
+    nonzero_seed = ERI[N-1, N-1, :, 0] != 0
+    tolerance = 1e-7
+
+    # print('test:')
+    # for k in range(N):
+    #     for l in range(k+1):
+    #         is_nonzero = ~(nonzero_seed[k] ^ nonzero_seed[l]) # not XOR
+    #         print(is_nonzero, end=' ')
+    #     print()
+    # exit()
+
+    # find max value
+    I_max = 0
+    for a in range(N):
+        for b in range(N):
+            abab      = np.abs(ERI[a,b,a,b])
+            if abab > I_max:
+                I_max = abab
+
+    # collect candidate pairs for s8
+    considered_indices = []
+    for a in range(N):
+        for b in range(a, N):
+            abab = np.abs(ERI[a,b,a,b])
+            if abab*I_max>=tolerance:
+                considered_indices.append((a, b)) # collect candidate pairs for s8
+
+    # generate s8 indices
+    for index, ab in enumerate(considered_indices):
+        a, b = ab
+        for cd in considered_indices[index:]:
+            c, d = cd
+            # if b<=d:
+            ok = True
+            if ~(nonzero_seed[d] ^ nonzero_seed[c]):
+                ok = ~(nonzero_seed[b] ^ nonzero_seed[a])
+            else:
+                ok = (nonzero_seed[b] ^ nonzero_seed[a])
+            if ok:
+                screened_indices_s8_4d.append((d, c, b, a))
+
     # Fill input_ijkl and output_sizes with the necessary indices.
     c = 0
     for i in range(n_bas):
             for j in range(n_bas):
                     for k in range(n_bas):
                             for l in range(n_bas):
-                                    # * 8-fold symmetry, k>=l, k>=i>=j,
-                                    if not ( i >= j and k >= l and i*j >= k * l): continue
-
-                                    input_ijkl[c] = [i, j, k, l]
-
                                     di = ao_loc[i+1] - ao_loc[i]
                                     dj = ao_loc[j+1] - ao_loc[j]
                                     dk = ao_loc[k+1] - ao_loc[k]
                                     dl = ao_loc[l+1] - ao_loc[l]
+                                    skip = True # !!!!
+                                    for ni, nj, nk, nl in screened_indices_s8_4d:
+                                        if ao_loc[i] <= ni and ni < ao_loc[i+1] and \
+                                           ao_loc[j] <= nj and nj < ao_loc[j+1] and \
+                                           ao_loc[k] <= nk and nk < ao_loc[k+1] and \
+                                           ao_loc[l] <= nl and nl < ao_loc[l+1]:
+                                            skip = False
+                                            break
+                                    if skip:
+                                        print('skipping', i, j, k, l, di*dj*dk*dl)
+                                        continue
+                                    # * 8-fold symmetry, k>=l, k>=i>=j,
+                                    # if not ( i >= j and k >= l and i*j >= k * l): continue
+
+                                    
+
+                                    # print('>>>>>', i, j, k, l)
+
+                                    
+
+                                    input_ijkl[c] = [i, j, k, l]
 
                                     output_sizes[c] = [di, dj, dk, dl, di*dj*dk*dl]
 
                                     c += 1
+    print('!!! saved', num_calls - c, 'calls i.e.', num_calls, '-', c)
+    num_calls = c
+    input_ijkl = input_ijkl[:num_calls, :]
+    cpu_output = cpu_output[:num_calls, :]
+    output_sizes = output_sizes[:num_calls, :]
 
     # Prepare IPU inputs.
     # Merge all int/float inputs in seperate arrays.
