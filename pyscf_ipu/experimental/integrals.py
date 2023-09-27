@@ -32,9 +32,12 @@ def factorial_fori(n: IntN, nmax: int = LMAX) -> IntN:
 
 
 def factorial_gamma(n: IntN) -> IntN:
-    from jax.scipy.special import gammaln
+    """Appoximate factorial by evaluating the gamma function in log-space.
 
-    return jnp.exp(gammaln(n + 1))
+    This approximation is exact for small integers (n < 10).
+    """
+    approx = jnp.exp(gammaln(n + 1))
+    return jnp.rint(approx)
 
 
 factorial = factorial_fori
