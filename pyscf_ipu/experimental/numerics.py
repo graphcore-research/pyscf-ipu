@@ -4,6 +4,7 @@ from typing import Callable
 
 import jax.numpy as jnp
 import numpy as np
+from jax.experimental import enable_x64
 from jaxtyping import Array
 
 
@@ -27,10 +28,11 @@ def fpcast(func: Callable, dtype=jnp.float32):
 def compare_fp32_to_fp64(func: Callable):
     @wraps(func)
     def wrapper(*args, **kwargs):
-        outputs_fp32 = fpcast(func, dtype=jnp.float32)(*args, **kwargs)
-        outputs_fp64 = fpcast(func, dtype=jnp.float64)(*args, **kwargs)
-        print_compare(func.__name__, outputs_fp32, outputs_fp64)
-        return outputs_fp32
+        with enable_x64():
+            outputs_fp32 = fpcast(func, dtype=jnp.float32)(*args, **kwargs)
+            outputs_fp64 = fpcast(func, dtype=jnp.float64)(*args, **kwargs)
+            print_compare(func.__name__, outputs_fp32, outputs_fp64)
+            return outputs_fp32
 
     return wrapper
 
