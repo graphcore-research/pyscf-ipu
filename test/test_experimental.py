@@ -18,9 +18,10 @@ from pyscf_ipu.experimental.integrals import (
     overlap_basis,
     overlap_primitives,
 )
+from pyscf_ipu.experimental.interop import to_pyscf
 from pyscf_ipu.experimental.mesh import electron_density, uniform_mesh
 from pyscf_ipu.experimental.primitive import Primitive
-from pyscf_ipu.experimental.structure import molecule, to_pyscf
+from pyscf_ipu.experimental.structure import molecule
 
 
 @pytest.mark.parametrize("basis_name", ["sto-3g", "6-31g**"])
@@ -38,7 +39,7 @@ def test_gto(basis_name):
     # Atomic orbitals
     structure = molecule("water")
     basis = basisset(structure, basis_name)
-    mesh = uniform_mesh()
+    mesh, _ = uniform_mesh()
     actual = basis(mesh)
 
     mol = to_pyscf(structure, basis_name)

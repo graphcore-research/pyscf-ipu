@@ -28,13 +28,20 @@ def uniform_mesh(
     axes = [jnp.linspace(-bi, bi, ni) for bi, ni in zip(b, n)]
     mesh = jnp.stack(jnp.meshgrid(*axes, indexing="ij"), axis=-1)
     mesh = mesh.reshape(-1, ndim)
-    return mesh
+    return mesh, axes
 
 
 def electron_density(
     basis: Basis, mesh: FloatNx3, C: Optional[FloatNxN] = None
 ) -> FloatN:
-    C = jnp.eye(basis.num_orbitals) if C is None else C
-    orbitals = basis(mesh) @ C
+    orbitals = molecular_orbitals(basis, mesh, C)
     density = jnp.sum(basis.occupancy * orbitals * orbitals, axis=-1)
     return density
+
+
+def molecular_orbitals(
+    basis: Basis, mesh: FloatNx3, C: Optional[FloatNxN] = None
+) -> FloatN:
+    C = jnp.eye(basis.num_orbitals) if C is None else C
+    orbitals = basis(mesh) @ C
+    return orbitals
