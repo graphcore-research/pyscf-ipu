@@ -305,14 +305,13 @@ with Timer('Strategy 5'):
     if N % 2 == 0:
         nonzero_seed = ERI[N-1, N-1, :N//2, 0] != 0
         nonzero_seed = np.concatenate([nonzero_seed, np.flip(nonzero_seed)])
-        onzero_seed
     else:
         nonzero_seed = ERI[N-1, N-1, :(N+1)//2, 0] != 0
         nonzero_seed = np.concatenate([nonzero_seed, np.flip(nonzero_seed[:-1])])
     if not np.equal(nonzero_seed, ERI[N-1, N-1, :, 0]).all():
-        print('# --------------------------------------------------------------------------------------------- #')
-        print('# WARNING: Experimental symmetry pattern sample is inconsistent. Result may be wrong ¯\_(ツ)_/¯ #')
-        print('# --------------------------------------------------------------------------------------------- #')
+        print('# -------------------------------------------------------------- #')
+        print('# WARNING: Experimental symmetry pattern sample is inconsistent. #')
+        print('# -------------------------------------------------------------- #')
 
     # print('test:')
     # for k in range(N):
@@ -336,13 +335,7 @@ with Timer('Strategy 5'):
         a, b = ab
         for cd in considered_indices[index:]:
             c, d = cd
-            # if b<=d:
-            ok = True
-            if ~(nonzero_seed[d] ^ nonzero_seed[c]):
-                ok = ~(nonzero_seed[b] ^ nonzero_seed[a])
-            else:
-                ok = (nonzero_seed[b] ^ nonzero_seed[a])
-            if ok:
+            if ~(nonzero_seed[b] ^ nonzero_seed[a]) ^ (nonzero_seed[d] ^ nonzero_seed[c]):
                 screened_indices_s8_4d.append((d, c, b, a))
 
 print('len(considered_indices)', len(considered_indices))
