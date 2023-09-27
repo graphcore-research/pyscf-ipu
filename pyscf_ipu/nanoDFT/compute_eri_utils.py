@@ -147,11 +147,20 @@ def prepare_integrals_2_inputs(mol):
 
     
     screened_indices_s8_4d = []
-    
-    # sample complete column as pattern seed
-    ERI = mol.intor('int2e_sph')
-    nonzero_seed = ERI[N-1, N-1, :, 0] != 0
     tolerance = 1e-7
+    
+    # sample symmetry pattern and do safety check
+    ERI = mol.intor('int2e_sph')
+    if N % 2 == 0:
+        nonzero_seed = ERI[N-1, N-1, :N//2, 0] != 0
+        nonzero_seed = np.concatenate([nonzero_seed, np.flip(nonzero_seed)])
+    else:
+        nonzero_seed = ERI[N-1, N-1, :(N+1)//2, 0] != 0
+        nonzero_seed = np.concatenate([nonzero_seed, np.flip(nonzero_seed[:-1])])
+    if not np.equal(nonzero_seed, ERI[N-1, N-1, :, 0]).all():
+        print('# -------------------------------------------------------------- #')
+        print('# WARNING: Experimental symmetry pattern sample is inconsistent. #')
+        print('# -------------------------------------------------------------- #')
 
     # print('test:')
     # for k in range(N):
@@ -190,6 +199,9 @@ def prepare_integrals_2_inputs(mol):
                 ok = (nonzero_seed[b] ^ nonzero_seed[a])
             if ok:
                 screened_indices_s8_4d.append((d, c, b, a))
+
+    print('n_bas', n_bas)
+    print('ao_loc', ao_loc)
 
     # Fill input_ijkl and output_sizes with the necessary indices.
     c = 0
