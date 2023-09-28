@@ -106,7 +106,7 @@ def get_shapes(input_ijkl, bas):
 
     return len, nf, buflen
 
-def prepare_integrals_2_inputs(mol):
+def prepare_integrals_2_inputs(mol, itol):
     # Shapes/sizes.
     atm, bas, env   = mol._atm, mol._bas, mol._env
     n_atm, n_bas, N = atm.shape[0], bas.shape[0], mol.nao_nr()
@@ -149,8 +149,10 @@ def prepare_integrals_2_inputs(mol):
     screened_indices_s8_4d = []
 
     if USE_TOLERANCE_THRESHOLD:
-        tolerance = 1e-9
-        ERI = mol.intor('int2e_sph')
+        tolerance = itol
+        print('computing ERI s8 to sample N*(N+1)/2 values... ', end='')
+        ERI_s8 = mol.intor('int2e_sph', aosym='s8')
+        print('done')
 
         # sample symmetry pattern and do safety check
         # if N % 2 == 0:
@@ -175,7 +177,9 @@ def prepare_integrals_2_inputs(mol):
         I_max = 0
         tril_idx = np.tril_indices(N)
         for a, b in zip(tril_idx[0], tril_idx[1]):
-            abab = np.abs(ERI[a,b,a,b])
+            index_ab_s8 = a*(a+1)//2 + b
+            index_s8 = index_ab_s8*(index_ab_s8+3)//2
+            abab = np.abs(ERI_s8[index_s8])
             if abab > I_max:
                 I_max = abab
 
@@ -184,7 +188,9 @@ def prepare_integrals_2_inputs(mol):
     tril_idx = np.tril_indices(N)
     for a, b in zip(tril_idx[0], tril_idx[1]):
         if USE_TOLERANCE_THRESHOLD:
-            abab = np.abs(ERI[a,b,a,b])
+            index_ab_s8 = a*(a+1)//2 + b
+            index_s8 = index_ab_s8*(index_ab_s8+3)//2
+            abab = np.abs(ERI_s8[index_s8])
             if abab*I_max>=tolerance**2:
                 considered_indices.append((a, b)) # collect candidate pairs for s8
         else:

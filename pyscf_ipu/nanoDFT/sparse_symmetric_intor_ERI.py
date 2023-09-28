@@ -134,8 +134,8 @@ def sparse_symmetric_einsum(nonzero_distinct_ERI, nonzero_indices, dm, backend):
 
 
 
-def compute_eri(mol):
-    input_floats, input_ints, input_ijkl, shapes, sizes, counts, indxs, indxs_inv, ao_loc = prepare_integrals_2_inputs(mol)
+def compute_eri(mol, itol):
+    input_floats, input_ints, input_ijkl, shapes, sizes, counts, indxs, indxs_inv, ao_loc = prepare_integrals_2_inputs(mol, itol)
 
     # Load vertex using TileJax.
     vertex_filename = osp.join(osp.dirname(__file__), "intor_int2e_sph.cpp")
@@ -266,12 +266,12 @@ def compute_eri(mol):
 
     return all_outputs, all_indices, ao_loc
 
-def compute_diff_jk(dm, mol, nprog, nbatch, backend):
+def compute_diff_jk(dm, mol, nprog, nbatch, itol, backend):
     dm = dm.reshape(-1)
     diff_JK = jnp.zeros(dm.shape)
     N = int(np.sqrt(dm.shape[0])) 
 
-    all_eris, all_indices, ao_loc = compute_eri(mol)
+    all_eris, all_indices, ao_loc = compute_eri(mol, itol)
 
     BLOCK_ERI_SIZE = np.sum(np.array([eri.shape[0] for eri in all_eris]))
 
@@ -380,6 +380,7 @@ if __name__ == "__main__":
     parser.add_argument('-batches', default=5, type=int)
     parser.add_argument('-nipu', default=16, type=int)
     parser.add_argument('-skip', action="store_true") 
+    parser.add_argument('-itol', default=1e-9, type=float)
     
     args = parser.parse_args()
     backend = args.backend 
@@ -583,35 +584,35 @@ if __name__ == "__main__":
     print(nonzero_distinct_ERI.shape)
     print(nonzero_indices.shape)
 
-    distinct_idx = np.zeros((distinct_ERI.shape[0], 4))
-    for c in range(distinct_ERI.shape[0]):
-        c = np.array(c).astype(np.int32)
-        ij, kl = get_i_j(c)
-        i, j = get_i_j(ij)
-        k, l = get_i_j(kl)
-        distinct_idx[c, 0] = i
-        distinct_idx[c, 1] = j
-        distinct_idx[c, 2] = k
-        distinct_idx[c, 3] = l
-    distinct_idx = distinct_idx.reshape(1, -1, 4).astype(np.uint64)
+    # distinct_idx = np.zeros((distinct_ERI.shape[0], 4))
+    # for c in range(distinct_ERI.shape[0]):
+    #     c = np.array(c).astype(np.int32)
+    #     ij, kl = get_i_j(c)
+    #     i, j = get_i_j(ij)
+    #     k, l = get_i_j(kl)
+    #     distinct_idx[c, 0] = i
+    #     distinct_idx[c, 1] = j
+    #     distinct_idx[c, 2] = k
+    #     distinct_idx[c, 3] = l
+    # distinct_idx = distinct_idx.reshape(1, -1, 4).astype(np.uint64)
 
-    distinct_ERI = distinct_ERI.astype(np.float32)
-    # drep                 = num_repetitions_fast_4d(distinct_idx[:, :, 0], distinct_idx[:, :, 1], distinct_idx[:, :, 2], distinct_idx[:, :, 3])
-    # distinct_ERI         = distinct_ERI / drep
-    distinct_ERI = distinct_ERI.reshape(1, -1)
+    # distinct_ERI = distinct_ERI.astype(np.float32)
+    # # drep                 = num_repetitions_fast_4d(distinct_idx[:, :, 0], distinct_idx[:, :, 1], distinct_idx[:, :, 2], distinct_idx[:, :, 3])
+    # # distinct_ERI         = distinct_ERI / drep
+    # distinct_ERI = distinct_ERI.reshape(1, -1)
 
-    # print('distinct_ERI', distinct_ERI)
-    # print('nonzero_distinct_ERI', nonzero_distinct_ERI)
+    # # print('distinct_ERI', distinct_ERI)
+    # # print('nonzero_distinct_ERI', nonzero_distinct_ERI)
 
-    # print('distinct_idx', distinct_idx.reshape(-1, 4))
-    # print('nonzero_indices', nonzero_indices_bk.reshape(-1, 4))
+    # # print('distinct_idx', distinct_idx.reshape(-1, 4))
+    # # print('nonzero_indices', nonzero_indices_bk.reshape(-1, 4))
 
-    distinct_idx = jax.lax.bitcast_convert_type(distinct_idx.astype(np.int16), np.float16)
+    # distinct_idx = jax.lax.bitcast_convert_type(distinct_idx.astype(np.int16), np.float16)
 
-    print('distinct_ERI.shape', distinct_ERI.shape)
-    print('distinct_idx.shape', distinct_idx.shape)
+    # print('distinct_ERI.shape', distinct_ERI.shape)
+    # print('distinct_idx.shape', distinct_idx.shape)
 
-    diff_JK = jax.jit(compute_diff_jk, backend=backend, static_argnames=['mol', 'nprog', 'nbatch', 'backend'])(dm, mol, args.nipu, args.batches, args.backend)
+    diff_JK = jax.jit(compute_diff_jk, backend=backend, static_argnames=['mol', 'nprog', 'nbatch', 'itol', 'backend'])(dm, mol, args.nipu, args.batches, args.itol, args.backend)
     # diff_JK = jax.jit(compute_diff_jk, backend=backend, static_argnames=['mol', 'backend'])(nonzero_distinct_ERI.reshape(1, -1), nonzero_indices.reshape(1, -1, 4), mol, dm, args.backend)
 
     # exit()
