@@ -73,9 +73,9 @@ def reconstruct_ERI(ERI, nonzero_idx, N, sym=True, enhance=False):
 
 # -------------------------------------------------------------- #
 
-natm = 2
-# mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*j} {1.54*i};" for i in range(natm) for j in range(natm))) 
-mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*i} {1.54*i};" for i in range(natm)))
+natm = 3
+mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*j} {1.54*i};" for i in range(natm) for j in range(natm))) 
+# mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*i} {1.54*i};" for i in range(natm)))
 # atype = 'C' if natm % 2 == 0 else 'Mg'
 # mol = pyscf.gto.Mole(atom="".join(f"{atype} 0 {1.54*i} {1.54*i};" for i in range(natm))) 
 
@@ -98,6 +98,8 @@ ERI_patterns = np.zeros((N, N, N, N))
 
 ERI_pattern_errors = np.zeros((N, N, N, N))
 
+ERI_differences = np.zeros((N, N, N, N))
+
 for i in tqdm(range(N)):
     for j in range(N):
         ERI_slice = ERI_nonzeros[i, j, :, :]
@@ -105,13 +107,17 @@ for i in tqdm(range(N)):
         differences = ERI_slice^local_sym_pattern_mat
         ERI_patterns[i, j, :, :] = local_sym_pattern_mat
         ERI_pattern_errors[i, j, :, :] = np.not_equal(differences & local_sym_pattern_mat, differences)
+        ERI_differences[i, j, :, :] = ~differences # invert for consistency (yellow -> nonzero)
         assert np.equal(differences & local_sym_pattern_mat, differences).all()
 print('PASSED: sym_pattern_mat works on this ERI!')
 
-plot4D(ERI_nonzeros, N, 'ERI_dense_nonzeros')
-plot4D(ERI_nonzeros.swapaxes(1,2), N, 'ERI_dense_nonzeros_swap')
-plot4D(ERI_patterns, N, 'ERI_patterns')
-plot4D(ERI_pattern_errors, N, 'ERI_pattern_errors')
+if False:
+    plot4D(ERI_nonzeros, N, 'ERI_dense_nonzeros')
+    plot4D(ERI_nonzeros.swapaxes(1,2), N, 'ERI_dense_nonzeros_swap')
+    plot4D(ERI_patterns, N, 'ERI_patterns')
+    plot4D(ERI_pattern_errors, N, 'ERI_pattern_errors')
+    plot4D(ERI_differences, N, 'ERI_differences')
+    plot4D(ERI_differences.swapaxes(1,2), N, 'ERI_differences_swap')
 
 # plot4D(np.log(np.abs(ERI)+1), N, 'ERI_dense')
 
@@ -153,8 +159,10 @@ tolerance = 1e-9
 # assert np.equal(true_nonzero_indices_4d, test_nonzero_indices).all()
 
 # ERI_s8[np.abs(ERI_s8)<tolerance] = 0
+print('compute s8 nonzeros...')
 true_nonzero_indices_s8 = np.nonzero( ERI_s8.reshape(-1) )[0]
-true_nonzero_indices_s8_4d = [c2ijkl(c) for c in true_nonzero_indices_s8]
+# print('convert s8 nonzeros to 4D...')
+# true_nonzero_indices_s8_4d = [c2ijkl(c) for c in true_nonzero_indices_s8]
 
 print('--------------------------------')
 print('N', N)
@@ -166,7 +174,76 @@ print('--------------------------------')
 
 # -------------------------------------------------------------- #
 # Strategy 0
-with Timer('Strategy 0'):
+if True:
+    with Timer('Strategy 0'):
+        screened_indices_s8_4d = []
+        
+        # sample symmetry pattern and do safety check
+        if N % 2 == 0:
+            nonzero_seed = ERI[N-1, N-1, :N//2, 0] != 0
+            nonzero_seed = np.concatenate([nonzero_seed, np.flip(nonzero_seed)])
+        else:
+            nonzero_seed = ERI[N-1, N-1, :(N+1)//2, 0] != 0
+            nonzero_seed = np.concatenate([nonzero_seed, np.flip(nonzero_seed[:-1])])
+
+        if not np.equal(nonzero_seed, ERI[N-1, N-1, :, 0]!=0).all():
+            print('# -------------------------------------------------------------- #')
+            print('# WARNING: Experimental symmetry pattern sample is inconsistent. #')
+            # print('pred', nonzero_seed)
+            # print('real', ERI[N-1, N-1, :, 0]!=0)
+            print('# -------------------------------------------------------------- #')
+
+        nonzero_seed = sym_pattern.copy()
+        print('forcing sym_pattern')
+
+        ERI_considered = np.zeros((N, N, N, N))
+
+        # collect candidate pairs for s8
+        considered_indices = []
+        tril_idx = np.tril_indices(N)
+        for a, b in zip(tril_idx[0], tril_idx[1]):
+            abab = np.abs(ERI[a,b,a,b])
+            ERI_considered[a, b, a, b] = 1
+            if abab*I_max>=tolerance**2:
+                considered_indices.append((a, b)) # collect candidate pairs for s8
+                ERI_considered[a, b, a, b] = 2
+
+        ERI_considered_full = np.zeros((N, N, N, N))
+
+        # generate s8 indices
+        for index, ab in enumerate(considered_indices):
+            a, b = ab
+            for cd in considered_indices[index:]:
+                c, d = cd
+                ERI_considered_full[a, b, c, d] = 1
+                if ~(nonzero_seed[b] ^ nonzero_seed[a]) ^ (nonzero_seed[d] ^ nonzero_seed[c]):
+                    screened_indices_s8_4d.append((a, b, c, d))
+        
+    if False:
+        plot4D(ERI_considered, N, 'ERI_considered')
+        plot4D(ERI_considered.swapaxes(1,2), N, 'ERI_considered_swap')
+        plot4D(ERI_considered_full, N, 'ERI_considered_full')
+        plot4D(ERI_considered_full.swapaxes(1,2), N, 'ERI_considered_full_swap')
+
+    print('len(considered_indices)', len(considered_indices))
+    print('len(screened_indices_s8_4d)', len(screened_indices_s8_4d))
+    print('len(true_nonzero_indices_s8)', len(true_nonzero_indices_s8))
+    print('nonzero_seed', nonzero_seed)
+    rec_ERI = reconstruct_ERI(ERI, screened_indices_s8_4d, N)
+    absdiff = np.abs(ERI-rec_ERI)
+    print('avg error:', np.mean(absdiff))
+    print('std error:', np.std(absdiff))
+    print('max error:', np.max(absdiff))
+    print('tol', tolerance)
+
+    # check_s8 = [(item in screened_indices_s8_4d) for item in true_nonzero_indices_s8_4d]
+    # print ('[(item in screened_indices_4d) for item in true_nonzero_indices_s8_4d]', 'PASS' if np.array(check_s8).all() else 'FAIL')
+
+    print('---')
+
+# -------------------------------------------------------------- #
+# Strategy 1
+with Timer('Strategy 1'):
     screened_indices_s8_4d = []
     
     # sample symmetry pattern and do safety check
@@ -198,22 +275,56 @@ with Timer('Strategy 0'):
         if abab*I_max>=tolerance**2:
             considered_indices.append((a, b)) # collect candidate pairs for s8
             ERI_considered[a, b, a, b] = 2
+    considered_indices = set(considered_indices)
 
+    ERI_considered_full = np.zeros((N, N, N, N))
     
-    # generate s8 indices
-    for index, ab in enumerate(considered_indices):
-        a, b = ab
-        for cd in considered_indices[index:]:
-            c, d = cd
-            if ~(nonzero_seed[b] ^ nonzero_seed[a]) ^ (nonzero_seed[d] ^ nonzero_seed[c]):
-                screened_indices_s8_4d.append((a, b, c, d))
-    
-    plot4D(ERI_considered, N, 'ERI_considered')
-    plot4D(ERI_considered.swapaxes(1,2), N, 'ERI_considered_swap')
+    if False:
+        plot4D(ERI_considered, N, 'ERI_considered')
+        plot4D(ERI_considered.swapaxes(1,2), N, 'ERI_considered_swap')
+
+    t_size = (1, 2, 5, 3)
+    for ia in range(0, N, t_size[0]):
+        for ja in range(0, N, t_size[1]):
+            for ka in range(0, N, t_size[2]):
+                for la in range(0, N, t_size[3]):
+                    ib = ia + t_size[0]
+                    jb = ja + t_size[1]
+                    kb = ka + t_size[2]
+                    lb = la + t_size[3]
+
+                    found_nonzero = False
+                    # check i,j boxes
+                    for bi in range(ia, ib):
+                        for bj in range(ja, jb):
+                            if (bi, bj) in considered_indices: # if ij box is considered
+                                # check if kl pairs are considered
+                                for bk in range(ka, kb):
+                                    # mla = la
+                                    if bk>=bi: # apply symmetry - tril fade vertical
+                                        mla = la
+                                        if bk == bi:
+                                            mla = max(bj, la)
+                                        for bl in range(mla, lb):
+                                            if (bk, bl) in considered_indices:
+                                                ERI_considered_full[bi, bj, bk, bl] = 1
+                                                # apply grid pattern to find final nonzeros
+                                                if ~(nonzero_seed[bi] ^ nonzero_seed[bj]) ^ (nonzero_seed[bk] ^ nonzero_seed[bl]):
+                                                    # found_nonzero = True
+                                                    screened_indices_s8_4d.append((bi, bj, bk, bl))
+                                                    # break
+                                    # if found_nonzero: break
+                            # if found_nonzero: break
+                        # if found_nonzero: break
+                    # if not found_nonzero: continue
+                    
+
+if False:
+    plot4D(ERI_considered_full, N, 'ERI_considered_full_v1')
 
 print('len(considered_indices)', len(considered_indices))
 print('len(screened_indices_s8_4d)', len(screened_indices_s8_4d))
-print('len(true_nonzero_indices_s8_4d)', len(true_nonzero_indices_s8_4d))
+print('len(true_nonzero_indices_s8)', len(true_nonzero_indices_s8))
 print('nonzero_seed', nonzero_seed)
 rec_ERI = reconstruct_ERI(ERI, screened_indices_s8_4d, N)
 absdiff = np.abs(ERI-rec_ERI)
@@ -226,6 +337,7 @@ print('tol', tolerance)
 # print ('[(item in screened_indices_4d) for item in true_nonzero_indices_s8_4d]', 'PASS' if np.array(check_s8).all() else 'FAIL')
 
 print('---')
+
 exit()
 # -------------------------------------------------------------- #
 # Strategy 1
