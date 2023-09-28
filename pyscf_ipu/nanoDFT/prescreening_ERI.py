@@ -24,7 +24,7 @@ def plot4D(x, N, name='', norm=None):
     fig, axs = plt.subplots(N, N)
     for i in range(N):
         for j in range(N):
-            axs[i, j].imshow(x[i,j], norm=norm)
+            axs[i, j].imshow(x[i,j,:,:], norm=norm, interpolation='none')
             axs[i, j].set_ylabel(f'i={i}')
             axs[i, j].set_xlabel(f'j={j}')
             axs[i, j].axis("off")
@@ -73,9 +73,9 @@ def reconstruct_ERI(ERI, nonzero_idx, N, sym=True, enhance=False):
 
 # -------------------------------------------------------------- #
 
-natm = 3
-mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*j} {1.54*i};" for i in range(natm) for j in range(natm))) 
-# mol = pyscf.gto.Mole(atom="".join(f"C 0 {0.054*i} {0.54*i};" for i in range(natm)))
+natm = 2
+# mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*j} {1.54*i};" for i in range(natm) for j in range(natm))) 
+mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*i} {1.54*i};" for i in range(natm)))
 # atype = 'C' if natm % 2 == 0 else 'Mg'
 # mol = pyscf.gto.Mole(atom="".join(f"{atype} 0 {1.54*i} {1.54*i};" for i in range(natm))) 
 
@@ -87,34 +87,68 @@ ERI = mol.intor("int2e_sph", aosym="s1")
 ERI_s8 = mol.intor("int2e_sph", aosym="s8")
 N = mol.nao_nr()
 
+sym_pattern =  np.array([(i+3)%5!=0 for i in range(N)])
+sym_pattern_mat = ~(sym_pattern.reshape(N, 1) ^ sym_pattern.reshape(1, N))
+
+norm = mpl.colors.Normalize(vmin=0, vmax=1)
+
+ERI_nonzeros = np.abs(ERI)>0
+
+ERI_patterns = np.zeros((N, N, N, N))
+
+ERI_pattern_errors = np.zeros((N, N, N, N))
+
+for i in tqdm(range(N)):
+    for j in range(N):
+        ERI_slice = ERI_nonzeros[i, j, :, :]
+        local_sym_pattern_mat = sym_pattern_mat ^ (sym_pattern_mat[i] ^ sym_pattern_mat[j])
+        differences = ERI_slice^local_sym_pattern_mat
+        ERI_patterns[i, j, :, :] = local_sym_pattern_mat
+        ERI_pattern_errors[i, j, :, :] = np.not_equal(differences & local_sym_pattern_mat, differences)
+        assert np.equal(differences & local_sym_pattern_mat, differences).all()
+print('PASSED: sym_pattern_mat works on this ERI!')
+
+plot4D(ERI_nonzeros, N, 'ERI_dense_nonzeros')
+plot4D(ERI_nonzeros.swapaxes(1,2), N, 'ERI_dense_nonzeros_swap')
+plot4D(ERI_patterns, N, 'ERI_patterns')
+plot4D(ERI_pattern_errors, N, 'ERI_pattern_errors')
+
 # plot4D(np.log(np.abs(ERI)+1), N, 'ERI_dense')
 
 # -------------------------------------------------------------- #
 
-all_indices_4d = [ ]
-for a in range(N):
-  for b in range(N):
-    for c in range(N):
-      for d in range(N):
-        abcd      = np.abs(ERI[a,b,c,d])
-        sqrt_abab = np.sqrt(np.abs(ERI[a,b,a,b]))
-        sqrt_cdcd = np.sqrt(np.abs(ERI[c,d,c,d]))
-        assert abcd-1e9 <= sqrt_abab*sqrt_cdcd # add 1e-9 atol 
-        all_indices_4d.append((a,b,c,d))
+# all_indices_4d = [ ]
+# for a in range(N):
+#   for b in range(N):
+#     for c in range(N):
+#       for d in range(N):
+#         abcd      = np.abs(ERI[a,b,c,d])
+#         sqrt_abab = np.sqrt(np.abs(ERI[a,b,a,b]))
+#         sqrt_cdcd = np.sqrt(np.abs(ERI[c,d,c,d]))
+#         assert abcd-1e9 <= sqrt_abab*sqrt_cdcd # add 1e-9 atol 
+#         all_indices_4d.append((a,b,c,d))
+
+# # find max value
+# I_max = 0
+# for a in range(N):
+#   for b in range(N):
+#     abab      = np.abs(ERI[a,b,a,b])
+#     if abab > I_max:
+#         I_max = abab
 
 # find max value
 I_max = 0
-for a in range(N):
-  for b in range(N):
-    abab      = np.abs(ERI[a,b,a,b])
+tril_idx = np.tril_indices(N)
+for a, b in zip(tril_idx[0], tril_idx[1]):
+    abab = np.abs(ERI[a,b,a,b])
     if abab > I_max:
         I_max = abab
 
-tolerance = 1e-7
+tolerance = 1e-9
 
 # ERI[np.abs(ERI)<tolerance] = 0 
-true_nonzero_indices = np.nonzero( ERI.reshape(-1) )[0]
-true_nonzero_indices_4d = [np.unravel_index(c, (N, N, N, N)) for c in true_nonzero_indices]
+# true_nonzero_indices = np.nonzero( ERI.reshape(-1) )[0]
+# true_nonzero_indices_4d = [np.unravel_index(c, (N, N, N, N)) for c in true_nonzero_indices]
 # test_nonzero_indices = [(x[0], x[1], x[2], x[3]) for x in np.vstack(np.nonzero(ERI)).T]
 # assert np.equal(true_nonzero_indices_4d, test_nonzero_indices).all()
 
@@ -127,45 +161,107 @@ print('N', N)
 print('I_max', I_max)
 print('ERI.reshape(-1).shape', ERI.reshape(-1).shape)
 print('ERI_s8.shape', ERI_s8.shape)
-print('len(all_indices_4d)', len(all_indices_4d))
+# print('len(all_indices_4d)', len(all_indices_4d))
 print('--------------------------------')
 
 # -------------------------------------------------------------- #
-# Strategy 1
-with Timer('Strategy 1'):
-    screened_indices_4d = []
+# Strategy 0
+with Timer('Strategy 0'):
+    screened_indices_s8_4d = []
+    
+    # sample symmetry pattern and do safety check
+    if N % 2 == 0:
+        nonzero_seed = ERI[N-1, N-1, :N//2, 0] != 0
+        nonzero_seed = np.concatenate([nonzero_seed, np.flip(nonzero_seed)])
+    else:
+        nonzero_seed = ERI[N-1, N-1, :(N+1)//2, 0] != 0
+        nonzero_seed = np.concatenate([nonzero_seed, np.flip(nonzero_seed[:-1])])
 
-    # collect candidate pairs for s1
+    if not np.equal(nonzero_seed, ERI[N-1, N-1, :, 0]!=0).all():
+        print('# -------------------------------------------------------------- #')
+        print('# WARNING: Experimental symmetry pattern sample is inconsistent. #')
+        # print('pred', nonzero_seed)
+        # print('real', ERI[N-1, N-1, :, 0]!=0)
+        print('# -------------------------------------------------------------- #')
+
+    nonzero_seed = sym_pattern.copy()
+    print('forcing sym_pattern')
+
+    ERI_considered = np.zeros((N, N, N, N))
+
+    # collect candidate pairs for s8
     considered_indices = []
-    for a in range(N):
-        for b in range(N):
-            abab = np.abs(ERI[a,b,a,b])
-            if abab*I_max>=tolerance:
-                considered_indices.append((a, b))
-            else:
-                print('>>', abab, I_max)
+    tril_idx = np.tril_indices(N)
+    for a, b in zip(tril_idx[0], tril_idx[1]):
+        abab = np.abs(ERI[a,b,a,b])
+        ERI_considered[a, b, a, b] = 1
+        if abab*I_max>=tolerance**2:
+            considered_indices.append((a, b)) # collect candidate pairs for s8
+            ERI_considered[a, b, a, b] = 2
 
-    # generate s1 indices
-    for ab in considered_indices:
+    
+    # generate s8 indices
+    for index, ab in enumerate(considered_indices):
         a, b = ab
-        for cd in considered_indices:
+        for cd in considered_indices[index:]:
             c, d = cd
-            screened_indices_4d.append((a, b, c, d))
+            if ~(nonzero_seed[b] ^ nonzero_seed[a]) ^ (nonzero_seed[d] ^ nonzero_seed[c]):
+                screened_indices_s8_4d.append((a, b, c, d))
+    
+    plot4D(ERI_considered, N, 'ERI_considered')
+    plot4D(ERI_considered.swapaxes(1,2), N, 'ERI_considered_swap')
 
 print('len(considered_indices)', len(considered_indices))
-print('len(screened_indices_4d)', len(screened_indices_4d))
-print('len(true_nonzero_indices_4d)', len(true_nonzero_indices_4d))
-rec_ERI = reconstruct_ERI(ERI, screened_indices_4d, N)
+print('len(screened_indices_s8_4d)', len(screened_indices_s8_4d))
+print('len(true_nonzero_indices_s8_4d)', len(true_nonzero_indices_s8_4d))
+print('nonzero_seed', nonzero_seed)
+rec_ERI = reconstruct_ERI(ERI, screened_indices_s8_4d, N)
 absdiff = np.abs(ERI-rec_ERI)
 print('avg error:', np.mean(absdiff))
-print('avg error:', np.std(absdiff))
+print('std error:', np.std(absdiff))
 print('max error:', np.max(absdiff))
 print('tol', tolerance)
 
-# check_s1 = [(item in screened_indices_4d) for item in true_nonzero_indices_4d]
-# print ('[(item in screened_indices_4d) for item in true_nonzero_indices_4d]', 'PASS' if np.array(check_s1).all() else 'FAIL')
+# check_s8 = [(item in screened_indices_s8_4d) for item in true_nonzero_indices_s8_4d]
+# print ('[(item in screened_indices_4d) for item in true_nonzero_indices_s8_4d]', 'PASS' if np.array(check_s8).all() else 'FAIL')
 
 print('---')
+exit()
+# -------------------------------------------------------------- #
+# Strategy 1
+if False:
+    with Timer('Strategy 1'):
+        screened_indices_4d = []
+
+        # collect candidate pairs for s1
+        considered_indices = []
+        for a in range(N):
+            for b in range(N):
+                abab = np.abs(ERI[a,b,a,b])
+                if abab*I_max>=tolerance**2:
+                    considered_indices.append((a, b))
+
+        # generate s1 indices
+        for ab in considered_indices:
+            a, b = ab
+            for cd in considered_indices:
+                c, d = cd
+                screened_indices_4d.append((a, b, c, d))
+
+    print('len(considered_indices)', len(considered_indices))
+    print('len(screened_indices_4d)', len(screened_indices_4d))
+    print('len(true_nonzero_indices_4d)', len(true_nonzero_indices_4d))
+    rec_ERI = reconstruct_ERI(ERI, screened_indices_4d, N)
+    absdiff = np.abs(ERI-rec_ERI)
+    print('avg error:', np.mean(absdiff))
+    print('avg error:', np.std(absdiff))
+    print('max error:', np.max(absdiff))
+    print('tol', tolerance)
+
+    # check_s1 = [(item in screened_indices_4d) for item in true_nonzero_indices_4d]
+    # print ('[(item in screened_indices_4d) for item in true_nonzero_indices_4d]', 'PASS' if np.array(check_s1).all() else 'FAIL')
+
+    print('---')
 
 # -------------------------------------------------------------- #
 if False:
@@ -178,7 +274,7 @@ if False:
         for a in range(N):
             for b in range(a, N):
                 abab = np.abs(ERI[a,b,a,b])
-                if abab*I_max>=tolerance:
+                if abab*I_max>=tolerance**2:
                     considered_indices.append((a, b)) # collect candidate pairs for s8
 
         # generate s8 indices
@@ -226,7 +322,7 @@ with Timer('Strategy 3'):
     tril_idx = np.tril_indices(N)
     for a, b in zip(tril_idx[0], tril_idx[1]):
         abab = np.abs(ERI[a,b,a,b])
-        if abab*I_max>=tolerance:
+        if abab*I_max>=tolerance**2:
             considered_indices.append((a, b)) # collect candidate pairs for s8
 
     # generate s8 indices
@@ -245,6 +341,7 @@ absdiff = np.abs(ERI-rec_ERI)
 print('avg error:', np.mean(absdiff))
 print('avg error:', np.std(absdiff))
 print('max error:', np.max(absdiff))
+print('tol', tolerance)
 
 # check_s8 = [(item in screened_indices_s8_4d) for item in true_nonzero_indices_s8_4d]
 # print ('[(item in screened_indices_4d) for item in true_nonzero_indices_s8_4d]', 'PASS' if np.array(check_s8).all() else 'FAIL')
@@ -261,7 +358,7 @@ with Timer('Strategy 4'):
     for a in range(N):
         for b in range(a, N):
             abab = np.abs(ERI[a,b,a,b])
-            if abab*I_max>=tolerance:
+            if abab*I_max>=tolerance**2:
                 considered_indices.append((a, b)) # collect candidate pairs for s8
 
     # generate s8 indices
@@ -290,6 +387,7 @@ absdiff = np.abs(ERI-rec_ERI)
 print('avg error:', np.mean(absdiff))
 print('std error:', np.std(absdiff))
 print('max error:', np.max(absdiff))
+print('tol', tolerance)
 
 # check_s8 = [(item in screened_indices_s8_4d) for item in true_nonzero_indices_s8_4d]
 # print ('[(item in screened_indices_4d) for item in true_nonzero_indices_s8_4d]', 'PASS' if np.array(check_s8).all() else 'FAIL')
@@ -308,9 +406,11 @@ with Timer('Strategy 5'):
     else:
         nonzero_seed = ERI[N-1, N-1, :(N+1)//2, 0] != 0
         nonzero_seed = np.concatenate([nonzero_seed, np.flip(nonzero_seed[:-1])])
-    if not np.equal(nonzero_seed, ERI[N-1, N-1, :, 0]).all():
+    if not np.equal(nonzero_seed, ERI[N-1, N-1, :, 0]!=0).all():
         print('# -------------------------------------------------------------- #')
         print('# WARNING: Experimental symmetry pattern sample is inconsistent. #')
+        # print('pred', nonzero_seed)
+        # print('real', ERI[N-1, N-1, :, 0]!=0)
         print('# -------------------------------------------------------------- #')
 
     # print('test:')
@@ -327,7 +427,7 @@ with Timer('Strategy 5'):
     for a in range(N):
         for b in range(a, N):
             abab = np.abs(ERI[a,b,a,b])
-            if abab*I_max>=tolerance:
+            if abab*I_max>=tolerance**2:
                 considered_indices.append((a, b)) # collect candidate pairs for s8
 
     # generate s8 indices
@@ -347,11 +447,14 @@ absdiff = np.abs(ERI-rec_ERI)
 print('avg error:', np.mean(absdiff))
 print('std error:', np.std(absdiff))
 print('max error:', np.max(absdiff))
+print('tol', tolerance)
 
 # check_s8 = [(item in screened_indices_s8_4d) for item in true_nonzero_indices_s8_4d]
 # print ('[(item in screened_indices_4d) for item in true_nonzero_indices_s8_4d]', 'PASS' if np.array(check_s8).all() else 'FAIL')
 
 print('---')
+
+
 
 # -------------------------------------------------------------- #
 
