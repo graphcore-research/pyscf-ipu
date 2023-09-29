@@ -294,6 +294,4 @@ def prepare_integrals_2_inputs(mol, itol):
     for i in range(len(sizes)):
         shapes.append(get_shapes(input_ijkl[i], bas))
 
-    # indxs_inv = inverse_permutation(indxs)
-
-    return input_floats, input_ints, tuple_ijkl, tuple(shapes), tuple(sizes.tolist()), tuple(counts.tolist()), ao_loc, num_calls
+    return input_floats, input_ints, tuple_ijkl, tuple(shapes), tuple(sizes.tolist()), counts.tolist(), ao_loc, num_calls

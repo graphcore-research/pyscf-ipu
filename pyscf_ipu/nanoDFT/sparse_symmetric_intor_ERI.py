@@ -134,7 +134,9 @@ def sparse_symmetric_einsum(nonzero_distinct_ERI, nonzero_indices, dm, backend):
 
 
 
-def compute_eri(input_floats, input_ints, input_ijkl, shapes, sizes, counts, ao_loc, num_calls):
+def compute_eri(input_floats, input_ints, input_ijkl, shapes, sizes, counts, num_calls):
+
+    # input_ijkl = input_ijkl.reshape(-1, 4)
     
     # Load vertex using TileJax.
     vertex_filename = osp.join(osp.dirname(__file__), "intor_int2e_sph.cpp")
@@ -261,7 +263,7 @@ def compute_eri(input_floats, input_ints, input_ijkl, shapes, sizes, counts, ao_
 
         start = stop
 
-    return all_outputs, all_indices, ao_loc
+    return all_outputs, all_indices
 
 def compute_nonzero_distinct_ERI(mol, nprog, nbatch, itol, backend):
     N = mol.nao_nr()
@@ -269,9 +271,12 @@ def compute_nonzero_distinct_ERI(mol, nprog, nbatch, itol, backend):
     # float32       int16?     int16?             int16? int16?  int16?
     input_floats, input_ints, input_ijkl, shapes, sizes, counts, ao_loc, num_calls = prepare_integrals_2_inputs(mol, itol)
 
+    # convert input_ijkl to np.array
+    input_ijkl = [np.array(t) for t in input_ijkl]
+
     print('input_floats.shape', input_floats.shape)
     print('input_ints', np.array(input_ints).shape, 'n_eri, n_buf, ...')
-    print('input_ijkl', len(input_ijkl), 'x4 offsets as (i,j,k,l) ao_loc indices')
+    print('input_ijkl', [idx.shape for idx in input_ijkl], 'tuples of offsets as (i,j,k,l) ao_loc indices')
     # shape-> list of shapes: (count, nf, buflen) -- nf == buflen afaict
     print('sizes', sizes)
     print('counts', counts)
@@ -279,7 +284,28 @@ def compute_nonzero_distinct_ERI(mol, nprog, nbatch, itol, backend):
     print('num_calls', num_calls)
     # exit()
 
-    all_eris, all_indices, ao_loc = compute_eri(input_floats, input_ints, input_ijkl, shapes, sizes, counts, ao_loc, num_calls)
+    assert nbatch == 1, 'batching not supported yet'
+
+    # pad everything
+    pads_to_zero_out = [None]*len(sizes)
+    for i, (size, count) in enumerate(zip(sizes, counts)):
+        pad_size = nprog*nbatch - count % (nprog*nbatch)
+        counts[i] = count + pad_size
+        num_calls += pad_size
+        input_ijkl[i] = np.pad(input_ijkl[i], ((0, pad_size), (0, 0)))
+        pads_to_zero_out[i] = pad_size
+        print('padded with', pad_size)
+    print('input_ijkl', [ijkl.shape for ijkl in input_ijkl])
+    # prepare inputs
+    # p_counts     = [c//(nprog*nbatch) for c in counts]
+    # p_num_calls  = num_calls // (nprog*nbatch)
+    # p_input_ijkl = np.zeros((nprog, nbatch*np.sum([s*c for s, c in zip(sizes, p_counts)])))
+    # p_input_ijkl = np.concatenate([ijkl.reshape(nprog, -1, 4) for ijkl in input_ijkl], axis=1)
+
+    all_eris, all_indices = compute_eri(input_floats, input_ints, input_ijkl, shapes, sizes, counts, num_calls)
+
+    print('len(all_eris)', len(all_eris))
+    print('len(all_indices)', len(all_indices))
 
     BLOCK_ERI_SIZE = np.sum(np.array([eri.shape[0] for eri in all_eris]))
 
@@ -292,13 +318,13 @@ def compute_nonzero_distinct_ERI(mol, nprog, nbatch, itol, backend):
     print('[a.shape for a in all_eris]', [a.shape for a in all_eris])
     print('[a.shape for a in all_indices]', [a.shape for a in all_indices])
 
-    for eri, idx in zip(all_eris, all_indices):
+    for group_id, (eri, idx) in enumerate(zip(all_eris, all_indices)):
         print(eri.shape)
         i = idx[:, 0]
         j = idx[:, 1]
         k = idx[:, 2]
         l = idx[:, 3]
-
+        
         di = ao_loc[i+1] - ao_loc[i]
         dj = ao_loc[j+1] - ao_loc[j]
         dk = ao_loc[k+1] - ao_loc[k]
@@ -329,27 +355,31 @@ def compute_nonzero_distinct_ERI(mol, nprog, nbatch, itol, backend):
                 if ij < kl: ij,kl = kl,ij
                 c = ij*(ij+1)//2 + kl
                 return c
+            
+            if ind < eri.shape[0]-pads_to_zero_out[group_id]: # real entries (no paddings)
+                block_idx = np.mgrid[
+                    _i0:(_i0+_di),
+                    _j0:(_j0+_dj),
+                    _k0:(_k0+_dk),
+                    _l0:(_l0+_dl)].transpose(4, 3, 2, 1, 0).astype(np.int16)
 
-            block_idx = np.mgrid[
-                _i0:(_i0+_di),
-                _j0:(_j0+_dj),
-                _k0:(_k0+_dk),
-                _l0:(_l0+_dl)].transpose(4, 3, 2, 1, 0).astype(np.int16)
+                block_c = [ijkl2c(ijkl[0],ijkl[1], ijkl[2], ijkl[3]) for ijkl in block_idx.reshape(-1, 4)]
+                block_do = np.zeros((_dl*_dk*_dj*_di))
+                for ci, c in enumerate(block_c):
+                    block_do[ci] = int(c not in overlap_bookkeeping)
+                    overlap_bookkeeping[c] = True
+            else: # ignore paddings
+                block_do = np.zeros((sizes[group_id]))
 
-            block_c = [ijkl2c(ijkl[0],ijkl[1], ijkl[2], ijkl[3]) for ijkl in block_idx.reshape(-1, 4)]
-            block_do = np.zeros((_dl*_dk*_dj*_di))
-            for ci, c in enumerate(block_c):
-                block_do[ci] = int(c not in overlap_bookkeeping)
-                overlap_bookkeeping[c] = True
-                            
             comp_distinct_idx_list[comp_list_index] = block_idx.reshape(-1, 4)
             comp_do_list[comp_list_index] = block_do
             comp_list_index += 1
     
-    
+    print(len(all_eris), len(comp_do_list))
     comp_distinct_idx = np.concatenate(comp_distinct_idx_list)
     comp_do = np.concatenate(comp_do_list)
     comp_distinct_ERI = jnp.concatenate([eri.reshape(-1) for eri in all_eris])
+    print(comp_distinct_ERI.shape, comp_do.shape)
     comp_distinct_ERI *= comp_do
 
     remainder = comp_distinct_idx.shape[0] % (nprog*nbatch)
@@ -434,6 +464,7 @@ if __name__ == "__main__":
     #   - padded/reshaped to fit the required number of devices and batches
 
     comp_distinct_ERI, comp_distinct_idx = jax.jit(compute_nonzero_distinct_ERI,backend=backend, static_argnames=['mol', 'nprog', 'nbatch', 'itol', 'backend'])(mol, args.nipu, args.batches, args.itol, args.backend)
+    # comp_distinct_ERI, comp_distinct_idx = compute_nonzero_distinct_ERI(mol, args.nipu, args.batches, args.itol, args.backend)
 
     # --------------------------------------------------------------------------------------- #
     # Use ERI and dm to compute diff_JK
