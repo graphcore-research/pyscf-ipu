@@ -134,9 +134,8 @@ def sparse_symmetric_einsum(nonzero_distinct_ERI, nonzero_indices, dm, backend):
 
 
 
-def compute_eri(mol, itol):
-    input_floats, input_ints, input_ijkl, shapes, sizes, counts, indxs, indxs_inv, ao_loc = prepare_integrals_2_inputs(mol, itol)
-
+def compute_eri(input_floats, input_ints, input_ijkl, shapes, sizes, counts, ao_loc, num_calls):
+    
     # Load vertex using TileJax.
     vertex_filename = osp.join(osp.dirname(__file__), "intor_int2e_sph.cpp")
     int2e_sph = create_ipu_tile_primitive(
@@ -166,10 +165,7 @@ def compute_eri(mol, itol):
 
     num_tiles = NUM_TILES-1
     num_threads = 6
-
-    num_calls = len(indxs_inv)
-    #print(num_calls)
-
+    
     if num_calls < num_tiles:  tiles       = tuple((np.arange(num_calls)+1).tolist())
     else:                      tiles       = tuple((np.arange(num_tiles*num_threads)%(num_tiles)+1).tolist())
 
@@ -188,6 +184,7 @@ def compute_eri(mol, itol):
 
         print('>>>', i, size, count)
         glen, nf, buflen = shapes[i]
+        print('glen', glen, 'nf', nf, 'buflen', buflen)
 
         tiles       = tuple((np.arange(num_tiles*num_threads)%(num_tiles)+1).tolist())
         tile_g      = tile_put_replicated(jnp.empty(min(int(glen), 3888)+1),                     tiles)
@@ -209,7 +206,7 @@ def compute_eri(mol, itol):
             tile_indices = tile_put_sharded(_indices, tiles)
 
             chunks = tile_put_replicated( jnp.zeros(count//chunk_size), tiles)
-            integral_size = tile_put_replicated( jnp.zeros(size), tiles)
+            integral_size = tile_put_replicated( jnp.zeros(size), tiles) # this can be modified to only contain 1 element (vertex also needs modification)
 
             batched_out , _, _, _= tile_map(int2e_sph_forloop,
                                             tile_floats,
@@ -266,12 +263,23 @@ def compute_eri(mol, itol):
 
     return all_outputs, all_indices, ao_loc
 
-def compute_diff_jk(dm, mol, nprog, nbatch, itol, backend):
-    dm = dm.reshape(-1)
-    diff_JK = jnp.zeros(dm.shape)
-    N = int(np.sqrt(dm.shape[0])) 
+def compute_nonzero_distinct_ERI(mol, nprog, nbatch, itol, backend):
+    N = mol.nao_nr()
 
-    all_eris, all_indices, ao_loc = compute_eri(mol, itol)
+    # float32       int16?     int16?             int16? int16?  int16?
+    input_floats, input_ints, input_ijkl, shapes, sizes, counts, ao_loc, num_calls = prepare_integrals_2_inputs(mol, itol)
+
+    print('input_floats.shape', input_floats.shape)
+    print('input_ints', np.array(input_ints).shape, 'n_eri, n_buf, ...')
+    print('input_ijkl', len(input_ijkl), 'x4 offsets as (i,j,k,l) ao_loc indices')
+    # shape-> list of shapes: (count, nf, buflen) -- nf == buflen afaict
+    print('sizes', sizes)
+    print('counts', counts)
+    print('ao_loc', ao_loc)
+    print('num_calls', num_calls)
+    # exit()
+
+    all_eris, all_indices, ao_loc = compute_eri(input_floats, input_ints, input_ijkl, shapes, sizes, counts, ao_loc, num_calls)
 
     BLOCK_ERI_SIZE = np.sum(np.array([eri.shape[0] for eri in all_eris]))
 
@@ -341,33 +349,31 @@ def compute_diff_jk(dm, mol, nprog, nbatch, itol, backend):
     
     comp_distinct_idx = np.concatenate(comp_distinct_idx_list)
     comp_do = np.concatenate(comp_do_list)
-    
+    comp_distinct_ERI = jnp.concatenate([eri.reshape(-1) for eri in all_eris])
+    comp_distinct_ERI *= comp_do
+
     remainder = comp_distinct_idx.shape[0] % (nprog*nbatch)
 
     if remainder != 0:
         print('padding', remainder, nprog*nbatch-remainder, comp_distinct_idx.shape)
         comp_distinct_idx = np.pad(comp_distinct_idx, ((0, nprog*nbatch-remainder), (0, 0)))
         comp_do = np.pad(comp_do, ((0, nprog*nbatch-remainder)))
-        all_eris.append(jnp.zeros((nprog*nbatch-remainder), dtype=jnp.float32))
-    
-    comp_distinct_ERI = jnp.concatenate([eri.reshape(-1) for eri in all_eris]).reshape(nprog, nbatch, -1)
+        comp_distinct_ERI = jnp.pad(comp_distinct_ERI, ((0, nprog*nbatch-remainder)))
+
+    comp_distinct_ERI = comp_distinct_ERI.reshape(nprog, nbatch, -1)
     comp_distinct_idx = comp_distinct_idx.reshape(nprog, nbatch, -1, 4)
-    comp_do = comp_do.reshape(nprog, nbatch, -1)
-    comp_distinct_ERI *= comp_do
 
     print('comp_distinct_ERI.shape', comp_distinct_ERI.shape)
     print('comp_distinct_idx.shape', comp_distinct_idx.shape)
 
-    # compute repetitions caused by 8x symmetry when computing from the distinct_ERI form and scale accordingly
-    drep                      = num_repetitions_fast_4d(comp_distinct_idx[:, :, :, 0], comp_distinct_idx[:, :, :, 1], comp_distinct_idx[:, :, :, 2], comp_distinct_idx[:, :, :, 3], xnp=np, dtype=np.uint32)
-    comp_distinct_ERI         = comp_distinct_ERI / drep
-
     # int16 storage supported but not slicing; use conversion trick to enable slicing
     comp_distinct_idx = jax.lax.bitcast_convert_type(comp_distinct_idx, jnp.float16)
-    
-    diff_JK = jax.pmap(sparse_symmetric_einsum, in_axes=(0,0,None,None), static_broadcasted_argnums=(3,), backend=backend, axis_name="p")(comp_distinct_ERI, comp_distinct_idx, dm, backend)
 
-    return diff_JK
+    # compute repetitions caused by 8x symmetry when computing from the distinct_ERI form and scale accordingly
+    drep                      = num_repetitions_fast_4d(comp_distinct_idx[:, :, :, 0], comp_distinct_idx[:, :, :, 1], comp_distinct_idx[:, :, :, 2], comp_distinct_idx[:, :, :, 3], xnp=jnp, dtype=jnp.uint32)
+    comp_distinct_ERI         = comp_distinct_ERI / drep
+    
+    return comp_distinct_ERI, comp_distinct_idx
 
 if __name__ == "__main__":
     import time 
@@ -422,11 +428,19 @@ if __name__ == "__main__":
     dm                   = dm.reshape(-1)
     diff_JK              = np.zeros(dm.shape)
 
-    # ------------------------------------ #
+    # --------------------------------------------------------------------------------------- #
+    # Compute ERI values from mol; returned values are already:
+    #   - scaled to account for repetitions in JK computation
+    #   - padded/reshaped to fit the required number of devices and batches
 
-    diff_JK = jax.jit(compute_diff_jk, backend=backend, static_argnames=['mol', 'nprog', 'nbatch', 'itol', 'backend'])(dm, mol, args.nipu, args.batches, args.itol, args.backend)
+    comp_distinct_ERI, comp_distinct_idx = jax.jit(compute_nonzero_distinct_ERI,backend=backend, static_argnames=['mol', 'nprog', 'nbatch', 'itol', 'backend'])(mol, args.nipu, args.batches, args.itol, args.backend)
 
-    # ------------------------------------ #
+    # --------------------------------------------------------------------------------------- #
+    # Use ERI and dm to compute diff_JK
+    
+    diff_JK = jax.pmap(sparse_symmetric_einsum, in_axes=(0,0,None,None), static_broadcasted_argnums=(3,), backend=backend, axis_name="p")(comp_distinct_ERI, comp_distinct_idx, dm, backend)
+
+    # --------------------------------------------------------------------------------------- #
 
     # diff_JK = jax.pmap(sparse_symmetric_einsum, in_axes=(0,0,None,None), static_broadcasted_argnums=(3,), backend=backend, axis_name="p")(nonzero_distinct_ERI, nonzero_indices, dm, args.backend) 
 

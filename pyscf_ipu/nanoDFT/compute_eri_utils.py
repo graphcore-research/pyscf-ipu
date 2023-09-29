@@ -249,8 +249,8 @@ def prepare_integrals_2_inputs(mol, itol):
                     output_sizes[n_items] = [di, dj, dk, dl, di*dj*dk*dl]
 
                     n_items += 1
-    print('!!! saved', num_calls - n_items, 'calls i.e.', num_calls, '-', n_items)
-    print('!!! saved', n_all_integrals - n_new_integrals, 'integrals i.e.', n_all_integrals, '-', n_new_integrals)
+    print('!!! saved', num_calls - n_items, 'calls i.e.', num_calls, '->', n_items)
+    print('!!! saved', n_all_integrals - n_new_integrals, 'integrals i.e.', n_all_integrals, '->', n_new_integrals)
 
     num_calls = n_items
     input_ijkl = input_ijkl[:num_calls, :]
@@ -294,6 +294,6 @@ def prepare_integrals_2_inputs(mol, itol):
     for i in range(len(sizes)):
         shapes.append(get_shapes(input_ijkl[i], bas))
 
-    indxs_inv = inverse_permutation(indxs)
+    # indxs_inv = inverse_permutation(indxs)
 
-    return input_floats, input_ints, tuple_ijkl, tuple(shapes), tuple(sizes.tolist()), tuple(counts.tolist()), indxs, indxs_inv, ao_loc
+    return input_floats, input_ints, tuple_ijkl, tuple(shapes), tuple(sizes.tolist()), tuple(counts.tolist()), ao_loc, num_calls
