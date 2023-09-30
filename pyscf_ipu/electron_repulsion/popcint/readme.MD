@@ -17,7 +17,7 @@ mol.intor("int2e_sph")     # electron repulsion integral
 mol.intor("int2e_ip1_sph") # gradient (ip1) of electron repulsion integral 
 ```
 
-You can test all integrals with `./cpp_libcint.sh -all`. The C++ plumbing to run all integrals is in place and all (but kinetic) pass a simple H2 test-case in STO3G (this and runs libcint.c both with CPU/G++ and IPU/tesselate).  
+You can test all integrals with `./cpp_libcint.sh -all`. The C++ plumbing to run all integrals is in place and all (but kinetic) pass a simple H2 test-case in STO3G (this compiles and runs libcint.c both with CPU/G++ and IPU/tesselate).  
 
 ```
 > ./cpp_libcint.sh -all
