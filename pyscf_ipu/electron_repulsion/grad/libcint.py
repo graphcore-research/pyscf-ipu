@@ -160,122 +160,76 @@ def grad(self, intor, which_integral, N, comp=None, hermi=0, aosym='s1', out=Non
 
     return result 
 
+one_elect =False 
+if one_elect: 
+    us    =  intor1e(mol, 'int1e_kin', N, comp=1)
+    truth =  mol.intor('int1e_kin', comp=1)
+    ovlp =   np.asarray( grad(mol, "int1e_kin", INT1E_KIN,  N, 1))
+    print(np.max(np.abs(ovlp.reshape(-1)-truth.reshape(-1))))
 
-us    =  intor1e(mol, 'int1e_kin', N, comp=1)
-truth =  mol.intor('int1e_kin', comp=1)
-ovlp =   np.asarray( grad(mol, "int1e_kin", INT1E_KIN,  N, 1))
-print(np.max(np.abs(ovlp.reshape(-1)-truth.reshape(-1))))
+    us    =  intor1e(mol, 'int1e_ovlp', N, comp=1)
+    truth =  mol.intor('int1e_ovlp', comp=1)
+    ovlp =   np.asarray( grad(mol, "int1e_ovlp", INT1E_OVLP,  N, 1))
+    print(np.max(np.abs(ovlp.reshape(-1)-truth.reshape(-1))))
 
-us    =  intor1e(mol, 'int1e_ovlp', N, comp=1)
-truth =  mol.intor('int1e_ovlp', comp=1)
-ovlp =   np.asarray( grad(mol, "int1e_ovlp", INT1E_OVLP,  N, 1))
-print(np.max(np.abs(ovlp.reshape(-1)-truth.reshape(-1))))
+    us    =  intor1e(mol, 'int1e_nuc', N, comp=1)
+    truth =  mol.intor('int1e_nuc', comp=1)
+    nuc =   np.asarray( grad(mol, "int1e_nuc", INT1E_NUC,  N, 1))
+    print(np.max(np.abs(nuc.reshape(-1)-truth.reshape(-1))))
 
-us    =  intor1e(mol, 'int1e_nuc', N, comp=1)
-truth =  mol.intor('int1e_nuc', comp=1)
-nuc =   np.asarray( grad(mol, "int1e_nuc", INT1E_NUC,  N, 1))
-print(np.max(np.abs(nuc.reshape(-1)-truth.reshape(-1))))
+    us    = - intor1e(mol, 'int1e_ipkin', N, comp=3)
+    truth = - mol.intor('int1e_ipkin', comp=3)
+    ovlp = - np.transpose( np.asarray( grad(mol, "int1e_ipkin", INT1E_KIN_IP,  N, 3)), (0, 2, 1))
+    print(np.max(np.abs(ovlp.reshape(-1)-truth.reshape(-1))))
 
-us    = - intor1e(mol, 'int1e_ipkin', N, comp=3)
-truth = - mol.intor('int1e_ipkin', comp=3)
-ovlp = - np.transpose( np.asarray( grad(mol, "int1e_ipkin", INT1E_KIN_IP,  N, 3)), (0, 2, 1))
-print(np.max(np.abs(ovlp.reshape(-1)-truth.reshape(-1))))
+    us    = - intor1e(mol, 'int1e_ipovlp', N, comp=3)
+    truth = - mol.intor('int1e_ipovlp', comp=3)
+    print(truth.shape)
+    ovlp = - np.transpose( np.asarray( grad(mol, "int1e_ipovlp", INT1E_OVLP_IP,  N, 3)), (0, 2, 1))
+    print(np.max(np.abs(ovlp.reshape(-1)-truth.reshape(-1))))
 
-us    = - intor1e(mol, 'int1e_ipovlp', N, comp=3)
-truth = - mol.intor('int1e_ipovlp', comp=3)
-print(truth.shape)
-ovlp = - np.transpose( np.asarray( grad(mol, "int1e_ipovlp", INT1E_OVLP_IP,  N, 3)), (0, 2, 1))
-print(np.max(np.abs(ovlp.reshape(-1)-truth.reshape(-1))))
-
-us    = - intor1e(mol, 'int1e_ipnuc', N, comp=3)
-truth = - mol.intor('int1e_ipnuc', comp=3)
-print(truth.shape)
-nuc = - np.transpose( np.asarray( grad(mol, "int1e_ipnuc", INT1E_NUC_IP,  N, 3)), (0, 2, 1))
-print(np.max(np.abs(nuc.reshape(-1)-truth.reshape(-1))))
-
-
-'''truth = - mol.intor('int1e_ipovlp', comp=3).reshape(-1)
-us = - intor1e(mol, 'int1e_ipovlp', N, comp=3).reshape(-1)
-print(truth)
-print(us)
-ovlp = np.asarray(grad(mol, "int1e_ipovlp",  INT1E_OVLP_IP,  N, 3)).reshape(-1)
-print(ovlp)
-print(np.max(np.abs(ovlp-truth)))'''
-
-exit()
+    us    = - intor1e(mol, 'int1e_ipnuc', N, comp=3)
+    truth = - mol.intor('int1e_ipnuc', comp=3)
+    print(truth.shape)
+    nuc = - np.transpose( np.asarray( grad(mol, "int1e_ipnuc", INT1E_NUC_IP,  N, 3)), (0, 2, 1))
+    print(np.max(np.abs(nuc.reshape(-1)-truth.reshape(-1))))
 
 
-print("one electron forward pass")
-truth      = mol.intor_symmetric('int1e_kin')              # (N,N)
-us         = intor1e(mol,'int1e_kin', N, 1)              # (N,N)
-print(np.max(np.abs(truth-us)))
-print(np.allclose(truth, us))
-# got kin and nuc, next overlap, then derivatives. 
-# perhaps then split over tiles => make faster. 
-kin      = mol.intor_symmetric('int1e_kin').reshape(-1)              # (N,N)
-nuc      = mol.intor_symmetric('int1e_nuc').reshape(-1)              # (N,N)
-ovlp     = mol.intor_symmetric('int1e_ovlp').reshape(-1)              # (N,N)
+one_elect_forward = False 
 
-kin1  = intor1e(mol, 'int1e_kin', N, 1).reshape(-1)             # (N,N)
-nuc1  = intor1e(mol, 'int1e_nuc', N, 1).reshape(-1)             # (N,N)
-ovlp1 = intor1e(mol, 'int1e_ovlp', N, 1).reshape(-1)             # (N,N)
+if one_elect_forward: 
+    print("one electron forward pass")
+    truth      = mol.intor_symmetric('int1e_kin')              # (N,N)
+    us         = intor1e(mol,'int1e_kin', N, 1)              # (N,N)
+    print(np.max(np.abs(truth-us)))
+    print(np.allclose(truth, us))
+    # got kin and nuc, next overlap, then derivatives. 
+    # perhaps then split over tiles => make faster. 
+    kin      = mol.intor_symmetric('int1e_kin').reshape(-1)              # (N,N)
+    nuc      = mol.intor_symmetric('int1e_nuc').reshape(-1)              # (N,N)
+    ovlp     = mol.intor_symmetric('int1e_ovlp').reshape(-1)              # (N,N)
 
-kin2 = np.asarray(grad(mol, "int1e_kin",  INT1E_KIN,  N, 1)).reshape(-1)
-nuc2 = np.asarray(grad(mol, "int1e_nuc",  INT1E_NUC,  N, 1)).reshape(-1)
-ovlp2 = np.asarray(grad(mol, "int1e_ovlp", INT1E_OVLP, N, 1)).reshape(-1)
+    kin1  = intor1e(mol, 'int1e_kin', N, 1).reshape(-1)             # (N,N)
+    nuc1  = intor1e(mol, 'int1e_nuc', N, 1).reshape(-1)             # (N,N)
+    ovlp1 = intor1e(mol, 'int1e_ovlp', N, 1).reshape(-1)             # (N,N)
 
-print(kin)
-print(kin1)
-print(kin2)
+    kin2 = np.asarray(grad(mol, "int1e_kin",  INT1E_KIN,  N, 1)).reshape(-1)
+    nuc2 = np.asarray(grad(mol, "int1e_nuc",  INT1E_NUC,  N, 1)).reshape(-1)
+    ovlp2 = np.asarray(grad(mol, "int1e_ovlp", INT1E_OVLP, N, 1)).reshape(-1)
 
-print(nuc)
-print(nuc1)
-print(nuc2)
+    print(kin)
+    print(kin1)
+    print(kin2)
 
-print(ovlp)
-print(ovlp1)
-print(ovlp2)
+    print(nuc)
+    print(nuc1)
+    print(nuc2)
 
-exit()
+    print(ovlp)
+    print(ovlp1)
+    print(ovlp2)
 
-
-
-truth      = mol.intor_symmetric('int1e_nuc')              # (N,N)
-us         = intor1e(mol,'int1e_nuc', N, 1)              # (N,N)
-print(np.max(np.abs(truth-us)))
-#assert np.allclose(truth, us)
-print(np.allclose(truth, us))
-truth      = mol.intor_symmetric('int1e_ovlp')             # (N,N)
-us         = intor1e(mol, 'int1e_ovlp', N, 1)             # (N,N)
-print(np.max(np.abs(truth-us)))
-print(np.allclose(truth, us))
-#assert np.allclose(truth, us)
-
-print("\none electron backward ")
-truth = - mol.intor('int1e_ipovlp', comp=3)
-us = -intor1e(mol,'int1e_ipovlp', N, comp=3)
-print(np.max(np.abs(truth-us)))
-#assert np.allclose(truth, us)
-print(np.allclose(truth, us))
-truth = - mol.intor('int1e_ipkin', comp=3)
-us = - intor1e(mol, 'int1e_ipkin', N, comp=3)
-print(np.max(np.abs(truth-us)))
-#assert np.allclose(truth, us)
-print(np.allclose(truth, us))
-
-truth = - mol.intor('int1e_ipnuc',  comp=3)
-us = - intor1e(mol,'int1e_ipnuc', N,  comp=3)
-print(np.max(np.abs(truth-us)))
-#assert np.allclose(truth, us)
-print(np.allclose(truth, us))
-
-#mol.intor('int1e_iprinv', comp=3)
-truth      = mol.intor('int1e_iprinv')             
-us         = intor1e(mol, "int1e_iprinv", N, 3)
-print(np.max(np.abs(truth-us)))
-#assert np.allclose(truth, us)
-print(np.allclose(truth, us))
-
+    exit()
 
 def getints4c(intor_name, atm, bas, env, N, shls_slice=None, comp=1,
             aosym='s1', ao_loc=None, cintopt=None, out=None):
@@ -292,6 +246,7 @@ def getints4c(intor_name, atm, bas, env, N, shls_slice=None, comp=1,
     
     drv = libcgto.GTOnr2e_fill_drv
     fill = getattr(libcgto, 'GTOnr2e_fill_'+aosym)
+    print()
     out = numpy.ndarray(shape, buffer=out)
 
     # type 
@@ -301,9 +256,11 @@ def getints4c(intor_name, atm, bas, env, N, shls_slice=None, comp=1,
         env = env.astype(np.float32)
 
     c_env = env.ctypes.data_as(ctypes.c_void_p)
+    #ic| intor_name: 'int2e_sph', 'GTOnr2e_fill_drv'
 
     cintopt = None 
     prescreen = lib.c_null_ptr()
+    ic(intor_name, "GTOnr2e_fill_drv", 'GTOnr2e_fill_'+aosym)
     drv(getattr(libcgto, intor_name), fill, prescreen,
         out.ctypes.data_as(ctypes.c_void_p), ctypes.c_int(comp),
         (ctypes.c_int*8)(*shls_slice),
@@ -319,16 +276,127 @@ def intor(self, intor, N, comp=None, hermi=0, aosym='s1', out=None, shls_slice=N
 
 truth = mol.intor("int2e_sph")
 us = intor(mol, "int2e_sph", N, 1)
+print(us.reshape(-1))
+print(truth.reshape(-1))
 
 print(np.max(np.abs(truth-us)))
 #assert np.allclose(truth, us )
 print(np.allclose(truth, us))
 
-truth = mol.intor("int2e_ip1")
+
+
+'''truth = mol.intor("int2e_ip1")
 us = intor(mol, "int2e_ip1_sph", N, 3)
+print()
+print("ERI grad")
+print(truth.reshape(-1))
+print(us.reshape(-1))
 print(np.max(np.abs(truth-us)))
-#assert np.allclose(truth, us )
-print(np.allclose(truth, us))
+print()
+exit()'''
 
-print("PASSED")
+
+
+
+def getints4c(intor_name, atm, bas, env, N, shls_slice=None, comp=1,
+            aosym='s1', ao_loc=None, cintopt=None, out=None):
+    print(intor_name)
+    #c_atm = atm.ctypes.data_as(ctypes.c_void_p)
+    #c_bas = bas.ctypes.data_as(ctypes.c_void_p)
+    natm = atm.shape[0]
+    nbas = bas.shape[0]
+
+    shls_slice = (0, nbas, 0, nbas, 0, nbas, 0, nbas)
+    
+    shape = [comp, N, N, N, N] 
+    
+    drv = libcgto.GTOnr2e_fill_drv
+    fill = getattr(libcgto, 'GTOnr2e_fill_'+aosym)
+    out = numpy.ndarray(shape, buffer=out)
+
+    # type 
+    float32 = "#define dtype float" in open("_libcint.c", "r").read()
+    if float32: 
+        out = out.astype(np.float32)
+        env = env.astype(np.float32)
+
+    #c_env = env.ctypes.data_as(ctypes.c_void_p)
+    #ic| intor_name: 'int2e_sph', 'GTOnr2e_fill_drv'
+
+    cintopt = None 
+    prescreen = lib.c_null_ptr()
+    ic(intor_name, "GTOnr2e_fill_drv", 'GTOnr2e_fill_'+aosym)
+    '''drv(getattr(libcgto, intor_name), fill, prescreen,
+        out.ctypes.data_as(ctypes.c_void_p), ctypes.c_int(comp),
+        (ctypes.c_int*8)(*shls_slice),
+        ao_loc.ctypes.data_as(ctypes.c_void_p), cintopt,
+        c_atm, ctypes.c_int(natm), c_bas, ctypes.c_int(nbas), c_env)'''
+
+
+    from tessellate_ipu import create_ipu_tile_primitive, ipu_cycle_count, tile_map, tile_put_sharded, tile_put_replicated
+    vertex_filename  = osp.join(osp.dirname(__file__), "grad.cpp")
+    #mat, shls_slice, ao_loc, atm, bas, env
+    grad = create_ipu_tile_primitive(
+            "Int2e" ,
+            "Int2e" ,
+            inputs=["mat", "shls_slice", "ao_loc", "atm", "bas", "env", "natm", "nbas", "which_integral"], 
+            outputs={"out": 0},
+            gp_filename=vertex_filename,
+            perf_estimate=100,
+    )
+    
+    
+    #intor_name, N, atm, bas, env, shls_slice, comp, hermi, ao_loc, cintopt, out=\
+    #intor_name+"_sph", N, self._atm, self._bas, self._env, shls_slice, comp, hermi, None, None, out
+
+    natm = atm.shape[0]
+    nbas = bas.shape[0]
+
+    prefix = 'GTO'
+
+    dtype = numpy.double
+    drv_name = prefix + 'int2c'
+
+
+    # type 
+    float32 = "#define dtype float" in open("_libcint.c", "r").read()
+    if float32: 
+        out = out.astype(np.float32)
+        env = env.astype(np.float32)
+
+
+    out = tile_put_replicated(jnp.array(out, dtype=jnp.float32),   (1,)) 
+    shls_slice = tile_put_replicated(jnp.array(shls_slice, dtype=jnp.int32),   (1,)) 
+    ao_loc = tile_put_replicated(jnp.array(ao_loc, dtype=jnp.int32),   (1,)) 
+    atm = tile_put_replicated(jnp.array(atm, dtype=jnp.int32),   (1,)) 
+    bas = tile_put_replicated(jnp.array(bas, dtype=jnp.int32),   (1,)) 
+    env = tile_put_replicated(jnp.array(env, dtype=jnp.float32),   (1,)) 
+    natm = tile_put_replicated(jnp.array(natm, dtype=jnp.int32),   (1,)) 
+    nbas = tile_put_replicated(jnp.array(nbas, dtype=jnp.int32),   (1,)) 
+
+    which_integral = 0 
+    which_integral = tile_put_replicated(np.array(which_integral, dtype=jnp.int32),   (1,)) 
+
+    value = tile_map(grad, out, shls_slice, ao_loc, atm, bas, env, natm, nbas, which_integral)
+
+    out = value.array # value.array[0]
+    print(out.shape)
+
+    if comp == 1:
+        out = out[0]
+    return out
+
+def intor(self, intor, N, comp=None, hermi=0, aosym='s1', out=None, shls_slice=None, grids=None):
+    ao_loc = make_loc(mol._bas, intor)
+    return np.asarray(jax.jit(getints4c, static_argnums=(0,4,5,6,7,9,10))
+                        (intor, self._atm, self._bas, self._env, N, None, comp, "s1", ao_loc, None, None))
+
+eri = True
+if eri: 
+    us_ipu = intor(mol, "int2e_sph", N, 1)
+    print(us_ipu.reshape(-1))
+    print(np.max(np.abs(truth-us_ipu)))
+
+
+#assert np.allclose(truth, us )
 

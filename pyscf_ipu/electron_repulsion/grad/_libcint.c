@@ -19,16 +19,16 @@ extern "C" {
 
 #ifdef I8
 #include <stdint.h>
-#define FINT int//int
+#define FINT int //int
 #else
 #define FINT int//int
 #endif
 
 #ifdef CACHE_SIZE_I8
 #include <stdint.h>
-#define CACHE_SIZE_T int
+#define CACHE_SIZE_T int64_t
 #else
-#define CACHE_SIZE_T int
+#define CACHE_SIZE_T int64_t
 #endif
 
 #define PTR_EXPCUTOFF           0
@@ -367,10 +367,8 @@ void CINTdel_optimizer(CINTOpt **opt);
 void CINTdel_pairdata_optimizer(CINTOpt *cintopt);
 void CINTOpt_log_max_pgto_coeff(dtype *log_maxc, dtype *coeff, FINT nprim, FINT nctr);
 void CINTOpt_log_max_pgto_coeff(dtype *log_maxc, dtype *coeff, FINT nprim, FINT nctr);
-void CINTOpt_set_log_maxc(CINTOpt *opt, FINT *atm, FINT natm,
-                          FINT *bas, FINT nbas, dtype *env);
-void CINTOpt_setij(CINTOpt *opt, FINT *ng,
-                   FINT *atm, FINT natm, FINT *bas, FINT nbas, dtype *env);
+//void CINTOpt_set_log_maxc(CINTOpt *opt, FINT *atm, FINT natm, FINT *bas, FINT nbas, dtype *env);
+//void CINTOpt_setij(CINTOpt *opt, FINT *ng, FINT *atm, FINT natm, FINT *bas, FINT nbas, dtype *env);
 void CINTOpt_non0coeff_byshell(FINT *sortedidx, FINT *non0ctr, dtype *ci, FINT iprim, FINT ictr);
 void CINTOpt_set_non0coeff(CINTOpt *opt, FINT *atm, FINT natm,
                            FINT *bas, FINT nbas, dtype *env);
@@ -575,7 +573,7 @@ dtype CINTgto_norm(FINT n, dtype a);
         var = reinterpret_cast<decltype(var)>(new char[(n) * sizeof(*var)]);
 
 #define MALLOC(type, var) \
-        type var[128];
+        type var[64];
 
 #else
 #define MALLOC_INSTACK(var, n) \
@@ -1440,7 +1438,7 @@ void CINTgout2e(dtype *g, dtype *gout, FINT *idx, CINTEnvVars *envs, FINT gout_e
 FINT CINT2e_loop(dtype *gctr, CINTEnvVars *envs, dtype *cache, FINT *empty);
 
 CACHE_SIZE_T CINT2e_drv(dtype *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt,
-                    dtype *cache, void (*f_c2s)(dtype *opij, dtype *gctr, FINT *dims, CINTEnvVars *envs, dtype *cache));
+                    dtype *cache);//, void (*f_c2s)(dtype *opij, dtype *gctr, FINT *dims, CINTEnvVars *envs, dtype *cache));
 #ifdef __cplusplus 
 CACHE_SIZE_T CINT2e_spinor_drv(dtype *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt,
                       dtype *cache, void (*f_e1_c2s)(...), void (*f_e2_c2s)(...));
@@ -6209,19 +6207,19 @@ envs.f_gout = (void (*)(...))&CINTgout2e_int2e_ip1;
 #else
 envs.f_gout = &CINTgout2e_int2e_ip1;
 #endif
-return CINT2e_drv(out, dims, &envs, opt, cache, &c2s_cart_2e1);
+return CINT2e_drv(out, dims, &envs, opt, cache);//, &c2s_cart_2e1);
 } 
 CACHE_SIZE_T int2e_ip1_sph(dtype *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, dtype *env, CINTOpt *opt, dtype *cache) {
-FINT ng[] = {1, 0, 0, 0, 1, 1, 1, 3};
-CINTEnvVars envs;
-CINTinit_int2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
-#ifdef __cplusplus
-envs.f_gout = (void (*)(...))&CINTgout2e_int2e_ip1;
-#else
-envs.f_gout = &CINTgout2e_int2e_ip1;
-#endif
-return CINT2e_drv(out, dims, &envs, opt, cache, &c2s_sph_2e1);
+        FINT ng[] = {1, 0, 0, 0, 1, 1, 1, 3};
+        CINTEnvVars envs;
+        CINTinit_int2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
+        #ifdef __cplusplus
+        envs.f_gout = (void (*)(...))&CINTgout2e_int2e_ip1;
+        #else
+        envs.f_gout = &CINTgout2e_int2e_ip1;
+        #endif
+        return CINT2e_drv(out, dims, &envs, opt, cache);//, &c2s_sph_2e1);
 } 
 /*CACHE_SIZE_T int2e_ip1_spinor(dtype *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, dtype *env, CINTOpt *opt, dtype *cache) {
@@ -8130,9 +8128,10 @@ void CINTOpt_log_max_pgto_coeff(dtype *log_maxc, dtype *coeff, FINT nprim, FINT 
         }
 }
 
-void CINTOpt_set_log_maxc(CINTOpt *opt, FINT *atm, FINT natm,
+/*void CINTOpt_set_log_maxc(CINTOpt *opt, FINT *atm, FINT natm,
                           FINT *bas, FINT nbas, dtype *env)
 {
+        printf("ASD"); // this isn't caled? 
         return; 
         FINT i, iprim, ictr;
         dtype *ci;
@@ -8145,10 +8144,10 @@ void CINTOpt_set_log_maxc(CINTOpt *opt, FINT *atm, FINT natm,
         }
 
         #ifdef __cplusplus 
-        //opt->log_max_coeff = new dtype*[1024]; 
-        //dtype *plog_maxc = new dtype[1024]; 
-        opt->log_max_coeff = new dtype*[128]; 
-        dtype *plog_maxc = new dtype[128]; 
+        opt->log_max_coeff = new dtype*[1024]; 
+        dtype *plog_maxc = new dtype[1024]; 
+        //opt->log_max_coeff = new dtype*[128]; 
+        //dtype *plog_maxc = new dtype[128]; 
         #else
         opt->log_max_coeff = malloc(sizeof(dtype *) * MAX(nbas, 1));
         dtype *plog_maxc = malloc(sizeof(dtype) * tot_prim);
@@ -8163,7 +8162,7 @@ void CINTOpt_set_log_maxc(CINTOpt *opt, FINT *atm, FINT natm,
                 CINTOpt_log_max_pgto_coeff(plog_maxc, ci, iprim, ictr);
                 plog_maxc += iprim;
         }
-}
+}*/
 
 FINT CINTset_pairdata(PairData *pairdata, dtype *ai, dtype *aj, dtype *ri, dtype *rj,
                      dtype *log_maxci, dtype *log_maxcj,
@@ -8223,9 +8222,10 @@ FINT CINTset_pairdata(PairData *pairdata, dtype *ai, dtype *aj, dtype *ri, dtype
         return empty;
 }
 
-void CINTOpt_setij(CINTOpt *opt, FINT *ng,
+/*void CINTOpt_setij(CINTOpt *opt, FINT *ng,
                    FINT *atm, FINT natm, FINT *bas, FINT nbas, dtype *env)
 {
+        printf("---> CINTOpt_set_ij <--- \n");
         return; 
         FINT i, j, ip, jp;
         FINT iprim, jprim, li, lj;
@@ -8311,7 +8311,7 @@ void CINTOpt_setij(CINTOpt *opt, FINT *ng,
                         }
                 }
         }
-}
+}*/
 
 void CINTdel_pairdata_optimizer(CINTOpt *cintopt)
 {
@@ -8323,8 +8323,8 @@ void CINTdel_pairdata_optimizer(CINTOpt *cintopt)
 }
 
 
-
-void CINTOpt_set_non0coeff(CINTOpt *opt, FINT *atm, FINT natm,
+// start return 
+/*void CINTOpt_set_non0coeff(CINTOpt *opt, FINT *atm, FINT natm,
                            FINT *bas, FINT nbas, dtype *env)
 {
         return; 
@@ -8363,7 +8363,7 @@ void CINTOpt_set_non0coeff(CINTOpt *opt, FINT *atm, FINT natm,
                 pnon0ctr += iprim;
                 psortedidx += iprim * ictr;
         }
-}
+}*/
 
 
 #include <string.h>
@@ -8420,13 +8420,15 @@ void CINTinit_int1e_EnvVars(CINTEnvVars *envs,
         // FIXME
         envs->natm = natm;
         envs->nbas = nbas;
-        envs->atm  = atm;
-        envs->bas  = bas;
-        envs->env  = env;
+        envs->atm = atm;
+        envs->bas = bas;
+        envs->env = env;
         envs->shls = shls;
 
-        const FINT i_sh = (const int)shls[0];
-        const FINT j_sh = (const int)shls[1];
+        //const FINT i_sh = (const int)shls[0];
+        //const FINT j_sh = (const int)shls[1];
+        const FINT i_sh = shls[0];
+        const FINT j_sh = shls[1];
         envs->i_l = bas(ANG_OF, i_sh);
         envs->j_l = bas(ANG_OF, j_sh);
         envs->x_ctr[0] = bas(NCTR_OF, i_sh);
@@ -8434,7 +8436,6 @@ void CINTinit_int1e_EnvVars(CINTEnvVars *envs,
         envs->nfi = (envs->i_l+1)*(envs->i_l+2)/2;
         envs->nfj = (envs->j_l+1)*(envs->j_l+2)/2;
         envs->nf = envs->nfi * envs->nfj;
-        if (print) printf("envs-> nf %d\n\n\n", envs->nf);
         envs->common_factor = 1;
         if (env[PTR_EXPCUTOFF] == 0) {
                 envs->expcutoff = EXPCUTOFF;
@@ -8444,34 +8445,8 @@ void CINTinit_int1e_EnvVars(CINTEnvVars *envs,
 
         envs->li_ceil = envs->i_l + ng[IINC];
         envs->lj_ceil = envs->j_l + ng[JINC];
-
-        //#define bas(SLOT,I)     bas[BAS_SLOTS * (I) + (SLOT)]
-        //#define atm(SLOT,I)     atm[ATM_SLOTS * (I) + (SLOT)]
-
         envs->ri = env + atm(PTR_COORD, bas(ATOM_OF, i_sh));
         envs->rj = env + atm(PTR_COORD, bas(ATOM_OF, j_sh));
-
-        //envs->ri = env + atm(PTR_COORD, bas(ATOM_OF, i_sh));
-        //envs->ri = env + atm(PTR_COORD, bas[BAS_SLOTS*i_sh + ATOM_OF]);
-        //printf("before computing ri,rj\n");
-        //envs->ri = env + atm[ATM_SLOTS * bas[BAS_SLOTS*i_sh + ATOM_OF] + PTR_COORD];
-        //envs->ri = env + atm[ATM_SLOTS * bas[BAS_SLOTS*i_sh ] + PTR_COORD];
-        //envs->ri = env + atm[ATM_SLOTS * bas[0] + PTR_COORD];
-        //envs->rj = env + atm(PTR_COORD, bat[BAS_SLOTS*j_sh + ATOM_OF]);
-        //envs->rj = env + atm[ATM_SLOTS * bas[BAS_SLOTS*j_sh + ATOM_OF] + PTR_COORD];
-        //printf("after comptuing ri,rj\n");
-        //envs->rj = env + atm[ATM_SLOTS * bas[BAS_SLOTS*j_sh ] + PTR_COORD];
-        //envs->rj = env + atm[ATM_SLOTS * bas[0] + PTR_COORD];
-        
-        //printf("%d %d %d %d\n", i_sh, j_sh, bas[BAS_SLOTS*i_sh + ATOM_OF] , bas[BAS_SLOTS*i_sh + ATOM_OF] );
-        //printf("%d %d %d %d\n", i_sh, j_sh, bas[BAS_SLOTS*i_sh + ATOM_OF] , bas[BAS_SLOTS*i_sh + ATOM_OF] );
-        //printf("%d %d %d %d\n", i_sh, j_sh, atm[ATM_SLOTS * bas[BAS_SLOTS*i_sh + ATOM_OF] + PTR_COORD], atm[ATM_SLOTS * bas[BAS_SLOTS*i_sh + ATOM_OF] + PTR_COORD]);
-
-        //printf("%f %f %f\n", envs->ri[0], envs->ri[1], envs->ri[2]);
-        //printf("%f %f %f\n", envs->rj[0], envs->rj[1], envs->rj[2]);
-        //printf("%f %f %f\n", envs->ri[0]-envs->rj[0], envs->ri[1]-envs->rj[1], envs->ri[2]-envs->rj[2]);
-
-        //envs->rj = env + atm(PTR_COORD, bas(ATOM_OF, j_sh));
 
         envs->gbits = ng[GSHIFT];
         envs->ncomp_e1 = ng[POS_E1];
@@ -8482,32 +8457,26 @@ void CINTinit_int1e_EnvVars(CINTEnvVars *envs,
                 envs->nrys_roots = (envs->li_ceil + envs->lj_ceil)/2 + 1;
         }
 
-        if (print) printf("init env bfore rirj \n");
         FINT dli, dlj;
         FINT ibase = envs->li_ceil > envs->lj_ceil;
         if (ibase) {
                 dli = envs->li_ceil + envs->lj_ceil + 1;
                 dlj = envs->lj_ceil + 1;
-                //envs->rirj[0] = envs->ri[0];//- envs->rj[0]; //
-                //envs->rirj[1] = envs->ri[1];// - envs->rj[1];
                 envs->rirj[0] = envs->ri[0] - envs->rj[0];
                 envs->rirj[1] = envs->ri[1] - envs->rj[1];
                 envs->rirj[2] = envs->ri[2] - envs->rj[2];
-        }
-        else {
+        } else {
                 dli = envs->li_ceil + 1;
                 dlj = envs->li_ceil + envs->lj_ceil + 1;
-                envs->rirj[0] = envs->rj[0] - envs->ri[0];//envs->rj[0] - envs->ri[0];
+                envs->rirj[0] = envs->rj[0] - envs->ri[0];
                 envs->rirj[1] = envs->rj[1] - envs->ri[1];
                 envs->rirj[2] = envs->rj[2] - envs->ri[2];
         }
-        if (print) printf("init env post rirj \n");
         envs->g_stride_i = envs->nrys_roots;
         envs->g_stride_j = envs->nrys_roots * dli;
         envs->g_size     = envs->nrys_roots * dli * dlj;
         envs->g_stride_k = envs->g_size;
         envs->g_stride_l = envs->g_size;
-        return;
 
         /*assert(i_sh < SHLS_MAX);
         assert(j_sh < SHLS_MAX);
@@ -9269,531 +9238,20 @@ static dtype g_trans_cart2sph[] = {
         
 #ifdef PYPZPX
         
-        0,
-        1,
-        0,
-        
-        0,
-        0,
-        1,
-        
-        1,
-        0,
-        0,
+        0, 1, 0, 0, 0, 1, 1, 0, 0,
 #else
-
-        
-        1,
-        0,
-        0,
-        
-        0,
-        1,
-        0,
-        
-        0,
-        0,
-        1,
+1, 0, 0, 0, 1, 0, 0, 0, 1,
 #endif
-        
-        0,
-        1.092548430592079070,
-        0,
-        0,
-        0,
-        0,
-        
-        0,
-        0,
-        0,
-        0,
-        1.092548430592079070,
-        0,
-        
-        -0.315391565252520002,
-        0,
-        0,
-        -0.315391565252520002,
-        0,
-        0.630783130505040012,
-        
-        0,
-        0,
-        1.092548430592079070,
-        0,
-        0,
-        0,
-        
-        0.546274215296039535,
-        0,
-        0,
-        -0.546274215296039535,
-        0,
-        0,
-        
-        0,
-        1.770130769779930531,
-        0,
-        0,
-        0,
-        0,
-        -0.590043589926643510,
-        0,
-        0,
-        0,
-        
-        0,
-        0,
-        0,
-        0,
-        2.890611442640554055,
-        0,
-        0,
-        0,
-        0,
-        0,
-        
-        0,
-        -0.457045799464465739,
-        0,
-        0,
-        0,
-        0,
-        -0.457045799464465739,
-        0,
-        1.828183197857862944,
-        0,
-        
-        0,
-        0,
-        -1.119528997770346170,
-        0,
-        0,
-        0,
-        0,
-        -1.119528997770346170,
-        0,
-        0.746352665180230782,
-        
-        -0.457045799464465739,
-        0,
-        0,
-        -0.457045799464465739,
-        0,
-        1.828183197857862944,
-        0,
-        0,
-        0,
-        0,
-        
-        0,
-        0,
-        1.445305721320277020,
-        0,
-        0,
-        0,
-        0,
-        -1.445305721320277020,
-        0,
-        0,
-        
-        0.590043589926643510,
-        0,
-        0,
-        -1.770130769779930530,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        
-        0,
-        2.503342941796704538,
-        0,
-        0,
-        0,
-        0,
-        -2.503342941796704530,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        
-        0,
-        0,
-        0,
-        0,
-        5.310392309339791593,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        -1.770130769779930530,
-        0,
-        0,
-        0,
-        
-        0,
-        -0.946174695757560014,
-        0,
-        0,
-        0,
-        0,
-        -0.946174695757560014,
-        0,
-        5.677048174545360108,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        
-        0,
-        0,
-        0,
-        0,
-        -2.007139630671867500,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        -2.007139630671867500,
-        0,
-        2.676186174229156671,
-        0,
-        
-        0.317356640745612911,
-        0,
-        0,
-        0.634713281491225822,
-        0,
-        -2.538853125964903290,
-        0,
-        0,
-        0,
-        0,
-        0.317356640745612911,
-        0,
-        -2.538853125964903290,
-        0,
-        0.846284375321634430,
-        
-        0,
-        0,
-        -2.007139630671867500,
-        0,
-        0,
-        0,
-        0,
-        -2.007139630671867500,
-        0,
-        2.676186174229156671,
-        0,
-        0,
-        0,
-        0,
-        0,
-        
-        -0.473087347878780002,
-        0,
-        0,
-        0,
-        0,
-        2.838524087272680054,
-        0,
-        0,
-        0,
-        0,
-        0.473087347878780009,
-        0,
-        -2.838524087272680050,
-        0,
-        0,
-        
-        0,
-        0,
-        1.770130769779930531,
-        0,
-        0,
-        0,
-        0,
-        -5.310392309339791590,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        
-        0.625835735449176134,
-        0,
-        0,
-        -3.755014412695056800,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0.625835735449176134,
-        0,
-        0,
-        0,
-        0,
-        
-        0,
-        3.281910284200850514,
-        0,
-        0,
-        0,
-        0,
-        -6.563820568401701020,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0.656382056840170102,
-        0,
-        0,
-        0,
-        0,
-        0,
-        
-        0,
-        0,
-        0,
-        0,
-        8.302649259524165115,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        -8.302649259524165110,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        
-        0,
-        -1.467714898305751160,
-        0,
-        0,
-        0,
-        0,
-        -0.978476598870500779,
-        0,
-        11.741719186446009300,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0.489238299435250387,
-        0,
-        -3.913906395482003100,
-        0,
-        0,
-        0,
-        
-        0,
-        0,
-        0,
-        0,
-        -4.793536784973323750,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        -4.793536784973323750,
-        0,
-        9.587073569946647510,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        
-        0,
-        0.452946651195696921,
-        0,
-        0,
-        0,
-        0,
-        0.905893302391393842,
-        0,
-        -5.435359814348363050,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0.452946651195696921,
-        0,
-        -5.435359814348363050,
-        0,
-        3.623573209565575370,
-        0,
-        
-        0,
-        0,
-        1.754254836801353946,
-        0,
-        0,
-        0,
-        0,
-        3.508509673602707893,
-        0,
-        -4.678012898136943850,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        1.754254836801353946,
-        0,
-        -4.678012898136943850,
-        0,
-        0.935602579627388771,
-        
-        0.452946651195696921,
-        0,
-        0,
-        0.905893302391393842,
-        0,
-        -5.435359814348363050,
-        0,
-        0,
-        0,
-        0,
-        0.452946651195696921,
-        0,
-        -5.435359814348363050,
-        0,
-        3.623573209565575370,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        
-        0,
-        0,
-        -2.396768392486661870,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        4.793536784973323755,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        2.396768392486661877,
-        0,
-        -4.793536784973323750,
-        0,
-        0,
-        
-        -0.489238299435250389,
-        0,
-        0,
-        0.978476598870500775,
-        0,
-        3.913906395482003101,
-        0,
-        0,
-        0,
-        0,
-        1.467714898305751163,
-        0,
-        -11.741719186446009300,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        
-        0,
-        0,
-        2.075662314881041278,
-        0,
-        0,
-        0,
-        0,
-        -12.453973889286247600,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        2.075662314881041278,
-        0,
-        0,
-        0,
-        0,
-        
-        0.656382056840170102,
-        0,
-        0,
-        -6.563820568401701020,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        3.281910284200850514,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        
+        0, 1.092548430592079070, 0, 0, 0, 0, 0, 0, 0, 0, 1.092548430592079070, 0, -0.315391565252520002, 0, 0, -0.315391565252520002, 0, 0.630783130505040012, 0,
+        0, 1.092548430592079070, 0, 0, 0, 0.546274215296039535, 0, 0, -0.546274215296039535, 0, 0, 0, 1.770130769779930531,
+        0, 0, 0, 0, -0.590043589926643510, 0, 0, 0, 0, 0, 0, 0, 2.890611442640554055, 0,
+        0, 0, 0, 0, 0, -0.457045799464465739, 0, 0, 0, 0, -0.457045799464465739, 0, 1.828183197857862944, 0,
+        0, 0, -1.119528997770346170, 0, 0, 0, 0, -1.119528997770346170, 0, 0.746352665180230782, -0.457045799464465739, 0, 0,
+        -0.457045799464465739, 0, 1.828183197857862944, 0, 0, 0, 0, 0, 0, 1.445305721320277020, 0, 0, 0, 0, -1.445305721320277020,
+        0, 0, 0.590043589926643510, 0, 0, -1.770130769779930530, 0, 0, 0, 0,
+        0, 0, 0, 2.503342941796704538, 0, 0, 0, 0, -2.503342941796704530, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5.310392309339791593, 0, 0, 0, 0, 0, 0, -1.770130769779930530, 0, 0, 0, 0, -0.946174695757560014, 0, 0, 0, 0, -0.946174695757560014, 0, 5.677048174545360108, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -2.007139630671867500, 0, 0, 0, 0, 0, 0, -2.007139630671867500, 0, 2.676186174229156671, 0, 0.317356640745612911, 0, 0,
+        0.634713281491225822, 0, -2.538853125964903290, 0, 0, 0, 0, 0.317356640745612911, 0, -2.538853125964903290, 0, 0.846284375321634430, 0, 0, -2.007139630671867500, 0, 0, 0, 0, -2.007139630671867500, 0, 2.676186174229156671, 0, 0, 0, 0, 0, -0.473087347878780002, 0, 0, 0, 0, 2.838524087272680054, 0, 0, 0, 0, 0.473087347878780009, 0, -2.838524087272680050, 0, 0, 0, 0, 1.770130769779930531, 0, 0, 0, 0, -5.310392309339791590, 0, 0, 0, 0, 0, 0, 0, 0.625835735449176134,
+        0, 0, -3.755014412695056800, 0, 0, 0, 0, 0, 0, 0.625835735449176134, 0, 0, 0, 0, 0, 3.281910284200850514, 0, 0, 0, 0, -6.563820568401701020, 0, 0, 0, 0, 0, 0, 0, 0, 0.656382056840170102, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.302649259524165115, 0, 0, 0, 0, 0, 0, -8.302649259524165110, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.467714898305751160, 0, 0, 0, 0, -0.978476598870500779, 0, 11.741719186446009300, 0, 0, 0, 0, 0, 0, 0.489238299435250387, 0, -3.913906395482003100, 0, 0, 0, 0, 0, 0, 0, -4.793536784973323750, 0, 0, 0, 0, 0, 0, -4.793536784973323750, 0, 9.587073569946647510, 0, 0, 0, 0, 0, 0, 0, 0, 0.452946651195696921, 0, 0, 0, 0, 0.905893302391393842, 0, -5.435359814348363050, 0, 0, 0, 0, 0, 0, 0.452946651195696921, 0, -5.435359814348363050, 0, 3.623573209565575370, 0, 0, 0, 1.754254836801353946, 0, 0, 0, 0, 3.508509673602707893, 0, -4.678012898136943850, 0, 0, 0, 0, 0, 0, 1.754254836801353946, 0, -4.678012898136943850, 0, 0.935602579627388771, 0.452946651195696921, 0, 0, 0.905893302391393842, 0, -5.435359814348363050, 0, 0, 0, 0, 0.452946651195696921, 0, -5.435359814348363050, 0, 3.623573209565575370, 0, 0, 0, 0, 0, 0, 0, 0, -2.396768392486661870, 0, 0, 0, 0, 0, 0, 4.793536784973323755, 0, 0, 0, 0, 0, 0, 2.396768392486661877, 0, -4.793536784973323750, 0, 0, -0.489238299435250389, 0, 0, 0.978476598870500775, 0, 3.913906395482003101, 0, 0, 0, 0, 1.467714898305751163, 0, -11.741719186446009300, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.075662314881041278, 0, 0, 0, 0, -12.453973889286247600, 0, 0, 0, 0, 0, 0, 0, 0, 2.075662314881041278, 0, 0, 0, 0, 0.656382056840170102, 0, 0, -6.563820568401701020, 0, 0, 0, 0, 0, 0, 3.281910284200850514, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 4.0991046311514863, 0, 0, 0, 0, -13.6636821038382887, 0, 0, 0, 0, 0, 0, 0, 0, 4.0991046311514863, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         
         0, 0, 0, 0, 11.8330958111587634, 0, 0, 0, 0, 0, 0, -23.6661916223175268, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.3666191622317525, 0, 0, 0, 0, 0,
@@ -12797,11 +12255,11 @@ struct cart2sp_t {
         dtype *cart2j_gt_lI; 
 };
 
-
+// hardcoded g_c2s;; warning 
 static struct cart2sp_t g_c2s[] = {
         {g_trans_cart2sph     ,g_trans_cart2jR      , g_trans_cart2jI      , g_trans_cart2jR      , g_trans_cart2jI      },
         {g_trans_cart2sph+1   ,g_trans_cart2jR+4    , g_trans_cart2jI+4    , g_trans_cart2jR+16   , g_trans_cart2jI+16   },
-        {g_trans_cart2sph+10  ,g_trans_cart2jR+40   , g_trans_cart2jI+40   , g_trans_cart2jR+88   , g_trans_cart2jI+88   },
+        /*{g_trans_cart2sph+10  ,g_trans_cart2jR+40   , g_trans_cart2jI+40   , g_trans_cart2jR+88   , g_trans_cart2jI+88   },
         {g_trans_cart2sph+40  ,g_trans_cart2jR+160  , g_trans_cart2jI+160  , g_trans_cart2jR+280  , g_trans_cart2jI+280  },
         {g_trans_cart2sph+110 ,g_trans_cart2jR+440  , g_trans_cart2jI+440  , g_trans_cart2jR+680  , g_trans_cart2jI+680  },
         {g_trans_cart2sph+245 ,g_trans_cart2jR+980  , g_trans_cart2jI+980  , g_trans_cart2jR+1400 , g_trans_cart2jI+1400 },
@@ -12814,7 +12272,7 @@ static struct cart2sp_t g_c2s[] = {
         {g_trans_cart2sph+6370,g_trans_cart2jR+25480, g_trans_cart2jI+25480, g_trans_cart2jR+29848, g_trans_cart2jI+29848},
         {g_trans_cart2sph+8645,  NULL, NULL, NULL, NULL},
         {g_trans_cart2sph+11480, NULL, NULL, NULL, NULL},
-        {g_trans_cart2sph+14960, NULL, NULL, NULL, NULL},
+        {g_trans_cart2sph+14960, NULL, NULL, NULL, NULL},*/
 };
 
 
@@ -13117,6 +12575,7 @@ static dtype *g_ket_cart2spheric(dtype *gsph, dtype *gcart,
 }
 
 
+// c2s hardcoded array 
 #ifdef __cplusplus
 //dtype *(*c2s_bra_sph[16])(...) = {
 typedef dtype *(*Funcs) (dtype *gsph, int nket, dtype *gcart, int l);
@@ -14114,10 +13573,11 @@ void c2s_sph_1e(dtype *opij, dtype *gctr, FINT *dims,
 }
 
 
+// return hack start 
 void c2s_sf_1e(dtype *opij, dtype *gctr, FINT *dims,
                CINTEnvVars *envs, dtype *cache)
 {
-        return; // TODO; 
+        //return; // TODO; 
         FINT *shls = envs->shls;
         FINT *bas = envs->bas;
         FINT i_sh = shls[0];
@@ -14137,11 +13597,15 @@ void c2s_sf_1e(dtype *opij, dtype *gctr, FINT *dims,
         FINT nf2j = nfj + nfj;
         FINT nf = envs->nf;
         FINT ic, jc;
-        dtype *tmp1R, *tmp1I, *tmp2R, *tmp2I;
+        /*dtype *tmp1R, *tmp1I, *tmp2R, *tmp2I;
         MALLOC_INSTACK(tmp1R, di*nf2j);
         MALLOC_INSTACK(tmp1I, di*nf2j);
         MALLOC_INSTACK(tmp2R, di*dj);
-        MALLOC_INSTACK(tmp2I, di*dj);
+        MALLOC_INSTACK(tmp2I, di*dj);*/
+        MALLOC(dtype, tmp1R);
+        MALLOC(dtype, tmp1I);
+        MALLOC(dtype, tmp2R);
+        MALLOC(dtype, tmp2I);
 
         for (jc = 0; jc < j_ctr; jc++) {
         for (ic = 0; ic < i_ctr; ic++) {
@@ -14153,9 +13617,7 @@ void c2s_sf_1e(dtype *opij, dtype *gctr, FINT *dims,
 }
 
 void c2s_sf_1ei(dtype *opij, dtype *gctr, FINT *dims,
-                CINTEnvVars *envs, dtype *cache)
-{
-        return; 
+                CINTEnvVars *envs, dtype *cache) {
         FINT *shls = envs->shls;
         FINT *bas = envs->bas;
         FINT i_sh = shls[0];
@@ -14175,11 +13637,15 @@ void c2s_sf_1ei(dtype *opij, dtype *gctr, FINT *dims,
         FINT nf2j = nfj + nfj;
         FINT nf = envs->nf;
         FINT ic, jc;
-        dtype *tmp1R, *tmp1I, *tmp2R, *tmp2I;
+        /*dtype *tmp1R, *tmp1I, *tmp2R, *tmp2I;
         MALLOC_INSTACK(tmp1R, di*nf2j);
         MALLOC_INSTACK(tmp1I, di*nf2j);
         MALLOC_INSTACK(tmp2R, di*dj);
-        MALLOC_INSTACK(tmp2I, di*dj);
+        MALLOC_INSTACK(tmp2I, di*dj);*/
+        MALLOC(dtype, tmp1R);
+        MALLOC(dtype, tmp1I);
+        MALLOC(dtype, tmp2R);
+        MALLOC(dtype, tmp2I);
 
         for (jc = 0; jc < j_ctr; jc++) {
         for (ic = 0; ic < i_ctr; ic++) {
@@ -14194,7 +13660,7 @@ void c2s_sf_1ei(dtype *opij, dtype *gctr, FINT *dims,
 void c2s_si_1e(dtype *opij, dtype *gctr, FINT *dims,
                CINTEnvVars *envs, dtype *cache)
 {
-        return; 
+        //return; 
         FINT *shls = envs->shls;
         FINT *bas = envs->bas;
         FINT i_sh = shls[0];
@@ -14220,11 +13686,15 @@ void c2s_si_1e(dtype *opij, dtype *gctr, FINT *dims,
         dtype *gc_y = gc_x + nf * i_ctr * j_ctr;
         dtype *gc_z = gc_y + nf * i_ctr * j_ctr;
         dtype *gc_1 = gc_z + nf * i_ctr * j_ctr;
-        dtype *tmp1R, *tmp1I, *tmp2R, *tmp2I;
+        /*dtype *tmp1R, *tmp1I, *tmp2R, *tmp2I;
         MALLOC_INSTACK(tmp1R, di*nf2j);
         MALLOC_INSTACK(tmp1I, di*nf2j);
         MALLOC_INSTACK(tmp2R, di*dj);
-        MALLOC_INSTACK(tmp2I, di*dj);
+        MALLOC_INSTACK(tmp2I, di*dj);*/
+        MALLOC(dtype, tmp1R);
+        MALLOC(dtype, tmp1I);
+        MALLOC(dtype, tmp2R);
+        MALLOC(dtype, tmp2I);
 
         for (jc = 0; jc < j_ctr; jc++) {
         for (ic = 0; ic < i_ctr; ic++) {
@@ -14266,12 +13736,16 @@ void c2s_si_1ei(dtype *opij, dtype *gctr, FINT *dims,
         dtype *gc_y = gc_x + nf * i_ctr * j_ctr;
         dtype *gc_z = gc_y + nf * i_ctr * j_ctr;
         dtype *gc_1 = gc_z + nf * i_ctr * j_ctr;
-        dtype *tmp1R, *tmp1I, *tmp2R, *tmp2I;
+        /*dtype *tmp1R, *tmp1I, *tmp2R, *tmp2I;
         return; 
         MALLOC_INSTACK(tmp1R, di*nf2j);
         MALLOC_INSTACK(tmp1I, di*nf2j);
         MALLOC_INSTACK(tmp2R, di*dj);
-        MALLOC_INSTACK(tmp2I, di*dj);
+        MALLOC_INSTACK(tmp2I, di*dj);*/
+        MALLOC(dtype, tmp1R);
+        MALLOC(dtype, tmp1I);
+        MALLOC(dtype, tmp2R);
+        MALLOC(dtype, tmp2I);
 
         for (jc = 0; jc < j_ctr; jc++) {
         for (ic = 0; ic < i_ctr; ic++) {
@@ -14305,10 +13779,12 @@ void c2s_sph_1e_grids(dtype *out, dtype *gctr, FINT *dims,
         FINT ic, jc, grids_offset;
         FINT bgrids, bgrids_di, bgrids_nfi;
         FINT buflen = GRID_BLKSIZE * nfi * dj;
-        dtype *buf1, *buf2;
-        return;
+        /*dtype *buf1, *buf2;
+        //return;
         MALLOC_ALIGN8_INSTACK(buf1, buflen);
-        MALLOC_ALIGN8_INSTACK(buf2, buflen);
+        MALLOC_ALIGN8_INSTACK(buf2, buflen);*/
+        MALLOC(dtype, buf1);
+        MALLOC(dtype, buf2);
         dtype *pij;
         dtype *tmp1;
 
@@ -14383,12 +13859,16 @@ void c2s_sf_1e_grids(dtype *out, dtype *gctr, FINT *dims,
         FINT ic, jc, grids_offset;
         FINT bgrids, bgrids_di;
         FINT buflen = GRID_BLKSIZE * di * nf2j;
-        dtype *tmp1R, *tmp1I, *tmp2R, *tmp2I;
+        /*dtype *tmp1R, *tmp1I, *tmp2R, *tmp2I;
         return; 
         MALLOC_ALIGN8_INSTACK(tmp1R, buflen);
         MALLOC_ALIGN8_INSTACK(tmp1I, buflen);
         MALLOC_ALIGN8_INSTACK(tmp2R, buflen);
-        MALLOC_ALIGN8_INSTACK(tmp2I, buflen);
+        MALLOC_ALIGN8_INSTACK(tmp2I, buflen);*/
+        MALLOC(dtype, tmp1R);
+        MALLOC(dtype, tmp1I);
+        MALLOC(dtype, tmp2R);
+        MALLOC(dtype, tmp2I);
         dtype *pij;
 
         for (grids_offset = 0; grids_offset < ngrids; grids_offset += GRID_BLKSIZE) {
@@ -14431,12 +13911,16 @@ void c2s_sf_1e_gridsi(dtype *out, dtype *gctr, FINT *dims,
         FINT ic, jc, grids_offset;
         FINT bgrids, bgrids_di;
         FINT buflen = GRID_BLKSIZE * di * nf2j;
-        dtype *tmp1R, *tmp1I, *tmp2R, *tmp2I;
+        /*dtype *tmp1R, *tmp1I, *tmp2R, *tmp2I;
         return; 
         MALLOC_ALIGN8_INSTACK(tmp1R, buflen);
         MALLOC_ALIGN8_INSTACK(tmp1I, buflen);
         MALLOC_ALIGN8_INSTACK(tmp2R, buflen);
-        MALLOC_ALIGN8_INSTACK(tmp2I, buflen);
+        MALLOC_ALIGN8_INSTACK(tmp2I, buflen);*/
+        MALLOC(dtype, tmp1R);
+        MALLOC(dtype, tmp1I);
+        MALLOC(dtype, tmp2R);
+        MALLOC(dtype, tmp2I);
         dtype *pij;
 
         for (grids_offset = 0; grids_offset < ngrids; grids_offset += GRID_BLKSIZE) {
@@ -14484,12 +13968,16 @@ void c2s_si_1e_grids(dtype *out, dtype *gctr, FINT *dims,
         dtype *gc_z = gc_y + ngrids * nf * i_ctr * j_ctr;
         dtype *gc_1 = gc_z + ngrids * nf * i_ctr * j_ctr;
         FINT buflen = GRID_BLKSIZE * di * nf2j;
-        dtype *tmp1R, *tmp1I, *tmp2R, *tmp2I;
+        /*dtype *tmp1R, *tmp1I, *tmp2R, *tmp2I;
         return; 
         MALLOC_ALIGN8_INSTACK(tmp1R, buflen);
         MALLOC_ALIGN8_INSTACK(tmp1I, buflen);
         MALLOC_ALIGN8_INSTACK(tmp2R, buflen);
-        MALLOC_ALIGN8_INSTACK(tmp2I, buflen);
+        MALLOC_ALIGN8_INSTACK(tmp2I, buflen);*/
+        MALLOC(dtype, tmp1R);
+        MALLOC(dtype, tmp1I);
+        MALLOC(dtype, tmp2R);
+        MALLOC(dtype, tmp2I);
         dtype *pij;
 
         for (grids_offset = 0; grids_offset < ngrids; grids_offset += GRID_BLKSIZE) {
@@ -14541,12 +14029,16 @@ void c2s_si_1e_gridsi(dtype *out, dtype *gctr, FINT *dims,
         dtype *gc_z = gc_y + ngrids * nf * i_ctr * j_ctr;
         dtype *gc_1 = gc_z + ngrids * nf * i_ctr * j_ctr;
         FINT buflen = GRID_BLKSIZE * di * nf2j;
-        dtype *tmp1R, *tmp1I, *tmp2R, *tmp2I;
+        /*dtype *tmp1R, *tmp1I, *tmp2R, *tmp2I;
         return; 
         MALLOC_ALIGN8_INSTACK(tmp1R, buflen);
         MALLOC_ALIGN8_INSTACK(tmp1I, buflen);
         MALLOC_ALIGN8_INSTACK(tmp2R, buflen);
-        MALLOC_ALIGN8_INSTACK(tmp2I, buflen);
+        MALLOC_ALIGN8_INSTACK(tmp2I, buflen);*/
+        MALLOC(dtype, tmp1R);
+        MALLOC(dtype, tmp1I);
+        MALLOC(dtype, tmp2R);
+        MALLOC(dtype, tmp2I);
         dtype *pij;
 
         for (grids_offset = 0; grids_offset < ngrids; grids_offset += GRID_BLKSIZE) {
@@ -14571,7 +14063,6 @@ void c2s_si_1e_gridsi(dtype *out, dtype *gctr, FINT *dims,
 void c2s_sph_2e1(dtype *out, dtype *gctr, FINT *dims,
                  CINTEnvVars *envs, dtype *cache)
 {
-        return;
         FINT i_l = envs->i_l;
         FINT j_l = envs->j_l;
         FINT k_l = envs->k_l;
@@ -14600,8 +14091,9 @@ void c2s_sph_2e1(dtype *out, dtype *gctr, FINT *dims,
         FINT ofl = ni * nj * nk * dl;
         FINT ic, jc, kc, lc;
         FINT buflen = nfikl*dj;
-        dtype *buf1;
-        MALLOC_INSTACK(buf1, buflen*4);
+        //dtype *buf1;
+        //MALLOC_INSTACK(buf1, buflen*4);
+        MALLOC(dtype, buf1);
         dtype *buf2 = buf1 + buflen;
         dtype *buf3 = buf2 + buflen;
         dtype *buf4 = buf3 + buflen;
@@ -14651,10 +14143,12 @@ void c2s_sf_2e1(dtype *opij, dtype *gctr, FINT *dims,
         FINT d_j = nfk * nfl * nfj;
         FINT i;
         FINT buflen = di * nfk * nfl * nf2j;
-        dtype *tmp1R, *tmp1I;
+        /*dtype *tmp1R, *tmp1I;
         return; 
         MALLOC_INSTACK(tmp1R, buflen);
-        MALLOC_INSTACK(tmp1I, buflen);
+        MALLOC_INSTACK(tmp1I, buflen);*/
+        MALLOC(dtype, tmp1R);
+        MALLOC(dtype, tmp1I);
 
         for (i = 0; i < i_ctr * j_ctr * k_ctr * l_ctr; i++) {
                 a_bra_cart2spinor_sf(tmp1R, tmp1I, NULL, NULL, NULL, gctr, d_j, i_kp, i_l);
@@ -14691,10 +14185,12 @@ void c2s_sf_2e1i(dtype *opij, dtype *gctr, FINT *dims,
         FINT d_j = nfk * nfl * nfj;
         FINT i;
         FINT len1 = di * nfk * nfl * nf2j;
-        dtype *tmp1R, *tmp1I;
+        /*dtype *tmp1R, *tmp1I;
         return; 
         MALLOC_INSTACK(tmp1R, len1);
-        MALLOC_INSTACK(tmp1I, len1);
+        MALLOC_INSTACK(tmp1I, len1);*/
+        MALLOC(dtype, tmp1R);
+        MALLOC(dtype, tmp1I);
 
         for (i = 0; i < i_ctr * j_ctr * k_ctr * l_ctr; i++) {
                 a_bra_cart2spinor_sf(tmp1R, tmp1I, NULL, NULL, NULL, gctr, d_j, i_kp, i_l);
@@ -14745,12 +14241,16 @@ void c2s_sf_2e2(dtype *fijkl, dtype *opij, FINT *dims,
         FINT ic, jc, kc, lc;
         FINT len1 = di * dk * nf2l * dj;
         FINT len2 = di * dk * dl * dj;
-        dtype *tmp1R, *tmp1I, *tmp2R, *tmp2I;
+        /*dtype *tmp1R, *tmp1I, *tmp2R, *tmp2I;
         return; 
         MALLOC_INSTACK(tmp1R, len1);
         MALLOC_INSTACK(tmp1I, len1);
         MALLOC_INSTACK(tmp2R, len2);
-        MALLOC_INSTACK(tmp2I, len2);
+        MALLOC_INSTACK(tmp2I, len2);*/
+        MALLOC(dtype, tmp1R);
+        MALLOC(dtype, tmp1I);
+        MALLOC(dtype, tmp2R);
+        MALLOC(dtype, tmp2I);
         dtype *pfijkl;
 
         for (lc = 0; lc < l_ctr; lc++) {
@@ -14804,12 +14304,16 @@ void c2s_sf_2e2i(dtype *fijkl, dtype *opij, FINT *dims,
         FINT ic, jc, kc, lc;
         FINT len2 = di * dk * dl * dj;
         FINT len1 = di * dk * nf2l * dj;
-        dtype *tmp1R, *tmp1I, *tmp2R, *tmp2I;
+        /*dtype *tmp1R, *tmp1I, *tmp2R, *tmp2I;
         return; 
         MALLOC_INSTACK(tmp1R, len1);
         MALLOC_INSTACK(tmp1I, len1);
         MALLOC_INSTACK(tmp2R, len2);
-        MALLOC_INSTACK(tmp2I, len2);
+        MALLOC_INSTACK(tmp2I, len2);*/
+        MALLOC(dtype, tmp1R);
+        MALLOC(dtype, tmp1I);
+        MALLOC(dtype, tmp2R);
+        MALLOC(dtype, tmp2I);
         dtype *pfijkl;
 
         for (lc = 0; lc < l_ctr; lc++) {
@@ -14858,10 +14362,12 @@ void c2s_si_2e1(dtype *opij, dtype *gctr, FINT *dims,
         dtype *gc_z = gc_y + nf * i_ctr * j_ctr * k_ctr * l_ctr;
         dtype *gc_1 = gc_z + nf * i_ctr * j_ctr * k_ctr * l_ctr;
         FINT len1 = di * nfk * nfl * nf2j;
-        dtype *tmp1R, *tmp1I;
+        /*dtype *tmp1R, *tmp1I;
         return; 
         MALLOC_INSTACK(tmp1R, len1);
-        MALLOC_INSTACK(tmp1I, len1);
+        MALLOC_INSTACK(tmp1I, len1);*/
+        MALLOC(dtype, tmp1R);
+        MALLOC(dtype, tmp1I);
 
         for (i = 0; i < i_ctr * j_ctr * k_ctr * l_ctr; i++) {
                 a_bra_cart2spinor_si(tmp1R, tmp1I, gc_x, gc_y, gc_z, gc_1, d_j, i_kp, i_l);
@@ -14906,11 +14412,13 @@ void c2s_si_2e1i(dtype *opij, dtype *gctr, FINT *dims,
         dtype *gc_z = gc_y + nf * i_ctr * j_ctr * k_ctr * l_ctr;
         dtype *gc_1 = gc_z + nf * i_ctr * j_ctr * k_ctr * l_ctr;
         FINT len1 = di * nfk * nfl * nf2j;
-        dtype *tmp1R, *tmp1I;
+        /*dtype *tmp1R, *tmp1I;
         return;
 
         MALLOC_INSTACK(tmp1R, len1);
-        MALLOC_INSTACK(tmp1I, len1);
+        MALLOC_INSTACK(tmp1I, len1);*/
+        MALLOC(dtype, tmp1R);
+        MALLOC(dtype, tmp1I);
 
         for (i = 0; i < i_ctr * j_ctr * k_ctr * l_ctr; i++) {
                 a_bra_cart2spinor_si(tmp1R, tmp1I, gc_x, gc_y, gc_z, gc_1, d_j, i_kp, i_l);
@@ -14923,6 +14431,7 @@ void c2s_si_2e1i(dtype *opij, dtype *gctr, FINT *dims,
         }
 }
 
+/**/
 void c2s_si_2e2(dtype *fijkl, dtype *opij, FINT *dims,
                 CINTEnvVars *envs, dtype *cache)
 {
@@ -14967,12 +14476,16 @@ void c2s_si_2e2(dtype *fijkl, dtype *opij, FINT *dims,
         dtype *oz = oy + nop * OF_CMPLX * i_ctr * j_ctr * k_ctr * l_ctr;
         dtype *o1 = oz + nop * OF_CMPLX * i_ctr * j_ctr * k_ctr * l_ctr;
         FINT buflen = di * dk * nf2l * dj;
-        dtype *tmp1R, *tmp1I, *tmp2R, *tmp2I;
+        /*dtype *tmp1R, *tmp1I, *tmp2R, *tmp2I;
         return; 
         MALLOC_INSTACK(tmp1R, buflen);
         MALLOC_INSTACK(tmp1I, buflen);
         MALLOC_INSTACK(tmp2R, buflen);
-        MALLOC_INSTACK(tmp2I, buflen);
+        MALLOC_INSTACK(tmp2I, buflen);*/
+        MALLOC(dtype, tmp1R);
+        MALLOC(dtype, tmp1I);
+        MALLOC(dtype, tmp2R);
+        MALLOC(dtype, tmp2I);
 
         for (lc = 0; lc < l_ctr; lc++) {
         for (kc = 0; kc < k_ctr; kc++) {
@@ -15033,12 +14546,16 @@ void c2s_si_2e2i(dtype *fijkl, dtype *opij, FINT *dims,
         dtype *oz = oy + nop * OF_CMPLX * i_ctr * j_ctr * k_ctr * l_ctr;
         dtype *o1 = oz + nop * OF_CMPLX * i_ctr * j_ctr * k_ctr * l_ctr;
         FINT buflen = di * dk * nf2l * dj;
-        dtype *tmp1R, *tmp1I, *tmp2R, *tmp2I;
+        /*dtype *tmp1R, *tmp1I, *tmp2R, *tmp2I;
         return; 
         MALLOC_INSTACK(tmp2R, buflen);
         MALLOC_INSTACK(tmp2I, buflen);
         MALLOC_INSTACK(tmp1R, buflen);
-        MALLOC_INSTACK(tmp1I, buflen);
+        MALLOC_INSTACK(tmp1I, buflen);*/
+        MALLOC(dtype, tmp1R);
+        MALLOC(dtype, tmp1I);
+        MALLOC(dtype, tmp2R);
+        MALLOC(dtype, tmp2I);
 
         for (lc = 0; lc < l_ctr; lc++) {
         for (kc = 0; kc < k_ctr; kc++) {
@@ -15136,9 +14653,10 @@ void c2s_sph_3c2e1(dtype *bufijk, dtype *gctr, FINT *dims,
         FINT ofk = ni * nj * dk;
         FINT ic, jc, kc;
         FINT buflen = nfi*nfk*dj;
-        dtype *buf1;
+        /*dtype *buf1;
         return; 
-        MALLOC_INSTACK(buf1, buflen*3);
+        MALLOC_INSTACK(buf1, buflen*3);*/ // HACK; be warry of this. 
+        MALLOC(dtype, buf1);
         dtype *buf2 = buf1 + buflen;
         dtype *buf3 = buf2 + buflen;
         dtype *pijk;
@@ -15205,10 +14723,13 @@ void c2s_sph_3c2e1_ssc(dtype *bufijk, dtype *gctr, FINT *dims,
         FINT ofk = ni * nj * nfk;
         FINT ic, jc, kc;
         FINT buflen = nfi*nfk*dj;
-        dtype *buf1, *buf2;
+        /*dtype *buf1, *buf2;
         return; 
         MALLOC_INSTACK(buf1, buflen);
-        MALLOC_INSTACK(buf2, buflen);
+        MALLOC_INSTACK(buf2, buflen);*/
+        MALLOC(dtype, buf1)
+        MALLOC(dtype, buf2)
+
         dtype *pijk;
         dtype *tmp1;
 
@@ -16683,6 +16204,8 @@ void CINTx1j_grids(dtype *f, dtype *g, dtype *rj,
         type *GY = G + envs->g_size; \
         type *GZ = G + envs->g_size * 2
 
+#define realbas bas 
+
 void CINTinit_int2e_EnvVars(CINTEnvVars *envs, FINT *ng, FINT *shls,
                             FINT *atm, FINT natm, FINT *bas, FINT nbas, dtype *env)
 {
@@ -16693,10 +16216,10 @@ void CINTinit_int2e_EnvVars(CINTEnvVars *envs, FINT *ng, FINT *shls,
         envs->env = env;
         envs->shls = shls;
 
-        const FINT i_sh = shls[0];
-        const FINT j_sh = shls[1];
-        const FINT k_sh = shls[2];
-        const FINT l_sh = shls[3];
+        FINT i_sh = shls[0];
+        FINT j_sh = shls[1];
+        FINT k_sh = shls[2];
+        FINT l_sh = shls[3];
         envs->i_l = bas(ANG_OF, i_sh);
         envs->j_l = bas(ANG_OF, j_sh);
         envs->k_l = bas(ANG_OF, k_sh);
@@ -16735,8 +16258,7 @@ void CINTinit_int2e_EnvVars(CINTEnvVars *envs, FINT *ng, FINT *shls,
         envs->lj_ceil = envs->j_l + ng[JINC];
         envs->lk_ceil = envs->k_l + ng[KINC];
         envs->ll_ceil = envs->l_l + ng[LINC];
-        int rys_order =(envs->li_ceil + envs->lj_ceil
-                        + envs->lk_ceil + envs->ll_ceil)/2 + 1;
+        int rys_order =(envs->li_ceil + envs->lj_ceil + envs->lk_ceil + envs->ll_ceil)/2 + 1;
         int nrys_roots = rys_order;
         dtype omega = env[PTR_RANGE_OMEGA];
         if (omega < 0 && rys_order <= 3) {
@@ -16745,7 +16267,7 @@ void CINTinit_int2e_EnvVars(CINTEnvVars *envs, FINT *ng, FINT *shls,
         envs->rys_order = rys_order;
         envs->nrys_roots = nrys_roots;
 
-        assert(i_sh < SHLS_MAX);
+        /*assert(i_sh < SHLS_MAX);
         assert(j_sh < SHLS_MAX);
         assert(k_sh < SHLS_MAX);
         assert(l_sh < SHLS_MAX);
@@ -16761,7 +16283,7 @@ void CINTinit_int2e_EnvVars(CINTEnvVars *envs, FINT *ng, FINT *shls,
         assert(bas(ATOM_OF,j_sh) < natm);
         assert(bas(ATOM_OF,k_sh) < natm);
         assert(bas(ATOM_OF,l_sh) < natm);
-        assert(rys_order < MXRYSROOTS);
+        assert(rys_order < MXRYSROOTS);*/
 
         FINT dli, dlj, dlk, dll;
         FINT ibase = envs->li_ceil > envs->lj_ceil;
@@ -16814,6 +16336,7 @@ void CINTinit_int2e_EnvVars(CINTEnvVars *envs, FINT *ng, FINT *shls,
                 envs->rirj[1] = envs->rj[1] - envs->ri[1];
                 envs->rirj[2] = envs->rj[2] - envs->ri[2];
         }
+
 
         #ifdef __cplusplus
         if (rys_order <= 2) {
@@ -21596,7 +21119,6 @@ void CINTx1l_2e(dtype *f, const dtype *g, const dtype *rl,
 
 FINT CINT2e_loop_nopt(dtype *gctr, CINTEnvVars *envs, dtype *cache, FINT *empty)
 {
-        return 0; 
         FINT *shls  = envs->shls;
         FINT *bas = envs->bas;
         dtype *env = envs->env;
@@ -21613,7 +21135,6 @@ FINT CINT2e_loop_nopt(dtype *gctr, CINTEnvVars *envs, dtype *cache, FINT *empty)
         FINT k_prim = bas(NPRIM_OF, k_sh);
         FINT l_prim = bas(NPRIM_OF, l_sh);
         
-        
         dtype *rk = envs->rk;
         dtype *rl = envs->rl;
         dtype *ai = env + bas(PTR_EXP, i_sh);
@@ -21627,11 +21148,15 @@ FINT CINT2e_loop_nopt(dtype *gctr, CINTEnvVars *envs, dtype *cache, FINT *empty)
         dtype expcutoff = envs->expcutoff;
         dtype rr_ij = SQUARE(envs->rirj);
         dtype rr_kl = SQUARE(envs->rkrl);
-        dtype *log_maxci, *log_maxcj, *log_maxck, *log_maxcl;
-        PairData *pdata_base, *pdata_ij;
-        return 0; 
-        MALLOC_INSTACK(log_maxci, i_prim+j_prim+k_prim+l_prim);
-        MALLOC_INSTACK(pdata_base, i_prim*j_prim);
+        //dtype *log_maxci, *log_maxcj, *log_maxck, *log_maxcl;
+        //PairData *pdata_base, *pdata_ij;
+        dtype *log_maxcj, *log_maxck, *log_maxcl;
+        PairData *pdata_ij;
+
+        MALLOC(dtype, log_maxci);
+        MALLOC(PairData, pdata_base);
+        //MALLOC_INSTACK(log_maxci, i_prim+j_prim+k_prim+l_prim);
+        //MALLOC_INSTACK(pdata_base, i_prim*j_prim);
         log_maxcj = log_maxci + i_prim;
         log_maxck = log_maxcj + j_prim;
         log_maxcl = log_maxck + k_prim;
@@ -21655,7 +21180,6 @@ FINT CINT2e_loop_nopt(dtype *gctr, CINTEnvVars *envs, dtype *cache, FINT *empty)
         FINT *kempty = _empty + 2;
         FINT *lempty = _empty + 3;
         FINT *gempty = _empty + 4;
-        
 
         int lkl = envs->lk_ceil + envs->ll_ceil;
         dtype akl, ekl, expijkl, ccekl, log_rr_kl, eijcutoff, cutoff;
@@ -21665,10 +21189,6 @@ FINT CINT2e_loop_nopt(dtype *gctr, CINTEnvVars *envs, dtype *cache, FINT *empty)
         log_rr_kl = 1.7 - 1.5 * approx_log(akl);
         dtype omega = env[PTR_RANGE_OMEGA];
         if (omega < 0) {
-                
-                
-                
-                
                 
                 if (envs->rys_order > 1) {
                         dtype r_guess = 8.;
@@ -21693,13 +21213,16 @@ FINT CINT2e_loop_nopt(dtype *gctr, CINTEnvVars *envs, dtype *cache, FINT *empty)
                 }
         }
 
-        FINT *idx;
-        MALLOC_INSTACK(idx, nf * 3);
+        //FINT *idx;
+        //MALLOC_INSTACK(idx, nf * 3);
+        MALLOC(FINT, idx);
         CINTg2e_index_xyz(idx, envs);
 
-        FINT *non0ctri, *non0ctrj, *non0ctrk, *non0ctrl;
+        //FINT *non0ctri, *non0ctrj, *non0ctrk, *non0ctrl;
+        FINT *non0ctrj, *non0ctrk, *non0ctrl;
         FINT *non0idxi, *non0idxj, *non0idxk, *non0idxl;
-        MALLOC_INSTACK(non0ctri, i_prim+j_prim+k_prim+l_prim+i_prim*i_ctr+j_prim*j_ctr+k_prim*k_ctr+l_prim*l_ctr);
+        //MALLOC_INSTACK(non0ctri, i_prim+j_prim+k_prim+l_prim+i_prim*i_ctr+j_prim*j_ctr+k_prim*k_ctr+l_prim*l_ctr);
+        MALLOC(FINT, non0ctri);
         non0ctrj = non0ctri + i_prim;
         non0ctrk = non0ctrj + j_prim;
         non0ctrl = non0ctrk + k_prim;
@@ -21721,8 +21244,9 @@ FINT CINT2e_loop_nopt(dtype *gctr, CINTEnvVars *envs, dtype *cache, FINT *empty)
         size_t leni = nf * i_ctr * n_comp; 
         size_t len0 = nf * n_comp; 
         size_t len = leng + lenl + lenk + lenj + leni + len0;
-        dtype *g;
-        MALLOC_INSTACK(g, len);  
+        //dtype *g;
+        //MALLOC_INSTACK(g, len);  
+        MALLOC(dtype, g);
         dtype *g1 = g + leng;
         dtype *gout, *gctri, *gctrj, *gctrk, *gctrl;
         ALIAS_ADDR_IF_EQUAL(l, m);
@@ -21783,8 +21307,11 @@ FINT CINT2e_loop_nopt(dtype *gctr, CINTEnvVars *envs, dtype *cache, FINT *empty)
                                                 fac1i = fac1j*expijkl;
                                         }
                                         envs->fac[0] = fac1i;
-                                        if ((*envs->f_g0_2e)(g, rij, rkl, cutoff, envs)) {
-                                                (*envs->f_gout)(gout, g, idx, envs, *gempty);
+                                        // todo; 
+                                        //if ((*envs->f_g0_2e)(g, rij, rkl, cutoff, envs)) {
+                                        //        (*envs->f_gout)(gout, g, idx, envs, *gempty);
+                                        if (CINTg0_2e(g, rij, rkl, cutoff, envs)) {
+                                                CINTgout2e(gout, g, idx, envs, *gempty);
                                                 PRIM2CTR(i, gout, len0);
                                         }
 i_contracted: ;
@@ -21849,7 +21376,7 @@ k_contracted: ;
         } else { \
                 dtype *log_maxci = opt->log_max_coeff[i_sh]; \
                 dtype *log_maxcj = opt->log_max_coeff[j_sh]; \
-                MALLOC_INSTACK(_pdata_ij, i_prim*j_prim + k_prim*l_prim); \
+                MALLOC(PairData, _pdata_ij); \
                 if (CINTset_pairdata(_pdata_ij, ai, aj, envs->ri, envs->rj, \
                                      log_maxci, log_maxcj, envs->li_ceil, envs->lj_ceil, \
                                      i_prim, j_prim, rr_ij, expcutoff, env)) { \
@@ -21890,7 +21417,7 @@ k_contracted: ;
                                         +envs->k_l*LMAX1 \
                                         +envs->l_l]; \
         if (idx == NULL) { \
-                MALLOC_INSTACK(idx, nf * 3); \
+                MALLOC(FINT, idx); \
                 CINTg2e_index_xyz(idx, envs); \
         }
 
@@ -21927,7 +21454,6 @@ k_contracted: ;
 
 FINT CINT2e_1111_loop(dtype *gctr, CINTEnvVars *envs, dtype *cache, FINT *empty)
 {
-        return 0; 
         COMMON_ENVS_AND_DECLARE;
         ADJUST_CUTOFF;
         FINT nc = 1;
@@ -21935,8 +21461,9 @@ FINT CINT2e_1111_loop(dtype *gctr, CINTEnvVars *envs, dtype *cache, FINT *empty)
         size_t len0 = nf * n_comp;
         size_t len = leng + len0;
         dtype *gout;
-        dtype *g;
-        MALLOC_INSTACK(g, len);
+        //dtype *g;
+        //MALLOC_INSTACK(g, len);
+        MALLOC(dtype, g);
         if (n_comp == 1) {
                 gout = gctr;
                 gempty = empty;
@@ -21981,7 +21508,6 @@ k_contracted: ;
 
 FINT CINT2e_n111_loop(dtype *gctr, CINTEnvVars *envs, dtype *cache, FINT *empty)
 {
-        return 0; 
         COMMON_ENVS_AND_DECLARE;
         ADJUST_CUTOFF;
         FINT nc = i_ctr;
@@ -21989,8 +21515,9 @@ FINT CINT2e_n111_loop(dtype *gctr, CINTEnvVars *envs, dtype *cache, FINT *empty)
         size_t leni = nf * i_ctr * n_comp; 
         size_t len0 = nf * n_comp; 
         size_t len = leng + leni + len0;
-        dtype *g;
-        MALLOC_INSTACK(g, len);
+        //dtype *g;
+        //MALLOC_INSTACK(g, len);
+        MALLOC(dtype, g);
         dtype *g1 = g + leng;
         dtype *gout, *gctri;
         ALIAS_ADDR_IF_EQUAL(i, m);
@@ -22036,7 +21563,7 @@ k_contracted: ;
 
 FINT CINT2e_1n11_loop(dtype *gctr, CINTEnvVars *envs, dtype *cache, FINT *empty)
 {
-        return 0; 
+        //return 0; 
         COMMON_ENVS_AND_DECLARE;
         ADJUST_CUTOFF;
         FINT nc = j_ctr;
@@ -22044,8 +21571,9 @@ FINT CINT2e_1n11_loop(dtype *gctr, CINTEnvVars *envs, dtype *cache, FINT *empty)
         size_t lenj = nf * j_ctr * n_comp; 
         size_t len0 = nf * n_comp; 
         size_t len = leng + lenj + len0;
-        dtype *g;
-        MALLOC_INSTACK(g, len);
+        //dtype *g;
+        //MALLOC_INSTACK(g, len);
+        MALLOC(dtype, g);
         dtype *g1 = g + leng;
         dtype *gout, *gctrj;
         ALIAS_ADDR_IF_EQUAL(j, m);
@@ -22092,7 +21620,7 @@ k_contracted: ;
 
 FINT CINT2e_11n1_loop(dtype *gctr, CINTEnvVars *envs, dtype *cache, FINT *empty)
 {
-        return 0; 
+        //return 0; 
         COMMON_ENVS_AND_DECLARE;
         ADJUST_CUTOFF;
         FINT nc = k_ctr;
@@ -22100,8 +21628,9 @@ FINT CINT2e_11n1_loop(dtype *gctr, CINTEnvVars *envs, dtype *cache, FINT *empty)
         size_t lenk = nf * k_ctr * n_comp; 
         size_t len0 = nf * n_comp; 
         size_t len = leng + lenk + len0;
-        dtype *g;
-        MALLOC_INSTACK(g, len);
+        //dtype *g;
+        //MALLOC_INSTACK(g, len);
+        MALLOC(dtype, g);
         dtype *g1 = g + leng;
         dtype *gout, *gctrk;
         ALIAS_ADDR_IF_EQUAL(k, m);
@@ -22148,7 +21677,7 @@ k_contracted: ;
 
 FINT CINT2e_111n_loop(dtype *gctr, CINTEnvVars *envs, dtype *cache, FINT *empty)
 {
-        return 0; 
+        //return 0; 
         COMMON_ENVS_AND_DECLARE;
         ADJUST_CUTOFF;
         FINT nc = l_ctr;
@@ -22156,8 +21685,9 @@ FINT CINT2e_111n_loop(dtype *gctr, CINTEnvVars *envs, dtype *cache, FINT *empty)
         size_t lenl = nf * l_ctr * n_comp; 
         size_t len0 = nf * n_comp; 
         size_t len = leng + lenl + len0;
-        dtype *g;
-        MALLOC_INSTACK(g, len);
+        //dtype *g;
+        //MALLOC_INSTACK(g, len);
+        MALLOC(dtype, g);
         dtype *g1 = g + leng;
         dtype *gout, *gctrl;
         ALIAS_ADDR_IF_EQUAL(l, m);
@@ -22203,7 +21733,7 @@ k_contracted: ;
 
 FINT CINT2e_loop(dtype *gctr, CINTEnvVars *envs, dtype *cache, FINT *empty)
 {
-        return 0;
+        //return 0;
         COMMON_ENVS_AND_DECLARE;
         ADJUST_CUTOFF;
         FINT nc = i_ctr * j_ctr * k_ctr * l_ctr;
@@ -22214,8 +21744,9 @@ FINT CINT2e_loop(dtype *gctr, CINTEnvVars *envs, dtype *cache, FINT *empty)
         size_t leni = nf * i_ctr * n_comp; 
         size_t len0 = nf * n_comp; 
         size_t len = leng + lenl + lenk + lenj + leni + len0;
-        dtype *g;
-        MALLOC_INSTACK(g, len);
+        //dtype *g;
+        //MALLOC_INSTACK(g, len);
+        MALLOC(dtype, g);
         dtype *g1 = g + leng;
         dtype *gout, *gctri, *gctrj, *gctrk, *gctrl;
 
@@ -22335,15 +21866,16 @@ static FINT (*CINTf_2e_loop[16])(dtype *, CINTEnvVars *, dtype *, FINT *) = {
                            + l_prim * x_ctr[3] \
                            +(i_prim+j_prim+k_prim+l_prim)*2 + nf*3);
 
+//acint
 CACHE_SIZE_T CINT2e_drv(dtype *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt,
-                      dtype *cache, void (*f_c2s)(dtype *opij, dtype *gctr, FINT *dims, CINTEnvVars *envs, dtype *cache))
+                      dtype *cache)//, void (*f_c2s)(dtype *opij, dtype *gctr, FINT *dims, CINTEnvVars *envs, dtype *cache))
 {
-        return 0; 
         FINT *x_ctr = envs->x_ctr;
         size_t nf = envs->nf;
         size_t nc = nf * x_ctr[0] * x_ctr[1] * x_ctr[2] * x_ctr[3];
         FINT n_comp = envs->ncomp_e1 * envs->ncomp_e2 * envs->ncomp_tensor;
-        if (out == NULL) {
+
+        /*if (out == NULL) { // warning
                 PAIRDATA_NON0IDX_SIZE(pdata_size);
                 size_t leng = envs->g_size*3*((1<<envs->gbits)+1);
                 size_t len0 = nf*n_comp;
@@ -22358,14 +21890,16 @@ CACHE_SIZE_T CINT2e_drv(dtype *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt,
                 }
 #endif
                 return cache_size;
-        }
-        dtype *stack = NULL;
+        }*/
+        dtype stack[128];
+        /*dtype *stack = NULL;
         if (cache == NULL) {
                 PAIRDATA_NON0IDX_SIZE(pdata_size);
                 size_t leng = envs->g_size*3*((1<<envs->gbits)+1);
                 size_t len0 = nf*n_comp;
                 size_t cache_size = MAX(leng+len0+nc*n_comp*3 + pdata_size,
                                         nc*n_comp+nf*4);
+                printf("cint2e -> cache_size %d\n", (int)cache_size);
 
 
                 #ifdef __cplusplus 
@@ -22374,49 +21908,57 @@ CACHE_SIZE_T CINT2e_drv(dtype *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt,
                 stack = malloc(sizeof(dtype)*cache_size);
                 #endif 
                 cache = stack;
-        }
-        dtype *gctr;
-        MALLOC_INSTACK(gctr, nc*n_comp);
+        }*/
+        //dtype *gctr;
+        //MALLOC_INSTACK(gctr, nc*n_comp);
+        //MALLOC(dtype, gctr);
+        dtype gctr[128];
 
         FINT n;
         FINT empty = 1;
-        if (opt != NULL) {
+        /*if (opt != NULL) { // WARNING 
+                printf("ASD\n");
                 envs->opt = opt;
                 n = ((x_ctr[0]==1) << 3) + ((x_ctr[1]==1) << 2)
                   + ((x_ctr[2]==1) << 1) +  (x_ctr[3]==1);
                 CINTf_2e_loop[n](gctr, envs, cache, &empty);
-        } else {
+        } else {*/
                 CINT2e_loop_nopt(gctr, envs, cache, &empty);
-        }
+        //}
+
+        //return !empty; //skip need for allthe translation (memory expensive)
 
         FINT counts[4];
-        if (f_c2s == &c2s_sph_2e1) {
+        //if (f_c2s == &c2s_sph_2e1) {
                 counts[0] = (envs->i_l*2+1) * x_ctr[0];
                 counts[1] = (envs->j_l*2+1) * x_ctr[1];
                 counts[2] = (envs->k_l*2+1) * x_ctr[2];
                 counts[3] = (envs->l_l*2+1) * x_ctr[3];
-        } else {
+        /*} else {
                 counts[0] = envs->nfi * x_ctr[0];
                 counts[1] = envs->nfj * x_ctr[1];
                 counts[2] = envs->nfk * x_ctr[2];
                 counts[3] = envs->nfl * x_ctr[3];
-        }
+        }*/
         if (dims == NULL) {
                 dims = counts;
         }
         FINT nout = dims[0] * dims[1] * dims[2] * dims[3];
-        if (!empty) {
+        if (!empty) { 
                 for (n = 0; n < n_comp; n++) {
-                        (*f_c2s)(out+nout*n, gctr+nc*n, dims, envs, cache);
+                        //(*f_c2s)(out+nout*n, gctr+nc*n, dims, envs, cache);
+                        // this is the one taking ~500kb/tile in code. 
+                        // ideally, we'd store this only on say 10 tiles and have them do all of theese. 
+                        c2s_sph_2e1(out+nout*n, gctr+nc*n, dims, envs, cache); // warning 
                 }
         } else {
                 for (n = 0; n < n_comp; n++) {
                         c2s_dset0(out+nout*n, dims, counts);
                 }
         }
-        if (stack != NULL) {
+        /*if (stack != NULL) {
                 //free(stack);
-        }
+        }*/
         return !empty;
 }
 
@@ -22742,6 +22284,8 @@ CACHE_SIZE_T int2e_sph(dtype *out, FINT *dims, FINT *shls, FINT *atm, FINT natm,
               FINT *bas, FINT nbas, dtype *env, CINTOpt *opt, dtype *cache)
 {
         FINT ng[] = {0, 0, 0, 0, 0, 1, 1, 1};
+
+
         CINTEnvVars envs;
         CINTinit_int2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
         #ifdef __cplusplus
@@ -22749,7 +22293,7 @@ CACHE_SIZE_T int2e_sph(dtype *out, FINT *dims, FINT *shls, FINT *atm, FINT natm,
         #else
         envs.f_gout = &CINTgout2e;
         #endif
-        return CINT2e_drv(out, dims, &envs, opt, cache, &c2s_sph_2e1);
+        return CINT2e_drv(out, dims, &envs, opt, cache);//, &c2s_sph_2e1);
 }
 void int2e_optimizer(CINTOpt **opt, FINT *atm, FINT natm,
                      FINT *bas, FINT nbas, dtype *env)
@@ -22769,7 +22313,7 @@ CACHE_SIZE_T int2e_cart(dtype *out, FINT *dims, FINT *shls, FINT *atm, FINT natm
         #else
         envs.f_gout = &CINTgout2e;
         #endif
-        return CINT2e_drv(out, dims, &envs, opt, cache, &c2s_cart_2e1);
+        return CINT2e_drv(out, dims, &envs, opt, cache);//, &c2s_cart_2e1);
 }
 
 
@@ -26454,7 +25998,7 @@ void CINTrys_roots(int nroots, dtype x, dtype *u, dtype *w)
         case 3:
                 err = rys_root3(x, u, w);
                 break;
-        case 4:
+        /*case 4:
                 err = rys_root4(x, u, w);
                 break;
         case 5:
@@ -26477,7 +26021,7 @@ void CINTrys_roots(int nroots, dtype x, dtype *u, dtype *w)
                 break;
         default:
                 err = segment_solve(nroots, x, 0., u, w, 50, CINTqrys_jacobi, CINTqrys_laguerre);
-        }
+        */}
         if (err) {
                 //fprintf(stderr, "rys_roots fails: nroots=%d x=%g\n",
                 //       nroots, x);
@@ -28393,6 +27937,7 @@ void GTOnr2e_fill_s1(int (*intor)(), int (*fprescreen)(),
         shls[0] = ish;
         shls[1] = jsh;
 
+
         for (ksh = ksh0; ksh < ksh1; ksh++) {
         for (lsh = lsh0; lsh < lsh1; lsh++) {
                 shls[2] = ksh;
@@ -28404,8 +27949,11 @@ void GTOnr2e_fill_s1(int (*intor)(), int (*fprescreen)(),
                 dijk = dij * dk;
                 dijkl = dijk * dl;
                 cache = buf + dijkl * comp;
-                if ((*fprescreen)(shls, atm, bas, env) &&
-                    (*intor)(buf, NULL, shls, atm, natm, bas, nbas, env, cintopt, cache)) {
+                if (
+                        //(*fprescreen)(shls, atm, bas, env) &&
+                    //(*intor)(buf, NULL, shls, atm, natm, bas, nbas, env, cintopt, cache)
+                    int2e_sph(buf, NULL, shls, atm, natm, bas, nbas, env, cintopt, cache)
+                    ) {
                         eri0 = eri + k0*nl+l0;
                         buf0 = buf;
                         for (icomp = 0; icomp < comp; icomp++) {
@@ -28854,7 +28402,6 @@ void GTOnr2e_fill_drv(int (*intor)(), void (*fill)(), int (*fprescreen)(),
                       int *atm, int natm, int *bas, int nbas, dtype *env)
 #endif
 {
-        return; 
         if (fprescreen == NULL) {
                 #ifdef __cplusplus
                 fprescreen = (int (*)(...))no_prescreen;
@@ -28870,14 +28417,15 @@ void GTOnr2e_fill_drv(int (*intor)(), void (*fill)(), int (*fprescreen)(),
         const int nish = ish1 - ish0;
         const int njsh = jsh1 - jsh0;
         const int di = GTOmax_shell_dim(ao_loc, shls_slice, 4);
-        const int cache_size = GTOmax_cache_size(intor, shls_slice, 4,
-                                                 atm, natm, bas, nbas, env);
+        const int cache_size = 256;//GTOmax_cache_size(intor, shls_slice, 4,
+                                    //             atm, natm, bas, nbas, env);
 
 #pragma omp parallel
 {
         int ij, i, j;
         #ifdef __cplusplus 
-        dtype *buf = new dtype[2048];
+        //dtype *buf = new dtype[2048];
+        dtype buf[256]; 
         #else
         dtype *buf = malloc(sizeof(dtype) * (di*di*di*di*comp + cache_size));
         #endif
@@ -28885,8 +28433,10 @@ void GTOnr2e_fill_drv(int (*intor)(), void (*fill)(), int (*fprescreen)(),
         for (ij = 0; ij < nish*njsh; ij++) {
                 i = ij / njsh;
                 j = ij % njsh;
-                (*fill)(intor, fprescreen, eri, buf, comp, i, j, shls_slice,
-                        ao_loc, cintopt, atm, natm, bas, nbas, env);
+                //printf("loop: %d\n", ij);
+                //(*fill)(intor, fprescreen, eri, buf, comp, i, j, shls_slice,
+                GTOnr2e_fill_s1(intor, fprescreen, eri, buf, comp, i, j, 
+                        shls_slice, ao_loc, cintopt, atm, natm, bas, nbas, env);
         }
         //free(buf);
 }
