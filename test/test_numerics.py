@@ -44,3 +44,8 @@ def test_binom(binom_func):
     assert_allclose(binom_func(zero, y), jnp.zeros_like(x))
     assert_allclose(binom_func(x, zero), jnp.ones_like(y))
     assert_allclose(binom_func(y, y), jnp.ones_like(y))
+
+    one = jnp.array([1])
+    assert_allclose(binom_func(one, one), one)
+    assert_allclose(binom_func(zero, -one), one)
+    assert_allclose(binom_func(zero, zero), one)
