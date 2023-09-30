@@ -47,5 +47,5 @@ def test_binom(binom_func):
 
     one = jnp.array([1])
     assert_allclose(binom_func(one, one), one)
-    assert_allclose(binom_func(zero, -one), one)
+    assert_allclose(binom_func(zero, -one), zero)
     assert_allclose(binom_func(zero, zero), one)
