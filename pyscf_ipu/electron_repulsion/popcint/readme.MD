@@ -2,6 +2,9 @@
 Libcint (manually) compiled to IPU implementing 
 
 ```
+import pyscf
+mol = pyscf.gto.Mole([["H", (0,0,0)], ["H", (0,0,1)]], basis="sto3g")
+mol.build()
 mol.intor("int1e_nuc")  # nuclear integral 
 mol.intor("int1e_kin")  # kinetic integral 
 mol.intor("int1e_ovlp") # overlap integral 
@@ -14,7 +17,7 @@ mol.intor("int2e_sph")     # electron repulsion integral
 mol.intor("int2e_ip1_sph") # gradient (ip1) of electron repulsion integral 
 ```
 
-You can test all integrals with `./cpp_libcint.sh -all`. The C++ plumbing to run all integrals is in place and all (but kinetic) pass a simple H2 test-case in STO3G. The test case compiles libcint.c to CPU w/ G++ and then IPU using tesselate. 
+You can test all integrals with `./cpp_libcint.sh -all`. The C++ plumbing to run all integrals is in place and all (but kinetic) pass a simple H2 test-case in STO3G (this and runs libcint.c both with CPU/G++ and IPU/tesselate).  
 
 ```
 > ./cpp_libcint.sh -all
