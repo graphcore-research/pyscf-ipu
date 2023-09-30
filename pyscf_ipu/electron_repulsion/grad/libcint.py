@@ -232,7 +232,7 @@ if one_elect_forward:
     exit()
 
 def getints4c(intor_name, atm, bas, env, N, shls_slice=None, comp=1,
-            aosym='s1', ao_loc=None, cintopt=None, out=None):
+            aosym='s1', ao_loc=None, cintopt=None, out=None, which_integral=-1):
     print(intor_name)
     c_atm = atm.ctypes.data_as(ctypes.c_void_p)
     c_bas = bas.ctypes.data_as(ctypes.c_void_p)
@@ -265,17 +265,19 @@ def getints4c(intor_name, atm, bas, env, N, shls_slice=None, comp=1,
         out.ctypes.data_as(ctypes.c_void_p), ctypes.c_int(comp),
         (ctypes.c_int*8)(*shls_slice),
         ao_loc.ctypes.data_as(ctypes.c_void_p), cintopt,
-        c_atm, ctypes.c_int(natm), c_bas, ctypes.c_int(nbas), c_env)
+        c_atm, ctypes.c_int(natm), c_bas, ctypes.c_int(nbas), c_env, which_integral)
 
     if comp == 1:
         out = out[0]
     return out
 
-def intor(self, intor, N, comp=None, hermi=0, aosym='s1', out=None, shls_slice=None, grids=None):
-    return getints4c(intor, self._atm, self._bas, self._env, N, None, comp, "s1", None, None, None)
+def intor(self, intor, N, comp=None, hermi=0, aosym='s1', out=None, shls_slice=None, grids=None, which_integral=-1):
+    return getints4c(intor, self._atm, self._bas, self._env, N, None, comp, "s1", None, None, None, which_integral)
 
+INT2E_SPH=6
+INT2E_IP1_SPH=7
 truth = mol.intor("int2e_sph")
-us = intor(mol, "int2e_sph", N, 1)
+us = intor(mol, "int2e_sph", N, 1, which_integral=INT2E_SPH)
 print(us.reshape(-1))
 print(truth.reshape(-1))
 
@@ -285,21 +287,19 @@ print(np.allclose(truth, us))
 
 
 
-'''truth = mol.intor("int2e_ip1")
-us = intor(mol, "int2e_ip1_sph", N, 3)
+_truth = mol.intor("int2e_ip1")
+_us = intor(mol, "int2e_ip1_sph", N, 3, which_integral=INT2E_IP1_SPH)
 print()
 print("ERI grad")
-print(truth.reshape(-1))
-print(us.reshape(-1))
-print(np.max(np.abs(truth-us)))
-print()
-exit()'''
+print(_truth.reshape(-1))
+print(_us.reshape(-1))
+print(np.max(np.abs(_truth-_us)))
 
 
 
 
 def getints4c(intor_name, atm, bas, env, N, shls_slice=None, comp=1,
-            aosym='s1', ao_loc=None, cintopt=None, out=None):
+            aosym='s1', ao_loc=None, cintopt=None, out=None, which_integral=-1):
     print(intor_name)
     #c_atm = atm.ctypes.data_as(ctypes.c_void_p)
     #c_bas = bas.ctypes.data_as(ctypes.c_void_p)
@@ -339,12 +339,11 @@ def getints4c(intor_name, atm, bas, env, N, shls_slice=None, comp=1,
     grad = create_ipu_tile_primitive(
             "Int2e" ,
             "Int2e" ,
-            inputs=["mat", "shls_slice", "ao_loc", "atm", "bas", "env", "natm", "nbas", "which_integral"], 
+            inputs=["mat", "shls_slice", "ao_loc", "atm", "bas", "env", "natm", "nbas", "which_integral", "comp"], 
             outputs={"out": 0},
             gp_filename=vertex_filename,
             perf_estimate=100,
     )
-    
     
     #intor_name, N, atm, bas, env, shls_slice, comp, hermi, ao_loc, cintopt, out=\
     #intor_name+"_sph", N, self._atm, self._bas, self._env, shls_slice, comp, hermi, None, None, out
@@ -353,10 +352,8 @@ def getints4c(intor_name, atm, bas, env, N, shls_slice=None, comp=1,
     nbas = bas.shape[0]
 
     prefix = 'GTO'
-
     dtype = numpy.double
     drv_name = prefix + 'int2c'
-
 
     # type 
     float32 = "#define dtype float" in open("_libcint.c", "r").read()
@@ -373,11 +370,11 @@ def getints4c(intor_name, atm, bas, env, N, shls_slice=None, comp=1,
     env = tile_put_replicated(jnp.array(env, dtype=jnp.float32),   (1,)) 
     natm = tile_put_replicated(jnp.array(natm, dtype=jnp.int32),   (1,)) 
     nbas = tile_put_replicated(jnp.array(nbas, dtype=jnp.int32),   (1,)) 
+    comp = tile_put_replicated(jnp.array(comp, dtype=jnp.int32),   (1,)) 
 
-    which_integral = 0 
     which_integral = tile_put_replicated(np.array(which_integral, dtype=jnp.int32),   (1,)) 
 
-    value = tile_map(grad, out, shls_slice, ao_loc, atm, bas, env, natm, nbas, which_integral)
+    value = tile_map(grad, out, shls_slice, ao_loc, atm, bas, env, natm, nbas, which_integral, comp)
 
     out = value.array # value.array[0]
     print(out.shape)
@@ -386,17 +383,22 @@ def getints4c(intor_name, atm, bas, env, N, shls_slice=None, comp=1,
         out = out[0]
     return out
 
-def intor(self, intor, N, comp=None, hermi=0, aosym='s1', out=None, shls_slice=None, grids=None):
+def intor(self, intor, N, comp=None, hermi=0, aosym='s1', out=None, shls_slice=None, grids=None, which_integral=-1):
     ao_loc = make_loc(mol._bas, intor)
-    return np.asarray(jax.jit(getints4c, static_argnums=(0,4,5,6,7,9,10))
-                        (intor, self._atm, self._bas, self._env, N, None, comp, "s1", ao_loc, None, None))
+    return np.asarray(jax.jit(getints4c, static_argnums=(0,4,5,6,7,9,10,11))
+                        (intor, self._atm, self._bas, self._env, N, None, comp, "s1", ao_loc, None, None, which_integral))
 
-eri = True
+eri = False
 if eri: 
-    us_ipu = intor(mol, "int2e_sph", N, 1)
+    us_ipu = intor(mol, "int2e_sph", N, 1, which_integral=INT2E_SPH)
     print(us_ipu.reshape(-1))
     print(np.max(np.abs(truth-us_ipu)))
 
-
 #assert np.allclose(truth, us )
+
+us_ipu = intor(mol, "int2e_ip1_sph", N, 3, which_integral=INT2E_IP1_SPH)
+print(us_ipu.reshape(-1))
+print(_truth.reshape(-1))
+print(np.max(np.abs(_truth-us_ipu)))
+
 

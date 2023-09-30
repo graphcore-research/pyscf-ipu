@@ -228,6 +228,9 @@ int INT1E_KIN_IP = 3;
 int INT1E_NUC_IP = 4;
 int INT1E_OVLP_IP = 5;
 
+int INT2E_SPH = 6; 
+int INT2E_IP1_SPH = 7;
+
 
 FINT CINTlen_cart(const FINT l);
 FINT CINTlen_spinor(const FINT bas_id, const FINT *bas);
@@ -6144,55 +6147,73 @@ ALL_CINT1E_FORTRAN_(int1e_ipprinvp)
 
 
 void CINTgout2e_int2e_ip1(dtype *gout,
-dtype *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
-FINT nf = envs->nf;
-FINT nrys_roots = envs->nrys_roots;
-FINT ix, iy, iz, i, n;
-dtype *g0 = g;
-dtype *g1 = g0 + envs->g_size * 3;
-G2E_D_I(g1, g0, envs->i_l+0, envs->j_l, envs->k_l, envs->l_l);
-dtype s[3];
-for (n = 0; n < nf; n++) {
-ix = idx[0+n*3];
-iy = idx[1+n*3];
-iz = idx[2+n*3];
-switch (nrys_roots) {
-case 1:
-s[0] = + g1[ix+0]*g0[iy+0]*g0[iz+0];
-s[1] = + g0[ix+0]*g1[iy+0]*g0[iz+0];
-s[2] = + g0[ix+0]*g0[iy+0]*g1[iz+0];
-break;
-case 2:
-s[0] = + g1[ix+0]*g0[iy+0]*g0[iz+0]+ g1[ix+1]*g0[iy+1]*g0[iz+1];
-s[1] = + g0[ix+0]*g1[iy+0]*g0[iz+0]+ g0[ix+1]*g1[iy+1]*g0[iz+1];
-s[2] = + g0[ix+0]*g0[iy+0]*g1[iz+0]+ g0[ix+1]*g0[iy+1]*g1[iz+1];
-break;
-case 3:
-s[0] = + g1[ix+0]*g0[iy+0]*g0[iz+0]+ g1[ix+1]*g0[iy+1]*g0[iz+1]+ g1[ix+2]*g0[iy+2]*g0[iz+2];
-s[1] = + g0[ix+0]*g1[iy+0]*g0[iz+0]+ g0[ix+1]*g1[iy+1]*g0[iz+1]+ g0[ix+2]*g1[iy+2]*g0[iz+2];
-s[2] = + g0[ix+0]*g0[iy+0]*g1[iz+0]+ g0[ix+1]*g0[iy+1]*g1[iz+1]+ g0[ix+2]*g0[iy+2]*g1[iz+2];
-break;
-case 4:
-s[0] = + g1[ix+0]*g0[iy+0]*g0[iz+0]+ g1[ix+1]*g0[iy+1]*g0[iz+1]+ g1[ix+2]*g0[iy+2]*g0[iz+2]+ g1[ix+3]*g0[iy+3]*g0[iz+3];
-s[1] = + g0[ix+0]*g1[iy+0]*g0[iz+0]+ g0[ix+1]*g1[iy+1]*g0[iz+1]+ g0[ix+2]*g1[iy+2]*g0[iz+2]+ g0[ix+3]*g1[iy+3]*g0[iz+3];
-s[2] = + g0[ix+0]*g0[iy+0]*g1[iz+0]+ g0[ix+1]*g0[iy+1]*g1[iz+1]+ g0[ix+2]*g0[iy+2]*g1[iz+2]+ g0[ix+3]*g0[iy+3]*g1[iz+3];
-break;
-default:
-for (i = 0; i < 3; i++) { s[i] = 0; }
-for (i = 0; i < nrys_roots; i++) {
-s[0] += g1[ix+i] * g0[iy+i] * g0[iz+i];
-s[1] += g0[ix+i] * g1[iy+i] * g0[iz+i];
-s[2] += g0[ix+i] * g0[iy+i] * g1[iz+i];
-} break;}
-if (gout_empty) {
-gout[n*3+0] = + s[0];
-gout[n*3+1] = + s[1];
-gout[n*3+2] = + s[2];
-} else {
-gout[n*3+0] += + s[0];
-gout[n*3+1] += + s[1];
-gout[n*3+2] += + s[2];
-}}}
+        dtype *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty) {
+        //printf("inside cintgout2e_int2e_ip1\n");
+        FINT nf = envs->nf;
+        //printf("nf %d\n", nf);
+        FINT nrys_roots = envs->nrys_roots;
+        FINT ix, iy, iz, i, n;
+        dtype *g0 = g;
+        dtype *g1 = g0 + envs->g_size * 3;
+        G2E_D_I(g1, g0, envs->i_l+0, envs->j_l, envs->k_l, envs->l_l);
+        dtype s[3];
+        //printf("before for loop;\n");
+        for (n = 0; n < nf; n++) {
+                //printf("for loop: %d / %d root=%d\n", n, nf, nrys_roots);
+                ix = idx[0+n*3];
+                iy = idx[1+n*3];
+                iz = idx[2+n*3];
+                //printf("before switch\n");
+                switch (nrys_roots) {
+                        case 1:
+                                //printf("case 1\n");
+                                s[0] = + g1[ix+0]*g0[iy+0]*g0[iz+0];
+                                s[1] = + g0[ix+0]*g1[iy+0]*g0[iz+0];
+                                s[2] = + g0[ix+0]*g0[iy+0]*g1[iz+0];
+                                break;
+                        case 2:
+                                //printf("case 2\n");
+                                s[0] = + g1[ix+0]*g0[iy+0]*g0[iz+0]+ g1[ix+1]*g0[iy+1]*g0[iz+1];
+                                s[1] = + g0[ix+0]*g1[iy+0]*g0[iz+0]+ g0[ix+1]*g1[iy+1]*g0[iz+1];
+                                s[2] = + g0[ix+0]*g0[iy+0]*g1[iz+0]+ g0[ix+1]*g0[iy+1]*g1[iz+1];
+                                break;
+                        case 3:
+                                //printf("case 3\n");
+                                s[0] = + g1[ix+0]*g0[iy+0]*g0[iz+0]+ g1[ix+1]*g0[iy+1]*g0[iz+1]+ g1[ix+2]*g0[iy+2]*g0[iz+2];
+                                s[1] = + g0[ix+0]*g1[iy+0]*g0[iz+0]+ g0[ix+1]*g1[iy+1]*g0[iz+1]+ g0[ix+2]*g1[iy+2]*g0[iz+2];
+                                s[2] = + g0[ix+0]*g0[iy+0]*g1[iz+0]+ g0[ix+1]*g0[iy+1]*g1[iz+1]+ g0[ix+2]*g0[iy+2]*g1[iz+2];
+                                break;
+                        case 4:
+                                //printf("case 4\n");
+                                s[0] = + g1[ix+0]*g0[iy+0]*g0[iz+0]+ g1[ix+1]*g0[iy+1]*g0[iz+1]+ g1[ix+2]*g0[iy+2]*g0[iz+2]+ g1[ix+3]*g0[iy+3]*g0[iz+3];
+                                s[1] = + g0[ix+0]*g1[iy+0]*g0[iz+0]+ g0[ix+1]*g1[iy+1]*g0[iz+1]+ g0[ix+2]*g1[iy+2]*g0[iz+2]+ g0[ix+3]*g1[iy+3]*g0[iz+3];
+                                s[2] = + g0[ix+0]*g0[iy+0]*g1[iz+0]+ g0[ix+1]*g0[iy+1]*g1[iz+1]+ g0[ix+2]*g0[iy+2]*g1[iz+2]+ g0[ix+3]*g0[iy+3]*g1[iz+3];
+                                break;
+                        default:
+                                //printf("case default \n");
+                                for (i = 0; i < 3; i++) { s[i] = 0; }
+                                for (i = 0; i < nrys_roots; i++) {
+                                        s[0] += g1[ix+i] * g0[iy+i] * g0[iz+i];
+                                        s[1] += g0[ix+i] * g1[iy+i] * g0[iz+i];
+                                        s[2] += g0[ix+i] * g0[iy+i] * g1[iz+i];
+                                } 
+                                break;
+                }
+                //printf("after switching \n");
+                if (gout_empty) {
+                        gout[n*3+0] = + s[0];
+                        gout[n*3+1] = + s[1];
+                        gout[n*3+2] = + s[2];
+                } 
+                else {
+                        gout[n*3+0] += + s[0];
+                        gout[n*3+1] += + s[1];
+                        gout[n*3+2] += + s[2];
+                }
+                //printf("first for loop over\n");
+        }
+        //printf("done. \n");
+}
 void int2e_ip1_optimizer(CINTOpt **opt, FINT *atm, FINT natm, FINT *bas, FINT nbas, dtype *env) {
 FINT ng[] = {1, 0, 0, 0, 1, 1, 1, 3};
 CINTall_2e_optimizer(opt, ng, atm, natm, bas, nbas, env);
@@ -6212,13 +6233,16 @@ return CINT2e_drv(out, dims, &envs, opt, cache);//, &c2s_cart_2e1);
 CACHE_SIZE_T int2e_ip1_sph(dtype *out, FINT *dims, FINT *shls,
 FINT *atm, FINT natm, FINT *bas, FINT nbas, dtype *env, CINTOpt *opt, dtype *cache) {
         FINT ng[] = {1, 0, 0, 0, 1, 1, 1, 3};
+        WHICH_INTEGRAL = INT2E_IP1_SPH; 
         CINTEnvVars envs;
+        printf("int2e_ip1_sph before init env\n");
         CINTinit_int2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
-        #ifdef __cplusplus
+        printf("int2e_ip1_sph after init env\n");
+        /*#ifdef __cplusplus
         envs.f_gout = (void (*)(...))&CINTgout2e_int2e_ip1;
         #else
         envs.f_gout = &CINTgout2e_int2e_ip1;
-        #endif
+        #endif*/
         return CINT2e_drv(out, dims, &envs, opt, cache);//, &c2s_sph_2e1);
 } 
 /*CACHE_SIZE_T int2e_ip1_spinor(dtype *out, FINT *dims, FINT *shls,
@@ -16206,6 +16230,8 @@ void CINTx1j_grids(dtype *f, dtype *g, dtype *rj,
 
 #define realbas bas 
 
+int version_f_g0_2d4d = -1;
+
 void CINTinit_int2e_EnvVars(CINTEnvVars *envs, FINT *ng, FINT *shls,
                             FINT *atm, FINT natm, FINT *bas, FINT nbas, dtype *env)
 {
@@ -16341,20 +16367,26 @@ void CINTinit_int2e_EnvVars(CINTEnvVars *envs, FINT *ng, FINT *shls,
         #ifdef __cplusplus
         if (rys_order <= 2) {
                 envs->f_g0_2d4d = (void (*)(...))&CINTg0_2e_2d4d_unrolled;
+                version_f_g0_2d4d = 0;
                 if (rys_order != nrys_roots) {
                         envs->f_g0_2d4d = (void (*)(...))&CINTsrg0_2e_2d4d_unrolled;
+                        version_f_g0_2d4d = 1;
                 }
         } else if (kbase) {
                 if (ibase) {
                         envs->f_g0_2d4d = (void (*)(...))&CINTg0_2e_ik2d4d;
+                        version_f_g0_2d4d = 2;
                 } else {
                         envs->f_g0_2d4d = (void (*)(...))&CINTg0_2e_kj2d4d;
+                        version_f_g0_2d4d = 3;
                 }
         } else {
                 if (ibase) {
                         envs->f_g0_2d4d = (void (*)(...))&CINTg0_2e_il2d4d;
+                        version_f_g0_2d4d = 4;
                 } else {
                         envs->f_g0_2d4d = (void (*)(...))&CINTg0_2e_lj2d4d;
+                        version_f_g0_2d4d = 5;
                 }
         }
         envs->f_g0_2e = (int (*)(...))&CINTg0_2e;
@@ -20744,7 +20776,38 @@ FINT CINTg0_2e(dtype *g, dtype *rij, dtype *rkl, dtype cutoff, CINTEnvVars *envs
                 w[irys] *= fac1;
         }
 
-        (*envs->f_g0_2d4d)(g, &bc, envs);
+        //(*envs->f_g0_2d4d)(g, &bc, envs);
+        if (version_f_g0_2d4d == 0){      CINTg0_2e_2d4d_unrolled(g, &bc, envs); }
+        else if (version_f_g0_2d4d == 1){ CINTsrg0_2e_2d4d_unrolled(g, &bc, envs); }
+        else if (version_f_g0_2d4d == 2){ CINTg0_2e_ik2d4d(g, &bc, envs); }
+        else if (version_f_g0_2d4d == 3){ CINTg0_2e_kj2d4d(g, &bc, envs); }
+        else if (version_f_g0_2d4d == 4){ CINTg0_2e_il2d4d(g, &bc, envs); }
+        else if (version_f_g0_2d4d == 5){ CINTg0_2e_lj2d4d(g, &bc, envs); }
+
+        /*if (rys_order <= 2) {
+                envs->f_g0_2d4d = (void (*)(...))&CINTg0_2e_2d4d_unrolled;
+                version_f_g0_2d4d = 0
+                if (rys_order != nrys_roots) {
+                        envs->f_g0_2d4d = (void (*)(...))&CINTsrg0_2e_2d4d_unrolled;
+                        version_f_g0_2d4d = 1
+                }
+        } else if (kbase) {
+                if (ibase) {
+                        envs->f_g0_2d4d = (void (*)(...))&CINTg0_2e_ik2d4d;
+                        version_f_g0_2d4d = 2
+                } else {
+                        envs->f_g0_2d4d = (void (*)(...))&CINTg0_2e_kj2d4d;
+                        version_f_g0_2d4d = 3
+                }
+        } else {
+                if (ibase) {
+                        envs->f_g0_2d4d = (void (*)(...))&CINTg0_2e_il2d4d;
+                        version_f_g0_2d4d = 4
+                } else {
+                        envs->f_g0_2d4d = (void (*)(...))&CINTg0_2e_lj2d4d;
+                        version_f_g0_2d4d = 5
+                }
+        }*/
 
         return 1;
 }
@@ -21294,6 +21357,7 @@ FINT CINT2e_loop_nopt(dtype *gctr, CINTEnvVars *envs, dtype *cache, FINT *empty)
                                         *iempty = 1;
                                 }
                                 for (ip = 0; ip < i_prim; ip++, pdata_ij++) {
+                                        printf("[%d/%d]\n", ip, i_prim);
                                         if (pdata_ij->cceij > eijcutoff) {
                                                 goto i_contracted;
                                         }
@@ -21310,11 +21374,25 @@ FINT CINT2e_loop_nopt(dtype *gctr, CINTEnvVars *envs, dtype *cache, FINT *empty)
                                         // todo; 
                                         //if ((*envs->f_g0_2e)(g, rij, rkl, cutoff, envs)) {
                                         //        (*envs->f_gout)(gout, g, idx, envs, *gempty);
+                                        printf("pre cintg0_2e\n");
                                         if (CINTg0_2e(g, rij, rkl, cutoff, envs)) {
-                                                CINTgout2e(gout, g, idx, envs, *gempty);
+                                                printf("which_int: \n", WHICH_INTEGRAL);
+                                                if (WHICH_INTEGRAL == INT2E_SPH){
+                                                        printf("CINTgout2e\n");
+                                                        CINTgout2e(gout, g, idx, envs, *gempty);
+                                                }
+                                                else if (WHICH_INTEGRAL == INT2E_IP1_SPH){
+                                                        printf("cintgout2e_int2e_ip1\n");
+                                                        CINTgout2e_int2e_ip1(gout, g, idx, envs, *gempty);
+                                                }
+                                                printf("going on?\n");
+
                                                 PRIM2CTR(i, gout, len0);
+                                                printf("after primt2ctr\n");
                                         }
+                                        printf("a\n");
 i_contracted: ;
+                                        printf("b\n");
                                 } 
                                 if (!*iempty) {
                                         PRIM2CTR(j, gctri, leni);
@@ -21923,7 +22001,9 @@ CACHE_SIZE_T CINT2e_drv(dtype *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt,
                   + ((x_ctr[2]==1) << 1) +  (x_ctr[3]==1);
                 CINTf_2e_loop[n](gctr, envs, cache, &empty);
         } else {*/
-                CINT2e_loop_nopt(gctr, envs, cache, &empty);
+        printf("before cint2e_loop_nopt\n");
+        CINT2e_loop_nopt(gctr, envs, cache, &empty);
+        printf("after cint2e_loop_nopt\n");
         //}
 
         //return !empty; //skip need for allthe translation (memory expensive)
@@ -22284,7 +22364,7 @@ CACHE_SIZE_T int2e_sph(dtype *out, FINT *dims, FINT *shls, FINT *atm, FINT natm,
               FINT *bas, FINT nbas, dtype *env, CINTOpt *opt, dtype *cache)
 {
         FINT ng[] = {0, 0, 0, 0, 0, 1, 1, 1};
-
+        WHICH_INTEGRAL = INT2E_SPH; 
 
         CINTEnvVars envs;
         CINTinit_int2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
@@ -27894,15 +27974,16 @@ int GTOmax_cache_size(int (*intor)(), int *shls_slice, int ncenter,
 void GTOnr2e_fill_s1(int (*intor)(...), int (*fprescreen)(...),
                      dtype *eri, dtype *buf, int comp, int ishp, int jshp,
                      int *shls_slice, int *ao_loc, CINTOpt *cintopt,
-                     int *atm, int natm, int *bas, int nbas, dtype *env)
+                     int *atm, int natm, int *bas, int nbas, dtype *env, int _WHICH_INTEGRAL)
 
 #else
 void GTOnr2e_fill_s1(int (*intor)(), int (*fprescreen)(),
                      dtype *eri, dtype *buf, int comp, int ishp, int jshp,
                      int *shls_slice, int *ao_loc, CINTOpt *cintopt,
-                     int *atm, int natm, int *bas, int nbas, dtype *env)
+                     int *atm, int natm, int *bas, int nbas, dtype *env, int _WHICH_INTEGRAL)
 #endif
 {
+        WHICH_INTEGRAL = WHICH_INTEGRAL; 
         int ish0 = shls_slice[0];
         int ish1 = shls_slice[1];
         int jsh0 = shls_slice[2];
@@ -27936,6 +28017,7 @@ void GTOnr2e_fill_s1(int (*intor)(), int (*fprescreen)(),
 
         shls[0] = ish;
         shls[1] = jsh;
+        printf("Which_integral %d\n", WHICH_INTEGRAL);
 
 
         for (ksh = ksh0; ksh < ksh1; ksh++) {
@@ -27949,11 +28031,24 @@ void GTOnr2e_fill_s1(int (*intor)(), int (*fprescreen)(),
                 dijk = dij * dk;
                 dijkl = dijk * dl;
                 cache = buf + dijkl * comp;
-                if (
+
+                FINT not_empty;
+                if (WHICH_INTEGRAL == INT2E_SPH){
+                        //printf(">> int2e_sph\n");
+                        not_empty = int2e_sph(buf, NULL, shls, atm, natm, bas, nbas, env, cintopt, cache);
+                        //printf("%d\n", not_empty);
+                }
+                else if (WHICH_INTEGRAL == INT2E_IP1_SPH){
+                        printf(">> int2e_ip_sph\n");
+                        not_empty = int2e_ip1_sph(buf, NULL, shls, atm, natm, bas, nbas, env, cintopt, cache);
+                }
+
+                if (not_empty
                         //(*fprescreen)(shls, atm, bas, env) &&
                     //(*intor)(buf, NULL, shls, atm, natm, bas, nbas, env, cintopt, cache)
-                    int2e_sph(buf, NULL, shls, atm, natm, bas, nbas, env, cintopt, cache)
+                    //int2e_sph(buf, NULL, shls, atm, natm, bas, nbas, env, cintopt, cache)
                     ) {
+                        //printf("inside\n");
                         eri0 = eri + k0*nl+l0;
                         buf0 = buf;
                         for (icomp = 0; icomp < comp; icomp++) {
@@ -28394,21 +28489,24 @@ static int no_prescreen()
 void GTOnr2e_fill_drv(int (*intor)(...), void (*fill)(...), int (*fprescreen)(...),
                       dtype *eri, int comp,
                       int *shls_slice, int *ao_loc, CINTOpt *cintopt,
-                      int *atm, int natm, int *bas, int nbas, dtype *env)
+                      int *atm, int natm, int *bas, int nbas, dtype *env, int _WHICH_INTEGRAL)
 #else
 void GTOnr2e_fill_drv(int (*intor)(), void (*fill)(), int (*fprescreen)(),
                       dtype *eri, int comp,
                       int *shls_slice, int *ao_loc, CINTOpt *cintopt,
-                      int *atm, int natm, int *bas, int nbas, dtype *env)
+                      int *atm, int natm, int *bas, int nbas, dtype *env, _WHICH_INTEGRAL)
 #endif
 {
+        WHICH_INTEGRAL = _WHICH_INTEGRAL;
+        printf("GTOnr2e_fill_drv, comp=%d, which_integral=%d\n", comp, WHICH_INTEGRAL);
+        /*printf("integral %d\n", WHICH_INTEGRAL);
         if (fprescreen == NULL) {
                 #ifdef __cplusplus
                 fprescreen = (int (*)(...))no_prescreen;
                 #else
                 fprescreen = no_prescreen;
                 #endif
-        }
+        }*/
 
         const int ish0 = shls_slice[0];
         const int ish1 = shls_slice[1];
@@ -28433,10 +28531,10 @@ void GTOnr2e_fill_drv(int (*intor)(), void (*fill)(), int (*fprescreen)(),
         for (ij = 0; ij < nish*njsh; ij++) {
                 i = ij / njsh;
                 j = ij % njsh;
-                //printf("loop: %d\n", ij);
+                printf("loop: %d\n", ij);
                 //(*fill)(intor, fprescreen, eri, buf, comp, i, j, shls_slice,
                 GTOnr2e_fill_s1(intor, fprescreen, eri, buf, comp, i, j, 
-                        shls_slice, ao_loc, cintopt, atm, natm, bas, nbas, env);
+                        shls_slice, ao_loc, cintopt, atm, natm, bas, nbas, env, WHICH_INTEGRAL);
         }
         //free(buf);
 }
