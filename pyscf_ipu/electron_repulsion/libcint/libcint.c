@@ -6235,9 +6235,7 @@ FINT *atm, FINT natm, FINT *bas, FINT nbas, dtype *env, CINTOpt *opt, dtype *cac
         FINT ng[] = {1, 0, 0, 0, 1, 1, 1, 3};
         WHICH_INTEGRAL = INT2E_IP1_SPH; 
         CINTEnvVars envs;
-        printf("int2e_ip1_sph before init env\n");
         CINTinit_int2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
-        printf("int2e_ip1_sph after init env\n");
         /*#ifdef __cplusplus
         envs.f_gout = (void (*)(...))&CINTgout2e_int2e_ip1;
         #else
@@ -12392,6 +12390,7 @@ static dtype *p_ket_cart2spheric_copy(dtype *gsph, dtype *gcart,
 
 static dtype *d_bra_cart2spheric(dtype *gsph, FINT nket, dtype *gcart, FINT l)
 {
+        return gsph; // NOT IMPLEMENTED YET, g_c2s takes too much memory for single tile. 
         dtype *coeff_c2s = g_c2s[2].cart2sph;
         dtype *pgsph = gsph;
         FINT i;
@@ -12412,6 +12411,7 @@ static dtype *d_bra_cart2spheric(dtype *gsph, FINT nket, dtype *gcart, FINT l)
 static dtype *d_ket_cart2spheric(dtype *gsph, dtype *gcart,
                                   FINT lds, FINT nbra, FINT l)
 {
+        return gsph; // NOT IMPLEMENTED YET, g_c2s takes too much memory. 
         dtype *coeff_c2s = g_c2s[2].cart2sph;
         dtype *pgsph = gsph;
         FINT i;
@@ -12439,6 +12439,7 @@ static dtype *d_ket_cart2spheric(dtype *gsph, dtype *gcart,
 
 static dtype *f_bra_cart2spheric(dtype *gsph, FINT nket, dtype *gcart, FINT l)
 {
+        return gsph; // Not implemented yet, g_c2s takes too much memory for single tile. 
         dtype *coeff_c2s = g_c2s[3].cart2sph;
         dtype *pgsph = gsph;
         FINT i;
@@ -12467,6 +12468,7 @@ static dtype *f_bra_cart2spheric(dtype *gsph, FINT nket, dtype *gcart, FINT l)
 static dtype *f_ket_cart2spheric(dtype *gsph, dtype *gcart,
                                   FINT lds, FINT nbra, FINT l)
 {
+        return gsph; // Not implemented yet, g_c2s takes too much memory for single tile. 
         dtype *coeff_c2s = g_c2s[3].cart2sph;
         dtype *pgsph = gsph;
         FINT i;
@@ -12506,6 +12508,7 @@ static dtype *f_ket_cart2spheric(dtype *gsph, dtype *gcart,
 
 static dtype *g_bra_cart2spheric(dtype *gsph, FINT nket, dtype *gcart, FINT l)
 {
+        return gsph; // Not implemented yet, g_c2s takes too much memory for single tile. 
         dtype *coeff_c2s = g_c2s[4].cart2sph;
         dtype *pgsph = gsph;
         FINT i;
@@ -12546,6 +12549,7 @@ static dtype *g_bra_cart2spheric(dtype *gsph, FINT nket, dtype *gcart, FINT l)
 static dtype *g_ket_cart2spheric(dtype *gsph, dtype *gcart,
                                   FINT lds, FINT nbra, FINT l)
 {
+        return gsph; // Not implemented yet, g_c2s takes too much memory for single tile. 
         dtype *coeff_c2s = g_c2s[4].cart2sph;
         dtype *pgsph = gsph;
         FINT i;
@@ -21357,7 +21361,6 @@ FINT CINT2e_loop_nopt(dtype *gctr, CINTEnvVars *envs, dtype *cache, FINT *empty)
                                         *iempty = 1;
                                 }
                                 for (ip = 0; ip < i_prim; ip++, pdata_ij++) {
-                                        printf("[%d/%d]\n", ip, i_prim);
                                         if (pdata_ij->cceij > eijcutoff) {
                                                 goto i_contracted;
                                         }
@@ -21374,25 +21377,17 @@ FINT CINT2e_loop_nopt(dtype *gctr, CINTEnvVars *envs, dtype *cache, FINT *empty)
                                         // todo; 
                                         //if ((*envs->f_g0_2e)(g, rij, rkl, cutoff, envs)) {
                                         //        (*envs->f_gout)(gout, g, idx, envs, *gempty);
-                                        printf("pre cintg0_2e\n");
                                         if (CINTg0_2e(g, rij, rkl, cutoff, envs)) {
-                                                printf("which_int: \n", WHICH_INTEGRAL);
                                                 if (WHICH_INTEGRAL == INT2E_SPH){
-                                                        printf("CINTgout2e\n");
                                                         CINTgout2e(gout, g, idx, envs, *gempty);
                                                 }
                                                 else if (WHICH_INTEGRAL == INT2E_IP1_SPH){
-                                                        printf("cintgout2e_int2e_ip1\n");
                                                         CINTgout2e_int2e_ip1(gout, g, idx, envs, *gempty);
                                                 }
-                                                printf("going on?\n");
 
                                                 PRIM2CTR(i, gout, len0);
-                                                printf("after primt2ctr\n");
                                         }
-                                        printf("a\n");
 i_contracted: ;
-                                        printf("b\n");
                                 } 
                                 if (!*iempty) {
                                         PRIM2CTR(j, gctri, leni);
@@ -22001,9 +21996,7 @@ CACHE_SIZE_T CINT2e_drv(dtype *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt,
                   + ((x_ctr[2]==1) << 1) +  (x_ctr[3]==1);
                 CINTf_2e_loop[n](gctr, envs, cache, &empty);
         } else {*/
-        printf("before cint2e_loop_nopt\n");
         CINT2e_loop_nopt(gctr, envs, cache, &empty);
-        printf("after cint2e_loop_nopt\n");
         //}
 
         //return !empty; //skip need for allthe translation (memory expensive)
@@ -28017,8 +28010,7 @@ void GTOnr2e_fill_s1(int (*intor)(), int (*fprescreen)(),
 
         shls[0] = ish;
         shls[1] = jsh;
-        printf("Which_integral %d\n", WHICH_INTEGRAL);
-
+        //printf("Which_integral %d\n", WHICH_INTEGRAL);
 
         for (ksh = ksh0; ksh < ksh1; ksh++) {
         for (lsh = lsh0; lsh < lsh1; lsh++) {
@@ -28039,7 +28031,6 @@ void GTOnr2e_fill_s1(int (*intor)(), int (*fprescreen)(),
                         //printf("%d\n", not_empty);
                 }
                 else if (WHICH_INTEGRAL == INT2E_IP1_SPH){
-                        printf(">> int2e_ip_sph\n");
                         not_empty = int2e_ip1_sph(buf, NULL, shls, atm, natm, bas, nbas, env, cintopt, cache);
                 }
 
@@ -28498,7 +28489,7 @@ void GTOnr2e_fill_drv(int (*intor)(), void (*fill)(), int (*fprescreen)(),
 #endif
 {
         WHICH_INTEGRAL = _WHICH_INTEGRAL;
-        printf("GTOnr2e_fill_drv, comp=%d, which_integral=%d\n", comp, WHICH_INTEGRAL);
+        //printf("GTOnr2e_fill_drv, comp=%d, which_integral=%d\n", comp, WHICH_INTEGRAL);
         /*printf("integral %d\n", WHICH_INTEGRAL);
         if (fprescreen == NULL) {
                 #ifdef __cplusplus
@@ -28531,7 +28522,7 @@ void GTOnr2e_fill_drv(int (*intor)(), void (*fill)(), int (*fprescreen)(),
         for (ij = 0; ij < nish*njsh; ij++) {
                 i = ij / njsh;
                 j = ij % njsh;
-                printf("loop: %d\n", ij);
+                //printf("loop: %d\n", ij);
                 //(*fill)(intor, fprescreen, eri, buf, comp, i, j, shls_slice,
                 GTOnr2e_fill_s1(intor, fprescreen, eri, buf, comp, i, j, 
                         shls_slice, ao_loc, cintopt, atm, natm, bas, nbas, env, WHICH_INTEGRAL);

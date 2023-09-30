@@ -20,14 +20,8 @@ using namespace poplar;
 #define NAMESPACE std
 #endif
 
-//#include "grad.c"
-#include "_libcint.c"
+#include "libcint.c"
 
-void test(int* shls){
-  printf("shls %d %d ", shls[0], shls[1]);
-
-
-}
 
 class Grad : public Vertex {
 public:
@@ -45,20 +39,12 @@ public:
   Output<Vector<float>> out; 
 
   bool compute() {
-
-        //GTOint2c(int (*intor)(), dtype *mat, int comp, int hermi,
-        //      int *shls_slice, int *ao_loc, CINTOpt *opt,
-        //      int *atm, int natm, int *bas, int nbas, dtype *env)
-        //int natm = 1;
-        //int nbas = 1; 
         float _env[200];
         int   _bas[200];
         int   _atm[200];
         int   _shls_slice[200];
         int   _ao_loc[200];
         float _mat[mat.size()];
-
-        //for (int i = 0; i < _mat.size(); i++) _mat[i] = mat[i];
 
         for (int i = 0; i < 200; i++){
           _env[i]=0;
@@ -105,26 +91,7 @@ public:
             (int (*)(dtype *out, FINT *dims, FINT *shls, FINT *atm, FINT natm, FINT *bas, FINT nbas, dtype *env, CINTOpt *opt, dtype *cache))
           int1e_ipnuc_sph, out.data(), 3, 0, _shls_slice, _ao_loc, NULL, _atm, natm.data()[0], _bas,  nbas.data()[0], _env);
         }
-        //GTOint2c((int (*)(...))int1e_kin_sph, out.data(), 1, 0, 
-        //GTOint2c((int (*)(...))int1e_nuc_sph, out.data(), 1, 0, 
-        //GTOint2c((int (*)(...))int1e_ovlp_sph, out.data(), 1, 0, _shls_slice, _ao_loc, NULL, _atm, natm.data()[0], _bas,  nbas.data()[0], _env);
-
-        /*int shls[2] = {7, 17};
-        int ish, jsh; 
-        for (int ij = 0; ij < 2*2; ij++) {
-                ish = ij / 2;
-                jsh = ij % 2;
-                if (ish > jsh) {
-                        continue;
-                }
-
-                ish += ish0;
-                jsh += jsh0;
-                printf("ish jsh %d %d\n", ish, jsh);
-                shls[0] = ish;
-                shls[1] = jsh;
-                test(shls);
-        }*/
+        
  
     
     return true;
@@ -153,19 +120,13 @@ public:
 
   bool compute() {
 
-        //GTOint2c(int (*intor)(), dtype *mat, int comp, int hermi,
-        //      int *shls_slice, int *ao_loc, CINTOpt *opt,
-        //      int *atm, int natm, int *bas, int nbas, dtype *env)
-        //int natm = 1;
-        //int nbas = 1; 
+        
         float _env[200];
         int   _bas[200];
         int   _atm[200];
         int   _shls_slice[200];
         int   _ao_loc[200];
         float _mat[mat.size()];
-
-        //for (int i = 0; i < _mat.size(); i++) _mat[i] = mat[i];
 
         for (int i = 0; i < 200; i++){
           _env[i]=0;
@@ -184,11 +145,7 @@ public:
         for (int i = 0; i < shls_slice.size(); i++){ _shls_slice[i] = shls_slice.data()[i]; }
         for (int i = 0; i < ao_loc.size(); i++){ _ao_loc[i] = ao_loc.data()[i]; }
 
-        /*GTOnr2e_fill_drv(int (*intor)(...), void (*fill)(...), int (*fprescreen)(...),
-                      dtype *eri, int comp,
-                      int *shls_slice, int *ao_loc, CINTOpt *cintopt,
-                      int *atm, int natm, int *bas, int nbas, dtype *env)*/
-
+     
         GTOnr2e_fill_drv(
                          (int (*)(...))int2e_sph, 
                          (void (*)(...))GTOnr2e_fill_s1,
@@ -200,30 +157,6 @@ public:
                         );
         
         
-          /*GTOint2c(
-            (int (*)(dtype *out, FINT *dims, FINT *shls, FINT *atm, FINT natm, FINT *bas, FINT nbas, dtype *env, CINTOpt *opt, dtype *cache))
-          int1e_kin_sph, out.data(), 1, 0, _shls_slice, _ao_loc, NULL, _atm, natm.data()[0], _bas,  nbas.data()[0], _env);*/
-        /*int shls[2] = {7, 17};
-        int ish, jsh; 
-        for (int ij = 0; ij < 2*2; ij++) {
-                ish = ij / 2;
-                jsh = ij % 2;
-                if (ish > jsh) {
-                        continue;
-                }
-
-                ish += ish0;
-                jsh += jsh0;
-                printf("ish jsh %d %d\n", ish, jsh);
-                shls[0] = ish;
-                shls[1] = jsh;
-                test(shls);
-        }*/
- 
-    
     return true;
   }
 };
-
-
-
