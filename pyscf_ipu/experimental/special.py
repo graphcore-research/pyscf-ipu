@@ -96,15 +96,15 @@ def gammanu(nu: IntN, t: FloatN, epsilon: float = 1e-10) -> FloatN:
     return jnp.exp(gn)
 
 
-def binom_factor(i: int, j: int, a: float, b: float) -> FloatN:
+def binom_factor(i: int, j: int, a: float, b: float, lmax: int = LMAX) -> FloatN:
     """
     Eq. 15 from Augspurger JD, Dykstra CE. General quantum mechanical operators. An
     open-ended approach for one-electron integrals with Gaussian bases. Journal of
     computational chemistry. 1990 Jan;11(1):105-11.
     <https://doi.org/10.1002/jcc.540110113>
     """
-    s, t = jnp.tril_indices(LMAX + 1)
+    s, t = jnp.tril_indices(lmax + 1)
     out = binom(i, s - t) * binom(j, t) * a ** (i - (s - t)) * b ** (j - t)
     mask = ((s - i) <= t) & (t <= j)
     out = jnp.where(mask, out, 0.0)
-    return segment_sum(out, s, num_segments=LMAX + 1)
+    return segment_sum(out, s, num_segments=lmax + 1)
