@@ -109,7 +109,6 @@ def ipu_intor1e(self, intor, which_integral, N, comp=None, hermi=0, aosym='s1', 
             perf_estimate=100,
     )
     
-    
     intor_name, N, atm, bas, env, shls_slice, comp, hermi, ao_loc, cintopt, out=\
         intor+"_sph", N, self._atm, self._bas, self._env, shls_slice, comp, hermi, None, None, out
 
@@ -419,6 +418,7 @@ if __name__ == "__main__":
     parser.add_argument('-all', action="store_true")
     parser.add_argument('-tilemap', action="store_true")
     parser.add_argument("-basis", type=str, default="sto3g")
+    parser.add_argument("-skipipu", action="store_true") 
     args = parser.parse_args()
 
     mol = pyscf.gto.Mole(atom="H 0 0 0; H 0 0 1; ", basis=args.basis)
@@ -438,63 +438,69 @@ if __name__ == "__main__":
         us    =  cpu_intor1e(mol, 'int1e_nuc', N, comp=1)
         truth =  mol.intor('int1e_nuc', comp=1)
         test(us, truth, "CPU: \t")
-        us    = np.asarray( ipu_intor1e(mol, "int1e_nuc", INT1E_NUC,  N, 1))
-        test(us, truth, "IPU: \t")
+        if not args.skipipu: 
+            us    = np.asarray( ipu_intor1e(mol, "int1e_nuc", INT1E_NUC,  N, 1))
+            test(us, truth, "IPU: \t")
 
     if args.kin or args.all: 
         print("\n[Kinetic Integral]")
         us    =  cpu_intor1e(mol, 'int1e_kin', N, comp=1)
         truth =  mol.intor('int1e_kin', comp=1)
         test(us, truth, "CPU: \t")
-        us =   np.asarray( ipu_intor1e(mol, "int1e_kin", INT1E_KIN,  N, 1))
-        test(us, truth, "IPU: \t")
+        if not args.skipipu: 
+            us =   np.asarray( ipu_intor1e(mol, "int1e_kin", INT1E_KIN,  N, 1))
+            test(us, truth, "IPU: \t")
  
     if args.ovlp or args.all:
         print("\n[Overlap Integral]")
         us    =  cpu_intor1e(mol, 'int1e_ovlp', N, comp=1)
         truth =  mol.intor('int1e_ovlp', comp=1)
         test(us, truth, "CPU: \t")
-        us    = np.asarray( ipu_intor1e(mol, "int1e_ovlp", INT1E_OVLP,  N, 1))
-        test(us, truth, "IPU: \t")
+        if not args.skipipu:
+            us    = np.asarray( ipu_intor1e(mol, "int1e_ovlp", INT1E_OVLP,  N, 1))
+            test(us, truth, "IPU: \t")
 
     if args.nucgrad or args.all:
         print("\n[Grad Nuclear]")
         us    = - cpu_intor1e(mol, 'int1e_ipnuc', N, comp=3)
         truth = - mol.intor('int1e_ipnuc', comp=3)
         test(us, truth, "CPU: \t")
-        us =  - np.transpose(np.asarray( ipu_intor1e(mol, "int1e_ipnuc", INT1E_NUC_IP,  N, 3)), (0,2,1))
-        test(us, truth, "IPU: \t")
+        if not args.skipipu:
+            us =  - np.transpose(np.asarray( ipu_intor1e(mol, "int1e_ipnuc", INT1E_NUC_IP,  N, 3)), (0,2,1))
+            test(us, truth, "IPU: \t")
 
     if args.kingrad or args.all:
         print("\n[Grad Kinetic]")
         us    = - cpu_intor1e(mol, 'int1e_ipkin', N, comp=3)
         truth = - mol.intor('int1e_ipkin', comp=3)
         test(us, truth, "CPU: \t")
-        exit()
-        us    =  - np.transpose(np.asarray( ipu_intor1e(mol, "int1e_ipkin", INT1E_KIN_IP,  N, 3)), (0,2,1))
-        test(us, truth, "IPU: \t")
+        if not args.skipipu:
+            us    =  - np.transpose(np.asarray( ipu_intor1e(mol, "int1e_ipkin", INT1E_KIN_IP,  N, 3)), (0,2,1))
+            test(us, truth, "IPU: \t")
 
     if args.ovlpgrad or args.all:
         print("\n[Grad Overlap]")
         us    = - cpu_intor1e(mol, 'int1e_ipovlp', N, comp=3)
         truth = - mol.intor('int1e_ipovlp', comp=3)
         test(us, truth, "CPU: \t")
-        us    =  - np.transpose(np.asarray( ipu_intor1e(mol, "int1e_ipovlp", INT1E_OVLP_IP,  N, 3)), (0,2,1))
-        test(us, truth, "IPU: \t")
+        if not args.skipipu:
+            us    =  - np.transpose(np.asarray( ipu_intor1e(mol, "int1e_ipovlp", INT1E_OVLP_IP,  N, 3)), (0,2,1))
+            test(us, truth, "IPU: \t")
         
     if args.eri or args.all: 
         print("\n[Electron Repulsion Integral]")
         truth = mol.intor("int2e_sph")
         us    = cpu_intor2e(mol, "int2e_sph", N, 1, which_integral=INT2E_SPH, tile_map=args.tilemap)
         test(us, truth, "CPU: \t")
-        us    = ipu_intor2e(mol, "int2e_sph", N, 1, which_integral=INT2E_SPH, tile_map=args.tilemap)
-        test(us, truth, "IPU: \t")
+        if not args.skipipu:
+            us    = ipu_intor2e(mol, "int2e_sph", N, 1, which_integral=INT2E_SPH, tile_map=args.tilemap)
+            test(us, truth, "IPU: \t")
 
     if args.erigrad or args.all:
         print("\n[Grad of Electron Repulsion Integral]")
         truth = mol.intor("int2e_ip1_sph")
         us    = cpu_intor2e(mol, "int2e_ip1_sph", N, 3, which_integral=INT2E_IP1_SPH, tile_map=args.tilemap)
         test(us, truth, "CPU: \t")
-        us    = ipu_intor2e(mol, "int2e_ip1_sph", N, 3, which_integral=INT2E_IP1_SPH, tile_map=args.tilemap)
-        test(us, truth, "IPU: \t")
-
+        if not args.skipipu:
+            us    = ipu_intor2e(mol, "int2e_ip1_sph", N, 3, which_integral=INT2E_IP1_SPH, tile_map=args.tilemap)
+            test(us, truth, "IPU: \t")
