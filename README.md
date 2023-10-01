@@ -3,6 +3,7 @@
 [![notebook-tests](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/notebooks.yaml/badge.svg)](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/notebooks.yaml)
 [![nanoDFT CLI](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/cli.yaml/badge.svg)](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/cli.yaml)
 [![unit tests](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/unittest.yaml/badge.svg)](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/unittest.yaml)
+[![pre-commit checks](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/pre-commit.yaml/badge.svg)](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/pre-commit.yaml)
 
 [**Installation guide**](#installation)
 | [**Example DFT Computations**](#example-dft-computations)
@@ -31,7 +32,7 @@ To generate datasets based on the paper __Repurposing Density Functional Theory 
 
 To run the notebook on Graphcore IPU hardware on Paperspace:
 
-[![Run on Gradient](https://assets.paperspace.io/img/gradient-badge.svg)](https://ipu.dev/ipobmC)
+[![Run on Gradient](https://assets.paperspace.io/img/gradient-badge.svg)](https://ipu.dev/YX0jlK)
 
 ### For DFT teaching and learning: nanoDFT
 
@@ -41,6 +42,7 @@ We also provide a lightweight implementation of the SCF algorithm, optimized for
 To run the notebook on Graphcore IPU hardware on Paperspace:
 
 [![Run on Gradient](https://assets.paperspace.io/img/gradient-badge.svg)](https://ipu.dev/ipobmC)
+
 
 
 Additional notebooks in [notebooks](notebooks) demonstrate other aspects of the computation.

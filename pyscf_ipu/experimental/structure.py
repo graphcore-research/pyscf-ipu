@@ -5,7 +5,6 @@ import chex
 import numpy as np
 from periodictable import elements
 from py3Dmol import view
-from pyscf import gto
 
 from .types import FloatNx3, IntN
 from .units import to_angstrom, to_bohr
@@ -46,19 +45,6 @@ class Structure:
 
     def view(self) -> "view":
         return view(data=self.to_xyz(), style={"stick": {"radius": 0.06}})
-
-
-def to_pyscf(
-    structure: Structure, basis_name: str = "sto-3g", unit: str = "Bohr"
-) -> "gto.Mole":
-    mol = gto.Mole(unit=unit, spin=structure.num_electrons % 2, cart=True)
-    mol.atom = [
-        (symbol, pos)
-        for symbol, pos in zip(structure.atomic_symbol, structure.position)
-    ]
-    mol.basis = basis_name
-    mol.build(unit=unit)
-    return mol
 
 
 def molecule(name: str):

@@ -1,7 +1,7 @@
 # Copyright (c) 2023 Graphcore Ltd. All rights reserved.
 
-from typing import Tuple
 from functools import partial
+from typing import Tuple
 
 import chex
 import jax.numpy as jnp
