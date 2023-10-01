@@ -21940,8 +21940,7 @@ static FINT (*CINTf_2e_loop[16])(dtype *, CINTEnvVars *, dtype *, FINT *) = {
                            +(i_prim+j_prim+k_prim+l_prim)*2 + nf*3);
 
 //acint
-CACHE_SIZE_T CINT2e_drv(dtype *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt,
-                      dtype *cache)//, void (*f_c2s)(dtype *opij, dtype *gctr, FINT *dims, CINTEnvVars *envs, dtype *cache))
+CACHE_SIZE_T CINT2e_drv(dtype *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt, dtype *cache)//, void (*f_c2s)(dtype *opij, dtype *gctr, FINT *dims, CINTEnvVars *envs, dtype *cache))
 {
         FINT *x_ctr = envs->x_ctr;
         size_t nf = envs->nf;
@@ -28628,7 +28627,6 @@ void GTOint2c(int (*intor)(), dtype *mat, int comp, int hermi,
                 //printf("%d %d\n", ish, jsh);
                 i0 = ao_loc[ish] - ao_loc[ish0];
                 j0 = ao_loc[jsh] - ao_loc[jsh0];
-
 
                 (*intor)(mat+j0*naoi+i0, dims, shls, atm, natm, bas, nbas, env, opt, cache);
 
