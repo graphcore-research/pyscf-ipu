@@ -20,48 +20,42 @@ def cpu_ijkl(value, symmetry, N, f):
     return f(i,j,k,l,symmetry,N)
 cpu_ijkl = jax.vmap(cpu_ijkl, in_axes=(0, None, None, None))
 
+
+
+from tessellate_ipu import create_ipu_tile_primitive, ipu_cycle_count, tile_map, tile_put_sharded, tile_put_replicated
+vertex_filename  = osp.join(osp.dirname(__file__), "compute_indices.cpp")
+compute_indices= create_ipu_tile_primitive(
+        "IndicesIJKL" ,
+        "IndicesIJKL" ,
+        #inputs=["i_", "j_", "k_", "l_", "nonzero_indices", "sym_", "N_", "start_", "stop_"], 
+        inputs=["outshape", "nonzero_indices", "sym_", "N_", "start_", "stop_"], 
+        outputs={"out_": 0},
+        gp_filename=vertex_filename,
+        perf_estimate=100,
+)
+
 @partial(jax.jit, backend="ipu")
 def ipu_ijkl(nonzero_indices, symmetry, N):
-    from tessellate_ipu import create_ipu_tile_primitive, ipu_cycle_count, tile_map, tile_put_sharded, tile_put_replicated
-    vertex_filename  = osp.join(osp.dirname(__file__), "compute_indices.cpp")
-    compute_indices= create_ipu_tile_primitive(
-            "IndicesIJKL" ,
-            "IndicesIJKL" ,
-            inputs=["i_", "j_", "k_", "l_", "sym_", "N_", "start_", "stop_"], 
-            outputs={"out_": 0},
-            gp_filename=vertex_filename,
-            perf_estimate=100,
-    )
-    size = nonzero_indices.shape[0]
+    size          = nonzero_indices.shape[0]
     total_threads = (1472-1) * 6 
-    remainder = size % total_threads
+    remainder     = size % total_threads
 
-    i, j, k, l = [nonzero_indices[:, i].astype(np.uint32) for i in range(4)] 
-    
-    if remainder != 0: 
-        i = jnp.pad(i, ((0, total_threads-remainder)))
-        j = jnp.pad(j, ((0, total_threads-remainder)))
-        k = jnp.pad(k, ((0, total_threads-remainder)))
-        l = jnp.pad(l, ((0, total_threads-remainder)))
+    if remainder != 0: nonzero_indices = jnp.pad(nonzero_indices, ((0, total_threads-remainder), (0, 0)))
 
-    i = i.reshape(total_threads, -1)
-    j = j.reshape(total_threads, -1)
-    k = k.reshape(total_threads, -1)
-    l = l.reshape(total_threads, -1)
-    
-    stop = i.shape[1]
+    nonzero_indices = nonzero_indices.reshape(total_threads, -1, 4)
+    stop            = nonzero_indices.shape[1]
+    outshape        = np.zeros((total_threads, stop), dtype=np.int32) # perhaps faster if jnp? 
 
     tiles = tuple((np.arange(0,total_threads) % (1471) + 1).astype(np.uint32).tolist())
     symmetry = tile_put_replicated(jnp.array(symmetry, dtype=jnp.uint32),   tiles) 
-    N        = tile_put_replicated(jnp.array(N, dtype=jnp.uint32),   tiles)
-    start    = tile_put_replicated(jnp.array(0, dtype=jnp.uint32),   tiles)
-    stop     = tile_put_replicated(jnp.array(stop, dtype=jnp.uint32),   tiles)
+    N        = tile_put_replicated(jnp.array(N,        dtype=jnp.uint32),   tiles)
+    start    = tile_put_replicated(jnp.array(0,        dtype=jnp.uint32),   tiles)
+    stop     = tile_put_replicated(jnp.array(stop,     dtype=jnp.uint32),   tiles)
 
-    i = tile_put_sharded(i, tiles)
-    j = tile_put_sharded(j, tiles)
-    k = tile_put_sharded(k, tiles)
-    l = tile_put_sharded(l, tiles)
-    value = tile_map(compute_indices, i, j, k, l, symmetry, N, start, stop)
+    outshape        = tile_put_sharded(outshape, tiles)
+    nonzero_indices = tile_put_sharded(nonzero_indices, tiles)
+
+    value = tile_map(compute_indices, outshape, nonzero_indices, symmetry, N, start, stop)
 
     return value.array.reshape(-1)[:size]
 
@@ -99,7 +93,7 @@ def sparse_symmetric_einsum(nonzero_distinct_ERI, nonzero_indices, dm, backend):
 
     def iteration(symmetry, vals): 
         diff_JK = vals 
-        is_K_matrix = (symmetry >= 8)
+        is_K_matrix =  (symmetry >= 8)
 
         def sequentialized_iter(i, vals):
             # Generalized J/K computation: does J when symmetry is in range(0,8) and K when symmetry is in range(8,16)
@@ -109,12 +103,15 @@ def sparse_symmetric_einsum(nonzero_distinct_ERI, nonzero_indices, dm, backend):
             indices = nonzero_indices[i]
             print(nonzero_indices.shape, indices.shape)
 
+            # move the casting from f16 to int32 to inside c code. 
             indices = jax.lax.bitcast_convert_type(indices, np.int16).astype(np.int32)
             eris    = nonzero_distinct_ERI[i]
 
             if backend == "cpu": dm_indices = cpu_ijkl(indices, symmetry+is_K_matrix*8, N, indices_func).reshape(-1, 1)
             else:                dm_indices = ipu_ijkl(indices, symmetry+is_K_matrix*8, N)  .reshape(-1, 1)
             # dm_values = jnp.take(dm, indices, axis=0) # for our special case the 50 lines of code reduces to the one line below. 
+            print(dm.shape, dm_indices.shape)
+            exit()
             dm_values = jax.lax.gather(dm, dm_indices, dimension_numbers=dnums, slice_sizes=(1,), mode=jax.lax.GatherScatterMode.FILL_OR_DROP)
 
             dm_values = dm_values.at[:].mul( eris ) # this is prod, but re-use variable for inplace update. 
@@ -130,9 +127,11 @@ def sparse_symmetric_einsum(nonzero_distinct_ERI, nonzero_indices, dm, backend):
             return diff_JK
 
         batches = nonzero_indices.shape[0] # Before pmap, tensor had shape (nipus, batches, -1) so [0]=batches after pmap
+        #diff_JK = jax.lax.fori_loop(0, batches, sequentialized_iter, diff_JK) 
         diff_JK = jax.lax.fori_loop(0, batches, sequentialized_iter, diff_JK) 
         return diff_JK
 
+    #diff_JK = jax.lax.fori_loop(0, 16, iteration, diff_JK) 
     diff_JK = jax.lax.fori_loop(0, 16, iteration, diff_JK) 
     return jax.lax.psum(diff_JK, axis_name="p")
 

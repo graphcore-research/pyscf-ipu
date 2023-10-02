@@ -21,10 +21,11 @@ using namespace poplar;
 
 class IndicesIJKL : public Vertex {
 public:
-  Input<Vector<const uint32_t>> i_;
-  Input<Vector<const uint32_t>> j_;
-  Input<Vector<const uint32_t>> k_;
-  Input<Vector<const uint32_t>> l_;
+  Input<Vector<const int>> outshape;
+  //Input<Vector<const int>> j_;
+  //Input<Vector<const int>> k_;
+  //Input<Vector<const int>> l_;
+  Input<Vector<const int>> nonzero_indices;
   
   Input<Vector<const uint32_t>> sym_;
   Input<Vector<const uint32_t>> N_;
@@ -32,7 +33,7 @@ public:
   Input<Vector<const uint32_t>> start_;
   Input<Vector<const uint32_t>> stop_;
 
-  Output<Vector<uint32_t>> out_; 
+  Output<Vector<int>> out_; 
 
   bool compute() {
 
@@ -43,12 +44,16 @@ public:
 
     for (uint32_t iteration = start; iteration < stop; iteration++){
 
-      const uint32_t& i = i_[iteration]; 
-      const uint32_t& j = j_[iteration];
-      const uint32_t& k = k_[iteration];
-      const uint32_t& l = l_[iteration];
+      //const int& i = i_[iteration]; 
+      //const int& j = j_[iteration];
+      //const int& k = k_[iteration];
+      //const int& l = l_[iteration];
+      const int& i = nonzero_indices[iteration*4+0];
+      const int& j = nonzero_indices[iteration*4+1];
+      const int& k = nonzero_indices[iteration*4+2];
+      const int& l = nonzero_indices[iteration*4+3];
 
-      uint32_t& out = out_[iteration];
+      int& out = out_[iteration];
 
       //_compute_symmetry(ij, kl, N, sym, out[iteration]);
       switch (sym) {
