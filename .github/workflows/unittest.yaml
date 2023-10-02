@@ -33,4 +33,4 @@ jobs:
           JAX_IPU_MODEL_NUM_TILES: 46
           JAX_PLATFORMS: cpu,ipu
         run: |
-          pytest -s .
+          pytest .

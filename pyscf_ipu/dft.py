@@ -28,6 +28,7 @@ import re
 from rdkit import Chem
 from rdkit.Chem import AllChem
 from rdkit import RDLogger
+from collections import namedtuple
 
 from pyscf_ipu.pyscf_utils.minao            import minao
 from pyscf_ipu.pyscf_utils.build_grid       import build_grid
@@ -43,8 +44,17 @@ from pyscf_ipu.electron_repulsion.direct    import (prepare_ipu_direct_mult_inpu
 lg = RDLogger.logger()
 lg.setLevel(RDLogger.CRITICAL)
 
+# Constants
 angstrom_to_bohr = 1.88973
 hartree_to_eV    = 27.2114
+
+# Global variables, set from args
+g_float32 = False
+g_ipu = False
+EPSILON_B3LYP  = 1e-20
+CLIP_RHO_MIN   = 1e-9
+CLIP_RHO_MAX   = 1e12
+
 
 def get_atom_string(atoms, locs):
     atom_string = atoms
@@ -54,8 +64,24 @@ def get_atom_string(atoms, locs):
       str += "%s %4f %4f %4f; "%((atom,) + tuple(loc) )
     return atom_string, str
 
-def _do_compute(density_matrix, kinetic, nuclear, overlap, ao,
-                electron_repulsion, weights, coords, nuclear_energy, disable_cache, mf_diis_space, N, hyb, mask, _input_floats, _input_ints, L_inv=None):
+# Explicit list of arguments used in do_compute and callees
+do_compute_args_names = (
+  'its', 'backend', 'ipumult', 'seperate','threads_int',
+  'intv', 'skiperi', 'randeri', 'float16', 'float32', 'nan', 'forloop',
+  'sk', 'xc', 'threads', 'multv', 'debug',
+  'skipdiis', 'skipeigh', 'geneigh', 'density_mixing'
+)
+dcargs_t = namedtuple('dcargs', do_compute_args_names)
+
+_do_compute_static_argnums = (10,11,16)
+def _do_compute(density_matrix, kinetic, nuclear, overlap, ao, # 0-4
+                electron_repulsion, weights, coords,  # 5-7
+                nuclear_energy, disable_cache,  # 8-9
+                mf_diis_space, N, hyb, mask, _input_floats, # 10,11,12-14
+                _input_ints,  # 15
+                args, # 16
+                L_inv=None):
+
         # --- INITIALIZE MATRICES USED FOR DIIS --- #
         mf_diis_H       = np.zeros((mf_diis_space+1, mf_diis_space+1))
         mf_diis_H[0,1:] = mf_diis_H[1:,0] = 1
@@ -87,10 +113,10 @@ def _do_compute(density_matrix, kinetic, nuclear, overlap, ao,
         cs = np.zeros((args.its, mf_diis_space+1))
         allvals = np.zeros((args.its, density_matrix.shape[0]))
 
+        indxs = None
         if args.backend == "ipu" and not args.ipumult:
             from pyscf_ipu.electron_repulsion.direct import prepare_integrals_2_inputs , compute_integrals_2
             _, _, _tuple_ijkl, _shapes, _sizes, _counts, indxs, indxs_inv, num_calls = prepare_integrals_2_inputs(mol)
-            args.indxs = indxs
             if not args.seperate:
                 electron_repulsion = compute_integrals_2( _input_floats, _input_ints, _tuple_ijkl, _shapes, _sizes, _counts, tuple(indxs_inv), num_threads=args.threads_int, v=args.intv)[0]
                 electron_repulsion = [a  for a in electron_repulsion]
@@ -114,10 +140,10 @@ def _do_compute(density_matrix, kinetic, nuclear, overlap, ao,
         _num_calls = np.zeros(num_calls)
         cycle = 0
         if type(electron_repulsion) == type([]):
-            if args.float32: E_xc, V_xc, E_coulomb, vj, vk = xc( density_matrix.astype(np.float32), dms.astype(np.float32), cycle, ao.astype(np.float32), electron_repulsion, weights.astype(np.float32), vj.astype(np.float32), vk.astype(np.float32), hyb, _num_calls)
+            if args.float32: E_xc, V_xc, E_coulomb, vj, vk = xc((args, indxs), density_matrix.astype(np.float32), dms.astype(np.float32), cycle, ao.astype(np.float32), electron_repulsion, weights.astype(np.float32), vj.astype(np.float32), vk.astype(np.float32), hyb, _num_calls)
         else:
-            if args.float32: E_xc, V_xc, E_coulomb, vj, vk = xc( density_matrix.astype(np.float32), dms.astype(np.float32), cycle, ao.astype(np.float32), electron_repulsion.astype(np.float32), weights.astype(np.float32), vj.astype(np.float32), vk.astype(np.float32), hyb, _num_calls)
-            else: E_xc, V_xc, E_coulomb, vj, vk = xc( density_matrix.astype(np.float64), dms.astype(np.float64), cycle, ao.astype(np.float64), electron_repulsion.astype(np.float64), weights.astype(np.float64), vj.astype(np.float64), vk.astype(np.float64), hyb, _num_calls)
+            if args.float32: E_xc, V_xc, E_coulomb, vj, vk = xc((args, indxs), density_matrix.astype(np.float32), dms.astype(np.float32), cycle, ao.astype(np.float32), electron_repulsion.astype(np.float32), weights.astype(np.float32), vj.astype(np.float32), vk.astype(np.float32), hyb, _num_calls)
+            else: E_xc, V_xc, E_coulomb, vj, vk = xc((args, indxs), density_matrix.astype(np.float64), dms.astype(np.float64), cycle, ao.astype(np.float64), electron_repulsion.astype(np.float64), weights.astype(np.float64), vj.astype(np.float64), vk.astype(np.float64), hyb, _num_calls)
 
         vals = [mask, allvals, cs, energies, V_xc, density_matrix, _V, _H, mf_diis_H,
                     vj, vk, eigvals, eigvects, energy, overlap, electron_repulsion,
@@ -126,13 +152,13 @@ def _do_compute(density_matrix, kinetic, nuclear, overlap, ao,
         vals = [f(a, args.float32) for a in vals]
 
         if args.nan or args.forloop:
-            if args.jit: _iter = jax.jit(iter, backend=args.backend)
+            if args.jit: _iter = jax.jit(dft_iter, backend=args.backend)
 
             os.makedirs("numerror/%s/"%(str(args.sk)) , exist_ok=True)
             for n in tqdm(range(int(args.its))):
 
-                if args.jit: vals = _iter(n, vals)
-                else: vals = iter(n, vals)
+                if args.jit: vals = _iter((args,indxs), n, vals)
+                else: vals = dft_iter((args,indxs), n, vals)
 
                 if args.numerror:
                     _str = ["mask", "allvals", "cs", "energies", "V_xc", "density_matrix", "_V", "_H", "mf_diis_H",
@@ -149,9 +175,9 @@ def _do_compute(density_matrix, kinetic, nuclear, overlap, ao,
                 exit()
 
         elif args.its == 1:
-            vals = jax.jit(iter, backend=args.backend)(0, vals)
+            vals = jax.jit(dft_iter, backend=args.backend)((args,indxs), 0, vals)
         else:
-            vals = jax.lax.fori_loop(0, args.its, iter, vals)
+            vals = jax.lax.fori_loop(0, args.its, lambda i, vals: dft_iter((args,indxs), i, vals), vals)
 
         eigenvalues   = vals[11]
         eigenvectors  = vals[12]
@@ -162,7 +188,13 @@ def _do_compute(density_matrix, kinetic, nuclear, overlap, ao,
 
         return energies, energy, eigenvalues, eigenvectors, dms, fixed_hamiltonian, part_energies, L_inv
 
-def density_functional_theory(atom_positions, mf_diis_space=9):
+do_compute_jit = None
+def compile_do_compute(device_1):
+    global do_compute_jit
+    do_compute_jit = jax.jit(_do_compute, device=device_1, static_argnums=_do_compute_static_argnums)
+
+
+def density_functional_theory(atom_positions, args, mf_diis_space=9):
     if args.backend == "ipu": mf_diis_space = 9
 
     if args.generate: global mol
@@ -266,8 +298,6 @@ def density_functional_theory(atom_positions, mf_diis_space=9):
         assert args.plevel == args.level
         initialized = False
 
-        device_1 = jax.devices(args.backend)[0]
-        function = jax.jit(_do_compute, device=device_1, static_argnums=(10,11))
         if args.seperate:
             device_2 = jax.devices("ipu")[1]
             print(device_2)
@@ -636,13 +666,22 @@ def density_functional_theory(atom_positions, mf_diis_space=9):
                 times = [time.perf_counter()]
                 if np.sum(np.isnan(density_matrix)) > 0 or density_matrix.shape != kinetic.shape:
                     density_matrix  = np.array(minao(mol))
+                dcargs_names = (
+                  'its', 'backend', 'ipumult', 'seperate','threads_int',
+                  'intv', 'skiperi', 'randeri', 'float16', 'float32', 'nan', 'forloop',
+                  'sk', 'xc', 'threads', 'multv', 'debug',
+                  'skipdiis', 'skipeigh', 'geneigh', 'density_mixing'
+                )
+
+                dcargs = dcargs_t(*(args.__dict__[a] for a in do_compute_args_names))
+
                 if not args.forloop:
                     if not args.skip_minao: density_matrix  = np.array(minao(mol))
-                    vals.append( function( density_matrix, kinetic, nuclear, overlap, ao, electron_repulsion, weights, coords, nuclear_energy, 0, mf_diis_space, N, hyb , mask, _input_floats, _input_ints, L_inv)  )
+                    vals.append( do_compute_jit( density_matrix, kinetic, nuclear, overlap, ao, electron_repulsion, weights, coords, nuclear_energy, 0, mf_diis_space, N, hyb , mask, _input_floats, _input_ints, dcargs, L_inv)  )
                 else:
                     # make this into a flag.
                     if not args.skip_minao: density_matrix  = np.array(minao(mol))
-                    vals.append(_do_compute( density_matrix, kinetic, nuclear, overlap, ao, electron_repulsion, weights, coords, nuclear_energy, 0, mf_diis_space, N, hyb , mask, _input_floats, _input_ints, L_inv) )
+                    vals.append(_do_compute( density_matrix, kinetic, nuclear, overlap, ao, electron_repulsion, weights, coords, nuclear_energy, 0, mf_diis_space, N, hyb , mask, _input_floats, _input_ints, dcargs, L_inv) )
 
                 times.append(time.perf_counter())
 
@@ -668,11 +707,11 @@ def density_functional_theory(atom_positions, mf_diis_space=9):
             electron_repulsion = [np.asarray(a)  for a in electron_repulsion]
 
 
-        vals = jax.jit(_do_compute, static_argnums=(10,11), device=device_1) ( density_matrix, kinetic, nuclear, overlap,
+        vals = jax.jit(_do_compute, static_argnums=_do_compute_static_argnums, device=device_1) ( density_matrix, kinetic, nuclear, overlap,
                                                                                        ao, electron_repulsion, weights, coords, nuclear_energy,
                                                                                        0,
                                                                                        mf_diis_space, N, hyb ,
-                                                                                       mask, input_floats, input_ints, L_inv)
+                                                                                       mask, input_floats, input_ints, args, L_inv)
 
         energies_, energy, eigenvalues, eigenvectors, dms, fixed_hamiltonian, part_energies, _  = [np.asarray(a).astype(np.float64) for a in vals]
         print(density_matrix.dtype)
@@ -694,7 +733,7 @@ def density_functional_theory(atom_positions, mf_diis_space=9):
                                                                                        ao, electron_repulsion, weights, coords, nuclear_energy,
                                                                                        0,
                                                                                        mf_diis_space, N, hyb ,
-                                                                                       mask, input_floats, input_ints, L_inv)
+                                                                                       mask, input_floats, input_ints, args, L_inv)
 
         print([a.dtype for a in vals])
         energies_, energy, eigenvalues, eigenvectors, dms, fixed_hamiltonian, part_energies  = [np.asarray(a).astype(np.float64) for a in vals]
@@ -710,15 +749,15 @@ def density_functional_theory(atom_positions, mf_diis_space=9):
 
 # utility functions for investigating float{64,32}
 def f(x, float32):
-    if not args.float32: return x  # in float64 mode just return x
+    if not g_float32: return x  # in float64 mode just return x
 
-    if args.backend == "ipu":
+    if g_ipu:
         try:
             return x.astype(np.float32) # could (shouldn't) do a copy
         except:
             return x
 
-    if not args.float32:
+    if not g_float32:
         if type(x) == type(.1): return x
         return x.astype(np.float64)
 
@@ -747,16 +786,18 @@ def kahan_dot(x, y, sort=False): # more stable dot product;
     xy, error, sum = jax.lax.fori_loop(np.zeros(1, dtype=np.int32), np.asarray(len(x), dtype=np.int32), body, (xy, error, sum))
     return sum
 
-def iter( cycle, val ):
+def dft_iter(args_indxs, cycle, val ):
+    args, indxs = args_indxs
+
     mask, allvals, cs, energies, V_xc, density_matrix, _V, _H, mf_diis_H, vj, vk, eigvals, eigvects, energy, overlap, electron_repulsion, \
         fixed_hamiltonian, L_inv, weights, hyb, ao, nuclear_energy, num_calls, cholesky, generalized_hamiltonian, sdf, errvec, hamiltonian, dms, part_energies = val
 
     for i, a in enumerate(val):
         try:
             if type(a) == type([]):
-                print([(b.shape, b.nbytes/10**6) for b in a])
+                print('dft_iter:', [(b.shape, b.nbytes/10**6) for b in a])
             else:
-                if a.nbytes>1000000: print(a.nbytes/10**6, a.shape, i)
+                if a.nbytes>1000000: print('dft_iter:', a.nbytes/10**6, a.shape, i)
         except:
             pass
 
@@ -767,7 +808,7 @@ def iter( cycle, val ):
     sdf                            = overlap @ density_matrix @ hamiltonian
     sdf, hamiltonian, _V, _H, mf_diis_H, fixed_hamiltonian, V_xc, overlap, density_matrix, hamiltonian = f(sdf, d), f(hamiltonian, d), f(_V, d), f(_H,d), f(mf_diis_H, d), f(fixed_hamiltonian, d), f(V_xc, d), f(overlap, d), f(density_matrix, d), f(hamiltonian, d)
     if not args.skipdiis:
-        hamiltonian, _V, _H, mf_diis_H, errvec = DIIS(cycle, sdf, hamiltonian, _V, _H, mf_diis_H)
+        hamiltonian, _V, _H, mf_diis_H, errvec = DIIS(cycle, sdf, hamiltonian, _V, _H, mf_diis_H, args.backend == "ipu", args.float32)
     d = args.float32
     sdf, hamiltonian, _V, _H, mf_diis_H, fixed_hamiltonian, V_xc, overlap, density_matrix, hamiltonian = f(sdf, d), f(hamiltonian, d), f(_V, d), f(_H,d), f(mf_diis_H, d), f(fixed_hamiltonian, d), f(V_xc, d), f(overlap, d), f(density_matrix, d), f(hamiltonian, d)
 
@@ -812,10 +853,10 @@ def iter( cycle, val ):
 
 
     if type(electron_repulsion) == type([]):
-        if args.float32: E_xc, V_xc, E_coulomb, vj, vk = xc( density_matrix.astype(np.float32), dms.astype(np.float32), cycle, ao.astype(np.float32), electron_repulsion, weights.astype(np.float32), vj.astype(np.float32), vk.astype(np.float32), hyb, num_calls)
+        if args.float32: E_xc, V_xc, E_coulomb, vj, vk = xc((args, indxs), density_matrix.astype(np.float32), dms.astype(np.float32), cycle, ao.astype(np.float32), electron_repulsion, weights.astype(np.float32), vj.astype(np.float32), vk.astype(np.float32), hyb, num_calls)
     else:
-        if args.float32: E_xc, V_xc, E_coulomb, vj, vk = xc( density_matrix.astype(np.float32), dms.astype(np.float32), cycle, ao.astype(np.float32), electron_repulsion.astype(np.float32), weights.astype(np.float32), vj.astype(np.float32), vk.astype(np.float32), hyb, num_calls)
-        else: E_xc, V_xc, E_coulomb, vj, vk = xc( density_matrix.astype(np.float64), dms.astype(np.float64), cycle, ao.astype(np.float64), electron_repulsion.astype(np.float64), weights.astype(np.float64), vj.astype(np.float64), vk.astype(np.float64), hyb, num_calls)
+        if args.float32: E_xc, V_xc, E_coulomb, vj, vk = xc((args, indxs), density_matrix.astype(np.float32), dms.astype(np.float32), cycle, ao.astype(np.float32), electron_repulsion.astype(np.float32), weights.astype(np.float32), vj.astype(np.float32), vk.astype(np.float32), hyb, num_calls)
+        else: E_xc, V_xc, E_coulomb, vj, vk = xc((args, indxs), density_matrix.astype(np.float64), dms.astype(np.float64), cycle, ao.astype(np.float64), electron_repulsion.astype(np.float64), weights.astype(np.float64), vj.astype(np.float64), vk.astype(np.float64), hyb, num_calls)
 
     if type(part_energies) == type(jnp.array(1)): part_energies = part_energies.at[cycle].set(  E_xc )
     else: part_energies[cycle] =E_xc
@@ -855,8 +896,9 @@ def kahan_sum_sort(xy): # x is vector and y is matrix
     return sum
 
 
-def xc(density_matrix, dms, cycle, ao, electron_repulsion, weights, vj, vk, hyb, num_calls):
+def xc(args_indxs, density_matrix, dms, cycle, ao, electron_repulsion, weights, vj, vk, hyb, num_calls):
     # the f notation below allows testing the error when running entire dft in f64 except a single operation in f32.
+    args, indxs = args_indxs
 
     n = density_matrix.shape[0]
 
@@ -940,8 +982,8 @@ def xc(density_matrix, dms, cycle, ao, electron_repulsion, weights, vj, vk, hyb,
                                                 density_matrix,
                                                 _tuple_indices,
                                                 _tuple_do_lists, _N, num_calls.size,
-                                                tuple(args.indxs.tolist()),
-                                                tuple(args.indxs.tolist()),
+                                                tuple(indxs.tolist()),
+                                                tuple(indxs.tolist()),
                                                 int(args.threads),
                                                 v=int(args.multv)
                                                 )
@@ -995,7 +1037,7 @@ def xc(density_matrix, dms, cycle, ao, electron_repulsion, weights, vj, vk, hyb,
 
 
 def _eigh(x):
-    if args.backend == "ipu" and x.shape[0] >= 6:
+    if g_ipu and x.shape[0] >= 6:
         t0 = time.time()
         print("tracing ipu eigh (%s): "%str(x.shape))
         from tessellate_ipu.linalg import ipu_eigh
@@ -1015,11 +1057,11 @@ def _eigh(x):
             eigvects = jnp.roll(eigvects, -(-col))
             eigvects = eigvects[:-1]
     else:
-        eigvals, eigvects = jnp.linalg.eigh(f(x, args.float32))
+        eigvals, eigvects = jnp.linalg.eigh(f(x, g_float32))
 
     return eigvals, eigvects
 
-def DIIS(cycle, sdf, hamiltonian, _V, _H, mf_diis_H):
+def DIIS(cycle, sdf, hamiltonian, _V, _H, mf_diis_H, use_ipu, use_float32):
     # Update hamiltonian as linear combination of previous iterations
     mf_diis_head      = cycle % _V.shape[0]
     nd, d             = _V.shape
@@ -1051,12 +1093,12 @@ def DIIS(cycle, sdf, hamiltonian, _V, _H, mf_diis_H):
     mask_            = jnp.concatenate([jnp.ones(1, dtype=mask.dtype), mask])
     masked_mf_diis_H = mf_diis_H[:nd+1, :nd+1] * mask_.reshape(-1, 1) * mask_.reshape(1, -1)
 
-    if args.backend == "ipu":
+    if use_ipu:
         #c               = pinv( masked_mf_diis_H )[0, :]
         c               = pinv0( masked_mf_diis_H )
         #c               = jnp.linalg.pinv( masked_mf_diis_H )[0, :]
     else:
-        c = jnp.linalg.pinv(f(masked_mf_diis_H, args.float32))[0, :]
+        c = jnp.linalg.pinv(f(masked_mf_diis_H, use_float32))[0, :]
 
 
     scaled_H         = _H[:nd] * c[1:].reshape(nd, 1)
@@ -1080,9 +1122,10 @@ def pinv0(a):  # take out first row
     c = vect @ ( jnp.where( jnp.abs(vals) > cond, 1/vals, 0) * vect[0, :])
     return c
 
-table = None
 def recompute(args, molecules, id, num, our_fun, str="", atom_string=""):
-  global table
+  g_float32 = args.float32
+  g_ipu = args.backend == 'ipu'
+
   t0 = time.time()
 
   if str == "":
@@ -1095,10 +1138,10 @@ def recompute(args, molecules, id, num, our_fun, str="", atom_string=""):
 
   mol.build(atom=str, unit="Bohr", basis=args.basis, spin=args.spin, verbose=0)
 
-  print("\t", atom_string, end="")
+  print("recompute:", atom_string, end="")
 
   if not args.skipus:
-    energies, our_energy, our_hlgap, t_us, t_main_loop, us_hlgap = our_fun(str)
+    energies, our_energy, our_hlgap, t_us, t_main_loop, us_hlgap = our_fun(str, args)
 
   if not args.skippyscf:
     mol = Mole(atom=str, unit='Bohr', basis=args.basis, spin=args.spin)
@@ -1155,15 +1198,16 @@ def recompute(args, molecules, id, num, our_fun, str="", atom_string=""):
   if molecules is not None: pcq_hlgap = molecules["hlgap"][id]
   else: pcq_hlgap = -1
 
+  chemAcc = 0.043
   print("UNITS IS [eV]!")
   print("pyscf:\t\t%15f"%pyscf_energy)
   print("us:\t\t%15f"%our_energy)
   print("mus:\t\t%15f"%np.mean(energies[-10:]))
   print("diff:\t\t%15f"%np.abs(pyscf_energy-our_energy))
   print("mdiff:\t\t%15f"%np.abs(pyscf_energy-np.mean(energies[-10:])), np.std(energies[-10:]))
-  print("chemAcc: \t%15f"%0.043)
-  print("chemAcc/diff: \t%15f"%(0.043/np.abs(pyscf_energy-our_energy)))
-  print("chemAcc/mdiff: \t%15f"%(0.043/np.abs(pyscf_energy-np.mean(energies[-10:]))))
+  print("chemAcc: \t%15f"%chemAcc)
+  print("chemAcc/diff: \t%15f"%(chemAcc/np.abs(pyscf_energy-our_energy)))
+  print("chemAcc/mdiff: \t%15f"%(chemAcc/np.abs(pyscf_energy-np.mean(energies[-10:]))))
   print("> diffs:")
   print(np.abs(energies.reshape(-1)[-5:] - pyscf_energy))
   print("mean+-var: %f +- %f"%( np.mean(np.abs(energies.reshape(-1)[-5:] - pyscf_energy)), np.var(np.abs(energies.reshape(-1)[-5:] - pyscf_energy))))
@@ -1255,7 +1299,7 @@ def save_plot():
 
 mol = None
 _str = None
-def jax_dft(str):
+def jax_dft(str, args):
     global mol
 
     mol = Mole()
@@ -1282,7 +1326,7 @@ def jax_dft(str):
     ts = []
     for step in range(repeats):
         t0 = time.time()
-        vals = density_functional_theory(atom_positions)
+        vals = density_functional_theory(atom_positions, args)
         energies, e_tot, mo_energy, mo_coeff, dms, L_inv = [np.asarray(a) for a in vals]
         t = time.time() - t0
         e_tot = energies[-1]*hartree_to_eV
@@ -1302,8 +1346,7 @@ def jax_dft(str):
 
     return energies * hartree_to_eV, e_tot, hlgap, t, t, hlgap
 
-
-if __name__ == "__main__":
+def get_args(argv=None):
     parser = argparse.ArgumentParser(description='Arguments for Density Functional Theory. ')
     parser.add_argument('-generate',         action="store_true", help='Enable conformer data generation mode (instead of single point computation). ')
     parser.add_argument('-num_conformers', default=1000, type=int, help='How many rdkit conformers to perfor DFT for. ')
@@ -1383,23 +1426,20 @@ if __name__ == "__main__":
     parser.add_argument('-checkc',  action="store_true" , help='Check convergence; plot energy every iteration to compare against pyscf. ')
     parser.add_argument('-geneigh',  action="store_true" , help='Use generalized eigendecomposition like pyscf; relies on scipy, only works in debug mode with -forloop. ')
 
-    args = parser.parse_args()
+    return parser.parse_args(argv)
 
-    print(sys.argv)
-    print(natsorted(vars(args).items()) )
+def process_args(args):
 
     print("[BASIS]", args.basis)
+    args.sk = tuple(args.sk)
 
-    if -1 in args.sk: args.sk = list(range(20))
+    if -1 in args.sk: args.sk = tuple(range(20))
 
     if args.checkc:
         args.pyscf = True
 
     if args.pyscf:
         args.verbose = True
-
-    if args.backend == "cpu":
-        args.seperate = False
 
     if True:
         # currently tensor scaling is turned off by default.
@@ -1411,39 +1451,48 @@ if __name__ == "__main__":
         args.scale_ghamil = 1
         args.scale_eigvects = 1
 
-
-    sys.argv = sys.argv[:1]
-
     if args.numerror:
         args.forloop = True
         args.backend = "cpu"
         args.its = 20
 
-    print("")
+    g_ipu = (args.backend == "ipu")
+
+    if not args.backend == "ipu":
+        args.seperate = False
 
     if args.backend == "ipu":  # allows use of cpu float64 in jnp while using float32 on ipu
-        args.float32 = True
-        args.sk = list(range(20))
+        args.ipu = True
+        args.sk = tuple(range(20))
         args.debug = True
 
     if args.float32 or args.float16:
-        if args.enable64: config.update('jax_enable_x64', True) #
-        EPSILON_B3LYP  = 1e-20
-        CLIP_RHO_MIN   = 1e-9
-        CLIP_RHO_MAX   = 1e12
+        if args.enable64: config.update('jax_enable_x64', True) 
 
     else:  # float64
         config.update('jax_enable_x64', True)
-        EPSILON_B3LYP  = 1e-20
-        CLIP_RHO_MIN   = 1e-9
-        CLIP_RHO_MAX   = 1e12
 
     if args.nan:
         config.update("jax_debug_nans", True)
 
+    compile_do_compute(jax.devices(args.backend)[0])
+
+    return args
+
+def main():
+    args = get_args()
+
+    args = process_args(args)
+
+    print(sys.argv)
+    print(natsorted(vars(args).items()) )
+
+    sys.argv = sys.argv[:1]
+
+    print("")
+
     backend = args.backend
     eigh = _eigh
-
 
     if args.str != "":
         recompute(args, None, 0, 0, our_fun=jax_dft, str=args.str)
@@ -1454,10 +1503,10 @@ if __name__ == "__main__":
             t0 = time.time()
             print("loading gdb data")
 
-            if args.gdb == 10: args.smiles = [a for a in open("gdb/gdb11_size10_sorted.csv", "r").read().split("\n")]
-            if args.gdb == 9:  args.smiles = [a for a in open("gdb/gdb11_size09_sorted.csv", "r").read().split("\n")]
-            if args.gdb == 7:  args.smiles = [a for a in open("gdb/gdb11_size07_sorted.csv", "r").read().split("\n")]
-            if args.gdb == 8:  args.smiles = [a for a in open("gdb/gdb11_size08_sorted.csv", "r").read().split("\n")]
+            if args.gdb == 10: args.smiles = [a for a in open("data/gdb11_size10_sorted.csv", "r").read().split("\n")]
+            if args.gdb == 9:  args.smiles = [a for a in open("data/gdb11_size09_sorted.csv", "r").read().split("\n")]
+            if args.gdb == 7:  args.smiles = [a for a in open("data/gdb11_size07_sorted.csv", "r").read().split("\n")]
+            if args.gdb == 8:  args.smiles = [a for a in open("data/gdb11_size08_sorted.csv", "r").read().split("\n")]
 
             # used as example data for quick testing.
             if args.gdb == 6:  args.smiles = ["c1ccccc1"]*args.num_conformers
@@ -1528,3 +1577,6 @@ if __name__ == "__main__":
                                                                          ["H", (1, 0, 0)],
                                                                          ["H", (0, 1, 0)],
                                                                          ["H", (1, 1, 0)]])
+
+if __name__ == "__main__":
+    main()
