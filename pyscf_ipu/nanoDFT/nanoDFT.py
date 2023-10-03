@@ -199,10 +199,19 @@ def init_dft_tensors_cpu(mol, opts, DIIS_iters=9):
     grid_weights    = grids.weights                                 # (grid_size,) = (45624,) for C6H6
     coord_str       = 'GTOval_cart_deriv1' if mol.cart else 'GTOval_sph_deriv1'
     grid_AO         = mol.eval_gto(coord_str, grids.coords, 4)      # (4, grid_size, N) = (4, 45624, 9) for C6H6.
-    if opts.ao_threshold is not None:
+    if opts.ao_threshold > 0.0:
         grid_AO[np.abs(grid_AO)<opts.ao_threshold] = 0
-        sparsity_grid_AO = np.sum(grid_AO==0) / grid_AO.size
-        print(f"{sparsity_grid_AO=:.4f}")
+        # trim grid_size (4, grid_size, N) by removing slices with all zeros along (0, 2) axes  
+        sparsity_mask = np.where(np.all(grid_AO == 0, axis=0), 0, 1)
+        sparse_rows = np.where(np.all(sparsity_mask == 0, axis=1), 0, 1).reshape(-1, 1)
+        grid_AO = jnp.delete(grid_AO, jnp.where(sparse_rows == 0)[0], axis=1)
+        grid_weights = jnp.delete(grid_weights, jnp.where(sparse_rows == 0)[0], axis=0)
+        grid_coords = jnp.delete(grids.coords, jnp.where(sparse_rows == 0)[0], axis=0)
+        print(f"axis=( ,  ) sparsity in grid_AO: {np.sum(grid_AO==0) / grid_AO.size:.4f}")
+        print(f"axis=(0,  ) sparsity in grid_AO: {np.sum(sparsity_mask==0) / sparsity_mask.size:.4f}")
+        print(f"axis=(0, 2) sparsity in grid_AO: {np.sum(sparse_rows==0) / sparse_rows.size:.4f}")
+    else:
+        grid_coords = grids.coords
     density_matrix  = pyscf.scf.hf.init_guess_by_minao(mol)         # (N,N)=(66,66) for C6H6.
 
     # TODO(): Add integral math formulas for kinetic/nuclear/O/ERI.
@@ -227,7 +236,7 @@ def init_dft_tensors_cpu(mol, opts, DIIS_iters=9):
                            L_inv=L_inv, diis_history=diis_history)
 
 
-    return state, n_electrons_half, E_nuc, N, L_inv, grid_weights, grids.coords, grid_AO
+    return state, n_electrons_half, E_nuc, N, L_inv, grid_weights, grid_coords, grid_AO
 
 def nanoDFT(mol, opts):
     # Init DFT tensors on CPU using PySCF.
@@ -533,7 +542,7 @@ def nanoDFT_options(
         diis: bool = True,
         structure_optimization: bool = False, # AKA gradient descent on energy wrt nuclei
         eri_threshold : float = 0.0,
-        ao_threshold: float = None,
+        ao_threshold: float = 0.0,
         batches: int = 32,
         ndevices: int = 1, 
         dense_ERI: bool = False,        
