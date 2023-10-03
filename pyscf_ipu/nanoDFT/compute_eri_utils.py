@@ -1,5 +1,22 @@
 # Copyright (c) 2023 Graphcore Ltd. All rights reserved.
-import numpy as np 
+import numpy as np
+import jax 
+import jax.numpy as jnp 
+
+def reconstruct_ERI(ERI, nonzero_idx, N, sym=True):
+    i, j, k, l = nonzero_idx[:, 0], nonzero_idx[:, 1], nonzero_idx[:, 2], nonzero_idx[:, 3]
+    rec_ERI = np.zeros((N, N, N, N))
+    rec_ERI[i, j, k, l] = ERI[i, j, k, l]
+    if sym:
+        rec_ERI[j, i, k, l] = ERI[j, i, k, l]
+        rec_ERI[i, j, l, k] = ERI[i, j, l, k]
+        rec_ERI[j, i, l, k] = ERI[j, i, l, k]
+        rec_ERI[k, l, i, j] = ERI[k, l, i, j]
+        rec_ERI[k, l, j, i] = ERI[k, l, j, i]
+        rec_ERI[l, k, i, j] = ERI[l, k, i, j]
+        rec_ERI[l, k, j, i] = ERI[l, k, j, i]
+
+    return rec_ERI
 
 def inverse_permutation(a):
     b = np.arange(a.shape[0])
@@ -105,6 +122,88 @@ def get_shapes(input_ijkl, bas):
     buflen = nfikl*dj;
 
     return len, nf, buflen
+
+def prescreening(mol, itol, dtype=jnp.int16):
+    assert dtype in [jnp.int16, jnp.int32, jnp.uint32]
+
+    # get molecule info
+    bas, env   = mol._bas, mol._env
+    n_bas, N = bas.shape[0], mol.nao_nr()
+
+    tolerance = itol
+    print('computing ERI s8 to sample N*(N+1)/2 values... ', end='')
+    ERI_s8 = mol.intor('int2e_sph', aosym='s8')
+    print('done')
+
+    # find max value
+    I_max = 0
+    tril_idx = np.tril_indices(N)
+    for a, b in zip(tril_idx[0], tril_idx[1]):
+        index_ab_s8 = a*(a+1)//2 + b
+        index_s8 = index_ab_s8*(index_ab_s8+3)//2
+        abab = np.abs(ERI_s8[index_s8])
+        if abab > I_max:
+            I_max = abab
+    
+    # collect candidate pairs for s8
+    considered_indices = []
+    tril_idx = np.tril_indices(N)
+    for a, b in zip(tril_idx[0], tril_idx[1]):
+        index_ab_s8 = a*(a+1)//2 + b
+        index_s8 = index_ab_s8*(index_ab_s8+3)//2
+        abab = np.abs(ERI_s8[index_s8])
+        if abab*I_max>=tolerance**2:
+            considered_indices.append((a, b)) # collect candidate pairs for s8
+
+    screened_indices_s8_4d = np.zeros(((len(considered_indices)*(len(considered_indices)+1)//2), 4), dtype=dtype)
+
+    # generate s8 indices
+    sid = 0
+    for index, ab in enumerate(considered_indices):
+        a, b = ab
+        for cd in considered_indices[index:]:
+            c, d = cd
+            screened_indices_s8_4d[sid, :] = (a, b, c, d)
+            sid += 1
+    
+    return screened_indices_s8_4d
+
+def remove_ortho(arr, nonzero_pattern, output_size, dtype=jnp.int16):
+    assert dtype in [jnp.int16, jnp.int32, jnp.uint32]
+    if dtype == jnp.int16: reinterpret_dtype = jnp.float16
+    else: reinterpret_dtype = None
+
+    def condition(i, j, k, l):
+        return ~(nonzero_pattern[i] ^ nonzero_pattern[j]) ^ (nonzero_pattern[k] ^ nonzero_pattern[l])
+    
+    def body_fun(carry, x):
+        results, counter = carry
+        x_reinterpret = jax.lax.bitcast_convert_type(x, dtype).astype(jnp.uint32)
+        i, j, k, l = x_reinterpret
+        
+        def update_vals(carry):
+            res, count, v = carry
+            res = res.at[count].set(v)
+            count = count + 1
+            return res, count
+        
+        results, counter = jax.lax.cond(condition(i, j, k, l), (results, counter, x), update_vals, (results, counter), lambda x: x)
+        return (results, counter), ()
+        
+    
+    init_results = jnp.zeros((output_size, arr.shape[1]), dtype=dtype)
+    init_count = jnp.array(0, dtype=jnp.int32)
+
+    if reinterpret_dtype is not None:
+        init_results = jax.lax.bitcast_convert_type(init_results, reinterpret_dtype)
+        arr = jax.lax.bitcast_convert_type(arr, reinterpret_dtype)
+    
+    (final_results, _), _ = jax.lax.scan(body_fun, (init_results, init_count), arr)
+
+    final_results = jax.lax.bitcast_convert_type(final_results, dtype)
+    
+    return final_results
+vmap_remove_ortho = jax.vmap(remove_ortho, in_axes=(0, None, None), out_axes=0)
 
 def prepare_integrals_2_inputs(mol, itol):
     # Shapes/sizes.

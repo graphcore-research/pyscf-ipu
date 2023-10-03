@@ -7,7 +7,7 @@ import os.path as osp
 from tessellate_ipu import create_ipu_tile_primitive, ipu_cycle_count, tile_map, tile_put_sharded, tile_put_replicated
 from functools import partial 
 from icecream import ic
-from compute_eri_utils import prepare_integrals_2_inputs
+from compute_eri_utils import prepare_integrals_2_inputs, prescreening, remove_ortho, vmap_remove_ortho, reconstruct_ERI
 jax.config.update('jax_platform_name', "cpu")
 #jax.config.update('jax_enable_x64', True) 
 HYB_B3LYP = 0.2
@@ -459,11 +459,61 @@ if __name__ == "__main__":
     diff_JK              = np.zeros(dm.shape)
 
     # --------------------------------------------------------------------------------------- #
+    # Prescreening to compute relevant indices
+    comp_prescreened_distinct_idx = jax.jit(prescreening, backend=backend, static_argnames=['mol', 'itol', 'dtype'])(mol, args.itol)
+
+    if not args.skip:
+        print('ERI stats after prescreening:')
+        rec_ERI = reconstruct_ERI(dense_ERI, np.array(comp_prescreened_distinct_idx, dtype=np.uint32), N)
+        absdiff = np.abs(dense_ERI-rec_ERI)
+        print('avg error:', np.mean(absdiff))
+        print('std error:', np.std(absdiff))
+        print('max error:', np.max(absdiff))
+    
+    # --------------------------------------------------------------------------------------- #
+    # Filter to remove orthogonal zeros
+    nonzero_pattern = np.array([(i+3)%5!=0 for i in range(N)]).astype(bool)
+    num_nonzeros = int(2*len(comp_prescreened_distinct_idx)*(np.count_nonzero(nonzero_pattern.reshape(N, 1) ^ nonzero_pattern.reshape(1, N))/(N*N)) + 1)
+    print('Estimating', num_nonzeros, 'nonzeros out of', len(comp_prescreened_distinct_idx), 'prescreened values')
+    print('actual nonzero_indices', len(nonzero_indices))
+    print('comp_prescreened_distinct_idx', len(comp_prescreened_distinct_idx))
+    
+    comp_nonzero_distinct_idx = jax.jit(remove_ortho, backend=backend, static_argnames=['output_size', 'dtype'])(comp_prescreened_distinct_idx, nonzero_pattern, num_nonzeros)
+
+    if not args.skip:
+        print('ERI stats after orthogonal zero removal:')
+        rec_ERI = reconstruct_ERI(dense_ERI, np.array(comp_nonzero_distinct_idx, dtype=np.uint32), N)
+        absdiff = np.abs(dense_ERI-rec_ERI)
+        print('shape', comp_nonzero_distinct_idx.shape)
+        print('avg error:', np.mean(absdiff))
+        print('std error:', np.std(absdiff))
+        print('max error:', np.max(absdiff))
+
+    num_batches = 2
+    if comp_prescreened_distinct_idx.shape[0] % num_batches > 0:
+        comp_prescreened_distinct_idx = jnp.pad(comp_prescreened_distinct_idx, ((0, num_batches-comp_prescreened_distinct_idx.shape[0] % num_batches), (0, 0)))
+    vmap_comp_prescreened_distinct_idx = comp_prescreened_distinct_idx.reshape(num_batches, -1, 4)
+    vmap_num_nonzeros = num_nonzeros // num_batches + 1
+    comp_nonzero_distinct_idx = jax.jit(vmap_remove_ortho, backend=backend, static_argnames=['output_size', 'dtype'])(vmap_comp_prescreened_distinct_idx, nonzero_pattern, vmap_num_nonzeros)
+    comp_nonzero_distinct_idx = comp_nonzero_distinct_idx.reshape(-1, 4)
+    
+    if not args.skip:
+        print('ERI stats after orthogonal zero removal:')
+        rec_ERI = reconstruct_ERI(dense_ERI, np.array(comp_nonzero_distinct_idx, dtype=np.uint32), N)
+        absdiff = np.abs(dense_ERI-rec_ERI)
+        print('shape', comp_nonzero_distinct_idx.shape)
+        print('avg error:', np.mean(absdiff))
+        print('std error:', np.std(absdiff))
+        print('max error:', np.max(absdiff))
+
+    exit()
+
+    # --------------------------------------------------------------------------------------- #
     # Compute ERI values from mol; returned values are already:
     #   - scaled to account for repetitions in JK computation
     #   - padded/reshaped to fit the required number of devices and batches
 
-    comp_distinct_ERI, comp_distinct_idx = jax.jit(compute_nonzero_distinct_ERI,backend=backend, static_argnames=['mol', 'nprog', 'nbatch', 'itol', 'backend'])(mol, args.nipu, args.batches, args.itol, args.backend)
+    comp_distinct_ERI, comp_distinct_idx = jax.jit(compute_nonzero_distinct_ERI, backend=backend, static_argnames=['mol', 'nprog', 'nbatch', 'itol', 'backend'])(mol, args.nipu, args.batches, args.itol, args.backend)
     # comp_distinct_ERI, comp_distinct_idx = compute_nonzero_distinct_ERI(mol, args.nipu, args.batches, args.itol, args.backend)
 
     # --------------------------------------------------------------------------------------- #
