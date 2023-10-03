@@ -57,12 +57,16 @@ def get_mol_str_pubchem(entry: str):
     'entry' is interpreted as Compound ID if it is a string of digits or as
     name of a compound otherwise"""
 
-    if entry.isdigit():                    # If all digits, we assume it is a CID
+    if entry.isdigit(): # If all digits, we assume it is a CID
         print(f"Searching in PubChem for CID '{entry}'")
         compound = pubchempy.get_compounds(entry, "cid", record_type='3d')
-    else:  
-        print(f"Searching in PubChem for compound with name '{entry}'")                              # if not, we assume it is a name
+        if len(compound) == 0:
+            compound = pubchempy.get_compounds(entry, 'cid', record_type='2d')
+    else: # if not, we assume it is a name
+        print(f"Searching in PubChem for compound with name '{entry}'")
         compound = pubchempy.get_compounds(entry, 'name', record_type='3d')
+        if len(compound) == 0:
+            compound = pubchempy.get_compounds(entry, 'name', record_type='2d')
     mol_str = []
     if len(compound) > 1:
         print("INFO: PubChem returned more than one compound; using the first...", file=sys.stderr)
@@ -71,7 +75,8 @@ def get_mol_str_pubchem(entry: str):
         return None
     print(f"Found compound: {compound[0].synonyms[0]}") 
     for a in compound[0].atoms:
-        mol_str.append((a.element,np.array([a.x, a.y, a.z])))   
+        z = a.z or 0.0
+        mol_str.append((a.element,np.array([a.x, a.y, z])))   
     return mol_str
 
 
