@@ -1,4 +1,5 @@
 # Copyright (c) 2023 Graphcore Ltd. All rights reserved.
+# todo
 import pyscf 
 import numpy as np 
 import jax 
@@ -7,7 +8,6 @@ import os.path as osp
 from tessellate_ipu import create_ipu_tile_primitive, ipu_cycle_count, tile_map, tile_put_sharded, tile_put_replicated
 from functools import partial 
 from icecream import ic
-from compute_eri_utils import prepare_integrals_2_inputs, prescreening, remove_ortho, vmap_remove_ortho, reconstruct_ERI
 jax.config.update('jax_platform_name', "cpu")
 #jax.config.update('jax_enable_x64', True) 
 HYB_B3LYP = 0.2
@@ -22,17 +22,18 @@ def cpu_ijkl(value, symmetry, f):
     return f(i,j,k,l,symmetry)
 cpu_ijkl = jax.vmap(cpu_ijkl, in_axes=(0, None, None))
 
+vertex_filename  = osp.join(osp.dirname(__file__), "compute_indices.cpp")
+compute_indices= create_ipu_tile_primitive(
+        "IndicesIJKL" ,
+        "IndicesIJKL" ,
+        inputs=["i_", "j_", "k_", "l_", "sym_", "N_", "start_", "stop_"], 
+        outputs={"out_": 0},
+        gp_filename=vertex_filename,
+        perf_estimate=100,
+)
+
 @partial(jax.jit, backend="ipu")
 def ipu_ijkl(nonzero_indices, symmetry, N):
-    vertex_filename  = osp.join(osp.dirname(__file__), "compute_indices.cpp")
-    compute_indices= create_ipu_tile_primitive(
-            "IndicesIJKL" ,
-            "IndicesIJKL" ,
-            inputs=["i_", "j_", "k_", "l_", "sym_", "N_", "start_", "stop_"], 
-            outputs={"out_": 0},
-            gp_filename=vertex_filename,
-            perf_estimate=100,
-    )
     size = nonzero_indices.shape[0]
     total_threads = (1472-1) * 6 
     remainder = size % total_threads
@@ -129,15 +130,188 @@ def sparse_symmetric_einsum(nonzero_distinct_ERI, nonzero_indices, dm, backend):
         diff_JK = jax.lax.fori_loop(0, batches, sequentialized_iter, diff_JK) 
         return diff_JK
 
-    diff_JK = jax.lax.fori_loop(0, 16, iteration, diff_JK) 
-    return jax.lax.psum(diff_JK, axis_name="p")
+    return jax.lax.fori_loop(0, 16, iteration, diff_JK) 
 
 
 
-def compute_eri(input_floats, input_ints, input_ijkl, shapes, sizes, counts, num_calls):
+def get_shapes(input_ijkl, bas):
+    i_sh, j_sh, k_sh, l_sh  = input_ijkl[0]
+    BAS_SLOTS = 8
+    NPRIM_OF = 2
+    NCTR_OF = 3
+    ANG_OF = 1
+    GSHIFT = 4
 
-    # input_ijkl = input_ijkl.reshape(-1, 4)
+    i_ctr   = bas.reshape(-1)[BAS_SLOTS * i_sh + NCTR_OF]
+    j_ctr   = bas.reshape(-1)[BAS_SLOTS * j_sh + NCTR_OF]
+    k_ctr   = bas.reshape(-1)[BAS_SLOTS * k_sh + NCTR_OF]
+    l_ctr   = bas.reshape(-1)[BAS_SLOTS * l_sh + NCTR_OF]
+
+    i_l     = bas.reshape(-1)[BAS_SLOTS * i_sh + ANG_OF]
+    j_l     = bas.reshape(-1)[BAS_SLOTS * j_sh + ANG_OF]
+    k_l     = bas.reshape(-1)[BAS_SLOTS * k_sh + ANG_OF]
+    l_l     = bas.reshape(-1)[BAS_SLOTS * l_sh + ANG_OF]
+
+    nfi  = (i_l+1)*(i_l+2)/2
+    nfj  = (j_l+1)*(j_l+2)/2
+    nfk  = (k_l+1)*(k_l+2)/2
+    nfl  = (l_l+1)*(l_l+2)/2
+    nf = nfi * nfk * nfl * nfj
+    n_comp = 1
+
+    nc = i_ctr * j_ctr * k_ctr * l_ctr
+    lenl = nf * nc * n_comp
+    lenk = nf * i_ctr * j_ctr * k_ctr * n_comp
+    lenj = nf * i_ctr * j_ctr * n_comp
+    leni = nf * i_ctr * n_comp
+    len0 = nf * n_comp
+
+    ng = [0, 0, 0, 0, 0, 1, 1, 1]
+
+    IINC=0
+    JINC=1
+    KINC=2
+    LINC=3
+
+    li_ceil = i_l + ng[IINC]
+    lj_ceil = j_l + ng[JINC]
+    lk_ceil = k_l + ng[KINC]
+    ll_ceil = l_l + ng[LINC]
+    nrys_roots = (li_ceil + lj_ceil + lk_ceil + ll_ceil)/2 + 1
+
+
+    ibase = li_ceil > lj_ceil
+    kbase = lk_ceil > ll_ceil
+    if (nrys_roots <= 2):
+        ibase = 0
+        kbase = 0
+    if (kbase) :
+        dlk = lk_ceil + ll_ceil + 1
+        dll = ll_ceil + 1
+    else:
+        dlk = lk_ceil + 1
+        dll = lk_ceil + ll_ceil + 1
+
+    if (ibase) :
+        dli = li_ceil + lj_ceil + 1
+        dlj = lj_ceil + 1
+    else :
+        dli = li_ceil + 1
+        dlj = li_ceil + lj_ceil + 1
+
+    g_size     = nrys_roots * dli * dlk * dll * dlj
+    gbits        = ng[GSHIFT]
+    leng = g_size*3*((1<<gbits)+1)
+
+    len = leng + lenl + lenk + lenj + leni + len0
+
+    return len, nf
+
+def compute_eri(mol, tolerance):
+    atm, bas, env   = mol._atm, mol._bas, mol._env
+    n_atm, n_bas, N = atm.shape[0], bas.shape[0], mol.nao_nr()
+    ao_loc          = np.cumsum(np.concatenate([np.zeros(1), (bas[:,1]*2+1) * bas[:,3] ])).astype(np.int32)
+    n_ao_loc        = np.prod(ao_loc.shape)
+
+    n_buf, n_eri, n_env = 1, 1, np.prod(env.shape) # TODO: Try to remove this. 
+
+    # Step 1. Compute indices where ERI is non-zero due to geometry (pre-screening). 
+    # Below computes: np.max([ERI[a,b,a,b] for a,b in zip(tril_idx[0], tril_idx[1])])
+    ERI_s8 = mol.intor("int2e_sph", aosym="s8") # TODO: make custom libcint code compute this. 
+    lst = [ ]
+    tril_idx = np.tril_indices(N)
+    for a, b in zip(tril_idx[0], tril_idx[1]):
+        index_ab_s8 = a*(a+1)//2 + b
+        index_s8 = index_ab_s8*(index_ab_s8+3)//2
+        abab = np.abs(ERI_s8[index_s8])
+        lst.append((abab, a,b))
+    considered_indices = set([(a,b) for abab, a, b in lst if abab*np.max(lst) >= tolerance**2])
+    print('n_bas', n_bas)
+    print('ao_loc', ao_loc)
+
+    # Step 2: Remove zeros by orthogonality and match indices with shells. 
+    # Precompute Fill input_ijkl and output_sizes with the necessary indices.
+    n_upper_bound = (n_bas*(n_bas-1))**2
+    input_ijkl    = np.zeros((n_upper_bound, 4), dtype=np.int32)
+    output_sizes  = np.zeros((n_upper_bound, 5))
+
+    sym_pattern =  np.array([(i+3)%5!=0 for i in range(N)])
+    nonzero_seed = sym_pattern
+    num_calls = 0
     
+    for i in range(n_bas): # consider all shells << all ijkl 
+        for j in range(i+1):
+            for k in range(i, n_bas):
+                for l in range(k+1):
+                    di, dj, dk, dl = [ao_loc[z+1] - ao_loc[z] for z in [i,j,k,l]]
+
+                    found_nonzero = False
+                    # check i,j boxes
+                    for bi in range(ao_loc[i], ao_loc[i+1]):
+                        for bj in range(ao_loc[j], ao_loc[j+1]):
+                            if (bi, bj) in considered_indices: # if ij box is considered
+                                # check if kl pairs are considered
+                                for bk in range(ao_loc[k], ao_loc[k+1]):
+                                    if bk>=bi: # apply symmetry - tril fade vertical
+                                        mla = ao_loc[l]
+                                        if bk == bi:
+                                            mla = max(bj, ao_loc[l]) # apply symmetry - tril fade horizontal
+                                        for bl in range(mla, ao_loc[l+1]):
+                                            if (bk, bl) in considered_indices:
+                                                # apply grid pattern to find final nonzeros
+                                                if ~(nonzero_seed[bi] ^ nonzero_seed[bj]) ^ (nonzero_seed[bk] ^ nonzero_seed[bl]):
+                                                    found_nonzero = True
+                                                    break
+                                    if found_nonzero: break
+                            if found_nonzero: break
+                        if found_nonzero: break
+                    if not found_nonzero: continue 
+
+                    input_ijkl[num_calls] = [i, j, k, l]
+                    output_sizes[num_calls] = [di, dj, dk, dl, di*dj*dk*dl]
+                    num_calls += 1
+
+    input_ijkl   = input_ijkl[:num_calls, :]
+    output_sizes = output_sizes[:num_calls, :]
+
+    # Prepare IPU inputs.
+    # Merge all int/float inputs in seperate arrays.
+    input_floats = env.reshape(1, -1)
+    input_ints   = np.zeros((1, 6+n_ao_loc +n_atm*6+n_bas*8), dtype=np.int32)
+    start, stop = 0, 6
+    input_ints[:, start:stop] = np.array( [n_eri, n_buf, n_atm, n_bas, n_env, n_ao_loc] )
+    start, stop = start+6, stop+n_ao_loc
+    input_ints[:, start:stop] = ao_loc.reshape(-1)
+    start, stop = start+n_ao_loc, stop + n_atm*6
+    input_ints[:, start:stop] = atm.reshape(-1)
+    start, stop = start+n_atm*6, stop + n_bas*8
+    input_ints[:, start:stop] = bas.reshape(-1)
+
+    sizes, counts  = np.unique(output_sizes[:, -1], return_counts=True)
+    sizes, counts = sizes.astype(np.int32), counts.astype(np.int32)
+
+    indxs               = np.argsort(output_sizes[:, -1])
+    input_ijkl          = input_ijkl[indxs]
+
+    sizes, counts  = np.unique(output_sizes[:, -1], return_counts=True)
+    sizes, counts = sizes.astype(np.int32), counts.astype(np.int32)
+    start_index = 0
+    inputs = []
+    shapes = []
+    for i, (size, count) in enumerate(zip(sizes, counts)):
+        a = input_ijkl[start_index: start_index+count]
+        tuples = tuple(map(tuple, a))
+        inputs.append(tuples)
+        start_index += count
+
+    tuple_ijkl = tuple(inputs)
+    input_ijkl = inputs
+
+    for i in range(len(sizes)):
+        shapes.append(get_shapes(input_ijkl[i], bas))
+
+    input_floats, input_ints, input_ijkl, shapes, sizes, counts, ao_loc, num_calls = input_floats, input_ints, tuple_ijkl, tuple(shapes), tuple(sizes.tolist()), counts.tolist(), ao_loc, num_calls
+
     # Load vertex using TileJax.
     vertex_filename = osp.join(osp.dirname(__file__), "intor_int2e_sph.cpp")
     int2e_sph = create_ipu_tile_primitive(
@@ -167,11 +341,9 @@ def compute_eri(input_floats, input_ints, input_ijkl, shapes, sizes, counts, num
 
     num_tiles = NUM_TILES-1
     num_threads = 6
-    
+
     if num_calls < num_tiles:  tiles       = tuple((np.arange(num_calls)+1).tolist())
     else:                      tiles       = tuple((np.arange(num_tiles*num_threads)%(num_tiles)+1).tolist())
-
-    # print('-> TILES:', tiles)
 
     tile_floats = tile_put_replicated(input_floats, tiles)
     tile_ints   = tile_put_replicated(input_ints,   tiles)
@@ -185,8 +357,7 @@ def compute_eri(input_floats, input_ints, input_ijkl, shapes, sizes, counts, num
     for i, (size, count) in enumerate(zip(sizes, counts)):
 
         print('>>>', i, size, count)
-        glen, nf, buflen = shapes[i]
-        print('glen', glen, 'nf', nf, 'buflen', buflen)
+        glen, nf = shapes[i]
 
         tiles       = tuple((np.arange(num_tiles*num_threads)%(num_tiles)+1).tolist())
         tile_g      = tile_put_replicated(jnp.empty(min(int(glen), 3888)+1),                     tiles)
@@ -208,7 +379,7 @@ def compute_eri(input_floats, input_ints, input_ijkl, shapes, sizes, counts, num
             tile_indices = tile_put_sharded(_indices, tiles)
 
             chunks = tile_put_replicated( jnp.zeros(count//chunk_size), tiles)
-            integral_size = tile_put_replicated( jnp.zeros(size), tiles) # this can be modified to only contain 1 element (vertex also needs modification)
+            integral_size = tile_put_replicated( jnp.zeros(size), tiles)
 
             batched_out , _, _, _= tile_map(int2e_sph_forloop,
                                             tile_floats,
@@ -263,54 +434,18 @@ def compute_eri(input_floats, input_ints, input_ijkl, shapes, sizes, counts, num
 
         start = stop
 
-    return all_outputs, all_indices
+    return all_outputs, all_indices, ao_loc
 
-def compute_nonzero_distinct_ERI(mol, nprog, nbatch, itol, backend):
-    N = mol.nao_nr()
+def compute_diff_jk(dm, mol, nprog, nbatch, itol, backend):
+    dm = dm.reshape(-1)
+    diff_JK = jnp.zeros(dm.shape)
+    N = int(np.sqrt(dm.shape[0])) 
 
-    # float32       int16?     int16?             int16? int16?  int16?
-    input_floats, input_ints, input_ijkl, shapes, sizes, counts, ao_loc, num_calls = prepare_integrals_2_inputs(mol, itol)
-
-    # convert input_ijkl to np.array
-    input_ijkl = [np.array(t) for t in input_ijkl]
-
-    print('input_floats.shape', input_floats.shape)
-    print('input_ints', np.array(input_ints).shape, 'n_eri, n_buf, ...')
-    print('input_ijkl', [idx.shape for idx in input_ijkl], 'tuples of offsets as (i,j,k,l) ao_loc indices')
-    # shape-> list of shapes: (count, nf, buflen) -- nf == buflen afaict
-    print('sizes', sizes)
-    print('counts', counts)
-    print('ao_loc', ao_loc)
-    print('num_calls', num_calls)
-    # exit()
-
-    assert nbatch == 1, 'batching not supported yet'
-
-    # pad everything
-    pads_to_zero_out = [None]*len(sizes)
-    for i, (size, count) in enumerate(zip(sizes, counts)):
-        pad_size = nprog*nbatch - count % (nprog*nbatch)
-        counts[i] = count + pad_size
-        num_calls += pad_size
-        input_ijkl[i] = np.pad(input_ijkl[i], ((0, pad_size), (0, 0)))
-        pads_to_zero_out[i] = pad_size
-        print('padded with', pad_size)
-    print('input_ijkl', [ijkl.shape for ijkl in input_ijkl])
-    # prepare inputs
-    # p_counts     = [c//(nprog*nbatch) for c in counts]
-    # p_num_calls  = num_calls // (nprog*nbatch)
-    # p_input_ijkl = np.zeros((nprog, nbatch*np.sum([s*c for s, c in zip(sizes, p_counts)])))
-    # p_input_ijkl = np.concatenate([ijkl.reshape(nprog, -1, 4) for ijkl in input_ijkl], axis=1)
-
-    all_eris, all_indices = compute_eri(input_floats, input_ints, input_ijkl, shapes, sizes, counts, num_calls)
-
-    print('len(all_eris)', len(all_eris))
-    print('len(all_indices)', len(all_indices))
+    all_eris, all_indices, ao_loc = compute_eri(mol, itol)
 
     BLOCK_ERI_SIZE = np.sum(np.array([eri.shape[0] for eri in all_eris]))
 
     overlap_bookkeeping = {}
-    comp_distinct_ERI_list = [None]*BLOCK_ERI_SIZE
     comp_distinct_idx_list = [None]*BLOCK_ERI_SIZE
     comp_do_list = [None]*BLOCK_ERI_SIZE
     comp_list_index = 0
@@ -318,13 +453,13 @@ def compute_nonzero_distinct_ERI(mol, nprog, nbatch, itol, backend):
     print('[a.shape for a in all_eris]', [a.shape for a in all_eris])
     print('[a.shape for a in all_indices]', [a.shape for a in all_indices])
 
-    for group_id, (eri, idx) in enumerate(zip(all_eris, all_indices)):
+    for eri, idx in zip(all_eris, all_indices):
         print(eri.shape)
         i = idx[:, 0]
         j = idx[:, 1]
         k = idx[:, 2]
         l = idx[:, 3]
-        
+
         di = ao_loc[i+1] - ao_loc[i]
         dj = ao_loc[j+1] - ao_loc[j]
         dk = ao_loc[k+1] - ao_loc[k]
@@ -355,55 +490,54 @@ def compute_nonzero_distinct_ERI(mol, nprog, nbatch, itol, backend):
                 if ij < kl: ij,kl = kl,ij
                 c = ij*(ij+1)//2 + kl
                 return c
-            
-            if ind < eri.shape[0]-pads_to_zero_out[group_id]: # real entries (no paddings)
-                block_idx = np.mgrid[
-                    _i0:(_i0+_di),
-                    _j0:(_j0+_dj),
-                    _k0:(_k0+_dk),
-                    _l0:(_l0+_dl)].transpose(4, 3, 2, 1, 0).astype(np.int16)
 
-                block_c = [ijkl2c(ijkl[0],ijkl[1], ijkl[2], ijkl[3]) for ijkl in block_idx.reshape(-1, 4)]
-                block_do = np.zeros((_dl*_dk*_dj*_di))
-                for ci, c in enumerate(block_c):
-                    block_do[ci] = int(c not in overlap_bookkeeping)
-                    overlap_bookkeeping[c] = True
-            else: # ignore paddings
-                block_do = np.zeros((sizes[group_id]))
+            block_idx = np.mgrid[
+                _i0:(_i0+_di),
+                _j0:(_j0+_dj),
+                _k0:(_k0+_dk),
+                _l0:(_l0+_dl)].transpose(4, 3, 2, 1, 0).astype(np.int16)
 
+            block_c = [ijkl2c(ijkl[0],ijkl[1], ijkl[2], ijkl[3]) for ijkl in block_idx.reshape(-1, 4)]
+            block_do = np.zeros((_dl*_dk*_dj*_di))
+            for ci, c in enumerate(block_c):
+                block_do[ci] = int(c not in overlap_bookkeeping)
+                overlap_bookkeeping[c] = True
+                            
             comp_distinct_idx_list[comp_list_index] = block_idx.reshape(-1, 4)
             comp_do_list[comp_list_index] = block_do
             comp_list_index += 1
     
-    print(len(all_eris), len(comp_do_list))
+    
     comp_distinct_idx = np.concatenate(comp_distinct_idx_list)
     comp_do = np.concatenate(comp_do_list)
-    comp_distinct_ERI = jnp.concatenate([eri.reshape(-1) for eri in all_eris])
-    print(comp_distinct_ERI.shape, comp_do.shape)
-    comp_distinct_ERI *= comp_do
-
+    
     remainder = comp_distinct_idx.shape[0] % (nprog*nbatch)
 
     if remainder != 0:
         print('padding', remainder, nprog*nbatch-remainder, comp_distinct_idx.shape)
         comp_distinct_idx = np.pad(comp_distinct_idx, ((0, nprog*nbatch-remainder), (0, 0)))
         comp_do = np.pad(comp_do, ((0, nprog*nbatch-remainder)))
-        comp_distinct_ERI = jnp.pad(comp_distinct_ERI, ((0, nprog*nbatch-remainder)))
-
-    comp_distinct_ERI = comp_distinct_ERI.reshape(nprog, nbatch, -1)
+        all_eris.append(jnp.zeros((nprog*nbatch-remainder), dtype=jnp.float32))
+    
+    comp_distinct_ERI = jnp.concatenate([eri.reshape(-1) for eri in all_eris]).reshape(nprog, nbatch, -1)
     comp_distinct_idx = comp_distinct_idx.reshape(nprog, nbatch, -1, 4)
+    comp_do = comp_do.reshape(nprog, nbatch, -1)
+    comp_distinct_ERI *= comp_do
 
     print('comp_distinct_ERI.shape', comp_distinct_ERI.shape)
     print('comp_distinct_idx.shape', comp_distinct_idx.shape)
 
+    # compute repetitions caused by 8x symmetry when computing from the distinct_ERI form and scale accordingly
+    drep                      = num_repetitions_fast_4d(comp_distinct_idx[:, :, :, 0], comp_distinct_idx[:, :, :, 1], comp_distinct_idx[:, :, :, 2], comp_distinct_idx[:, :, :, 3], xnp=np, dtype=np.uint32)
+    comp_distinct_ERI         = comp_distinct_ERI / drep
+
     # int16 storage supported but not slicing; use conversion trick to enable slicing
     comp_distinct_idx = jax.lax.bitcast_convert_type(comp_distinct_idx, jnp.float16)
-
-    # compute repetitions caused by 8x symmetry when computing from the distinct_ERI form and scale accordingly
-    drep                      = num_repetitions_fast_4d(comp_distinct_idx[:, :, :, 0], comp_distinct_idx[:, :, :, 1], comp_distinct_idx[:, :, :, 2], comp_distinct_idx[:, :, :, 3], xnp=jnp, dtype=jnp.uint32)
-    comp_distinct_ERI         = comp_distinct_ERI / drep
     
-    return comp_distinct_ERI, comp_distinct_idx
+    #diff_JK = jax.pmap(sparse_symmetric_einsum, in_axes=(0,0,None,None), static_broadcasted_argnums=(3,), backend=backend, axis_name="p")(comp_distinct_ERI, comp_distinct_idx, dm, backend)
+    diff_JK = sparse_symmetric_einsum(comp_distinct_ERI[0], comp_distinct_idx[0], dm, backend)
+
+    return diff_JK
 
 if __name__ == "__main__":
     import time 
@@ -414,7 +548,7 @@ if __name__ == "__main__":
     parser.add_argument('-test', action="store_true")
     parser.add_argument('-prof', action="store_true")
     parser.add_argument('-batches', default=5, type=int)
-    parser.add_argument('-nipu', default=16, type=int)
+    parser.add_argument('-nipu', default=1, type=int)
     parser.add_argument('-skip', action="store_true") 
     parser.add_argument('-itol', default=1e-9, type=float)
     
@@ -427,7 +561,10 @@ if __name__ == "__main__":
 
     start = time.time()
 
-    mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*j} {1.54*i};" for i in range(natm) for j in range(natm))) 
+    #mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*j} {1.54*i};" for i in range(natm) for j in range(natm))) 
+    mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*j} {1.54*i};" for i in range(1) for j in range(2)), basis="sto3g") 
+    #mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*j} {1.54*i};" for i in range(1) for j in range(1)), basis="def2-TZVPPD") 
+    #mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*j} {1.54*i};" for i in range(1) for j in range(2)), basis="6-31G*") 
     # mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*i} {1.54*i};" for i in range(natm))) 
     #mol = pyscf.gto.Mole(atom="".join(f"C 0 {15.4*j} {15.4*i};" for i in range(1) for j in range(75))) 
     mol.build()
@@ -458,70 +595,11 @@ if __name__ == "__main__":
     dm                   = dm.reshape(-1)
     diff_JK              = np.zeros(dm.shape)
 
-    # --------------------------------------------------------------------------------------- #
-    # Prescreening to compute relevant indices
-    comp_prescreened_distinct_idx = jax.jit(prescreening, backend=backend, static_argnames=['mol', 'itol', 'dtype'])(mol, args.itol)
+    # ------------------------------------ #
 
-    if not args.skip:
-        print('ERI stats after prescreening:')
-        rec_ERI = reconstruct_ERI(dense_ERI, np.array(comp_prescreened_distinct_idx, dtype=np.uint32), N)
-        absdiff = np.abs(dense_ERI-rec_ERI)
-        print('avg error:', np.mean(absdiff))
-        print('std error:', np.std(absdiff))
-        print('max error:', np.max(absdiff))
-    
-    # --------------------------------------------------------------------------------------- #
-    # Filter to remove orthogonal zeros
-    nonzero_pattern = np.array([(i+3)%5!=0 for i in range(N)]).astype(bool)
-    num_nonzeros = int(2*len(comp_prescreened_distinct_idx)*(np.count_nonzero(nonzero_pattern.reshape(N, 1) ^ nonzero_pattern.reshape(1, N))/(N*N)) + 1)
-    print('Estimating', num_nonzeros, 'nonzeros out of', len(comp_prescreened_distinct_idx), 'prescreened values')
-    print('actual nonzero_indices', len(nonzero_indices))
-    print('comp_prescreened_distinct_idx', len(comp_prescreened_distinct_idx))
-    
-    comp_nonzero_distinct_idx = jax.jit(remove_ortho, backend=backend, static_argnames=['output_size', 'dtype'])(comp_prescreened_distinct_idx, nonzero_pattern, num_nonzeros)
+    diff_JK = jax.jit(compute_diff_jk, backend=backend, static_argnames=['mol', 'nprog', 'nbatch', 'itol', 'backend'])(dm, mol, args.nipu, args.batches, args.itol, args.backend)
 
-    if not args.skip:
-        print('ERI stats after orthogonal zero removal:')
-        rec_ERI = reconstruct_ERI(dense_ERI, np.array(comp_nonzero_distinct_idx, dtype=np.uint32), N)
-        absdiff = np.abs(dense_ERI-rec_ERI)
-        print('shape', comp_nonzero_distinct_idx.shape)
-        print('avg error:', np.mean(absdiff))
-        print('std error:', np.std(absdiff))
-        print('max error:', np.max(absdiff))
-
-    num_batches = 2
-    if comp_prescreened_distinct_idx.shape[0] % num_batches > 0:
-        comp_prescreened_distinct_idx = jnp.pad(comp_prescreened_distinct_idx, ((0, num_batches-comp_prescreened_distinct_idx.shape[0] % num_batches), (0, 0)))
-    vmap_comp_prescreened_distinct_idx = comp_prescreened_distinct_idx.reshape(num_batches, -1, 4)
-    vmap_num_nonzeros = num_nonzeros // num_batches + 1
-    comp_nonzero_distinct_idx = jax.jit(vmap_remove_ortho, backend=backend, static_argnames=['output_size', 'dtype'])(vmap_comp_prescreened_distinct_idx, nonzero_pattern, vmap_num_nonzeros)
-    comp_nonzero_distinct_idx = comp_nonzero_distinct_idx.reshape(-1, 4)
-    
-    if not args.skip:
-        print('ERI stats after orthogonal zero removal:')
-        rec_ERI = reconstruct_ERI(dense_ERI, np.array(comp_nonzero_distinct_idx, dtype=np.uint32), N)
-        absdiff = np.abs(dense_ERI-rec_ERI)
-        print('shape', comp_nonzero_distinct_idx.shape)
-        print('avg error:', np.mean(absdiff))
-        print('std error:', np.std(absdiff))
-        print('max error:', np.max(absdiff))
-
-    exit()
-
-    # --------------------------------------------------------------------------------------- #
-    # Compute ERI values from mol; returned values are already:
-    #   - scaled to account for repetitions in JK computation
-    #   - padded/reshaped to fit the required number of devices and batches
-
-    comp_distinct_ERI, comp_distinct_idx = jax.jit(compute_nonzero_distinct_ERI, backend=backend, static_argnames=['mol', 'nprog', 'nbatch', 'itol', 'backend'])(mol, args.nipu, args.batches, args.itol, args.backend)
-    # comp_distinct_ERI, comp_distinct_idx = compute_nonzero_distinct_ERI(mol, args.nipu, args.batches, args.itol, args.backend)
-
-    # --------------------------------------------------------------------------------------- #
-    # Use ERI and dm to compute diff_JK
-    
-    diff_JK = jax.pmap(sparse_symmetric_einsum, in_axes=(0,0,None,None), static_broadcasted_argnums=(3,), backend=backend, axis_name="p")(comp_distinct_ERI, comp_distinct_idx, dm, backend)
-
-    # --------------------------------------------------------------------------------------- #
+    # ------------------------------------ #
 
     # diff_JK = jax.pmap(sparse_symmetric_einsum, in_axes=(0,0,None,None), static_broadcasted_argnums=(3,), backend=backend, axis_name="p")(nonzero_distinct_ERI, nonzero_indices, dm, args.backend) 
 
