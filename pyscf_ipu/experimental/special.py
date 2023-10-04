@@ -5,7 +5,7 @@ import jax.numpy as jnp
 import numpy as np
 from jax import lax
 from jax.ops import segment_sum
-from jax.scipy.special import betaln, gammainc, gammaln
+from jax.scipy.special import betaln, gammaln
 
 from .types import FloatN, IntN
 from .units import LMAX
@@ -90,10 +90,9 @@ def gammanu(nu: IntN, t: FloatN, epsilon: float = 1e-10) -> FloatN:
 
     We evaulate this in log-space to avoid overflow/nan
     """
-    t = jnp.maximum(t, epsilon)
     x = nu + 0.5
     gn = jnp.log(0.5) - x * jnp.log(t) + jnp.log(gammainc(x, t)) + gammaln(x)
-    return jnp.exp(gn)
+    return jnp.where(t <= epsilon, 1 / (2 * nu + 1), jnp.exp(gn))
 
 
 def binom_factor(i: int, j: int, a: float, b: float, lmax: int = LMAX) -> FloatN:
@@ -108,3 +107,16 @@ def binom_factor(i: int, j: int, a: float, b: float, lmax: int = LMAX) -> FloatN
     mask = ((s - i) <= t) & (t <= j)
     out = jnp.where(mask, out, 0.0)
     return segment_sum(out, s, num_segments=lmax + 1)
+
+
+def gammainc(a, x, amax=LMAX + 1):
+    from jax.scipy.special import erfc
+
+    out_shape = a.shape
+    a = a.reshape(-1, 1)
+    x = x.reshape(-1, 1)
+    n = jnp.arange(1, amax + 1)
+    terms = (n <= a) * (x**n / jnp.cumprod(n - 0.5))
+    q = erfc(jnp.sqrt(x)) + jnp.exp(-x) / jnp.sqrt(jnp.pi * x) * jnp.sum(terms, axis=-1)
+
+    return (1 - q).reshape(out_shape)
