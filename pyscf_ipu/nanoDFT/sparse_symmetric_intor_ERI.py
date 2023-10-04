@@ -680,6 +680,7 @@ def compute_diff_jk(dm, mol, nprog, nbatch, tolerance, backend):
     print('[a.shape for a in all_eris]', [a.shape for a in all_eris])
     print('[a.shape for a in all_indices]', [a.shape for a in all_indices])
 
+
     # go from our memory layout to mol.intor("int2e_sph", "s8")
     for zip_counter, (eri, idx) in enumerate(zip(all_eris, all_indices)):
         print(eri.shape)
@@ -726,6 +727,7 @@ def compute_diff_jk(dm, mol, nprog, nbatch, tolerance, backend):
         comp_do = np.pad(comp_do, ((0, nprog*nbatch-remainder)))
         all_eris.append(jnp.zeros((nprog*nbatch-remainder), dtype=jnp.float32))
     
+    #   output of mol.intor("int2e_ssph", aosym="s8")
     comp_distinct_ERI = jnp.concatenate([eri.reshape(-1) for eri in all_eris]).reshape(nprog, nbatch, -1)
     comp_distinct_idx = comp_distinct_idx.reshape(nprog, nbatch, -1, 4)
     comp_do = comp_do.reshape(nprog, nbatch, -1)
@@ -740,6 +742,7 @@ def compute_diff_jk(dm, mol, nprog, nbatch, tolerance, backend):
 
     # int16 storage supported but not slicing; use conversion trick to enable slicing
     comp_distinct_idx = jax.lax.bitcast_convert_type(comp_distinct_idx, jnp.float16)
+    # reduce this from |eri_floats| to num_calls*4   ~ perhaps 10x smaller 
     
     #diff_JK = jax.pmap(sparse_symmetric_einsum, in_axes=(0,0,None,None), static_broadcasted_argnums=(3,), backend=backend, axis_name="p")(comp_distinct_ERI, comp_distinct_idx, dm, backend)
     #diff_JK = sparse_symmetric_einsum(comp_distinct_ERI[0], comp_distinct_idx[0], dm, backend)
