@@ -201,6 +201,8 @@ def _eri_primitives(a: Primitive, b: Primitive, c: Primitive, d: Primitive) -> f
         v = factorial(r) * factorial(i - 2 * r) * (4 * gamma) ** (i - r)
         return u / v
 
+    # vmap over cartesian axes (x,y,z)
+    @vmap
     def c_term(la, lb, lc, ld, pa, pb, qc, qd, qp):
         # THO Eq 2.22 and 3.4
         i1, i2, r1, r2, u = build_cindex()
@@ -214,10 +216,7 @@ def _eri_primitives(a: Primitive, b: Primitive, c: Primitive, d: Primitive) -> f
         c = jnp.where(mask, c, 0.0)
         return segment_sum(c, index, num_segments=4 * LMAX + 1)
 
-    # Manual vmap over cartesian axes (x, y, z) as ran into possible bug.
-    # See https://github.com/graphcore-research/pyscf-ipu/issues/105
-    args = [a.lmn, b.lmn, c.lmn, d.lmn, pa, pb, qc, qd, qp]
-    Ci, Cj, Ck = [c_term(*[v.at[i].get() for v in args]) for i in range(3)]
+    Ci, Cj, Ck = c_term(a.lmn, b.lmn, c.lmn, d.lmn, pa, pb, qc, qd, qp)
 
     ijk = jnp.arange(4 * LMAX + 1)
     nu = (
