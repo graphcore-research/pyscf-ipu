@@ -132,8 +132,6 @@ def sparse_symmetric_einsum(nonzero_distinct_ERI, nonzero_indices, dm, backend):
 
     return jax.lax.fori_loop(0, 16, iteration, diff_JK) 
 
-
-
 def get_shapes(input_ijkl, bas):
     i_sh, j_sh, k_sh, l_sh  = input_ijkl[0]
     BAS_SLOTS = 8
@@ -206,235 +204,6 @@ def get_shapes(input_ijkl, bas):
     len = leng + lenl + lenk + lenj + leni + len0
 
     return len, nf
-
-def compute_eri(mol, tolerance):
-    atm, bas, env   = mol._atm, mol._bas, mol._env
-    n_atm, n_bas, N = atm.shape[0], bas.shape[0], mol.nao_nr()
-    ao_loc          = np.cumsum(np.concatenate([np.zeros(1), (bas[:,1]*2+1) * bas[:,3] ])).astype(np.int32)
-    n_ao_loc        = np.prod(ao_loc.shape)
-
-    n_buf, n_eri, n_env = 1, 1, np.prod(env.shape) # TODO: Try to remove this. 
-
-    # Step 1. Compute indices where ERI is non-zero due to geometry (pre-screening). 
-    # Below computes: np.max([ERI[a,b,a,b] for a,b in zip(tril_idx[0], tril_idx[1])])
-    ERI_s8 = mol.intor("int2e_sph", aosym="s8") # TODO: make custom libcint code compute this. 
-    lst = [ ]
-    tril_idx = np.tril_indices(N)
-    for a, b in zip(tril_idx[0], tril_idx[1]):
-        index_ab_s8 = a*(a+1)//2 + b
-        index_s8 = index_ab_s8*(index_ab_s8+3)//2
-        abab = np.abs(ERI_s8[index_s8])
-        lst.append((abab, a,b))
-    considered_indices = set([(a,b) for abab, a, b in lst if abab*np.max(lst) >= tolerance**2])
-    print('n_bas', n_bas)
-    print('ao_loc', ao_loc)
-
-    # Step 2: Remove zeros by orthogonality and match indices with shells. 
-    # Precompute Fill input_ijkl and output_sizes with the necessary indices.
-    n_upper_bound = (n_bas*(n_bas-1))**2
-    input_ijkl    = np.zeros((n_upper_bound, 4), dtype=np.int32)
-    output_sizes  = np.zeros((n_upper_bound, 5))
-
-    sym_pattern =  np.array([(i+3)%5!=0 for i in range(N)])
-    nonzero_seed = sym_pattern
-    num_calls = 0
-    
-    for i in range(n_bas): # consider all shells << all ijkl 
-        for j in range(i+1):
-            for k in range(i, n_bas):
-                for l in range(k+1):
-                    di, dj, dk, dl = [ao_loc[z+1] - ao_loc[z] for z in [i,j,k,l]]
-
-                    found_nonzero = False
-                    # check i,j boxes
-                    for bi in range(ao_loc[i], ao_loc[i+1]):
-                        for bj in range(ao_loc[j], ao_loc[j+1]):
-                            if (bi, bj) in considered_indices: # if ij box is considered
-                                # check if kl pairs are considered
-                                for bk in range(ao_loc[k], ao_loc[k+1]):
-                                    if bk>=bi: # apply symmetry - tril fade vertical
-                                        mla = ao_loc[l]
-                                        if bk == bi:
-                                            mla = max(bj, ao_loc[l]) # apply symmetry - tril fade horizontal
-                                        for bl in range(mla, ao_loc[l+1]):
-                                            if (bk, bl) in considered_indices:
-                                                # apply grid pattern to find final nonzeros
-                                                if ~(nonzero_seed[bi] ^ nonzero_seed[bj]) ^ (nonzero_seed[bk] ^ nonzero_seed[bl]):
-                                                    found_nonzero = True
-                                                    break
-                                    if found_nonzero: break
-                            if found_nonzero: break
-                        if found_nonzero: break
-                    if not found_nonzero: continue 
-
-                    input_ijkl[num_calls] = [i, j, k, l]
-                    output_sizes[num_calls] = [di, dj, dk, dl, di*dj*dk*dl]
-                    num_calls += 1
-
-    input_ijkl   = input_ijkl[:num_calls, :]
-    output_sizes = output_sizes[:num_calls, :]
-
-    # Prepare IPU inputs.
-    # Merge all int/float inputs in seperate arrays.
-    input_floats = env.reshape(1, -1)
-    input_ints   = np.zeros((1, 6+n_ao_loc +n_atm*6+n_bas*8), dtype=np.int32)
-    start, stop = 0, 6
-    input_ints[:, start:stop] = np.array( [n_eri, n_buf, n_atm, n_bas, n_env, n_ao_loc] )
-    start, stop = start+6, stop+n_ao_loc
-    input_ints[:, start:stop] = ao_loc.reshape(-1)
-    start, stop = start+n_ao_loc, stop + n_atm*6
-    input_ints[:, start:stop] = atm.reshape(-1)
-    start, stop = start+n_atm*6, stop + n_bas*8
-    input_ints[:, start:stop] = bas.reshape(-1)
-
-    sizes, counts  = np.unique(output_sizes[:, -1], return_counts=True)
-    sizes, counts = sizes.astype(np.int32), counts.astype(np.int32)
-
-    indxs               = np.argsort(output_sizes[:, -1])
-    input_ijkl          = input_ijkl[indxs]
-
-    sizes, counts  = np.unique(output_sizes[:, -1], return_counts=True)
-    sizes, counts = sizes.astype(np.int32), counts.astype(np.int32)
-    start_index = 0
-    inputs = []
-    shapes = []
-    for i, (size, count) in enumerate(zip(sizes, counts)):
-        a = input_ijkl[start_index: start_index+count]
-        tuples = tuple(map(tuple, a))
-        inputs.append(tuples)
-        start_index += count
-
-    tuple_ijkl = tuple(inputs)
-    input_ijkl = inputs
-
-    for i in range(len(sizes)):
-        shapes.append(get_shapes(input_ijkl[i], bas))
-
-    input_floats, input_ints, input_ijkl, shapes, sizes, counts, ao_loc, num_calls = input_floats, input_ints, tuple_ijkl, tuple(shapes), tuple(sizes.tolist()), counts.tolist(), ao_loc, num_calls
-
-    # Load vertex using TileJax.
-    vertex_filename = osp.join(osp.dirname(__file__), "intor_int2e_sph.cpp")
-    int2e_sph = create_ipu_tile_primitive(
-            "poplar_int2e_sph",
-            "poplar_int2e_sph",
-            inputs=["ipu_floats", "ipu_ints", "ipu_ij", "ipu_output", "tile_g", "tile_idx", "tile_buf"],
-            outputs={"ipu_output": 3, "tile_g": 4, "tile_idx": 5, "tile_buf": 6},
-            gp_filename=vertex_filename,
-            perf_estimate=100,
-    )
-    int2e_sph_forloop = create_ipu_tile_primitive(
-                "poplar_int2e_sph_forloop",
-                "poplar_int2e_sph_forloop",
-                inputs=["ipu_floats", "ipu_ints", "ipu_ij", "ipu_output", "tile_g", "tile_idx", "tile_buf", "chunks", "integral_size"],
-                outputs={"ipu_output": 3, "tile_g": 4, "tile_idx": 5, "tile_buf": 6},
-                gp_filename=vertex_filename,
-                perf_estimate=100,
-        )
-
-    all_outputs = []
-    all_indices = []
-    start_index = 0
-    start, stop = 0, 0
-    np.random.seed(42)
-
-    NUM_TILES = 1472
-
-    num_tiles = NUM_TILES-1
-    num_threads = 6
-
-    if num_calls < num_tiles:  tiles       = tuple((np.arange(num_calls)+1).tolist())
-    else:                      tiles       = tuple((np.arange(num_tiles*num_threads)%(num_tiles)+1).tolist())
-
-    tile_floats = tile_put_replicated(input_floats, tiles)
-    tile_ints   = tile_put_replicated(input_ints,   tiles)
-
-    print(sizes, counts)
-
-    print('full count:', np.array(counts).sum())
-    print('full mult count:', np.array(sizes).dot(np.array(counts)))
-    # exit()
-
-    for i, (size, count) in enumerate(zip(sizes, counts)):
-
-        print('>>>', i, size, count)
-        glen, nf = shapes[i]
-
-        tiles       = tuple((np.arange(num_tiles*num_threads)%(num_tiles)+1).tolist())
-        tile_g      = tile_put_replicated(jnp.empty(min(int(glen), 3888)+1),                     tiles)
-        tile_idx    = tile_put_replicated(jnp.empty(max(256, min(int(nf*3), 3888)+1), dtype = jnp.int32) ,  tiles)
-        tile_buf    = tile_put_replicated(jnp.empty(1080*4+1) ,                   tiles)
-
-        chunk_size      = num_tiles * num_threads
-
-        if count // chunk_size > 0:
-            output = jnp.empty((len(tiles), count//chunk_size, size))
-            output  = tile_put_sharded(   output,   tiles)
-
-            _indices = []
-            for j in range( count // (chunk_size) ):
-                start, stop = j*chunk_size, (j+1)*chunk_size
-                indices = np.array(input_ijkl[i][start:stop])
-                _indices.append(indices.reshape(indices.shape[0], 1, indices.shape[1]))
-            _indices = np.concatenate(_indices, axis=1)
-            tile_indices = tile_put_sharded(_indices, tiles)
-
-            chunks = tile_put_replicated( jnp.zeros(count//chunk_size), tiles)
-            integral_size = tile_put_replicated( jnp.zeros(size), tiles)
-
-            batched_out , _, _, _= tile_map(int2e_sph_forloop,
-                                            tile_floats,
-                                            tile_ints,
-                                            tile_indices,
-                                            output,
-                                            tile_g,
-                                            tile_idx,
-                                            tile_buf,
-                                            chunks,
-                                            integral_size
-                                            )
-            batched_out = jnp.transpose(batched_out.array, (1, 0, 2)).reshape(-1, size)
-            print('batched mode!')
-
-        # do last iteration normally. -- assuming only one iteration for indices to be correct
-        for j in range(count // chunk_size, count // (chunk_size) + 1):
-            start, stop = j*chunk_size, (j+1)*chunk_size
-            indices = np.array(input_ijkl[i][start:stop])
-            if indices.shape[0] != len(tiles):
-                    tiles = tuple((np.arange(indices.shape[0])%(num_tiles)+1).tolist())
-
-            tile_ijkl   = tile_put_sharded(   indices ,     tiles)
-            output = jnp.empty((len(tiles), size))
-            output  = tile_put_sharded(   output+j,   tiles)
-
-            # print('indices', indices)
-
-            _output, _, _, _= tile_map(int2e_sph,
-                tile_floats[:len(tiles)],
-                tile_ints[:len(tiles)],
-                tile_ijkl,
-                output,
-                tile_g[:len(tiles)],
-                tile_idx[:len(tiles)],
-                tile_buf[:len(tiles)]
-            )
-            print('???', j)
-        
-        if count//chunk_size>0:
-            print(batched_out.shape)
-            print(_indices.shape)
-        print(_output.array.shape)
-        print(np.array(indices).shape)
-
-        if count//chunk_size>0:
-            all_outputs.append(jnp.concatenate([batched_out, _output.array]))
-            all_indices.append(np.concatenate([np.transpose(_indices, (1, 0, 2)).reshape(-1, 4), indices]))
-        else:
-            all_outputs.append(_output.array)
-            all_indices.append(indices)
-
-        start = stop
-
-    return all_outputs, all_indices, ao_loc
 
 def compute_diff_jk(dm, mol, nprog, nbatch, tolerance, backend):
     dm = dm.reshape(-1)
@@ -540,14 +309,6 @@ def compute_diff_jk(dm, mol, nprog, nbatch, tolerance, backend):
 
     # Load vertex using TileJax.
     vertex_filename = osp.join(osp.dirname(__file__), "intor_int2e_sph.cpp")
-    int2e_sph = create_ipu_tile_primitive(
-            "poplar_int2e_sph",
-            "poplar_int2e_sph",
-            inputs=["ipu_floats", "ipu_ints", "ipu_ij", "ipu_output", "tile_g", "tile_idx", "tile_buf"],
-            outputs={"ipu_output": 3, "tile_g": 4, "tile_idx": 5, "tile_buf": 6},
-            gp_filename=vertex_filename,
-            perf_estimate=100,
-    )
     int2e_sph_forloop = create_ipu_tile_primitive(
                 "poplar_int2e_sph_forloop",
                 "poplar_int2e_sph_forloop",
@@ -578,7 +339,6 @@ def compute_diff_jk(dm, mol, nprog, nbatch, tolerance, backend):
 
     print('full count:', np.array(counts).sum())
     print('full mult count:', np.array(sizes).dot(np.array(counts)))
-    # exit()
 
     for i, (size, count) in enumerate(zip(sizes, counts)):
         print('>>>', i, size, count) # the small test case won't test this. 
@@ -603,8 +363,8 @@ def compute_diff_jk(dm, mol, nprog, nbatch, tolerance, backend):
             _indices = np.concatenate(_indices, axis=1)
             tile_indices = tile_put_sharded(_indices, tiles)
 
-            chunks = tile_put_replicated( jnp.zeros(count//chunk_size), tiles)
-            integral_size = tile_put_replicated( jnp.zeros(size), tiles)
+            chunks = tile_put_replicated( jnp.array(count//chunk_size, dtype=jnp.uint32), tiles)
+            integral_size = tile_put_replicated( jnp.array(size, dtype=jnp.uint32), tiles)
 
             batched_out , _, _, _= tile_map(int2e_sph_forloop,
                                             tile_floats,
@@ -625,7 +385,7 @@ def compute_diff_jk(dm, mol, nprog, nbatch, tolerance, backend):
             start, stop = j*chunk_size, (j+1)*chunk_size
             indices = np.array(input_ijkl[i][start:stop])
             if indices.shape[0] != len(tiles):
-                    tiles = tuple((np.arange(indices.shape[0])%(num_tiles)+1).tolist())
+                tiles = tuple((np.arange(indices.shape[0])%(num_tiles)+1).tolist())
 
             tile_ijkl   = tile_put_sharded(   indices ,     tiles)
             output = jnp.empty((len(tiles), size))
@@ -633,14 +393,19 @@ def compute_diff_jk(dm, mol, nprog, nbatch, tolerance, backend):
 
             # print('indices', indices)
 
-            _output, _, _, _= tile_map(int2e_sph,
+            chunks = tile_put_replicated( jnp.array(1, dtype=jnp.uint32), tiles)
+            integral_size = tile_put_replicated( jnp.array(size, dtype=jnp.uint32), tiles)
+
+            _output, _, _, _= tile_map(int2e_sph_forloop,
                 tile_floats[:len(tiles)],
                 tile_ints[:len(tiles)],
                 tile_ijkl,
                 output,
                 tile_g[:len(tiles)],
                 tile_idx[:len(tiles)],
-                tile_buf[:len(tiles)]
+                tile_buf[:len(tiles)],
+                chunks,
+                integral_size
             )
             print('???', j)
         
@@ -695,9 +460,6 @@ def compute_diff_jk(dm, mol, nprog, nbatch, tolerance, backend):
             block_do = np.zeros((_dl*_dk*_dj*_di))
             for ci, ijkl in enumerate(block_idx.reshape(-1, 4)):
                 block_do[ci] = ijkl_in_bounds(ijkl[2], ijkl[3], ijkl[0], ijkl[1])
-            
-            
-            # exit()
                             
             comp_distinct_idx_list[comp_list_index] = block_idx.reshape(-1, 4)
             comp_do_list[comp_list_index] = block_do

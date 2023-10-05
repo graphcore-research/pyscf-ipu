@@ -7189,13 +7189,16 @@ public:
         Output<Vector<int>>    tile_idx;
         Output<Vector<float>>  tile_buf;
 
-        Input<Vector<float>>  chunks;
-        Input<Vector<float>>  integral_size;
+        Input<Vector<uint32_t>>  chunks;
+        Input<Vector<uint32_t>>  integral_size;
 
         bool compute() {
                 // the output size is rather small
                 const float * floats = ipu_floats.data();
                 const int   * ints   = ipu_ints  .data();
+                
+                const uint32_t& ichunks = chunks[0];
+                const uint32_t& isize   = integral_size[0];
 
                 int n_eri    = ipu_ints[0];
                 int n_buf    = ipu_ints[1];
@@ -7213,111 +7216,17 @@ public:
 
                 const float * env = floats;
 
-                for (int i = 0; i < ipu_output.size(); i++) ipu_output[i] = 0;
-                //float * eri = ipu_output.data();
+                for (uint32_t i = 0; i < ipu_output.size(); i++) ipu_output[i] = 0;
 
+                for (uint32_t i = 0; i < ichunks; i++){
+                        float * eri = ipu_output.data() + i*isize;
 
-                for (int j = 0; j < chunks.size(); j++ ){
-                //for (int j = 0; j < 1; j++ ){
-
-                        //float array[integral_size.size()] = {0.};
-                        //for (int i = 0; i < 81; i++){ eri[i] = 0; }
-                        //float array[81] = {0.};
-                        float array[625] = {0.};
-                        float * eri = array;
-
-                        //for (unsigned short i = 0; i < tile_g.size(); i++) tile_g[i] = 0;
-                        //for (unsigned short i = 0; i < tile_idx.size(); i++) tile_idx[i] = 0;
-                        //for (unsigned short i = 0; i < tile_buf.size(); i++) tile_buf[i] = 0;
-
-                        int arr[] = {ipu_ij[0+j*4], ipu_ij[1+j*4], ipu_ij[2+j*4], ipu_ij[3+j*4]};
+                        int arr[] = {ipu_ij[0+i*4], ipu_ij[1+i*4], ipu_ij[2+i*4], ipu_ij[3+i*4]};
                         const int* shls = arr;
 
                         dtype *_eri = eri;
 
                         int2e_sph(eri, n_buf, NULL, shls, atm, n_atm, bas, n_bas, env, n_env, _eri, tile_g.data(), tile_idx.data(), tile_buf.data()) ;
-                        //int2e_sph(eri, n_buf, NULL, __ipu_ij, atm, n_atm, bas, n_bas, env, n_env, _eri) ;
-
-                        //for (unsigned short i = 0; i < tile_g.size(); i++) tile_g[i] = 0;
-                        //for (unsigned short i = 0; i < tile_idx.size(); i++) tile_idx[i] = 0;
-                        //for (unsigned short i = 0; i < tile_buf.size(); i++) tile_buf[i] = 0;
-                        //for (int i = 0; i < 100; i++) tile_idx[i] = 3.;
-                        //for (int i = 0; i < 100; i++) tile_buf[i] = 3.;
-
-                        for (int i = 0; i < integral_size.size(); i++){ ipu_output[j*integral_size.size()+i] = eri[i]; }
-                }
-
-
-                return true;
-        }
-
-};
-
-
-class poplar_int2e_sph_forloop__broken : public Vertex {
-public:
-        // same as poplar_int2_sph but just has a forloop inside C++ instead of python.
-
-        Input<Vector<float>>  ipu_floats;
-        Input<Vector<int>>    ipu_ints;
-        Input<Vector<int>>    ipu_ij;
-
-        Output<Vector<float>> ipu_output;
-
-        Output<Vector<float>>  tile_g;
-        Output<Vector<int>>    tile_idx;
-        Output<Vector<float>>  tile_buf;
-
-        Input<Vector<float>>    chunks;       // size of this is the number of chunks.
-        Input<Vector<float>>    integral_size; // size of each intergral output
-
-
-        bool compute() {
-
-                float * eri = ipu_output.data();
-                for (int i = 0; i < ipu_output.size(); i++){ eri[i] = 0; }
-
-                int integral_output_size = integral_size.size(); //di*dj*dk*dl;
-                const float * floats = ipu_floats.data();
-                const int   * ints   = ipu_ints  .data();
-                int n_eri    = ipu_ints[0];
-                int n_buf    = ipu_ints[1];
-                int n_atm    = ipu_ints[2];
-                int n_bas    = ipu_ints[3];
-                int n_env    = ipu_ints[4];
-                int n_ao_loc = ipu_ints[5];
-
-                int offset = 6;
-                const int *ao_loc     = ints + offset;
-                offset += n_ao_loc;
-                const int *atm        = ints + offset;
-                offset += n_atm*6;
-                const int *bas        = ints + offset;
-
-                const float * env = floats;
-
-                //for (int j = 0; j < chunks.size(); j++){
-                for (int j = 0; j < 1; j++){
-
-                        eri += integral_output_size;
-
-                        //for (unsigned short i = 0; i < tile_g.size(); i++) tile_g[i] = 0;
-                        //for (unsigned short i = 0; i < tile_idx.size(); i++) tile_idx[i] = 0;
-                        //for (unsigned short i = 0; i < tile_buf.size(); i++) tile_buf[i] = 0;
-
-                        dtype *_eri = eri;
-
-                        int arr[] = {ipu_ij[0+j*4], ipu_ij[1+j*4], ipu_ij[2+j*4], ipu_ij[3+j*4]};
-                        const int* shls = arr;
-
-                        int2e_sph(eri, n_buf, NULL, shls, atm, n_atm, bas, n_bas, env, n_env, _eri, tile_g.data(), tile_idx.data(), tile_buf.data()) ;
-                        //int2e_sph(eri, n_buf, NULL, __ipu_ij, atm, n_atm, bas, n_bas, env, n_env, _eri) ;
-
-                        //for (unsigned short i = 0; i < tile_g.size(); i++) tile_g[i] = 0;
-                        //for (unsigned short i = 0; i < tile_idx.size(); i++) tile_idx[i] = 0;
-                        //for (unsigned short i = 0; i < tile_buf.size(); i++) tile_buf[i] = 0;
-                        //for (int i = 0; i < 100; i++) tile_idx[i] = 3.;
-                        //for (int i = 0; i < 100; i++) tile_buf[i] = 3.;
                 }
 
 
