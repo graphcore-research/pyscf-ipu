@@ -321,7 +321,6 @@ def compute_diff_jk(dm, mol, nprog, nbatch, tolerance, backend):
     all_outputs = []
     all_indices = []
     start_index = 0
-    start, stop = 0, 0
     np.random.seed(42)
 
     NUM_TILES = 1472
@@ -459,7 +458,7 @@ def compute_diff_jk(dm, mol, nprog, nbatch, tolerance, backend):
 
             block_do = np.zeros((_dl*_dk*_dj*_di))
             for ci, ijkl in enumerate(block_idx.reshape(-1, 4)):
-                block_do[ci] = ijkl_in_bounds(ijkl[2], ijkl[3], ijkl[0], ijkl[1])
+                block_do[ci] = ijkl_in_bounds(ijkl[2], ijkl[3], ijkl[0], ijkl[1]) and ~(nonzero_seed[ijkl[0]] ^ nonzero_seed[ijkl[1]]) ^ (nonzero_seed[ijkl[2]] ^ nonzero_seed[ijkl[3]])
                             
             comp_distinct_idx_list[comp_list_index] = block_idx.reshape(-1, 4)
             comp_do_list[comp_list_index] = block_do
