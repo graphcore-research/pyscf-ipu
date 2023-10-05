@@ -512,15 +512,7 @@ def compute_diff_jk(dm, mol, nprog, nbatch, tolerance, backend):
     # Prepare IPU inputs.
     # Merge all int/float inputs in seperate arrays.
     input_floats = env.reshape(1, -1)
-    input_ints   = np.zeros((1, 6+n_ao_loc +n_atm*6+n_bas*8), dtype=np.int32)
-    start, stop = 0, 6
-    input_ints[:, start:stop] = np.array( [n_eri, n_buf, n_atm, n_bas, n_env, n_ao_loc] )
-    start, stop = start+6, stop+n_ao_loc
-    input_ints[:, start:stop] = ao_loc.reshape(-1)
-    start, stop = start+n_ao_loc, stop + n_atm*6
-    input_ints[:, start:stop] = atm.reshape(-1)
-    start, stop = start+n_atm*6, stop + n_bas*8
-    input_ints[:, start:stop] = bas.reshape(-1)
+    input_ints = np.hstack([n_eri, n_buf, n_atm, n_bas, n_env, n_ao_loc, ao_loc.reshape(-1), atm.reshape(-1), bas.reshape(-1)])
 
     sizes, counts = np.unique(output_sizes[:, -1], return_counts=True)
     sizes, counts = sizes.astype(np.int32), counts.astype(np.int32)
@@ -539,13 +531,12 @@ def compute_diff_jk(dm, mol, nprog, nbatch, tolerance, backend):
         inputs.append(tuples)
         start_index += count
 
-    tuple_ijkl = tuple(inputs)
-    input_ijkl = inputs
+    input_ijkl = tuple(inputs)
 
     for i in range(len(sizes)):
-        shapes.append(get_shapes(input_ijkl[i], bas))
+        shapes.append(get_shapes(inputs[i], bas))
 
-    input_floats, input_ints, input_ijkl, shapes, sizes, counts, ao_loc, num_calls = input_floats, input_ints, tuple_ijkl, tuple(shapes), tuple(sizes.tolist()), counts.tolist(), ao_loc, num_calls
+    shapes, sizes, counts = tuple(shapes), tuple(sizes.tolist()), counts.tolist()
 
     # Load vertex using TileJax.
     vertex_filename = osp.join(osp.dirname(__file__), "intor_int2e_sph.cpp")
@@ -672,7 +663,6 @@ def compute_diff_jk(dm, mol, nprog, nbatch, tolerance, backend):
 
     BLOCK_ERI_SIZE = np.sum(np.array([eri.shape[0] for eri in all_eris]))
 
-    overlap_bookkeeping = {}
     comp_distinct_idx_list = [None]*BLOCK_ERI_SIZE
     comp_do_list = [None]*BLOCK_ERI_SIZE
     comp_list_index = 0
@@ -688,27 +678,26 @@ def compute_diff_jk(dm, mol, nprog, nbatch, tolerance, backend):
             i, j, k, l         = [idx[ind, z] for z in range(4)]
             _di, _dj, _dk, _dl = ao_loc[i+1] - ao_loc[i], ao_loc[j+1] - ao_loc[j], ao_loc[k+1] - ao_loc[k], ao_loc[l+1] - ao_loc[l]
             _i0, _j0, _k0, _l0 = ao_loc[i], ao_loc[j], ao_loc[k], ao_loc[l]
-            
-            def ijkl2c(i, j, k, l):
-                if i<j: i,j = j,i
-                if k<l: k,l = l,k
-                ij = i*(i+1)//2 + j
-                kl = k*(k+1)//2 + l
-                if ij < kl: ij,kl = kl,ij
-                c = ij*(ij+1)//2 + kl
-                return c
-
             block_idx = np.mgrid[
                 _i0:(_i0+_di),
                 _j0:(_j0+_dj),
                 _k0:(_k0+_dk),
                 _l0:(_l0+_dl)].transpose(4, 3, 2, 1, 0).astype(np.int16)
 
-            block_c = [ijkl2c(ijkl[0],ijkl[1], ijkl[2], ijkl[3]) for ijkl in block_idx.reshape(-1, 4)]
+            def ijkl_in_bounds(i, j, k, l):
+                if i<j: return False
+                if k<l: return False
+                ij = i*(i+1)//2 + j
+                kl = k*(k+1)//2 + l
+                if ij < kl: return False
+                return True
+
             block_do = np.zeros((_dl*_dk*_dj*_di))
-            for ci, c in enumerate(block_c):
-                block_do[ci] = int(c not in overlap_bookkeeping)
-                overlap_bookkeeping[c] = True
+            for ci, ijkl in enumerate(block_idx.reshape(-1, 4)):
+                block_do[ci] = ijkl_in_bounds(ijkl[2], ijkl[3], ijkl[0], ijkl[1])
+            
+            
+            # exit()
                             
             comp_distinct_idx_list[comp_list_index] = block_idx.reshape(-1, 4)
             comp_do_list[comp_list_index] = block_do
@@ -810,8 +799,9 @@ if __name__ == "__main__":
 
     start = time.time()
 
-    #mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*j} {1.54*i};" for i in range(natm) for j in range(natm))) 
-    mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*j} {1.54*i};" for i in range(1) for j in range(2)), basis="sto3g") 
+    #mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*j} {1.54*i};" for i in range(natm) for j in range(natm))) # sto-3g by default
+    # mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*j} {1.54*i};" for i in range(1) for j in range(2)), basis="sto3g") 
+    mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*j} {1.54*i};" for i in range(natm) for j in range(natm)), basis="sto3g") 
     #mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*j} {1.54*i};" for i in range(1) for j in range(1)), basis="def2-TZVPPD") 
     #mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*j} {1.54*i};" for i in range(1) for j in range(2)), basis="6-31G*") 
     # mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*i} {1.54*i};" for i in range(natm))) 
