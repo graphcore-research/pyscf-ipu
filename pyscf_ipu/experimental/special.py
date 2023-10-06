@@ -77,22 +77,23 @@ def binom_lookup(x: IntN, y: IntN, nmax: int = LMAX) -> IntN:
 binom = binom_lookup
 
 
-def gammanu(nu: IntN, t: FloatN, epsilon: float = 1e-10) -> FloatN:
+def gammanu(nu: IntN, t: FloatN, num_terms: int = 128) -> FloatN:
     """
-    eq 2.11 from THO but simplified using SymPy and converted to jax
-
-        t, u = symbols("t u", real=True, positive=True)
-        nu = Symbol("nu", integer=True, nonnegative=True)
-
-        expr = simplify(integrate(u ** (2 * nu) * exp(-t * u**2), (u, 0, 1)))
-        f = lambdify((nu, t), expr, modules="scipy")
-        ?f
-
-    We evaulate this in log-space to avoid overflow/nan
+    eq 2.11 from THO but simplified as derived in gammanu.ipynb
     """
-    x = nu + 0.5
-    gn = jnp.log(0.5) - x * jnp.log(t) + jnp.log(gammainc(x, t)) + gammaln(x)
-    return jnp.where(t <= epsilon, 1 / (2 * nu + 1), jnp.exp(gn))
+
+    def body(_, vals):
+        prev_a, prev_term, total = vals
+        an = prev_a + 1
+        tn = prev_term * t / an
+        return an, tn, total + tn
+
+    a0 = nu + 0.5
+    t0 = 1 / a0
+    total = jnp.full_like(nu, t0, dtype=jnp.float32)
+    init_vals = (a0, t0, total)
+    total = lax.fori_loop(0, num_terms, body, init_vals)[-1]
+    return jnp.exp(-t) / 2 * total
 
 
 def binom_factor(i: int, j: int, a: float, b: float, lmax: int = LMAX) -> FloatN:
@@ -107,16 +108,3 @@ def binom_factor(i: int, j: int, a: float, b: float, lmax: int = LMAX) -> FloatN
     mask = ((s - i) <= t) & (t <= j)
     out = jnp.where(mask, out, 0.0)
     return segment_sum(out, s, num_segments=lmax + 1)
-
-
-def gammainc(a, x, amax=LMAX + 1):
-    from jax.scipy.special import erfc
-
-    out_shape = a.shape
-    a = a.reshape(-1, 1)
-    x = x.reshape(-1, 1)
-    n = jnp.arange(1, amax + 1)
-    terms = (n <= a) * (x**n / jnp.cumprod(n - 0.5))
-    q = erfc(jnp.sqrt(x)) + jnp.exp(-x) / jnp.sqrt(jnp.pi * x) * jnp.sum(terms, axis=-1)
-
-    return (1 - q).reshape(out_shape)
