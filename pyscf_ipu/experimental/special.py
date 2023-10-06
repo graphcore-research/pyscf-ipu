@@ -81,18 +81,15 @@ def gammanu(nu: IntN, t: FloatN, num_terms: int = 128) -> FloatN:
     """
     eq 2.11 from THO but simplified as derived in gammanu.ipynb
     """
+    an = nu + 0.5
+    tn = 1 / an
+    total = jnp.full_like(nu, tn, dtype=jnp.float32)
 
-    def body(_, vals):
-        prev_a, prev_term, total = vals
-        an = prev_a + 1
-        tn = prev_term * t / an
-        return an, tn, total + tn
+    for _ in range(num_terms):
+        an = an + 1
+        tn = tn * t / an
+        total = total + tn
 
-    a0 = nu + 0.5
-    t0 = 1 / a0
-    total = jnp.full_like(nu, t0, dtype=jnp.float32)
-    init_vals = (a0, t0, total)
-    total = lax.fori_loop(0, num_terms, body, init_vals)[-1]
     return jnp.exp(-t) / 2 * total
 
 
