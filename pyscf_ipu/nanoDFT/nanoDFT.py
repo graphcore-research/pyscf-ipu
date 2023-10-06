@@ -81,7 +81,26 @@ def nanoDFT_iteration(i, vals, opts, mol):
     log["matrices"] = jax.lax.dynamic_update_slice(log["matrices"], H.             reshape(1, 1, N, N), (i, 2, 0, 0))
     log["energy"]   = log["energy"].at[i].set(energy(density_matrix, H_core, diff_JK, E_xc, E_nuc))  # (iterations, 6)
 
+    if opts.vis_num_error is True:
+        import os
+        dir_label = opts.molecule_name
+        num_error_dir = f'num_error/{dir_label}/'
+        os.makedirs(num_error_dir , exist_ok=True)
+
+        def host_callback(data, i):
+            # labels are adjusted to the `data` that will be passed to the callback - keep that in mind when passing different list of tensors
+            labels = ["density_matrix", "V_xc", "diff_JK", "O", "H_core", "L_inv", "E_nuc", "occupancy", "ERI", "grid_weights", "grid_AO", "diis_history", "E_xc", "eigvects", "H"]
+            for l, d  in zip(labels, data):
+                if l == "diis_history" or l == "ERI":
+                    for idx, arr in enumerate(d):
+                        np.savez(f'{num_error_dir}{i}_{l}{idx}.npz', v = np.array(arr))
+                else:
+                    np.savez(f'{num_error_dir}{i}_{l}.npz', v = d)
+
+        jax.debug.callback(host_callback, vals[:-1] + [E_xc, eigvects, H], i)
+
     return [density_matrix, V_xc, diff_JK, O, H_core, L_inv, E_nuc, occupancy, ERI, grid_weights, grid_AO, diis_history, log]
+
 
 def exchange_correlation(density_matrix, grid_AO, grid_weights):
     """Compute exchange correlation integral using atomic orbitals (AO) evalauted on a grid. """
@@ -538,7 +557,9 @@ def nanoDFT_options(
         ndevices: int = 1, 
         dense_ERI: bool = False,        
         v: bool = False, # verbose 
-        profile: bool = False # if we only want profile exit after IPU finishes. 
+        profile: bool = False, # if we only want profile exit after IPU finishes.
+        vis_num_error: bool = False,
+        molecule_name: str = None
 ):
     """
     nanoDFT
@@ -562,6 +583,10 @@ def nanoDFT_options(
         ao_threshold (float): Zero out grid_AO that are below the threshold in absolute value.
         dense_ERI (bool): Whether to use dense ERI (s1) or sparse symmtric ERI. 
     """
+    if molecule_name is None:
+        # use mol_str as a molecule name (in case it has not been provided)
+        # before mol_str CLI arg is preprocessed and overwritten
+        molecule_name = mol_str
 
     # From a compound name or CID, get a list of its atoms and their coordinates
     mol_str = utils.process_mol_str(mol_str)
@@ -603,6 +628,12 @@ def main():
         nanoDFT_forces = grad(mol, grid_coords, grid_weights, mo_coeff, mo_energy)
         pyscf_E, pyscf_hlgap, pyscf_forces = pyscf_reference(mol_str, opts)
         print_difference(nanoDFT_E, nanoDFT_forces, nanoDFT_logged_E, nanoDFT_hlgap, pyscf_E, pyscf_forces, pyscf_hlgap)
+
+        if opts.vis_num_error is True:
+            from utils import save_plot
+            import sys
+            _plot_title = f"Created with:  python {' '.join(sys.argv)}"
+            save_plot("num_error/", opts.molecule_name, opts.its, _plot_title)
     else:
         # pip install mogli imageio[ffmpeg] matplotlib
         import mogli
