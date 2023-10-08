@@ -279,7 +279,7 @@ def eri_basis_sparse(b: Basis):
         tree_map(lambda x: jnp.take(x, idx, axis=0), primitives) for idx in indices
     ]
     eris = cijkl * vmap_eri_primitives(*pijkl)
-    return segment_sum(eris, batch)
+    return segment_sum(eris, batch, num_segments=count + 1)
 
 
 def eri_basis(b: Basis):
