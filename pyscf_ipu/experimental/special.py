@@ -79,7 +79,7 @@ binom = binom_lookup
 
 def gammanu(nu: IntN, t: FloatN, num_terms: int = 128) -> FloatN:
     """
-    eq 2.11 from THO but simplified as derived in gammanu.ipynb
+    eq 2.11 from THO but simplified as derived in equation 19 of gammanu.ipynb
     """
     an = nu + 0.5
     tn = 1 / an
