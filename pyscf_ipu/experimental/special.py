@@ -77,7 +77,7 @@ def binom_lookup(x: IntN, y: IntN, nmax: int = LMAX) -> IntN:
 binom = binom_lookup
 
 
-def gammanu(nu: IntN, t: FloatN, epsilon: float = 1e-10) -> FloatN:
+def gammanu_gamma(nu: IntN, t: FloatN, epsilon: float = 1e-10) -> FloatN:
     """
     eq 2.11 from THO but simplified using SymPy and converted to jax
 
@@ -94,6 +94,25 @@ def gammanu(nu: IntN, t: FloatN, epsilon: float = 1e-10) -> FloatN:
     x = nu + 0.5
     gn = jnp.log(0.5) - x * jnp.log(t) + jnp.log(gammainc(x, t)) + gammaln(x)
     return jnp.exp(gn)
+
+
+def gammanu_series(nu: IntN, t: FloatN, num_terms: int = 128) -> FloatN:
+    """
+    eq 2.11 from THO but simplified as derived in equation 19 of gammanu.ipynb
+    """
+    an = nu + 0.5
+    tn = 1 / an
+    total = jnp.full_like(nu, tn, dtype=jnp.float32)
+
+    for _ in range(num_terms):
+        an = an + 1
+        tn = tn * t / an
+        total = total + tn
+
+    return jnp.exp(-t) / 2 * total
+
+
+gammanu = gammanu_series
 
 
 def binom_factor(i: int, j: int, a: float, b: float, lmax: int = LMAX) -> FloatN:
