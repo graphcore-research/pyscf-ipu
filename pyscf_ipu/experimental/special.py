@@ -90,9 +90,10 @@ def gammanu_gamma(nu: IntN, t: FloatN, epsilon: float = 1e-10) -> FloatN:
 
     We evaulate this in log-space to avoid overflow/nan
     """
+    t = jnp.maximum(t, epsilon)
     x = nu + 0.5
     gn = jnp.log(0.5) - x * jnp.log(t) + jnp.log(gammainc(x, t)) + gammaln(x)
-    return jnp.where(t <= epsilon, 1 / (2 * nu + 1), jnp.exp(gn))
+    return jnp.exp(gn)
 
 
 def gammanu_series(nu: IntN, t: FloatN, num_terms: int = 128) -> FloatN:
