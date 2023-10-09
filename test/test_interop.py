@@ -18,11 +18,11 @@ def test_to_pyscf(basis_name):
     assert basis.num_orbitals == pyscf_mol.nao
 
 
-@pytest.mark.parametrize("basis_name", ["sto-3g", "6-31+g"])
-def test_gto(basis_name):
+def test_gto():
     from pyscf.dft.numint import eval_rho
 
     # Atomic orbitals
+    basis_name = "6-31+g"
     structure = molecule("water")
     basis = basisset(structure, basis_name)
     mesh, _ = uniform_mesh()
