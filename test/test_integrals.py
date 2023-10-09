@@ -2,7 +2,6 @@
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from jax import tree_map, vmap
 from numpy.testing import assert_allclose
 
 from pyscf_ipu.experimental.basis import basisset
@@ -109,19 +108,6 @@ def test_water_nuclear():
     assert_allclose(actual, expect, atol=1e-4)
 
 
-def eri_orbitals(orbitals):
-    def take(orbital, index):
-        p = tree_map(lambda *xs: jnp.stack(xs), *orbital.primitives)
-        p = tree_map(lambda x: jnp.take(x, index, axis=0), p)
-        c = jnp.take(orbital.coefficients, index)
-        return p, c
-
-    indices = [jnp.arange(o.num_primitives) for o in orbitals]
-    indices = [i.reshape(-1) for i in jnp.meshgrid(*indices)]
-    prim, coef = zip(*[take(o, i) for o, i in zip(orbitals, indices)])
-    return jnp.sum(jnp.prod(jnp.stack(coef), axis=0) * vmap(eri_primitives)(*prim))
-
-
 def test_eri():
     # PyQuante test cases for ERI
     a, b, c, d = [Primitive()] * 4
@@ -130,18 +116,6 @@ def test_eri():
     c, d = [Primitive(lmn=jnp.array([1, 0, 0]))] * 2
     assert_allclose(eri_primitives(a, b, c, d), 0.940316, atol=1e-5)
 
-    # H2 molecule in sto-3g: See equation 3.235 of Szabo and Ostlund
-    h2 = molecule("h2")
-    basis = basisset(h2, "sto-3g")
-    indices = [(0, 0, 0, 0), (0, 0, 1, 1), (1, 0, 0, 0), (1, 0, 1, 0)]
-    expected = [0.7746, 0.5697, 0.4441, 0.2970]
-
-    for ijkl, expect in zip(indices, expected):
-        actual = eri_orbitals([basis.orbitals[aoid] for aoid in ijkl])
-        assert_allclose(actual, expect, atol=1e-4)
-
-
-def test_eri_basis():
     # H2 molecule in sto-3g: See equation 3.235 of Szabo and Ostlund
     h2 = molecule("h2")
     basis = basisset(h2, "sto-3g")
