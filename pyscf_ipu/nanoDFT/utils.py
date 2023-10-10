@@ -148,3 +148,79 @@ def min_interatomic_distance(mol_str):
     coords = map(itemgetter(1), mol_str) 
     distances = map(lambda x: np.linalg.norm(np.array(x[0]) - np.array(x[1])), combinations(coords, 2))
     return min(distances)
+
+
+def save_plot(base_data_dir: str, molecule_name: str, iterations: int, _plot_title: str = "Default Title"):
+    import matplotlib.pyplot as plt
+    import matplotlib
+    import os
+    matplotlib.rc('font', **{'family': 'serif', 'serif': ['Computer Modern']})
+
+    import seaborn as sns
+    sns.set_theme()
+    sns.set_style("white")
+
+    data_dir = base_data_dir + molecule_name + '/'
+
+    def prepare(val):
+        val = np.abs(val[val == val])
+        val[np.logical_and(val<1e-15, val!=0)] = 2e-15 # show the ones that go out of plot
+        val[val==0] = 1e-17 # remove zeros.
+        return val
+
+    xticks = []
+    xticklabels = []
+
+    fig, ax = plt.subplots(1, 1, figsize=(14,8))
+    images_subdir = f'{base_data_dir}/tmp_images/num_error/'
+    os.makedirs(images_subdir, exist_ok=True)
+
+    for outer_num, i in enumerate(range(iterations)):
+        skip = 0
+        print(f'figure [{i+1} / {iterations}]\r', end="")
+        plt.cla()
+        plt.title("[Iterations %i] \n"%(i+1) + _plot_title)
+        files = sorted([a for a in os.listdir(data_dir) if "[" not in a and int(a.split("_")[0]) == i and ".jpg" not in a and ".gif" not in a])
+
+        for num, file in enumerate(files):
+            val= np.load(data_dir+file, allow_pickle=True)["v"]
+            shape = val.shape
+            if np.prod(shape) <= 1:
+                skip += 1
+                continue
+
+            val = prepare(val)
+            val = np.sort(val)
+            num_max_dots = 500
+
+            if val.size > num_max_dots: val= val[::int(val.size)//num_max_dots]
+
+            ys = -np.ones(val.shape[0])*(num - skip)
+            ax.plot([1e-15, 1e18], [ys[0], ys[1]], 'C%i-'%(num%10), lw=10, alpha=0.2)
+            ax.plot(val, ys, 'C%io'%(num%10), ms=6, alpha=0.2)
+
+            if i == 0:
+                xticks.append(ys[0])
+                xticklabels.append(file.replace(".npz", "").replace("%i_"%i, ""))
+
+        plt.plot( [10**(-10), 10**(-10)], [0, xticks[-1]], 'C7--', alpha=0.6)
+        plt.plot( [10**(10), 10**10], [0, xticks[-1]], 'C7--', alpha=0.6)
+        plt.plot( [10**(0), 10**0], [0, xticks[-1]], 'C7-', alpha=1)
+
+        for x, label in zip(xticks, xticklabels):
+            ax.text(1e10, x+0.25, label, horizontalalignment='left', size='small', color='black', weight='normal')
+
+        plt.yticks([], [])
+        plt.xscale("log")
+        plt.xlim([10**(-15), 10**18])
+        if i == 0: plt.tight_layout()
+
+        plt.savefig(f'{images_subdir}num_error{outer_num}.jpg')
+
+    import imageio
+    gif_path = f'{base_data_dir}visualize_DFT_num_error_{molecule_name}.gif'
+    writer = imageio.get_writer(gif_path, loop=0, duration=7)
+    for i in range(iterations):
+        writer.append_data(imageio.v2.imread(f'{images_subdir}num_error{i}.jpg'))
+    writer.close()
+    print("Numerical error visualisation saved in", gif_path)
