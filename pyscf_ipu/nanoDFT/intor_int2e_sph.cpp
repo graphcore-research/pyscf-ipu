@@ -8,6 +8,7 @@
 #include <cmath>
 #include <poplar/HalfFloat.hpp>
 #include <poplar/Vertex.hpp>
+#include <print.h>
 
 #include "poplar/TileConstants.hpp"
 
@@ -2449,6 +2450,13 @@ int CINTset_pairdata(PairData *pairdata, const dtype *ai, const dtype *aj, const
         return empty;
 }
 
+
+template<uint32_t N>
+void check_struct_ortho(bool &out, const bool (&nonzero_pattern)[N], const uint32_t &i, const uint32_t &j, const uint32_t &k, const uint32_t &l) {
+    out = (k>=l && i>=j && (k*(k+1)/2+l)>=(i*(i+1)/2+j)) && 
+          ~((nonzero_pattern[i] ^ nonzero_pattern[j]) ^ (nonzero_pattern[k] ^ nonzero_pattern[l]));
+}
+
 int CINT2e_loop_nopt(
         dtype *gctr,
         const dtype *env,
@@ -2456,7 +2464,7 @@ int CINT2e_loop_nopt(
         dtype *rkrl, dtype *rirj,
         dtype *envs_ai ,dtype *envs_aj ,dtype *envs_ak ,dtype *envs_al , dtype *envs_fac ,dtype *envs_rij ,dtype *envs_rkl ,
         const dtype *rx_in_rijrx ,const dtype *rx_in_rklrx , dtype common_factor ,dtype log_rr_kl ,
-        int len_gctr, int *empty, const int *shls, const int *bas,
+        int len_gctr, int *empty, const int *shls, const int *ao_loc, const int *bas,
         int n_env,    int i_ctr     ,int j_ctr,int k_ctr,int l_ctr        ,
         int n_comp,
         int li_ceil ,int lj_ceil ,int lk_ceil ,int ll_ceil ,int i_l
@@ -2473,6 +2481,11 @@ int CINT2e_loop_nopt(
   int j_sh    = shls[1];
   int k_sh    = shls[2];
   int l_sh    = shls[3];
+
+  int i0      = ao_loc[i_sh];
+  int j0      = ao_loc[j_sh];
+  int k0      = ao_loc[k_sh];
+  int l0      = ao_loc[l_sh];
 
   int i_prim  = bas[BAS_SLOTS*i_sh + NPRIM_OF];
   int j_prim  = bas[BAS_SLOTS*j_sh + NPRIM_OF];
@@ -2627,7 +2640,17 @@ int CINT2e_loop_nopt(
                                 else { fac1j = fac1k; *iempty = 1; }
 
                                 for (ip = 0; ip < i_prim; ip++, pdata_ij++) {
-                                        //printf("\t%i %i %i %i\n", lp, kp, jp, ip);
+                                        // printf("\t%d %d %d %d\n", lp, kp, jp, ip);
+
+                                        // bool compute = false;
+                                        // const bool nonzero_pattern[20] = {true,  true, false,  true,  true,  true,  true, false,  true, true,  true,  true, false,  true,  true,  true,  true, false, true,  true};
+                                        // bool nonzero_pattern[45] = {true,  true,  false, true,  true,  true,  true,  false, true,
+                                        //                             true,  true,  true,  false, true,  true,  true,  true,  false,
+                                        //                             true,  true,  true,  true,  false, true,  true,  true,  true,
+                                        //                             false, true,  true,  true,  true,  false, true,  true,  true,
+                                        //                             true,  false, true,  true,  true,  true,  false, true,  true};
+                                        // check_struct_ortho<20>(compute, nonzero_pattern, j0+jp, k0+kp, i0+ip, l0+lp); # INCORRECT INDEXING - TODO
+                                        // if (!compute) continue;
 
                                         envs_ai[0] = ai[ip];
                                         rij = pdata_ij->rij;
@@ -2650,7 +2673,6 @@ int CINT2e_loop_nopt(
                                         rklrx[0]  = envs_rkl[0] - rx_in_rklrx[0];
                                         rklrx[1]  = envs_rkl[1] - rx_in_rklrx[1];
                                         rklrx[2]  = envs_rkl[2] - rx_in_rklrx[2];
-
 
                                         // 3.08M to 700k ; so this is 2.2M
                                        int ret = CINTg0_2e(g, len,
@@ -6747,7 +6769,7 @@ void c2s_dset0(dtype *out, int *dims, int *counts)
 }
 
 
-int int2e_sph(dtype *out, int n_out, int *dims, const int *shls, const int *atm, int natm, const int *bas, int nbas, const dtype *env, int n_env, dtype * eri, dtype * tile_g, int * tile_idx, dtype * tile_buf) {
+int int2e_sph(dtype *out, int n_out, int *dims, const int *shls, const int *ao_loc, const int *atm, int natm, const int *bas, int nbas, const dtype *env, int n_env, dtype * eri, dtype * tile_g, int * tile_idx, dtype * tile_buf) {
 
   int ng[] = {0, 0, 0, 0, 0, 1, 1, 1};
 
@@ -6755,6 +6777,11 @@ int int2e_sph(dtype *out, int n_out, int *dims, const int *shls, const int *atm,
   const int j_sh = shls[1];
   const int k_sh = shls[2];
   const int l_sh = shls[3];
+
+  const int i0 = ao_loc[i_sh];
+  const int j0 = ao_loc[j_sh];
+  const int k0 = ao_loc[k_sh];
+  const int l0 = ao_loc[l_sh];
 
   int i_l = bas[BAS_SLOTS * i_sh + ANG_OF];
   int j_l = bas[BAS_SLOTS * j_sh + ANG_OF];
@@ -6907,7 +6934,7 @@ int int2e_sph(dtype *out, int n_out, int *dims, const int *shls, const int *atm,
 
   CINT2e_loop_nopt(gctr, env, rk, ri, rj, rl, expcutoff, rkrl, rirj,
                          ai, aj, ak, al, fac, rij, rkl, rx_in_rijrx, rx_in_rklrx,
-                         common_factor, (lk_ceil+ll_ceil+1), nc*n_comp, &empty, shls, bas, // ints after this
+                         common_factor, (lk_ceil+ll_ceil+1), nc*n_comp, &empty, shls, ao_loc, bas, // ints after this
                 n_env, _x_ctr[0], _x_ctr[1], _x_ctr[2], _x_ctr[3],
                 ncomp_e1 * ncomp_e2 * ncomp_tensor,
                 li_ceil, lj_ceil, lk_ceil, ll_ceil, i_l,
@@ -6971,6 +6998,16 @@ int int2e_sph(dtype *out, int n_out, int *dims, const int *shls, const int *atm,
                           for (kc = 0; kc < k_ctr; kc++) {
                                   for (jc = 0; jc < j_ctr; jc++) {
                                           for (ic = 0; ic < i_ctr; ic++) {
+                                                // bool compute = false;
+                                                // const bool nonzero_pattern[20] = {true,  true, false,  true,  true,  true,  true, false,  true, true,  true,  true, false,  true,  true,  true,  true, false, true,  true};
+                                                // bool nonzero_pattern[45] = {true,  true,  false, true,  true,  true,  true,  false, true,
+                                                //                             true,  true,  true,  false, true,  true,  true,  true,  false,
+                                                //                             true,  true,  true,  true,  false, true,  true,  true,  true,
+                                                //                             false, true,  true,  true,  true,  false, true,  true,  true,
+                                                //                             true,  false, true,  true,  true,  true,  false, true,  true};
+                                                // check_struct_ortho<20>(compute, nonzero_pattern,....); # INCORRECT INDEXING - TODO
+                                                // if (!compute) continue;
+
                                                   //tmp1 = c2s_ket_sph[j_l](buf1, _gctr, nfikl, nfikl, j_l);
                                                   tmp1 = c2s_ket_sph[j_l](buf1, gctr, nfikl, nfikl, j_l);
 
@@ -6996,6 +7033,31 @@ int int2e_sph(dtype *out, int n_out, int *dims, const int *shls, const int *atm,
                   c2s_dset0(out+nout*n, dims, counts);
           }
   }
+  
+  int di = i_l * 2 + 1;
+  int dj = j_l * 2 + 1;
+  int dk = k_l * 2 + 1;
+  int dl = l_l * 2 + 1;
+  for (int l = 0, ijkl=0; l < dl; l++) {
+    for (int k = 0; k < dk; k++) {
+        for (int j = 0; j < dj; j++) {
+            for (int i = 0; i < di; i++, ijkl++) {
+                bool compute = false;
+                const bool nonzero_pattern[20] = {true,  true, false,  true,  true,  true,  true, false,  true, true,  true,  true, false,  true,  true,  true,  true, false, true,  true};
+                // const bool nonzero_pattern[45] = {true,  true,  false, true,  true,  true,  true,  false, true,
+                //                                 true,  true,  true,  false, true,  true,  true,  true,  false,
+                //                                 true,  true,  true,  true,  false, true,  true,  true,  true,
+                //                                 false, true,  true,  true,  true,  false, true,  true,  true,
+                //                                 true,  false, true,  true,  true,  true,  false, true,  true};
+                
+                check_struct_ortho<20>(compute, nonzero_pattern, i0+i, j0+j, k0+k, l0+l); // PASS!!!
+                if (!compute)
+                {
+                    eri[ijkl] = 0;
+                }
+                            
+            }
+  } } }
 
   return !empty;
 }
@@ -7060,7 +7122,7 @@ void GTOnr2e_fill_s1( dtype *eri, int n_eri, dtype *buf, int n_buf, int comp, in
                   dijkl = dijk * dl;
                   //cache = buf + dijkl * comp;
 
-                  if (int2e_sph(buf, n_buf, NULL, shls, atm, natm, bas, nbas, env, n_env, _eri, NULL, NULL, NULL) ) {
+                  if (int2e_sph(buf, n_buf, NULL, shls, ao_loc, atm, natm, bas, nbas, env, n_env, _eri, NULL, NULL, NULL) ) {
 
                           // move from buf to eri.
                           eri0 = eri + k0*nl+l0;
@@ -7160,7 +7222,7 @@ public:
 
                 dtype *_eri = eri;
 
-                int2e_sph(eri, n_buf, NULL, ipu_ij.data(), atm, n_atm, bas, n_bas, env, n_env, _eri, tile_g.data(), tile_idx.data(), tile_buf.data()) ;
+                int2e_sph(eri, n_buf, NULL, ipu_ij.data(), ao_loc, atm, n_atm, bas, n_bas, env, n_env, _eri, tile_g.data(), tile_idx.data(), tile_buf.data()) ;
                 //int2e_sph(eri, n_buf, NULL, __ipu_ij, atm, n_atm, bas, n_bas, env, n_env, _eri) ;
 
                 //for (unsigned short i = 0; i < tile_g.size(); i++) tile_g[i] = 0;
@@ -7226,7 +7288,7 @@ public:
 
                         dtype *_eri = eri;
 
-                        int2e_sph(eri, n_buf, NULL, shls, atm, n_atm, bas, n_bas, env, n_env, _eri, tile_g.data(), tile_idx.data(), tile_buf.data()) ;
+                        int2e_sph(eri, n_buf, NULL, shls, ao_loc, atm, n_atm, bas, n_bas, env, n_env, _eri, tile_g.data(), tile_idx.data(), tile_buf.data()) ;
                 }
 
 
@@ -8256,7 +8318,7 @@ public:
 
                 //int2e_sph(eri, n_buf, NULL, ipu_ij.data(), atm, n_atm, bas, n_bas, env, n_env, _eri) ;
 
-                int2e_sph(eri, n_buf, NULL, ipu_ij.data(), atm, n_atm, bas, n_bas, env, n_env, _eri, NULL, NULL, NULL) ;
+                int2e_sph(eri, n_buf, NULL, ipu_ij.data(), ao_loc, atm, n_atm, bas, n_bas, env, n_env, _eri, NULL, NULL, NULL) ;
                 //for (int i = 0; i < 5; i++) eri[i] = 3.;
 
                 return true;
@@ -8386,9 +8448,9 @@ int CVHFnoscreen(int *shls, CVHFOpt *opt, int *atm, int *bas, ddtype *env)
         shls[2] = ksh; \
         shls[3] = lsh; \
         if (vhfopt != NULL) { \
-                        int2e_sph(buf, n_buf, NULL, shls, atm, natm, bas, nbas, env, n_env, NULL, NULL, NULL, NULL); \
+                        int2e_sph(buf, n_buf, NULL, shls, ao_loc, atm, natm, bas, nbas, env, n_env, NULL, NULL, NULL, NULL); \
         } else { \
-                notempty = int2e_sph(buf, n_buf, NULL, shls, atm, natm, bas, nbas, env, n_env, NULL, NULL, NULL, NULL); \
+                notempty = int2e_sph(buf, n_buf, NULL, shls, ao_loc, atm, natm, bas, nbas, env, n_env, NULL, NULL, NULL, NULL); \
         } \
         if (notempty) { \
                 i0 = ao_loc[ish] - ioff; \
@@ -8555,7 +8617,7 @@ void CVHFdot_nrs8( JKOperator **jkop, JKArray **vjk,
                                         shls[1] = jsh;
                                         shls[2] = ksh;
                                         shls[3] = lsh;
-                                        notempty = int2e_sph(buf, n_buf, NULL, shls, atm, natm, bas, nbas, env, n_env, NULL, NULL, NULL, NULL);
+                                        notempty = int2e_sph(buf, n_buf, NULL, shls, ao_loc, atm, natm, bas, nbas, env, n_env, NULL, NULL, NULL, NULL);
                                         if (notempty) {
                                                 i0 = ao_loc[ish] - ioff;
                                                 j0 = ao_loc[jsh] - joff;

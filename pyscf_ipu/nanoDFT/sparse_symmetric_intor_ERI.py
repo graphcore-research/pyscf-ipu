@@ -449,12 +449,7 @@ def compute_diff_jk(dm, mol, nprog, nbatch, tolerance, backend):
                 _l0:(_l0+_dl)].transpose(4, 3, 2, 1, 0).astype(np.int16)
 
             def ijkl_in_bounds(i, j, k, l):
-                if i<j: return False
-                if k<l: return False
-                ij = i*(i+1)//2 + j
-                kl = k*(k+1)//2 + l
-                if ij < kl: return False
-                return True
+                return i>=j and k>=l and (i*(i+1)//2+j)>=(k*(k+1)//2+l)
 
             block_do = np.zeros((_dl*_dk*_dj*_di))
             for ci, ijkl in enumerate(block_idx.reshape(-1, 4)):
@@ -481,7 +476,7 @@ def compute_diff_jk(dm, mol, nprog, nbatch, tolerance, backend):
     comp_distinct_ERI = jnp.concatenate([eri.reshape(-1) for eri in all_eris]).reshape(nprog, nbatch, -1)
     comp_distinct_idx = comp_distinct_idx.reshape(nprog, nbatch, -1, 4)
     comp_do = comp_do.reshape(nprog, nbatch, -1)
-    comp_distinct_ERI *= comp_do
+    # comp_distinct_ERI *= comp_do
 
     print('comp_distinct_ERI.shape', comp_distinct_ERI.shape)
     print('comp_distinct_idx.shape', comp_distinct_idx.shape)
