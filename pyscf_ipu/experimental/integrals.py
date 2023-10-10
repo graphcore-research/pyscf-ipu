@@ -125,7 +125,7 @@ def _nuclear_primitives(a: Primitive, b: Primitive, c: Float3):
         index = i - 2 * r - u
         g = (
             jnp.power(-1, i + u)
-            * jnp.take(binom_factor(l1, l2, pa, pb), i)
+            * binom_factor(l1, l2, pa, pb, i)
             * factorial(i)
             * jnp.power(cp, index - u)
             * jnp.power(epsilon, r + u)
@@ -197,7 +197,7 @@ def _eri_primitives(a: Primitive, b: Primitive, c: Primitive, d: Primitive) -> f
         # Note this should match THO Eq 3.5 but that seems to incorrectly show a
         # 1/(4 gamma) ^(i- 2r) term which is inconsistent with Eq 2.22.
         # Using (4 gamma)^(r - i) matches the reported expressions for H_L
-        u = factorial(i) * jnp.take(binom_factor(l1, l2, a, b, 2 * LMAX), i)
+        u = factorial(i) * binom_factor(l1, l2, a, b, i)
         v = factorial(r) * factorial(i - 2 * r) * (4 * gamma) ** (i - r)
         return u / v
 

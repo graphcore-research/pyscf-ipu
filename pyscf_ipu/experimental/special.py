@@ -7,6 +7,8 @@ from jax import lax
 from jax.ops import segment_sum
 from jax.scipy.special import betaln, gammainc, gammaln
 
+from pyscf_ipu.experimental import binom_factor_table
+
 from .types import FloatN, IntN
 from .units import LMAX
 
@@ -115,7 +117,9 @@ def gammanu_series(nu: IntN, t: FloatN, num_terms: int = 128) -> FloatN:
 gammanu = gammanu_series
 
 
-def binom_factor(i: int, j: int, a: float, b: float, lmax: int = LMAX) -> FloatN:
+def binom_factor_segment_sum(
+    i: int, j: int, a: float, b: float, lmax: int = LMAX
+) -> FloatN:
     """
     Eq. 15 from Augspurger JD, Dykstra CE. General quantum mechanical operators. An
     open-ended approach for one-electron integrals with Gaussian bases. Journal of
@@ -127,3 +131,19 @@ def binom_factor(i: int, j: int, a: float, b: float, lmax: int = LMAX) -> FloatN
     mask = ((s - i) <= t) & (t <= j)
     out = jnp.where(mask, out, 0.0)
     return segment_sum(out, s, num_segments=lmax + 1)
+
+
+def binom_factor__via_segment_sum(i: int, j: int, a: float, b: float, s: int):
+    return jnp.take(binom_factor_segment_sum(i, j, a, b), s)
+
+
+binom_factor_table_W = jnp.array(binom_factor_table.build_binom_factor_table())
+
+
+def binom_factor__via_lookup(i: int, j: int, a: float, b: float, s: int) -> FloatN:
+    monomials = jnp.array(binom_factor_table.get_monomials(a, b))
+    coeffs = binom_factor_table_W[i, j, s]
+    return coeffs @ monomials
+
+
+binom_factor = binom_factor__via_segment_sum
