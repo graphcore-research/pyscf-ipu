@@ -58,6 +58,8 @@ def factorial2_lookup(n: IntN, nmax: int = 2 * LMAX) -> IntN:
 
 factorial2 = factorial2_lookup
 
+# Various binom implementations
+
 
 def binom_beta(x: IntN, y: IntN) -> IntN:
     approx = 1.0 / ((x + 1) * jnp.exp(betaln(x - y + 1, y + 1)))
@@ -77,6 +79,8 @@ def binom_lookup(x: IntN, y: IntN, nmax: int = LMAX) -> IntN:
 
 
 binom = binom_lookup
+
+# Various gammanu implementations
 
 
 def gammanu_gamma(nu: IntN, t: FloatN, epsilon: float = 1e-10) -> FloatN:
@@ -117,15 +121,26 @@ def gammanu_series(nu: IntN, t: FloatN, num_terms: int = 128) -> FloatN:
 gammanu = gammanu_series
 
 
-def binom_factor_segment_sum(
-    i: int, j: int, a: float, b: float, lmax: int = LMAX
-) -> FloatN:
+# Several binom_factor implementations
+
+
+def binom_factor_direct(i: int, j: int, a: float, b: float, s: int):
     """
     Eq. 15 from Augspurger JD, Dykstra CE. General quantum mechanical operators. An
     open-ended approach for one-electron integrals with Gaussian bases. Journal of
     computational chemistry. 1990 Jan;11(1):105-11.
     <https://doi.org/10.1002/jcc.540110113>
     """
+    return sum(
+        binom_beta(i, s - t) * binom_beta(j, t) * a ** (i - (s - t)) * b ** (j - t)
+        for t in range(max(s - i, 0), j + 1)
+    )
+
+
+def binom_factor_segment_sum(
+    i: int, j: int, a: float, b: float, lmax: int = LMAX
+) -> FloatN:
+    # Vectorized version of above
     s, t = jnp.tril_indices(lmax + 1)
     out = binom(i, s - t) * binom(j, t) * a ** (i - (s - t)) * b ** (j - t)
     mask = ((s - i) <= t) & (t <= j)
@@ -141,6 +156,7 @@ binom_factor_table_W = jnp.array(binom_factor_table.build_binom_factor_table())
 
 
 def binom_factor__via_lookup(i: int, j: int, a: float, b: float, s: int) -> FloatN:
+    # Lookup-table version of above -- see binom_factor_table.ipynb for the derivation
     monomials = jnp.array(binom_factor_table.get_monomials(a, b))
     coeffs = binom_factor_table_W[i, j, s]
     return coeffs @ monomials
