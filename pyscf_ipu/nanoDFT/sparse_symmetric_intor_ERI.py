@@ -376,10 +376,10 @@ def compute_diff_jk(dm, mol, nbatch, tolerance, backend):
 
         if count//chunk_size>0:
             all_eris.append(jnp.concatenate([batched_out, _output.array]))
-            all_indices.append(np.concatenate([np.transpose(_indices, (1, 0, 2)).reshape(-1, 4), indices]))
+            all_indices.append(np.concatenate([np.transpose(_indices, (1, 0, 2)).reshape(-1, 4), indices]).astype(np.uint8))
         else:
             all_eris.append(_output.array)
-            all_indices.append(indices)
+            all_indices.append(indices.astype(np.uint8))
 
         start = stop
 
@@ -411,7 +411,7 @@ def compute_diff_jk(dm, mol, nbatch, tolerance, backend):
 
             # Compute offsets and sizes
             batch_idx = nonzero_indices[i]
-            _i, _j, _k, _l     = [batch_idx[:, z] for z in range(4)]
+            _i, _j, _k, _l     = [batch_idx[:, z].astype(jnp.uint32) for z in range(4)]
             _di, _dj, _dk, _dl = [(ao_loc[z+1] - ao_loc[z]).reshape(-1, 1) for z in [_i, _j, _k, _l]]
             _i0, _j0, _k0, _l0 = [ao_loc[z].reshape(-1, 1) for z in [_i, _j, _k, _l]]
 
