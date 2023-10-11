@@ -280,7 +280,7 @@ def compute_diff_jk(dm, mol, nprog, nbatch, tolerance, backend):
                 perf_estimate=100,
         )
 
-    all_outputs = []
+    all_eris = []
     all_indices = []
     start_index = 0
     np.random.seed(42)
@@ -352,8 +352,6 @@ def compute_diff_jk(dm, mol, nprog, nbatch, tolerance, backend):
             output = jnp.empty((len(tiles), size))
             output  = tile_put_sharded(   output+j,   tiles)
 
-            # print('indices', indices)
-
             chunks = tile_put_replicated( jnp.array(1, dtype=jnp.uint32), tiles)
             integral_size = tile_put_replicated( jnp.array(size, dtype=jnp.uint32), tiles)
 
@@ -377,45 +375,40 @@ def compute_diff_jk(dm, mol, nprog, nbatch, tolerance, backend):
         print(np.array(indices).shape)
 
         if count//chunk_size>0:
-            all_outputs.append(jnp.concatenate([batched_out, _output.array]))
+            all_eris.append(jnp.concatenate([batched_out, _output.array]))
             all_indices.append(np.concatenate([np.transpose(_indices, (1, 0, 2)).reshape(-1, 4), indices]))
         else:
-            all_outputs.append(_output.array)
+            all_eris.append(_output.array)
             all_indices.append(indices)
 
         start = stop
 
-    all_eris, all_indices, ao_loc = all_outputs, all_indices, ao_loc
-
-    BLOCK_ERI_SIZE = np.sum(np.array([eri.shape[0] for eri in all_eris]))
-
     print('[a.shape for a in all_eris]', [a.shape for a in all_eris])
     print('[a.shape for a in all_indices]', [a.shape for a in all_indices])
 
-    # comp_distinct_idx_list = [None]*BLOCK_ERI_SIZE
-    
     temp = 0
     for zip_counter, (eri, idx) in enumerate(zip(all_eris, all_indices)):
         # go from our memory layout to mol.intor("int2e_sph", "s8")
 
         num_shells, shell_size = eri.shape # save original tensor shape
 
-        comp_distinct_idx_list = []
-        print(eri.shape)
-        for ind in range(eri.shape[0]):
-            i, j, k, l         = [idx[ind, z] for z in range(4)]
-            _di, _dj, _dk, _dl = ao_loc[i+1] - ao_loc[i], ao_loc[j+1] - ao_loc[j], ao_loc[k+1] - ao_loc[k], ao_loc[l+1] - ao_loc[l]
-            _i0, _j0, _k0, _l0 = ao_loc[i], ao_loc[j], ao_loc[k], ao_loc[l]
-            block_idx = np.mgrid[
-                _i0:(_i0+_di),
-                _j0:(_j0+_dj),
-                _k0:(_k0+_dk),
-                _l0:(_l0+_dl)].transpose(4, 3, 2, 1, 0) #.astype(np.int16)
-                            
-            comp_distinct_idx_list.append(block_idx.reshape(-1, 4))
-            # comp_list_index += 1
+        def compute_full_shell_idx(idx):
+            comp_distinct_idx_list = []
+            for ind in range(eri.shape[0]):
+                i, j, k, l         = [idx[ind, z] for z in range(4)]
+                _di, _dj, _dk, _dl = ao_loc[i+1] - ao_loc[i], ao_loc[j+1] - ao_loc[j], ao_loc[k+1] - ao_loc[k], ao_loc[l+1] - ao_loc[l]
+                _i0, _j0, _k0, _l0 = ao_loc[i], ao_loc[j], ao_loc[k], ao_loc[l]
+                block_idx = np.mgrid[
+                    _i0:(_i0+_di),
+                    _j0:(_j0+_dj),
+                    _k0:(_k0+_dk),
+                    _l0:(_l0+_dl)].transpose(4, 3, 2, 1, 0) #.astype(np.int16)
+                                
+                comp_distinct_idx_list.append(block_idx.reshape(-1, 4))
+            comp_distinct_idx = np.concatenate(comp_distinct_idx_list)
+            return comp_distinct_idx
         
-        comp_distinct_idx = np.concatenate(comp_distinct_idx_list)
+        comp_distinct_idx = compute_full_shell_idx(idx)
 
         ijkl_arr = np.sum([np.prod(np.array(a).shape) for a in input_ijkl])
         print('input_ijkl.nbytes/1e6', ijkl_arr*2/1e6)
@@ -427,34 +420,12 @@ def compute_diff_jk(dm, mol, nprog, nbatch, tolerance, backend):
         if remainder != 0:
             print('padding', remainder, nprog*nbatch-remainder, comp_distinct_idx.shape)
             comp_distinct_idx = np.pad(comp_distinct_idx.reshape(-1, shell_size, 4), ((0, (nprog*nbatch-remainder)), (0, 0), (0, 0))).reshape(-1, 4)
-            # eri = jnp.pad(eri.reshape(-1), ((0, (nprog*nbatch-remainder))))
-            eri = jnp.pad(eri, ((0, nprog*nbatch-remainder), (0, 0))).reshape(-1)
+            eri = jnp.pad(eri, ((0, nprog*nbatch-remainder), (0, 0)))
             idx = jnp.pad(idx, ((0, nprog*nbatch-remainder), (0, 0)))
-
-        print('eri.shape', eri.shape)
-        print('comp_distinct_idx.shape', comp_distinct_idx.shape)            
-
-        #   output of mol.intor("int2e_ssph", aosym="s8")
-        # comp_distinct_ERI = eri.reshape(nprog, nbatch, -1, shell_size) #jnp.concatenate([eri.reshape(-1) for eri in all_eris]).reshape(nprog, nbatch, -1)
+            
         comp_distinct_ERI = eri.reshape(nprog, nbatch, -1)
         comp_distinct_idx = comp_distinct_idx.reshape(nprog, nbatch, -1, 4)
         idx = idx.reshape(nprog, nbatch, -1, 4)
-
-        print('comp_distinct_ERI.shape', comp_distinct_ERI.shape)
-        print('comp_distinct_idx.shape', comp_distinct_idx.shape)
-    
-        
-        # compute repetitions caused by 8x symmetry when computing from the distinct_ERI form and scale accordingly
-        # drep                      = num_repetitions_fast_4d(comp_distinct_idx[:, :, :, 0], comp_distinct_idx[:, :, :, 1], comp_distinct_idx[:, :, :, 2], comp_distinct_idx[:, :, :, 3], xnp=np, dtype=np.uint32)
-        # comp_distinct_ERI         = comp_distinct_ERI / drep
-        
-
-        # int16 storage supported but not slicing; use conversion trick to enable slicing
-        # comp_distinct_idx = jax.lax.bitcast_convert_type(comp_distinct_idx, jnp.float16)
-        # reduce this from |eri_floats| to num_calls*4   ~ perhaps 10x smaller 
-        
-        #diff_JK = jax.pmap(sparse_symmetric_einsum, in_axes=(0,0,None,None), static_broadcasted_argnums=(3,), backend=backend, axis_name="p")(comp_distinct_ERI, comp_distinct_idx, dm, backend)
-        #diff_JK = sparse_symmetric_einsum(comp_distinct_ERI[0], comp_distinct_idx[0], dm, backend)
 
 
         # nonzero_distinct_ERI, nonzero_indices, dm, backend = comp_distinct_ERI[0], comp_distinct_idx[0], dm, backend
@@ -473,17 +444,13 @@ def compute_diff_jk(dm, mol, nprog, nbatch, tolerance, backend):
             if False:
 
                 indices = nonzero_indices[i]
-                
-
                 # # indices = jax.lax.bitcast_convert_type(indices, np.int16).astype(np.int32)
-                indices = indices.astype(jnp.int32)
-                
+                indices = indices.astype(jnp.int32)                
 
                 print('eris.shape', eris.shape)
                 print('indices.shape', indices.shape)
 
             else:
-
                 # Compute offsets and sizes
                 idx = nonzero_indices[i]
                 _i, _j, _k, _l     = [idx[:, z] for z in range(4)]
@@ -531,7 +498,6 @@ def compute_diff_jk(dm, mol, nprog, nbatch, tolerance, backend):
                 diff_JK   = diff_JK + jax.ops.segment_sum(dm_values, ss_indices, N**2) * (-HYB_B3LYP/2)**is_K_matrix 
                 
                 return diff_JK
-
            
             diff_JK = jax.lax.fori_loop(0, 16, foreach_symmetry, diff_JK) 
             
@@ -542,9 +508,6 @@ def compute_diff_jk(dm, mol, nprog, nbatch, tolerance, backend):
         diff_JK, _, _ = jax.lax.fori_loop(0, batches, foreach_batch, (diff_JK, nonzero_indices, ao_loc)) 
 
         temp += diff_JK
-        
-    
-    # temp /= (zip_counter + 1)
 
     return temp
 
