@@ -12,13 +12,7 @@ from jax.ops import segment_sum
 from .basis import Basis
 from .orbital import batch_orbitals
 from .primitive import Primitive, product
-from .special import (
-    binom,
-    binom_factor__via_segment_sum,
-    factorial,
-    factorial2,
-    gammanu,
-)
+from .special import binom, binom_factor_default, factorial, factorial2, gammanu
 from .types import Float3, FloatN, FloatNx3, FloatNxN
 from .units import LMAX
 
@@ -119,7 +113,7 @@ def build_gindex():
 
 
 def _nuclear_primitives(
-    a: Primitive, b: Primitive, c: Float3, binom_factor=binom_factor__via_segment_sum
+    a: Primitive, b: Primitive, c: Float3, binom_factor=binom_factor_default
 ):
     p = product(a, b)
     pa = p.center - a.center
@@ -196,7 +190,7 @@ def _eri_primitives(
     b: Primitive,
     c: Primitive,
     d: Primitive,
-    binom_factor=binom_factor__via_segment_sum,
+    binom_factor=binom_factor_default,
 ) -> float:
     p = product(a, b)
     q = product(c, d)
@@ -211,7 +205,7 @@ def _eri_primitives(
         # Note this should match THO Eq 3.5 but that seems to incorrectly show a
         # 1/(4 gamma) ^(i- 2r) term which is inconsistent with Eq 2.22.
         # Using (4 gamma)^(r - i) matches the reported expressions for H_L
-        u = factorial(i) * binom_factor(l1, l2, a, b, i)
+        u = factorial(i) * binom_factor(l1, l2, a, b, i, lmax=2 * LMAX)
         v = factorial(r) * factorial(i - 2 * r) * (4 * gamma) ** (i - r)
         return u / v
 
@@ -259,7 +253,9 @@ def _eri_primitives(
 
 
 eri_primitives = jit(_eri_primitives, static_argnames="binom_factor")
-vmap_eri_primitives = jit(vmap(_eri_primitives))
+vmap_eri_primitives = jit(
+    vmap(_eri_primitives, in_axes=(0, 0, 0, 0, None)), static_argnames="binom_factor"
+)
 
 
 def gen_ijkl(n: int):
@@ -274,7 +270,7 @@ def gen_ijkl(n: int):
                     yield idx, jdx, kdx, ldx
 
 
-def eri_basis_sparse(b: Basis, binom_factor=binom_factor__via_segment_sum):
+def eri_basis_sparse(b: Basis, binom_factor=binom_factor_default):
     indices = []
     batch = []
     offset = np.cumsum([o.num_primitives for o in b.orbitals])
@@ -292,11 +288,11 @@ def eri_basis_sparse(b: Basis, binom_factor=binom_factor__via_segment_sum):
     pijkl = [
         tree_map(lambda x: jnp.take(x, idx, axis=0), primitives) for idx in indices
     ]
-    eris = cijkl * vmap_eri_primitives(*pijkl)
+    eris = cijkl * vmap_eri_primitives(*pijkl, binom_factor)
     return segment_sum(eris, batch, num_segments=count + 1)
 
 
-def eri_basis(b: Basis, binom_factor=binom_factor__via_segment_sum):
+def eri_basis(b: Basis, binom_factor=binom_factor_default):
     unique_eris = eri_basis_sparse(b, binom_factor)
     ii, jj, kk, ll = jnp.array(list(gen_ijkl(b.num_orbitals)), dtype=jnp.int32).T
 

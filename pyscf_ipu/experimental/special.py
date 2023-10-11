@@ -148,18 +148,23 @@ def binom_factor_segment_sum(
     return segment_sum(out, s, num_segments=lmax + 1)
 
 
-def binom_factor__via_segment_sum(i: int, j: int, a: float, b: float, s: int):
-    return jnp.take(binom_factor_segment_sum(i, j, a, b), s)
+def binom_factor__via_segment_sum(
+    i: int, j: int, a: float, b: float, s: int, lmax=LMAX
+):
+    return jnp.take(binom_factor_segment_sum(i, j, a, b, lmax), s)
 
 
 binom_factor_table_W = jnp.array(binom_factor_table.build_binom_factor_table())
 
 
-def binom_factor__via_lookup(i: int, j: int, a: float, b: float, s: int) -> FloatN:
+def binom_factor__via_lookup(
+    i: int, j: int, a: float, b: float, s: int, lmax=None
+) -> FloatN:
     # Lookup-table version of above -- see binom_factor_table.ipynb for the derivation
+    # lmax is ignored, but used to allow easy swapping with above implementation
     monomials = jnp.array(binom_factor_table.get_monomials(a, b))
     coeffs = binom_factor_table_W[i, j, s]
     return coeffs @ monomials
 
 
-binom_factor = binom_factor__via_segment_sum
+binom_factor_default = binom_factor__via_segment_sum
