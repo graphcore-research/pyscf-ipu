@@ -90,49 +90,6 @@ indices_func = lambda i,j,k,l,symmetry: jnp.array([i*N+j, j*N+i, i*N+j, j*N+i, k
                                                 k*N+j, k*N+i, l*N+j, l*N+i, i*N+l, i*N+k, j*N+l, j*N+k,
                                                 i*N+l, j*N+l, i*N+k, j*N+k, k*N+j, l*N+j, k*N+i, l*N+i])[symmetry]
 
-def sparse_symmetric_einsum(nonzero_distinct_ERI, nonzero_indices, dm, backend):
-
-
-    dm = dm.reshape(-1)
-    diff_JK = jnp.zeros(dm.shape)
-    N = int(np.sqrt(dm.shape[0]))
-
-    def iteration(symmetry, vals): 
-        diff_JK = vals 
-        is_K_matrix = (symmetry >= 8)
-
-        def sequentialized_iter(i, vals):
-            # Generalized J/K computation: does J when symmetry is in range(0,8) and K when symmetry is in range(8,16)
-            # Trade-off: Using one function leads to smaller always-live memory.
-            diff_JK = vals 
-
-            indices = nonzero_indices[i]
-
-            indices = jax.lax.bitcast_convert_type(indices, np.int16).astype(np.int32)
-            eris    = nonzero_distinct_ERI[i]
-            print(indices.shape)
-
-            if backend == "cpu": dm_indices = cpu_ijkl(indices, symmetry+is_K_matrix*8, indices_func)  
-            else:                dm_indices = ipu_ijkl(indices, symmetry+is_K_matrix*8, N)  
-            dm_values = jnp.take(dm, dm_indices, axis=0) 
-
-            print('nonzero_distinct_ERI.shape', nonzero_distinct_ERI.shape)
-            print('dm_values.shape', dm_values.shape)
-            print('eris.shape', eris.shape)
-            dm_values = dm_values.at[:].mul( eris ) # this is prod, but re-use variable for inplace update. 
-            
-            if backend == "cpu": ss_indices = cpu_ijkl(indices, symmetry+8+is_K_matrix*8, indices_func) 
-            else:                ss_indices = ipu_ijkl(indices, symmetry+8+is_K_matrix*8, N) 
-            diff_JK   = diff_JK + jax.ops.segment_sum(dm_values, ss_indices, N**2) * (-HYB_B3LYP/2)**is_K_matrix 
-            
-            return diff_JK
-
-        batches = nonzero_indices.shape[0] # before pmap, tensor had shape (nipus, batches, -1) so [0]=batches after pmap
-        diff_JK = jax.lax.fori_loop(0, batches, sequentialized_iter, diff_JK) 
-        return diff_JK
-
-    return jax.lax.fori_loop(0, 16, iteration, diff_JK) 
-
 def get_shapes(input_ijkl, bas):
     i_sh, j_sh, k_sh, l_sh  = input_ijkl[0]
     BAS_SLOTS = 8
@@ -439,11 +396,10 @@ def compute_diff_jk(dm, mol, nprog, nbatch, tolerance, backend):
     
     temp = 0
     for zip_counter, (eri, idx) in enumerate(zip(all_eris, all_indices)):
-
-        # comp_list_index = 0
-
         # go from our memory layout to mol.intor("int2e_sph", "s8")
-        # for zip_counter, (eri, idx) in enumerate(zip(all_eris, all_indices)):
+
+        shell_size = eri.shape[-1] # save original tensor shape
+
         comp_distinct_idx_list = []
         print(eri.shape)
         for ind in range(eri.shape[0]):
@@ -454,7 +410,7 @@ def compute_diff_jk(dm, mol, nprog, nbatch, tolerance, backend):
                 _i0:(_i0+_di),
                 _j0:(_j0+_dj),
                 _k0:(_k0+_dk),
-                _l0:(_l0+_dl)].transpose(4, 3, 2, 1, 0).astype(np.int16)
+                _l0:(_l0+_dl)].transpose(4, 3, 2, 1, 0) #.astype(np.int16)
                             
             comp_distinct_idx_list.append(block_idx.reshape(-1, 4))
             # comp_list_index += 1
@@ -472,7 +428,9 @@ def compute_diff_jk(dm, mol, nprog, nbatch, tolerance, backend):
             print('padding', remainder, nprog*nbatch-remainder, comp_distinct_idx.shape)
             comp_distinct_idx = np.pad(comp_distinct_idx, ((0, nprog*nbatch-remainder), (0, 0)))
             eri = jnp.pad(eri.reshape(-1), ((0, nprog*nbatch-remainder)))
-            
+
+        print('eri.shape', eri.shape)
+        print('comp_distinct_idx.shape', comp_distinct_idx.shape)            
 
         #   output of mol.intor("int2e_ssph", aosym="s8")
         comp_distinct_ERI = eri.reshape(nprog, nbatch, -1) #jnp.concatenate([eri.reshape(-1) for eri in all_eris]).reshape(nprog, nbatch, -1)
@@ -498,8 +456,8 @@ def compute_diff_jk(dm, mol, nprog, nbatch, tolerance, backend):
         diff_JK = jnp.zeros(dm.shape)
         N = int(np.sqrt(dm.shape[0]))
 
-        def iteration(i, vals): 
-            diff_JK = vals 
+        def foreach_batch(i, vals): 
+            diff_JK, nonzero_indices, ao_loc = vals 
 
             indices = nonzero_indices[i]
 
@@ -507,41 +465,68 @@ def compute_diff_jk(dm, mol, nprog, nbatch, tolerance, backend):
             indices = indices.astype(jnp.int32)
             eris    = nonzero_distinct_ERI[i]
             print(indices.shape)
+
+            # exp_distinct_idx = jnp.zeros((eris.shape[0], 4), dtype=jnp.int32)
+
+            # # exp_distinct_idx_list = []
+            # print(eris.shape)
+            # # for ind in range(eris.shape[0]):
+            # def gen_all_shell_idx(idx, arr):
+            #     i, j, k, l         = [indices[ind, z] for z in range(4)]
+            #     _di, _dj, _dk, _dl = ao_loc[i+1] - ao_loc[i], ao_loc[j+1] - ao_loc[j], ao_loc[k+1] - ao_loc[k], ao_loc[l+1] - ao_loc[l]
+            #     _i0, _j0, _k0, _l0 = ao_loc[i], ao_loc[j], ao_loc[k], ao_loc[l]
+
+            #     block_idx = jnp.zeros((shell_size, 4), dtype=jnp.int32)
+
+            #     def gen_shell_idx(idx_sh, arr):
+            #         # Compute the indices
+            #         ind_i = (idx_sh                 ) % _di + _i0
+            #         ind_j = (idx_sh // (_di)        ) % _dj + _j0
+            #         ind_k = (idx_sh // (_di*_dj)    ) % _dk + _k0
+            #         ind_l = (idx_sh // (_di*_dj*_dk)) % _dl + _l0
+                    
+            #         # Update the array with the computed indices
+            #         return arr.at[idx_sh, :].set(jnp.array([ind_i, ind_j, ind_k, ind_l]))
+                
+            #     block_idx = jax.lax.fori_loop(0, shell_size, gen_shell_idx, block_idx)
+
+            #     # return arr.at[idx*shell_size:(idx+1)*shell_size, :].set(block_idx)
+            #     return jax.lax.dynamic_update_slice(arr, block_idx, (idx*shell_size, 0))
+            
+            # exp_distinct_idx = jax.lax.fori_loop(0, eris.shape[0]//shell_size, gen_all_shell_idx, exp_distinct_idx) #jnp.concatenate(exp_distinct_idx_list)
+
+            # indices = exp_distinct_idx
             
 
-            def sequentialized_iter(symmetry, vals):
+            def foreach_symmetry(sym, vals):
                 # Generalized J/K computation: does J when symmetry is in range(0,8) and K when symmetry is in range(8,16)
                 # Trade-off: Using one function leads to smaller always-live memory.
-                is_K_matrix = (symmetry >= 8)
-
+                is_K_matrix = (sym >= 8)
                 diff_JK = vals 
 
-                
-
-                if backend == "cpu": dm_indices = cpu_ijkl(indices, symmetry+is_K_matrix*8, indices_func)  
-                else:                dm_indices = ipu_ijkl(indices, symmetry+is_K_matrix*8, N)  
+                if backend == "cpu": dm_indices = cpu_ijkl(indices, sym+is_K_matrix*8, indices_func)  
+                else:                dm_indices = ipu_ijkl(indices, sym+is_K_matrix*8, N)  
                 dm_values = jnp.take(dm, dm_indices, axis=0) 
 
-                print('nonzero_distinct_ERI.shape', nonzero_distinct_ERI.shape)
+                print('indices.shape', indices.shape)
                 print('dm_values.shape', dm_values.shape)
                 print('eris.shape', eris.shape)
                 dm_values = dm_values.at[:].mul( eris ) # this is prod, but re-use variable for inplace update. 
                 
-                if backend == "cpu": ss_indices = cpu_ijkl(indices, symmetry+8+is_K_matrix*8, indices_func) 
-                else:                ss_indices = ipu_ijkl(indices, symmetry+8+is_K_matrix*8, N) 
+                if backend == "cpu": ss_indices = cpu_ijkl(indices, sym+8+is_K_matrix*8, indices_func) 
+                else:                ss_indices = ipu_ijkl(indices, sym+8+is_K_matrix*8, N) 
                 diff_JK   = diff_JK + jax.ops.segment_sum(dm_values, ss_indices, N**2) * (-HYB_B3LYP/2)**is_K_matrix 
                 
                 return diff_JK
 
            
-            # diff_JK = jax.lax.fori_loop(0, batches, sequentialized_iter, diff_JK) 
-            diff_JK = jax.lax.fori_loop(0, 16, sequentialized_iter, diff_JK) 
-            # diff_JK = sequentialized_iter(0, diff_JK)
-            return diff_JK
+            diff_JK = jax.lax.fori_loop(0, 16, foreach_symmetry, diff_JK) 
+            
+            return (diff_JK, nonzero_indices, ao_loc)
 
         batches = nonzero_indices.shape[0] # before pmap, tensor had shape (nipus, batches, -1) so [0]=batches after pmap
-        for bi in range(batches):
-            diff_JK = iteration(bi, diff_JK)
+        
+        diff_JK, _, _ = jax.lax.fori_loop(0, batches, foreach_batch, (diff_JK, nonzero_indices, ao_loc)) 
 
         temp += diff_JK
         
