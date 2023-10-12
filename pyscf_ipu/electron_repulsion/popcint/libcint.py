@@ -76,6 +76,28 @@ def make_loc(bas, key):
     dims.cumsum(dtype=numpy.int32, out=ao_loc[1:])
     return ao_loc
 
+
+
+def ipu_make_loc(bas, key):
+    if 'cart' in key:
+        l = bas[:,ANG_OF]
+        dims = (l+1)*(l+2)//2 * bas[:,NCTR_OF]
+    elif 'sph' in key:
+        dims = (bas[:,ANG_OF]*2+1) * bas[:,NCTR_OF]
+    else:  # spinor
+        l = bas[:,ANG_OF]
+        k = bas[:,KAPPA_OF]
+        dims = (l*4+2) * bas[:,NCTR_OF]
+        dims[k<0] = (l[k<0] * 2 + 2) * bas[k<0,NCTR_OF]
+        dims[k>0] = (l[k>0] * 2    ) * bas[k>0,NCTR_OF]
+
+    #ao_loc = numpy.empty(len(dims)+1, dtype=numpy.int32)
+    ao_loc = np.arange(len(dims)+1, dtype=numpy.int32)
+    #ao_loc[0] = 0
+    #dims.cumsum(dtype=numpy.int32, out=ao_loc[1:])
+    #ao_loc = jnp.concatenate([jnp.zeros(1), jnp.cumsum(ao_loc[1:])])
+    return ao_loc
+
 def getints2c(intor_name, N, atm, bas, env, shls_slice=None, comp=1, hermi=0,
               ao_loc=None, cintopt=None, out=None):
     natm = atm.shape[0]
@@ -115,18 +137,23 @@ def getints2c(intor_name, N, atm, bas, env, shls_slice=None, comp=1, hermi=0,
 def cpu_intor1e(self, intor, N, comp=None, hermi=0, aosym='s1', out=None, shls_slice=None, grids=None):
     return getints2c(intor+"_sph", N, self._atm, self._bas, self._env, shls_slice, comp, hermi, None, None, out)
 
-@partial(jax.jit, backend="ipu", static_argnums=(0,1,2,3,4,5,6,7,8))
-def ipu_intor1e(self, intor, which_integral, N, comp=None, hermi=0, aosym='s1', out=None, shls_slice=None, grids=None):
+def ipu_intor1e(atm, bas, env, which_integral, N, comp=None, hermi=0, aosym='s1', out=None, shls_slice=None, grids=None):
     #mat, shls_slice, ao_loc, atm, bas, env
+    if comp == 3 : intor = "int1e_ipnuc"
+    elif comp == 1: intor = "int1e_nuc"
+
+    #if "ip" in intor: 
+    #intor = "int1e_nuc"
     
-    
-    intor_name, N, atm, bas, env, shls_slice, comp, hermi, ao_loc, cintopt, out=\
-        intor+"_sph", N, self._atm, self._bas, self._env, shls_slice, comp, hermi, None, None, out
+    intor_name, N, shls_slice, comp, hermi, ao_loc, cintopt, out=\
+        intor+"_sph", N,  shls_slice, comp, hermi, None, None, out
 
     natm = atm.shape[0]
     nbas = bas.shape[0]
     shls_slice = (0, nbas, 0, nbas)
-    ao_loc = make_loc(bas, intor_name)
+    #ao_loc = ipu_make_loc(bas, "int1e_kin_sph")
+
+    ao_loc          = jnp.cumsum(jnp.concatenate([jnp.zeros(1), (bas[:,1]*2+1) * bas[:,3] ])).astype(np.int32)
 
     shape = (N, N, comp)
 
@@ -146,14 +173,14 @@ def ipu_intor1e(self, intor, which_integral, N, comp=None, hermi=0, aosym='s1', 
 
     mat = tile_put_replicated(np.array(mat, dtype=jnp.float32),   (1,)) 
     shls_slice = tile_put_replicated(np.array(shls_slice[:4], dtype=jnp.int32),   (1,)) 
-    ao_loc = tile_put_replicated(np.array(ao_loc, dtype=jnp.int32),   (1,)) 
-    atm = tile_put_replicated(np.array(atm, dtype=jnp.int32),   (1,)) 
-    bas = tile_put_replicated(np.array(bas, dtype=jnp.int32),   (1,)) 
-    env = tile_put_replicated(np.array(env, dtype=jnp.float32),   (1,)) 
+    ao_loc = tile_put_replicated(ao_loc.astype(jnp.int32),   (1,)) 
+    atm = tile_put_replicated(atm.astype(jnp.int32),   (1,)) 
+    bas = tile_put_replicated(bas.astype(jnp.int32),   (1,)) 
+    env = tile_put_replicated(env.astype(jnp.float32),   (1,)) 
     natm = tile_put_replicated(np.array(natm, dtype=jnp.int32),   (1,)) 
     nbas = tile_put_replicated(np.array(nbas, dtype=jnp.int32),   (1,)) 
 
-    which_integral = tile_put_replicated(np.array(which_integral, dtype=jnp.int32),   (1,)) 
+    which_integral = tile_put_replicated(which_integral.astype(jnp.int32),   (1,)) 
 
     value = tile_map(grad, mat, shls_slice, ao_loc, atm, bas, env, natm, nbas, which_integral)
 
@@ -406,6 +433,10 @@ if __name__ == "__main__":
     N = mol.nao_nr()
     print("[N=%i]"%N)
 
+    #def ipu_intor1e(self, which_integral, N, comp=None, hermi=0, aosym='s1', out=None, shls_slice=None, grids=None):
+    #def ipu_intor1e(atm, bas, env, which_integral, N, comp=None, hermi=0, aosym='s1', out=None, shls_slice=None, grids=None):
+    ipu_intor1e = jax.jit(ipu_intor1e, backend="ipu", static_argnums=(4,5,6,7,8,9,10))
+
     def test(truth, us, str):
         error = np.max(us.reshape(-1)-truth.reshape(-1))
         print(str, error)
@@ -419,7 +450,7 @@ if __name__ == "__main__":
         truth =  mol.intor('int1e_nuc', comp=1)
         test(us, truth, "CPU: \t")
         if not args.skipipu: 
-            us    = np.asarray( ipu_intor1e(mol, "int1e_nuc", INT1E_NUC,  N, 1))
+            us    = np.asarray( ipu_intor1e(mol._atm, mol._bas, mol._env, INT1E_NUC,  N, 1))
             test(us, truth, "IPU: \t")
 
     if args.kin or args.all: 
@@ -428,7 +459,7 @@ if __name__ == "__main__":
         truth =  mol.intor('int1e_kin', comp=1)
         test(us, truth, "CPU: \t")
         if not args.skipipu: 
-            us =   np.asarray( ipu_intor1e(mol, "int1e_kin", INT1E_KIN,  N, 1))
+            us =   np.asarray( ipu_intor1e(mol._atm, mol._bas, mol._env, INT1E_KIN,  N, 1))
             test(us, truth, "IPU: \t")
  
     if args.ovlp or args.all:
@@ -437,7 +468,7 @@ if __name__ == "__main__":
         truth =  mol.intor('int1e_ovlp', comp=1)
         test(us, truth, "CPU: \t")
         if not args.skipipu:
-            us    = np.asarray( ipu_intor1e(mol, "int1e_ovlp", INT1E_OVLP,  N, 1))
+            us    = np.asarray( ipu_intor1e(mol._atm, mol._bas, mol._env, INT1E_OVLP,  N, 1))
             test(us, truth, "IPU: \t")
 
     if args.nucgrad or args.all:
@@ -446,7 +477,7 @@ if __name__ == "__main__":
         truth = - mol.intor('int1e_ipnuc', comp=3)
         test(us, truth, "CPU: \t")
         if not args.skipipu:
-            us =  - np.transpose(np.asarray( ipu_intor1e(mol, "int1e_ipnuc", INT1E_NUC_IP,  N, 3)), (0,2,1))
+            us =  - np.transpose(np.asarray( ipu_intor1e(mol._atm, mol._bas, mol._env, INT1E_NUC_IP,  N, 3)), (0,2,1))
             test(us, truth, "IPU: \t")
 
     if args.kingrad or args.all:
@@ -455,7 +486,7 @@ if __name__ == "__main__":
         truth = - mol.intor('int1e_ipkin', comp=3)
         test(us, truth, "CPU: \t")
         if not args.skipipu:
-            us    =  - np.transpose(np.asarray( ipu_intor1e(mol, "int1e_ipkin", INT1E_KIN_IP,  N, 3)), (0,2,1))
+            us    =  - np.transpose(np.asarray( ipu_intor1e(mol._atm, mol._bas, mol._env, INT1E_KIN_IP,  N, 3)), (0,2,1))
             test(us, truth, "IPU: \t")
 
     if args.ovlpgrad or args.all:
@@ -464,7 +495,7 @@ if __name__ == "__main__":
         truth = - mol.intor('int1e_ipovlp', comp=3)
         test(us, truth, "CPU: \t")
         if not args.skipipu:
-            us    =  - np.transpose(np.asarray( ipu_intor1e(mol, "int1e_ipovlp", INT1E_OVLP_IP,  N, 3)), (0,2,1))
+            us    =  - np.transpose(np.asarray( ipu_intor1e(mol._atm, mol._bas, mol._env, INT1E_OVLP_IP,  N, 3)), (0,2,1))
             test(us, truth, "IPU: \t")
         
     if args.eri or args.all: 
