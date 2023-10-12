@@ -237,25 +237,24 @@ def compute_diff_jk(dm, mol, nbatch, tolerance, backend):
                     output_sizes[num_calls] = [di, dj, dk, dl, di*dj*dk*dl]
                     num_calls += 1
 
-    input_ijkl   = input_ijkl[:num_calls, :]
-    output_sizes = output_sizes[:num_calls, :]
+    input_ijkl    = input_ijkl[:num_calls, :]
+    output_sizes  = output_sizes[:num_calls, :]
 
     # Prepare IPU inputs.
     # Merge all int/float inputs in seperate arrays.
-    input_floats = env.reshape(1, -1)
-    input_ints = np.hstack([n_eri, n_buf, n_atm, n_bas, n_env, n_ao_loc, ao_loc.reshape(-1), atm.reshape(-1), bas.reshape(-1)])
+    input_floats  = env.reshape(1, -1)
+    input_ints    = np.hstack([n_eri, n_buf, n_atm, n_bas, n_env, n_ao_loc, ao_loc.reshape(-1), atm.reshape(-1), bas.reshape(-1)])
 
     sizes, counts = np.unique(output_sizes[:, -1], return_counts=True)
     sizes, counts = sizes.astype(np.int32), counts.astype(np.int32)
 
-    indxs      = np.argsort(output_sizes[:, -1])
-    input_ijkl          = input_ijkl[indxs]
+    indxs         = np.argsort(output_sizes[:, -1])
+    input_ijkl    = input_ijkl[indxs]
 
-    sizes, counts  = np.unique(output_sizes[:, -1], return_counts=True)
+    sizes, counts = np.unique(output_sizes[:, -1], return_counts=True)
     sizes, counts = sizes.astype(np.int32), counts.astype(np.int32)
     start_index = 0
     inputs = []
-    shapes = []
     for i, (size, count) in enumerate(zip(sizes, counts)):
         a = input_ijkl[start_index: start_index+count]
         tuples = tuple(map(tuple, a))
@@ -264,10 +263,9 @@ def compute_diff_jk(dm, mol, nbatch, tolerance, backend):
 
     input_ijkl = tuple(inputs)
 
-    for i in range(len(sizes)):
-        shapes.append(get_shapes(inputs[i], bas))
+    shapes = tuple([get_shapes(inputs[i], bas) for i in range(len(sizes))])
 
-    shapes, sizes, counts = tuple(shapes), tuple(sizes.tolist()), counts.tolist()
+    sizes, counts = tuple(sizes.tolist()), counts.tolist()
 
     # Load vertex using TileJax.
     vertex_filename = osp.join(osp.dirname(__file__), "intor_int2e_sph.cpp")
@@ -310,78 +308,51 @@ def compute_diff_jk(dm, mol, nbatch, tolerance, backend):
         tile_idx    = tile_put_replicated(jnp.empty(max(256, min(int(nf*3), 3888)+1), dtype = jnp.int32) ,  tiles)
         tile_buf    = tile_put_replicated(jnp.empty(1080*4+1) ,                   tiles)
 
-        chunk_size      = num_tiles * num_threads
+        def batched_compute(start, stop, chunk_size, tiles):
+            assert (stop-start) < chunk_size or (stop-start) % chunk_size == 0
+            num_batches = max(1, (stop-start)//chunk_size)
 
-        if count // chunk_size > 0:
-            output = jnp.empty((len(tiles), count//chunk_size, size))
-            output  = tile_put_sharded(   output,   tiles)
+            output = jnp.empty((len(tiles), num_batches, size))
+            output = tile_put_sharded(output, tiles)
+            
+            print('>>>>>>', start, stop)
+            indices = np.array(input_ijkl[i][start:stop]).reshape(-1, num_batches, 4)
+            tile_indices = tile_put_sharded(indices, tiles)
 
-            _indices = []
-            for j in range( count // (chunk_size) ):
-                start, stop = j*chunk_size, (j+1)*chunk_size
-                indices = np.array(input_ijkl[i][start:stop])
-                _indices.append(indices.reshape(indices.shape[0], 1, indices.shape[1]))
-            _indices = np.concatenate(_indices, axis=1)
-            tile_indices = tile_put_sharded(_indices, tiles)
+            chunks = tile_put_replicated(jnp.array(num_batches, dtype=jnp.uint32), tiles)
+            integral_size = tile_put_replicated(jnp.array(size, dtype=jnp.uint32), tiles)
 
-            chunks = tile_put_replicated( jnp.array(count//chunk_size, dtype=jnp.uint32), tiles)
-            integral_size = tile_put_replicated( jnp.array(size, dtype=jnp.uint32), tiles)
-
-            batched_out , _, _, _= tile_map(int2e_sph_forloop,
-                                            tile_floats,
-                                            tile_ints,
+            out , _, _, _= tile_map(int2e_sph_forloop,
+                                            tile_floats[:len(tiles)],
+                                            tile_ints[:len(tiles)],
                                             tile_indices,
                                             output,
-                                            tile_g,
-                                            tile_idx,
-                                            tile_buf,
+                                            tile_g[:len(tiles)],
+                                            tile_idx[:len(tiles)],
+                                            tile_buf[:len(tiles)],
                                             chunks,
                                             integral_size
                                             )
-            batched_out = jnp.transpose(batched_out.array, (1, 0, 2)).reshape(-1, size)
-            print('batched mode!')
-
-        # do last iteration normally. -- assuming only one iteration for indices to be correct
-        for j in range(count // chunk_size, count // (chunk_size) + 1):
-            start, stop = j*chunk_size, (j+1)*chunk_size
-            indices = np.array(input_ijkl[i][start:stop])
-            if indices.shape[0] != len(tiles):
-                tiles = tuple((np.arange(indices.shape[0])%(num_tiles)+1).tolist())
-
-            tile_ijkl   = tile_put_sharded(   indices ,     tiles)
-            output = jnp.empty((len(tiles), size))
-            output  = tile_put_sharded(   output+j,   tiles)
-
-            chunks = tile_put_replicated( jnp.array(1, dtype=jnp.uint32), tiles)
-            integral_size = tile_put_replicated( jnp.array(size, dtype=jnp.uint32), tiles)
-
-            _output, _, _, _= tile_map(int2e_sph_forloop,
-                tile_floats[:len(tiles)],
-                tile_ints[:len(tiles)],
-                tile_ijkl,
-                output,
-                tile_g[:len(tiles)],
-                tile_idx[:len(tiles)],
-                tile_buf[:len(tiles)],
-                chunks,
-                integral_size
-            )
-            print('???', j)
+            out = out.array.reshape(-1, size)
+            indices = indices.reshape(-1, 4)
+            
+            return out, indices
         
-        if count//chunk_size>0:
-            print(batched_out.shape)
-            print(_indices.shape)
-        print(_output.array.shape)
-        print(np.array(indices).shape)
+        chunk_size  = num_tiles * num_threads
+        num_full_batches = count//chunk_size
+
+        if num_full_batches > 0:
+            batched_out, _indices = batched_compute(0, num_full_batches*chunk_size, chunk_size, tiles)
+
+        tiles = tuple((np.arange(count-num_full_batches*chunk_size)%(num_tiles)+1).tolist())
+        _output, indices = batched_compute(num_full_batches*chunk_size, count, chunk_size, tiles)
 
         if count//chunk_size>0:
-            all_eris.append(jnp.concatenate([batched_out, _output.array]))
-            all_indices.append(np.concatenate([np.transpose(_indices, (1, 0, 2)).reshape(-1, 4), indices]).astype(np.uint8))
+            all_eris.append(jnp.concatenate([batched_out, _output]))
+            all_indices.append(np.concatenate([_indices, indices]).astype(np.uint8))
         else:
-            all_eris.append(_output.array)
+            all_eris.append(_output)
             all_indices.append(indices.astype(np.uint8))
-
-        start = stop
 
     print('[a.shape for a in all_eris]', [a.shape for a in all_eris])
     print('[a.shape for a in all_indices]', [a.shape for a in all_indices])
@@ -487,6 +458,9 @@ if __name__ == "__main__":
 
     start = time.time()
 
+    # from cis_stillbene import cis_stillbene
+    # mol = pyscf.gto.Mole(atom=cis_stillbene(), basis="6-31G*") 
+
     #mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*j} {1.54*i};" for i in range(natm) for j in range(natm))) # sto-3g by default
     # mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*j} {1.54*i};" for i in range(1) for j in range(2)), basis="sto3g") 
     mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*j} {1.54*i};" for i in range(natm) for j in range(natm)), basis="sto3g") 
@@ -514,11 +488,11 @@ if __name__ == "__main__":
         K = np.einsum("ijkl,jk->il", dense_ERI, dm)
         truth = J - K / 2 * HYB_B3LYP
 
-    nonzero_indices      = np.nonzero(distinct_ERI)[0].astype(np.uint64) 
-    nonzero_distinct_ERI = distinct_ERI[nonzero_indices].astype(np.float32)
-    ij, kl               = get_i_j(nonzero_indices)
-    rep                  = num_repetitions_fast(ij, kl)
-    nonzero_distinct_ERI = nonzero_distinct_ERI / rep
+    # nonzero_indices      = np.nonzero(distinct_ERI)[0].astype(np.uint64) 
+    # nonzero_distinct_ERI = distinct_ERI[nonzero_indices].astype(np.float32)
+    # ij, kl               = get_i_j(nonzero_indices)
+    # rep                  = num_repetitions_fast(ij, kl)
+    # nonzero_distinct_ERI = nonzero_distinct_ERI / rep
     dm                   = dm.reshape(-1)
     diff_JK              = np.zeros(dm.shape)
 
