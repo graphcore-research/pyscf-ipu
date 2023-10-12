@@ -42,7 +42,6 @@ extern "C" {
 #define PTR_GRIDS               12
 #define PTR_ENV_START           20
 
-
 #define CHARGE_OF       0
 #define PTR_COORD       1
 #define NUC_MOD_OF      2
@@ -62,12 +61,10 @@ extern "C" {
 #define RESERVE_BASLOT  7
 #define BAS_SLOTS       8
 
-
 #define POSX            0
 #define POSY            1
 #define POSZ            2
 #define POS1            3
-
 
 #define POSXX           0
 #define POSYX           1
@@ -576,7 +573,7 @@ dtype CINTgto_norm(FINT n, dtype a);
         var = reinterpret_cast<decltype(var)>(new char[(n) * sizeof(*var)]);
 
 #define MALLOC(type, var) \
-        type var[64];
+        type var[256];
 
 #else
 #define MALLOC_INSTACK(var, n) \
@@ -1048,7 +1045,6 @@ CACHE_SIZE_T CINT1e_drv(dtype *out, FINT *dims, CINTEnvVars *envs,
                 printf("%f ", gctr[i]);
         }
         printf("\n");*/
-
 
 
         FINT counts[4];
@@ -28592,7 +28588,7 @@ void GTOint2c(int (*intor)(), dtype *mat, int comp, int hermi,
         int shls[2];
         #ifdef __cplusplus
         //dtype cache[128]; 
-        dtype cache[128]; 
+        dtype cache[128*2]; 
         #else
         dtype *cache = malloc(sizeof(dtype) * cache_size);
         #endif
@@ -28637,7 +28633,7 @@ void GTOint2c(int (*intor)(), dtype *mat, int comp, int hermi,
                 printf("\n");
                 return; */
 
-                //int1e_kin_sph(mat+j0*naoi+i0, dims, shls, atm, natm, bas, nbas, env, opt, cache);
+                //int1e_ipkin_sph(mat+j0*naoi+i0, dims, shls, atm, natm, bas, nbas, env, opt, cache);
                 //printf("%f\n", (mat+j0*naoi+i0)[0]);
                 /*for (int asd = 0; asd < 12; asd++){
                         printf("%f ", mat[asd]);
