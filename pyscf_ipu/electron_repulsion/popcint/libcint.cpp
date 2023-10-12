@@ -25,41 +25,26 @@ using namespace poplar;
 
 class Grad : public Vertex {
 public:
-  //"mat", "shls_slice", "ao_loc", "atm", "bas", "env"
-  Input<Vector<float>> mat;
-  Input<Vector<int>> shls_slice;
-  Input<Vector<int>> ao_loc;
-  Input<Vector<int>> atm;
-  Input<Vector<int>> bas;
-  Input<Vector<float>> env;
+  // TODO: Change InOut to Input. 
+  // Using InOut so it's float* instead of const float* (which would require changing 30k lines in libcint.c)
+  InOut<Vector<float>> mat;
+  InOut<Vector<int>> shls_slice;
+  InOut<Vector<int>> ao_loc;
+  InOut<Vector<int>> atm;
+  InOut<Vector<int>> bas;
+  InOut<Vector<float>> env;
   Input<Vector<int>> natm;
   Input<Vector<int>> nbas;
   Input<Vector<int>> which_integral;
-
   Output<Vector<float>> out; 
 
   bool compute() {
-        float _env[200];
-        int   _bas[200];
-        int   _atm[200];
-        int   _shls_slice[200];
-        int   _ao_loc[200];
-        float _mat[mat.size()];
-
-        for (int i = 0; i < 200; i++){
-          _env[i]=0;
-          _bas[i]=0;
-          _atm[i]=0;
-          _shls_slice[i]=0;
-          _ao_loc[i]=0;
-        }
-
-        for (int i = 0; i < env.size(); i++){ _env[i] = env.data()[i]; }
-        for (int i = 0; i < bas.size(); i++){ _bas[i] = bas.data()[i]; }
-        for (int i = 0; i < atm.size(); i++){ _atm[i] = atm.data()[i]; }
-        for (int i = 0; i < shls_slice.size(); i++){ _shls_slice[i] = shls_slice.data()[i]; }
-        for (int i = 0; i < ao_loc.size(); i++){ _ao_loc[i] = ao_loc.data()[i]; }
-
+        float * _env = env.data();
+        int  *_bas = bas.data(); 
+        int  *_atm = atm.data(); 
+        int  *_shls_slice = shls_slice.data(); 
+        int  *_ao_loc = ao_loc.data(); 
+        float * _mat = mat.data(); 
 
         if (which_integral.data()[0] == INT1E_KIN){
           GTOint2c(
@@ -105,12 +90,12 @@ public:
 class Int2e : public Vertex {
 public:
   //"mat", "shls_slice", "ao_loc", "atm", "bas", "env"
-  Input<Vector<float>> mat;
-  Input<Vector<int>> shls_slice;
-  Input<Vector<int>> ao_loc;
-  Input<Vector<int>> atm;
-  Input<Vector<int>> bas;
-  Input<Vector<float>> env;
+  InOut<Vector<float>> mat;
+  InOut<Vector<int>> shls_slice;
+  InOut<Vector<int>> ao_loc;
+  InOut<Vector<int>> atm;
+  InOut<Vector<int>> bas;
+  InOut<Vector<float>> env;
   Input<Vector<int>> natm;
   Input<Vector<int>> nbas;
   Input<Vector<int>> which_integral;
@@ -119,34 +104,14 @@ public:
   Output<Vector<float>> out; 
 
   bool compute() {
-
-        
-        float _env[200];
-        int   _bas[200];
-        int   _atm[200];
-        int   _shls_slice[200];
-        int   _ao_loc[200];
-        float _mat[mat.size()];
-
-        for (int i = 0; i < 200; i++){
-          _env[i]=0;
-          _bas[i]=0;
-          _atm[i]=0;
-          _shls_slice[i]=0;
-          _ao_loc[i]=0;
-        }
-
-        for (int i = 0; i < env.size(); i++){ _env[i] = env.data()[i]; }
-        for (int i = 0; i < bas.size(); i++){ 
-          //if (i < 10) printf("bas[%d]=%d", i, bas.data()[i]);
-          _bas[i] = bas.data()[i]; 
-        }
-        for (int i = 0; i < atm.size(); i++){ _atm[i] = atm.data()[i]; }
-        for (int i = 0; i < shls_slice.size(); i++){ _shls_slice[i] = shls_slice.data()[i]; }
-        for (int i = 0; i < ao_loc.size(); i++){ _ao_loc[i] = ao_loc.data()[i]; }
-
+      float * _env       = env.data();
+      int   *_bas        = bas.data(); 
+      int   *_atm        = atm.data(); 
+      int   *_shls_slice = shls_slice.data(); 
+      int   *_ao_loc     = ao_loc.data(); 
+      float * _mat       = mat.data(); 
      
-        GTOnr2e_fill_drv(
+      GTOnr2e_fill_drv(
                          (int (*)(...))int2e_sph, 
                          (void (*)(...))GTOnr2e_fill_s1,
                          NULL, 
