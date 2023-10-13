@@ -22348,7 +22348,7 @@ void CINTgout2e(dtype *gout, dtype *g, FINT *idx,
         }
 }
 
-CACHE_SIZE_T int2e_sph(dtype *out, FINT *dims, FINT *shls, FINT *atm, FINT natm,
+int int2e_sph(dtype *out, FINT *dims, FINT *shls, FINT *atm, FINT natm,
               FINT *bas, FINT nbas, dtype *env, CINTOpt *opt, dtype *cache)
 {
         FINT ng[] = {0, 0, 0, 0, 0, 1, 1, 1};
@@ -28500,17 +28500,16 @@ void GTOnr2e_fill_drv(int (*intor)(), void (*fill)(), int (*fprescreen)(),
         const int jsh1 = shls_slice[3];
         const int nish = ish1 - ish0;
         const int njsh = jsh1 - jsh0;
-        const int di = GTOmax_shell_dim(ao_loc, shls_slice, 4);
-        const int cache_size = 256;//GTOmax_cache_size(intor, shls_slice, 4,
-                                    //             atm, natm, bas, nbas, env);
 
 #pragma omp parallel
 {
         int ij, i, j;
         #ifdef __cplusplus 
         //dtype *buf = new dtype[2048];
-        dtype buf[256]; 
+        dtype buf[256];  // aarray 
         #else
+        const int di = GTOmax_shell_dim(ao_loc, shls_slice, 4);
+        const int cache_size = 256;//GTOmax_cache_size(intor, shls_slice, 4,
         dtype *buf = malloc(sizeof(dtype) * (di*di*di*di*comp + cache_size));
         #endif
 #pragma omp for nowait schedule(dynamic)

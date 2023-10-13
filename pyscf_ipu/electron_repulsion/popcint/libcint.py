@@ -26,6 +26,14 @@ int2e = create_ipu_tile_primitive(
         gp_filename=vertex_filename,
         perf_estimate=100,
 )
+int2e_shell = create_ipu_tile_primitive(
+        "Int2e_shell" ,
+        "Int2e_shell" ,
+        inputs=["mat", "shls_slice", "ao_loc", "atm", "bas", "env", "natm", "nbas", "which_integral", "comp", "i", "j"], 
+        outputs={"out": 0},
+        gp_filename=vertex_filename,
+        perf_estimate=100,
+)
 grad = create_ipu_tile_primitive(
         "Grad" ,
         "Grad" ,
@@ -75,8 +83,6 @@ def make_loc(bas, key):
     ao_loc[0] = 0
     dims.cumsum(dtype=numpy.int32, out=ao_loc[1:])
     return ao_loc
-
-
 
 def ipu_make_loc(bas, key):
     if 'cart' in key:
@@ -195,10 +201,13 @@ def cpu_getints4c(intor_name, atm, bas, env, N, shls_slice=None, comp=1,
     natm = atm.shape[0]
     nbas = bas.shape[0]
     ao_loc = make_loc(bas, intor_name)
+    print(ao_loc)
 
     shls_slice = (0, nbas, 0, nbas, 0, nbas, 0, nbas)
+    print(shls_slice)
     
     shape = [comp, N, N, N, N] 
+    print(shape)
     
     drv = libcgto.GTOnr2e_fill_drv
     fill = getattr(libcgto, 'GTOnr2e_fill_'+aosym)
@@ -227,25 +236,9 @@ def cpu_getints4c(intor_name, atm, bas, env, N, shls_slice=None, comp=1,
 
 def python_GTOnr2e_fill_drv(intor, shls_slice, prescreen, eri, ao_loc,
                 comp, cintopt, c_atm, natm, c_bas, nbas, c_env, which_integral):
-    ish0 = shls_slice[0]
-    ish1 = shls_slice[1]
-    jsh0 = shls_slice[2]
-    jsh1 = shls_slice[3]
-    nish = ish1 - ish0
-    njsh = jsh1 - jsh0
-    di   = 1 # ...?
-    cache_size = 256
-    buf = np.zeros(cache_size, dtype=np.float32).ctypes.data_as(ctypes.c_void_p)
-    ao_loc = ao_loc.ctypes.data_as(ctypes.c_void_p)
-
-    for ij in range(nish*njsh): 
-        i = ctypes.c_int(ij // njsh)
-        j = ctypes.c_int(ij % njsh)
-        libcgto.GTOnr2e_fill_s1(intor, prescreen, eri.ctypes.data_as(ctypes.c_void_p), buf, comp, i, j, 
-                (ctypes.c_int*8)(*shls_slice), ao_loc, cintopt, c_atm, ctypes.c_int(natm), c_bas, ctypes.c_int(nbas), 
-                c_env, which_integral)
-
+            #print(i,j)
     pass
+
 
 def cpu_tile_map_getints4c(intor_name, atm, bas, env, N, shls_slice=None, comp=1,
             aosym='s1', ao_loc=None, cintopt=None, out=None, which_integral=-1):
@@ -263,8 +256,8 @@ def cpu_tile_map_getints4c(intor_name, atm, bas, env, N, shls_slice=None, comp=1
     
     drv = libcgto.GTOnr2e_fill_drv
     fill = getattr(libcgto, 'GTOnr2e_fill_'+aosym)
-    #out = numpy.ndarray(shape, buffer=out)
-    out = numpy.zeros(shape)
+    out = numpy.ndarray(shape, buffer=out)
+    #out = numpy.zeros(shape)
     eri = numpy.zeros(shape)
 
     # type 
@@ -277,19 +270,32 @@ def cpu_tile_map_getints4c(intor_name, atm, bas, env, N, shls_slice=None, comp=1
 
     cintopt = None 
     prescreen = lib.c_null_ptr()
-    drv(getattr(libcgto, intor_name), fill, prescreen,
-        out.ctypes.data_as(ctypes.c_void_p), ctypes.c_int(comp),
-        (ctypes.c_int*8)(*shls_slice),
-        ao_loc.ctypes.data_as(ctypes.c_void_p), cintopt,
-        c_atm, ctypes.c_int(natm), c_bas, ctypes.c_int(nbas), c_env, which_integral)
-
+    #drv(getattr(libcgto, intor_name), fill, prescreen,
+    #    out.ctypes.data_as(ctypes.c_void_p), ctypes.c_int(comp),
+    #    (ctypes.c_int*8)(*shls_slice),
+    #    ao_loc.ctypes.data_as(ctypes.c_void_p), cintopt,
+    #    c_atm, ctypes.c_int(natm), c_bas, ctypes.c_int(nbas), c_env, which_integral)
 
     # preparing for tilemap by moving logic to python with C++/cpu backend. 
-    python_GTOnr2e_fill_drv(getattr(libcgto, intor_name), shls_slice, prescreen, eri, ao_loc, 
-                            comp, cintopt, c_atm, natm, c_bas, nbas, c_env, which_integral)
+    #python_GTOnr2e_fill_drv(getattr(libcgto, intor_name), shls_slice, prescreen, eri, ao_loc, 
+    #                        comp, cintopt, c_atm, natm, c_bas, nbas, c_env, which_integral)
+    cache_size = 256
+    buf = np.zeros(cache_size, dtype=np.float32).ctypes.data_as(ctypes.c_void_p)
+    ao_loc = ao_loc.ctypes.data_as(ctypes.c_void_p)
+    _eri = eri 
+    eri = eri.ctypes.data_as(ctypes.c_void_p)
 
-    out = eri 
+    from tqdm import tqdm 
+    for ij in tqdm(range(nbas*nbas)): 
+        i = ctypes.c_int(ij // nbas)
+        j = ctypes.c_int(ij % nbas)
+        print(intor_name)
+        libcgto.GTOnr2e_fill_s1(getattr(libcgto, intor_name), prescreen, eri, buf, comp, i, j, 
+                (ctypes.c_int*8)(*shls_slice), ao_loc, cintopt, c_atm, ctypes.c_int(natm), c_bas, ctypes.c_int(nbas), 
+                c_env, which_integral)
+        print(i,j, _eri.reshape(-1))
 
+    out = _eri 
     if comp == 1:
         out = out[0]
     return out
@@ -357,9 +363,7 @@ def ipu_tile_map_getints4c(intor_name, atm, bas, env, N, shls_slice=None, comp=1
     shls_slice = (0, nbas, 0, nbas, 0, nbas, 0, nbas)
     
     shape = [comp, N, N, N, N] 
-    
-    drv = libcgto.GTOnr2e_fill_drv
-    fill = getattr(libcgto, 'GTOnr2e_fill_'+aosym)
+
     out = numpy.ndarray(shape, buffer=out)
 
     # type 
@@ -371,28 +375,40 @@ def ipu_tile_map_getints4c(intor_name, atm, bas, env, N, shls_slice=None, comp=1
     natm = atm.shape[0]
     nbas = bas.shape[0]
 
-    prefix = 'GTO'
-
     if float32: 
         out = out.astype(np.float32)
         env = env.astype(np.float32)
 
 
-    out = tile_put_replicated(jnp.array(out, dtype=jnp.float32),   (1,)) 
-    shls_slice = tile_put_replicated(jnp.array(shls_slice, dtype=jnp.int32),   (1,)) 
-    ao_loc = tile_put_replicated(jnp.array(ao_loc, dtype=jnp.int32),   (1,)) 
-    atm = tile_put_replicated(jnp.array(atm, dtype=jnp.int32),   (1,)) 
-    bas = tile_put_replicated(jnp.array(bas, dtype=jnp.int32),   (1,)) 
-    env = tile_put_replicated(jnp.array(env, dtype=jnp.float32),   (1,)) 
-    natm = tile_put_replicated(jnp.array(natm, dtype=jnp.int32),   (1,)) 
-    nbas = tile_put_replicated(jnp.array(nbas, dtype=jnp.int32),   (1,)) 
-    comp = tile_put_replicated(jnp.array(comp, dtype=jnp.int32),   (1,)) 
+    _i = []
+    _j = []
+    for i in range(nbas):
+        for j in range(nbas):
+            _i.append(i)
+            _j.append(j)
+            print(i,j)
+    _i = np.array(_i)
+    _j = np.array(_j)
 
-    which_integral = tile_put_replicated(np.array(which_integral, dtype=jnp.int32),   (1,)) 
+    tiles = tuple(np.arange(_i.shape[0]).tolist()) 
+    i = tile_put_sharded(_i, tiles)
+    j = tile_put_sharded(_j, tiles)
 
-    value = tile_map(int2e, out, shls_slice, ao_loc, atm, bas, env, natm, nbas, which_integral, comp)
+    out        = tile_put_replicated(jnp.array(out, dtype=jnp.float32),   tiles) 
+    shls_slice = tile_put_replicated(jnp.array(shls_slice, dtype=jnp.int32),   tiles) 
+    ao_loc     = tile_put_replicated(jnp.array(ao_loc, dtype=jnp.int32),   tiles) 
+    atm        = tile_put_replicated(jnp.array(atm, dtype=jnp.int32),   tiles) 
+    bas = tile_put_replicated(jnp.array(bas, dtype=jnp.int32),   tiles) 
+    env = tile_put_replicated(jnp.array(env, dtype=jnp.float32),   tiles) 
+    natm = tile_put_replicated(jnp.array(natm, dtype=jnp.int32),   tiles) 
+    nbas = tile_put_replicated(jnp.array(nbas, dtype=jnp.int32),   tiles) 
+    comp = tile_put_replicated(jnp.array(comp, dtype=jnp.int32),   tiles) 
 
-    out = value.array 
+    which_integral = tile_put_replicated(np.array(which_integral, dtype=jnp.int32),   tiles) 
+
+    value = tile_map(int2e_shell, out, shls_slice, ao_loc, atm, bas, env, natm, nbas, which_integral, comp, i, j)
+
+    out = value.array.max(0)
 
     if comp == 1:
         out = out[0]
@@ -426,9 +442,11 @@ if __name__ == "__main__":
     parser.add_argument('-tilemap', action="store_true")
     parser.add_argument("-basis", type=str, default="sto3g")
     parser.add_argument("-skipipu", action="store_true") 
+    parser.add_argument("-C", action="store_true")
     args = parser.parse_args()
 
-    mol = pyscf.gto.Mole(atom="H 0 0 0; H 0 0 1; ", basis=args.basis)
+    if args.C:  mol = pyscf.gto.Mole(atom="C 0 0 0; C 0 0 1; ", basis=args.basis)
+    else:       mol = pyscf.gto.Mole(atom="H 0 0 0; H 0 0 1; ", basis=args.basis)
     mol.build()
     N = mol.nao_nr()
     print("[N=%i]"%N)
@@ -438,11 +456,18 @@ if __name__ == "__main__":
     ipu_intor1e = jax.jit(ipu_intor1e, backend="ipu", static_argnums=(4,5,6,7,8,9,10))
 
     def test(truth, us, str):
-        error = np.max(us.reshape(-1)-truth.reshape(-1))
+        us, truth = us.reshape(-1), truth.reshape(-1)
+        diff = us-truth
+        error = np.max(diff)
         print(str, error)
-        if error > 1e-6:
-            print(us.reshape(-1))
-            print(truth.reshape(-1))
+        if error > 5e-6:
+            print(np.around(us, 3))
+            print(np.around(truth, 3))
+            print(np.around(us-truth, 3))
+            indxs = np.abs(diff) > 1e-5
+            #print(np.around(us[indxs], 3))
+            #print(np.around(truth[indxs], 3))
+            #print(np.around(diff[indxs], 3))
 
     if args.nuc or args.all: 
         print("\n[Nuclear Integral]")
@@ -502,16 +527,16 @@ if __name__ == "__main__":
         print("\n[Electron Repulsion Integral]")
         truth = mol.intor("int2e_sph")
         us    = cpu_intor2e(mol, "int2e_sph", N, 1, which_integral=INT2E_SPH, tile_map=args.tilemap)
-        test(us, truth, "CPU: \t")
+        test(truth, us, "CPU: \t")
         if not args.skipipu:
             us    = ipu_intor2e(mol, "int2e_sph", N, 1, which_integral=INT2E_SPH, tile_map=args.tilemap)
-            test(us, truth, "IPU: \t")
+            test(truth, us, "IPU: \t")
 
     if args.erigrad or args.all:
         print("\n[Grad of Electron Repulsion Integral]")
         truth = mol.intor("int2e_ip1_sph")
         us    = cpu_intor2e(mol, "int2e_ip1_sph", N, 3, which_integral=INT2E_IP1_SPH, tile_map=args.tilemap)
-        test(us, truth, "CPU: \t")
+        test(truth, us, "CPU: \t")
         if not args.skipipu:
             us    = ipu_intor2e(mol, "int2e_ip1_sph", N, 3, which_integral=INT2E_IP1_SPH, tile_map=args.tilemap)
-            test(us, truth, "IPU: \t")
+            test(truth, us, "IPU: \t")

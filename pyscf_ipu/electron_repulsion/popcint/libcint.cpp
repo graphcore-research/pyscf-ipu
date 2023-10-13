@@ -125,3 +125,41 @@ public:
     return true;
   }
 };
+
+
+
+class Int2e_shell : public Vertex {
+public:
+  //"mat", "shls_slice", "ao_loc", "atm", "bas", "env"
+  InOut<Vector<float>> mat;
+  InOut<Vector<int>> shls_slice;
+  InOut<Vector<int>> ao_loc;
+  InOut<Vector<int>> atm;
+  InOut<Vector<int>> bas;
+  InOut<Vector<float>> env;
+  Input<Vector<int>> natm;
+  Input<Vector<int>> nbas;
+  Input<Vector<int>> which_integral;
+  Input<Vector<int>> comp;
+  Input<Vector<int>> i; 
+  Input<Vector<int>> j; 
+
+  Output<Vector<float>> out; 
+
+  bool compute() {
+      float * _env       = env.data();
+      int   *_bas        = bas.data(); 
+      int   *_atm        = atm.data(); 
+      int   *_shls_slice = shls_slice.data(); 
+      int   *_ao_loc     = ao_loc.data(); 
+      float * _mat       = mat.data(); 
+     
+      WHICH_INTEGRAL = which_integral.data()[0]; 
+      dtype buf[312];  
+
+      GTOnr2e_fill_s1(  (int (*)(...))int2e_sph,  NULL, out.data(), buf, comp.data()[0], i.data()[0], j.data()[0], 
+                        _shls_slice, _ao_loc, NULL, _atm, natm.data()[0], _bas, nbas.data()[0], _env, which_integral.data()[0]);
+        
+    return true;
+  }
+};
