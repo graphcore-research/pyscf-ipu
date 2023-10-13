@@ -1,10 +1,15 @@
 # Copyright (c) 2023 Graphcore Ltd. All rights reserved.
+import jax
 import jax.numpy as jnp
+import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
 from pyscf_ipu.experimental.special import (
     binom_beta,
+    binom_factor_direct,
+    binom_factor_via_lookup,
+    binom_factor_via_segment_sum,
     binom_fori,
     binom_lookup,
     factorial2_fori,
@@ -49,3 +54,23 @@ def test_binom(binom_func):
     assert_allclose(binom_func(one, one), one)
     assert_allclose(binom_func(zero, -one), zero)
     assert_allclose(binom_func(zero, zero), one)
+
+
+@pytest.mark.parametrize(
+    "binom_func",
+    [binom_factor_direct, binom_factor_via_lookup, binom_factor_via_segment_sum],
+)
+def test_binom_factor(binom_func):
+    if binom_func == binom_factor_direct:
+        n = 10
+    else:
+        binom_func = jax.jit(binom_func)
+        n = 100000
+    va = np.random.rand(n)
+    vb = np.random.rand(n)
+    for i, j, s in zip(
+        jnp.array([0, 1, 2, 3]), jnp.array([1, 2, 3, 1]), jnp.array([1, 2, 3, 4])
+    ):
+        for a, b in zip(va, vb):
+            val = binom_func(i, j, a, b, s)
+            val.block_until_ready()

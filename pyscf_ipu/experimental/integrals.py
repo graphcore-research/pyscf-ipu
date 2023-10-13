@@ -12,7 +12,7 @@ from jax.ops import segment_sum
 from .basis import Basis
 from .orbital import batch_orbitals
 from .primitive import Primitive, product
-from .special import binom, binom_factor_default, factorial, factorial2, gammanu
+from .special import binom, binom_factor, factorial, factorial2, gammanu
 from .types import Float3, FloatN, FloatNx3, FloatNxN
 from .units import LMAX
 
@@ -112,9 +112,7 @@ def build_gindex():
     return i, r, u
 
 
-def _nuclear_primitives(
-    a: Primitive, b: Primitive, c: Float3, binom_factor=binom_factor_default
-):
+def _nuclear_primitives(a: Primitive, b: Primitive, c: Float3):
     p = product(a, b)
     pa = p.center - a.center
     pb = p.center - b.center
@@ -157,7 +155,7 @@ def _nuclear_primitives(
 
 overlap_primitives = jit(_overlap_primitives)
 kinetic_primitives = jit(_kinetic_primitives)
-nuclear_primitives = jit(_nuclear_primitives, static_argnames="binom_factor")
+nuclear_primitives = jit(_nuclear_primitives)
 
 vmap_overlap_primitives = jit(vmap(_overlap_primitives))
 vmap_kinetic_primitives = jit(vmap(_kinetic_primitives))
@@ -185,13 +183,7 @@ def build_cindex():
     return i1, i2, r1, r2, u
 
 
-def _eri_primitives(
-    a: Primitive,
-    b: Primitive,
-    c: Primitive,
-    d: Primitive,
-    binom_factor=binom_factor_default,
-) -> float:
+def _eri_primitives(a: Primitive, b: Primitive, c: Primitive, d: Primitive) -> float:
     p = product(a, b)
     q = product(c, d)
     pa = p.center - a.center
@@ -252,10 +244,8 @@ def _eri_primitives(
     )
 
 
-eri_primitives = jit(_eri_primitives, static_argnames="binom_factor")
-vmap_eri_primitives = jit(
-    vmap(_eri_primitives, in_axes=(0, 0, 0, 0, None)), static_argnames="binom_factor"
-)
+eri_primitives = jit(_eri_primitives)
+vmap_eri_primitives = jit(vmap(_eri_primitives))
 
 
 def gen_ijkl(n: int):
@@ -270,7 +260,7 @@ def gen_ijkl(n: int):
                     yield idx, jdx, kdx, ldx
 
 
-def eri_basis_sparse(b: Basis, binom_factor=binom_factor_default):
+def eri_basis_sparse(b: Basis):
     indices = []
     batch = []
     offset = np.cumsum([o.num_primitives for o in b.orbitals])
@@ -288,12 +278,12 @@ def eri_basis_sparse(b: Basis, binom_factor=binom_factor_default):
     pijkl = [
         tree_map(lambda x: jnp.take(x, idx, axis=0), primitives) for idx in indices
     ]
-    eris = cijkl * vmap_eri_primitives(*pijkl, binom_factor)
+    eris = cijkl * vmap_eri_primitives(*pijkl)
     return segment_sum(eris, batch, num_segments=count + 1)
 
 
-def eri_basis(b: Basis, binom_factor=binom_factor_default):
-    unique_eris = eri_basis_sparse(b, binom_factor)
+def eri_basis(b: Basis):
+    unique_eris = eri_basis_sparse(b)
     ii, jj, kk, ll = jnp.array(list(gen_ijkl(b.num_orbitals)), dtype=jnp.int32).T
 
     # Apply 8x permutation symmetry to build dense ERI from sparse ERI.
