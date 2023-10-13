@@ -145,7 +145,7 @@ def is_mem_limited():
 
 @pytest.mark.parametrize("sparsity", ["sparse", "dense"])
 @pytest.mark.skipif(is_mem_limited(), reason="Not enough host memory!")
-def test_water_eri(sparsity, xpass):
+def test_water_eri(sparsity):
     sparse = sparsity == "sparse"
 
     basis_name = "sto-3g"
