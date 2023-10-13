@@ -224,7 +224,10 @@ def compute_diff_jk(dm, mol, nbatch, tolerance, backend):
                                         for bl in range(mla, ao_loc[l+1]):
                                             if (bk, bl) in considered_indices:
                                                 # apply grid pattern to find final nonzeros
-                                                if ~(nonzero_seed[bi] ^ nonzero_seed[bj]) ^ (nonzero_seed[bk] ^ nonzero_seed[bl]):
+                                                if False and ~(nonzero_seed[bi] ^ nonzero_seed[bj]) ^ (nonzero_seed[bk] ^ nonzero_seed[bl]):
+                                                    found_nonzero = True
+                                                    break
+                                                else: 
                                                     found_nonzero = True
                                                     break
                                     if found_nonzero: break
@@ -405,6 +408,7 @@ if __name__ == "__main__":
     parser.add_argument('-nipu', default=1, type=int)
     parser.add_argument('-skip', action="store_true") 
     parser.add_argument('-itol', default=1e-9, type=float)
+    parser.add_argument('-basis', default="6-311G", type=str)
     
     args = parser.parse_args()
     backend = args.backend 
@@ -417,7 +421,8 @@ if __name__ == "__main__":
 
     #mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*j} {1.54*i};" for i in range(natm) for j in range(natm))) # sto-3g by default
     # mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*j} {1.54*i};" for i in range(1) for j in range(2)), basis="sto3g") 
-    mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*j} {1.54*i};" for i in range(natm) for j in range(natm)), basis="sto3g") 
+    #mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*j} {1.54*i};" for i in range(natm) for j in range(natm)), basis="sto3g") 
+    mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*j} {1.54*i};" for i in range(1) for j in range(2)), basis=args.basis) 
     #mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*j} {1.54*i};" for i in range(1) for j in range(1)), basis="def2-TZVPPD") 
     #mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*j} {1.54*i};" for i in range(1) for j in range(2)), basis="6-31G*") 
     # mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*i} {1.54*i};" for i in range(natm))) 
