@@ -4,7 +4,6 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-import pyscf_ipu.experimental as pyscf_experimental
 from pyscf_ipu.experimental.basis import basisset
 from pyscf_ipu.experimental.integrals import (
     eri_basis,
@@ -79,49 +78,13 @@ def test_water_kinetic(basis_name):
     assert_allclose(actual, expect, atol=1e-4)
 
 
-def check_recompile(recompile, function):
-    # Force recompile
-    if recompile == "recompile":
-        # TBH, this is a bit of a red herring - it will force recompilation,
-        # but the whole switch is only really useful if the False case
-        # runs after the true case in the same process
-        # i.e. timing from
-        #    pytest -k test_nuclear[lookup-recompile] --durations=5
-        # will be the same as
-        #    pytest -k test_nuclear[lookup-cached] --durations=5
-        # While
-        #    pytest -k test_nuclear[lookup- --durations=5
-        # will show both times, and cached will be lower
-        function._clear_cache()
-
-
-@pytest.mark.parametrize("recompile", ["recompile", "cached"])
-@pytest.mark.parametrize("binom_factor_str", ["segment_sum", "lookup"])
-def test_nuclear(binom_factor_str, recompile):
+@pytest.mark.parametrize("recompile", ["first", "cached"])
+def test_nuclear(recompile):
     # PyQuante test case for nuclear attraction integral
     p = Primitive()
     c = jnp.zeros(3)
 
-    # Choose the implementation of binom_factor
-    if binom_factor_str == "segment_sum":
-        binom_factor = pyscf_experimental.special.binom_factor__via_segment_sum
-    elif binom_factor_str == "lookup":
-        binom_factor = pyscf_experimental.special.binom_factor__via_lookup
-    else:
-        assert False
-
-    check_recompile(recompile, nuclear_primitives)
-    assert_allclose(nuclear_primitives(p, p, c, binom_factor), -1.595769, atol=1e-5)
-
-    # if recompile == 'recompile':
-    #     from jaxutils.jaxpr_to_expr import show_jaxpr
-    #     show_jaxpr(
-    #         nuclear_primitives,
-    #         (p, p, c, binom_factor),
-    #         file=f"tmp/nuclear_primitives_jaxpr__binom_factor__via_{binom_factor_str}.py",
-    #         optimize=False,
-    #         static_argnums=3,
-    #     )
+    assert_allclose(nuclear_primitives(p, p, c), -1.595769, atol=1e-5)
 
     # Reproduce the nuclear attraction matrix for H2 using STO-3G basis set
     # See equation 3.231 and 3.232 of Szabo and Ostlund
@@ -180,24 +143,18 @@ def is_mem_limited():
     return total_mem_gib < 10
 
 
-@pytest.mark.parametrize("recompile", ["recompile", "cached"])
-@pytest.mark.parametrize("binom_factor_str", ["segment_sum", "lookup"])
 @pytest.mark.parametrize("sparsity", ["sparse", "dense"])
 @pytest.mark.skipif(is_mem_limited(), reason="Not enough host memory!")
-def test_water_eri(recompile, binom_factor_str, sparsity):
+def test_water_eri(sparsity, xpass):
     sparse = sparsity == "sparse"
-    check_recompile(recompile, eri_primitives)
-    binom_factor = eval(
-        "pyscf_experimental.special.binom_factor__via_" + binom_factor_str
-    )
 
     basis_name = "sto-3g"
     h2o = molecule("water")
     basis = basisset(h2o, basis_name)
     if sparse:
-        actual = eri_basis_sparse(basis, binom_factor)
+        actual = eri_basis_sparse(basis)
     else:
-        actual = eri_basis(basis, binom_factor)
+        actual = eri_basis(basis)
     aosym = "s8" if sparse else "s1"
     expect = to_pyscf(h2o, basis_name=basis_name).intor("int2e_cart", aosym=aosym)
     assert_allclose(actual, expect, atol=1e-4)
