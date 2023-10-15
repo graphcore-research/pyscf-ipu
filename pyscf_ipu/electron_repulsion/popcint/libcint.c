@@ -568,7 +568,7 @@ dtype CINTsquare_dist(const dtype *r1, const dtype *r2);
 dtype CINTgto_norm(FINT n, dtype a);
 
 
-int malloc_size = 2048;
+int malloc_size = 20480;
 
 #ifdef __cplusplus 
 #define MALLOC_INSTACK(var, n) \
@@ -26058,6 +26058,8 @@ void CINTrys_roots(int nroots, dtype x, dtype *u, dtype *w)
         }
 
         int err;
+        assert(nroots<=3);
+
         switch (nroots) {
         case 1:
                 err = rys_root1(x, u, w);
@@ -28508,7 +28510,7 @@ void GTOnr2e_fill_drv(int (*intor)(), void (*fill)(), int (*fprescreen)(),
         int ij, i, j;
         #ifdef __cplusplus 
         //dtype *buf = new dtype[2048];
-        dtype buf[256];  // aarray 
+        dtype buf[malloc_size];  // aarray 
         #else
         const int di = GTOmax_shell_dim(ao_loc, shls_slice, 4);
         const int cache_size = 256;//GTOmax_cache_size(intor, shls_slice, 4,
@@ -28589,7 +28591,7 @@ void GTOint2c(int (*intor)(), dtype *mat, int comp, int hermi,
         int shls[2];
         #ifdef __cplusplus
         //dtype cache[128]; 
-        dtype cache[128*2]; 
+        dtype cache[malloc_size]; 
         #else
         dtype *cache = malloc(sizeof(dtype) * cache_size);
         #endif
