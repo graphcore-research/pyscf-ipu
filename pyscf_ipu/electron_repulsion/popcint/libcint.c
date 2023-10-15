@@ -568,12 +568,14 @@ dtype CINTsquare_dist(const dtype *r1, const dtype *r2);
 dtype CINTgto_norm(FINT n, dtype a);
 
 
+int malloc_size = 2048;
+
 #ifdef __cplusplus 
 #define MALLOC_INSTACK(var, n) \
         var = reinterpret_cast<decltype(var)>(new char[(n) * sizeof(*var)]);
 
 #define MALLOC(type, var) \
-        type var[256];
+        type var[malloc_size];
 
 #else
 #define MALLOC_INSTACK(var, n) \
@@ -7985,8 +7987,8 @@ static FINT *_allocate_index_xyz(CINTOpt *opt, FINT max_l, FINT l_allow, FINT or
                 cc *= cumcart;
         }
         #ifdef __cplusplus
-        FINT *buf = new FINT[1000]; 
-        FINT **ppbuf = new FINT*[ll]{new FINT[1000]};
+        FINT *buf = new FINT[malloc_size]; 
+        FINT **ppbuf = new FINT*[ll]{new FINT[malloc_size]};
         #else
         FINT *buf = malloc(sizeof(FINT) * cc * 3);
         FINT **ppbuf = malloc(sizeof(FINT*) * ll);
@@ -21959,7 +21961,8 @@ CACHE_SIZE_T CINT2e_drv(dtype *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt,
 #endif
                 return cache_size;
         }*/
-        dtype stack[128];
+        //dtype stack[128];
+        MALLOC(dtype, stack);
         /*dtype *stack = NULL;
         if (cache == NULL) {
                 PAIRDATA_NON0IDX_SIZE(pdata_size);
@@ -21979,8 +21982,7 @@ CACHE_SIZE_T CINT2e_drv(dtype *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt,
         }*/
         //dtype *gctr;
         //MALLOC_INSTACK(gctr, nc*n_comp);
-        //MALLOC(dtype, gctr);
-        dtype gctr[128];
+        MALLOC(dtype, gctr);
 
         FINT n;
         FINT empty = 1;

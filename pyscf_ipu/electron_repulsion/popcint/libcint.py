@@ -223,11 +223,13 @@ def cpu_getints4c(intor_name, atm, bas, env, N, shls_slice=None, comp=1,
 
     cintopt = None 
     prescreen = lib.c_null_ptr()
+    print("BEFORE", intor_name, 'GTOnr2e_fill_'+aosym, "GTOnr2e_fill_drv")
     drv(getattr(libcgto, intor_name), fill, prescreen,
         out.ctypes.data_as(ctypes.c_void_p), ctypes.c_int(comp),
         (ctypes.c_int*8)(*shls_slice),
         ao_loc.ctypes.data_as(ctypes.c_void_p), cintopt,
         c_atm, ctypes.c_int(natm), c_bas, ctypes.c_int(nbas), c_env, which_integral)
+    print("AFTER")
 
     if comp == 1:
         out = out[0]
@@ -302,8 +304,9 @@ def cpu_tile_map_getints4c(intor_name, atm, bas, env, N, shls_slice=None, comp=1
 
 
 def cpu_intor2e(self, intor, N, comp=None, hermi=0, aosym='s1', out=None, shls_slice=None, grids=None, which_integral=-1, tile_map=False):
-    if tile_map: return cpu_tile_map_getints4c(intor, self._atm, self._bas, self._env, N, None, comp, "s1", None, None, None, which_integral)
-    else: return cpu_getints4c(intor, self._atm, self._bas, self._env, N, None, comp, "s1", None, None, None, which_integral)
+    #if tile_map: return cpu_tile_map_getints4c(intor, self._atm, self._bas, self._env, N, None, comp, "s1", None, None, None, which_integral)
+    #else: return cpu_getints4c(intor, self._atm, self._bas, self._env, N, None, comp, "s1", None, None, None, which_integral)
+    return cpu_getints4c(intor, self._atm, self._bas, self._env, N, None, comp, "s1", None, None, None, which_integral)
 
 def ipu_getints4c(intor_name, atm, bas, env, N, shls_slice=None, comp=1,
             aosym='s1', ao_loc=None, cintopt=None, out=None, which_integral=-1):
@@ -391,6 +394,7 @@ def ipu_tile_map_getints4c(intor_name, atm, bas, env, N, shls_slice=None, comp=1
     _j = np.array(_j)
 
     tiles = tuple(np.arange(_i.shape[0]).tolist()) 
+    print(tiles)
     i = tile_put_sharded(_i, tiles)
     j = tile_put_sharded(_j, tiles)
 
@@ -445,7 +449,8 @@ if __name__ == "__main__":
     parser.add_argument("-C", action="store_true")
     args = parser.parse_args()
 
-    if args.C:  mol = pyscf.gto.Mole(atom="C 0 0 0; C 0 0 1; ", basis=args.basis)
+    #if args.C:  mol = pyscf.gto.Mole(atom="C 0 0 0; C 0 0 1; ", basis=args.basis)
+    if args.C:  mol = pyscf.gto.Mole(atom="C 0 0 0;  ", basis=args.basis)
     else:       mol = pyscf.gto.Mole(atom="H 0 0 0; H 0 0 1; ", basis=args.basis)
     mol.build()
     N = mol.nao_nr()
@@ -458,9 +463,14 @@ if __name__ == "__main__":
     def test(truth, us, str):
         us, truth = us.reshape(-1), truth.reshape(-1)
         diff = us-truth
-        error = np.max(diff)
+        error = np.max(np.abs(diff))
         print(str, error)
-        if error > 5e-6:
+        import matplotlib.pyplot as plt 
+        fig, ax = plt.subplots()
+        plt.plot(us-truth)
+        plt.savefig("diff.jpg")
+    
+        if error > 1e-5:
             print(np.around(us, 3))
             print(np.around(truth, 3))
             print(np.around(us-truth, 3))
