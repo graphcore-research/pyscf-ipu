@@ -7,7 +7,7 @@ from numpy.testing import assert_allclose
 from pyscf_ipu.experimental.basis import basisset
 from pyscf_ipu.experimental.interop import to_pyscf
 from pyscf_ipu.experimental.mesh import electron_density, uniform_mesh
-from pyscf_ipu.experimental.structure import molecule
+from pyscf_ipu.experimental.structure import molecule, nuclear_energy
 
 
 @pytest.mark.parametrize("basis_name", ["sto-3g", "6-31g**"])
@@ -44,3 +44,11 @@ def test_gto():
     actual = electron_density(basis, mesh, C)
     expect = eval_rho(mol, expect_ao, mf.make_rdm1(), "lda")
     assert_allclose(actual, expect, atol=1e-6)
+
+
+@pytest.mark.parametrize("name", ["water", "h2"])
+def test_nuclear_energy(name):
+    mol = molecule(name)
+    actual = nuclear_energy(mol)
+    expect = to_pyscf(mol).energy_nuc()
+    assert_allclose(actual, expect)
