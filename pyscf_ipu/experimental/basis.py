@@ -63,7 +63,7 @@ def basisset(structure: Structure, basis_name: str = "sto-3g"):
                 ao = Orbital.from_bse(
                     center=center,
                     alphas=np.array(s["exponents"], dtype=np.float32),
-                    lmn=np.array(lmn, dtype=np.uint8),
+                    lmn=np.array(lmn, dtype=np.int32),
                     coefficients=np.array(s["coefficients"], dtype=np.float32),
                 )
                 orbitals.append(ao)
