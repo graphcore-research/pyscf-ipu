@@ -3,6 +3,7 @@ from typing import Tuple
 
 import chex
 import jax.numpy as jnp
+import numpy as np
 
 from .orbital import Orbital
 from .structure import Structure
@@ -61,9 +62,9 @@ def basisset(structure: Structure, basis_name: str = "sto-3g"):
             for lmn in LMN_MAP[s["angular_momentum"][0]]:
                 ao = Orbital.from_bse(
                     center=center,
-                    alphas=jnp.array(s["exponents"], dtype=float),
-                    lmn=jnp.array(lmn, dtype=jnp.int32),
-                    coefficients=jnp.array(s["coefficients"], dtype=float),
+                    alphas=np.array(s["exponents"], dtype=np.float32),
+                    lmn=np.array(lmn, dtype=np.uint8),
+                    coefficients=np.array(s["coefficients"], dtype=np.float32),
                 )
                 orbitals.append(ao)
 
