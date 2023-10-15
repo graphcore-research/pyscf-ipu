@@ -26058,7 +26058,8 @@ void CINTrys_roots(int nroots, dtype x, dtype *u, dtype *w)
         }
 
         int err;
-        assert(nroots<=3);
+        //printf("nroots%d\n", nroots);
+        assert(nroots<=5);
 
         switch (nroots) {
         case 1:
@@ -26070,13 +26071,13 @@ void CINTrys_roots(int nroots, dtype x, dtype *u, dtype *w)
         case 3:
                 err = rys_root3(x, u, w);
                 break;
-        /*case 4:
+        case 4:
                 err = rys_root4(x, u, w);
                 break;
         case 5:
                 err = rys_root5(x, u, w);
                 break;
-        case 6: case 7:
+        /*case 6: case 7:
                 err = segment_solve(nroots, x, 0., u, w, 11, CINTrys_jacobi, CINTrys_schmidt);
                 break;
         case 8:
