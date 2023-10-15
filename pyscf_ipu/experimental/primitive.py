@@ -41,7 +41,7 @@ def product(a: Primitive, b: Primitive) -> Primitive:
     lmn = a.lmn + b.lmn
     c = a.norm * b.norm
     Rab = a.center - b.center
-    c *= np.exp(-a.alpha * b.alpha / alpha * np.inner(Rab, Rab))
+    c *= jnp.exp(-a.alpha * b.alpha / alpha * jnp.inner(Rab, Rab))
     return Primitive(center=center, alpha=alpha, lmn=lmn, norm=c)
 
 
