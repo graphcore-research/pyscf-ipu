@@ -1,5 +1,4 @@
 # Copyright (c) 2023 Graphcore Ltd. All rights reserved.
-from dataclasses import asdict
 from functools import partial
 from itertools import product as cartesian_product
 from typing import Callable
@@ -84,15 +83,11 @@ def _overlap_primitives(a: Primitive, b: Primitive) -> float:
 def _kinetic_primitives(a: Primitive, b: Primitive) -> float:
     t0 = b.alpha * (2 * jnp.sum(b.lmn) + 3) * _overlap_primitives(a, b)
 
-    def offset_qn(ax: int, offset: int):
-        lmn = b.lmn.at[ax].add(offset)
-        return Primitive(**{**asdict(b), "lmn": lmn})
-
     axes = jnp.arange(3)
-    b1 = vmap(offset_qn, (0, None))(axes, 2)
+    b1 = vmap(b.offset_lmn, (0, None))(axes, 2)
     t1 = jnp.sum(vmap(_overlap_primitives, (None, 0))(a, b1))
 
-    b2 = vmap(offset_qn, (0, None))(axes, -2)
+    b2 = vmap(b.offset_lmn, (0, None))(axes, -2)
     t2 = jnp.sum(b.lmn * (b.lmn - 1) * vmap(_overlap_primitives, (None, 0))(a, b2))
     return t0 - 2.0 * b.alpha**2 * t1 - 0.5 * t2
 
