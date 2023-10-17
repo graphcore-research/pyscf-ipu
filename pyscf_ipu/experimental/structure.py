@@ -20,6 +20,9 @@ class Structure:
         if not self.is_bohr:
             self.position = to_bohr(self.position)
 
+        # single atom case
+        self.position = np.atleast_2d(self.position)
+
     @property
     def num_atoms(self) -> int:
         return len(self.atomic_number)
