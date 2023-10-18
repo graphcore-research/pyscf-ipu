@@ -93,4 +93,4 @@ def nuclear_energy(structure: Structure) -> float:
     idx, jdx = np.triu_indices(structure.num_atoms, 1)
     u = structure.atomic_number[idx] * structure.atomic_number[jdx]
     rij = structure.position[idx, :] - structure.position[jdx, :]
-    return np.sum(u / np.linalg.norm(rij, axis=-1))
+    return np.sum(u / np.linalg.norm(rij, axis=1))
