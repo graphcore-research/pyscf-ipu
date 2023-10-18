@@ -76,3 +76,24 @@ def molecule(name: str):
         )
 
     raise NotImplementedError(f"No structure registered for: {name}")
+
+
+def nuclear_energy(structure: Structure) -> float:
+    """Nuclear electrostatic interaction energy
+
+    Evaluated by taking sum over all unique pairs of atom centers:
+
+        sum_{j > i} z_i z_j / |r_i - r_j|
+
+    where z_i is the charge of the ith atom (the atomic number).
+
+    Args:
+        structure (Structure): input structure
+
+    Returns:
+        float: the total nuclear repulsion energy
+    """
+    idx, jdx = np.triu_indices(structure.num_atoms, 1)
+    u = structure.atomic_number[idx] * structure.atomic_number[jdx]
+    rij = structure.position[idx, :] - structure.position[jdx, :]
+    return np.sum(u / np.linalg.norm(rij, axis=1))
