@@ -138,7 +138,25 @@ def get_JK(density_matrix, ERI, dense_ERI, backend):
 
     return diff_JK
 
-def _nanoDFT(state, ERI, grid_AO, grid_weights, opts, mol):
+def _nanoDFT(state, ERI, grid_AO, grid_weights, profile_performance, opts, mol):
+
+    # print("SHAPES:", ERI.shape, grid_AO.shape, grid_weights.shape)
+    # NOTE:
+    # - check if IPU
+    # - enclose the dummy part into some get_ipu_cycles_wrapper()
+
+    if profile_performance is not None:
+        from tessellate_ipu import tile_map, ipu_cycle_count, tile_put_sharded
+        print("[INFO] Running nanoDFT with performance profiling.")
+
+        tmp = grid_weights[0:1]
+        tiles = tuple(range(len(tmp)))
+        tmp = tile_put_sharded(tmp, tiles)
+        tmp, start = ipu_cycle_count(tmp)
+        tmp = tmp.array
+        for idx in tiles:
+            grid_weights = grid_weights.at[idx].set(tmp[idx])
+
     # Utilize the IPUs MIMD parallism to compute the electron repulsion integrals (ERIs) in parallel.
     #if opts.backend == "ipu": state.ERI = electron_repulsion_integrals(state.input_floats, state.input_ints, mol, opts.threads_int, opts.intv)
     #else: pass # Compute on CPU.
@@ -156,6 +174,16 @@ def _nanoDFT(state, ERI, grid_AO, grid_weights, opts, mol):
     # Perform DFT iterations.
     log = jax.lax.fori_loop(0, opts.its, partial(nanoDFT_iteration, opts=opts, mol=mol), [state.density_matrix, V_xc, diff_JK, state.O, H_core, state.L_inv,  # all (N, N) matrices
                                                             state.E_nuc, state.mask, ERI, grid_weights, grid_AO, state.diis_history, log])[-1]
+    if profile_performance is not None:
+        tmp = log["energy"][0:1]
+        tiles = tuple(range(len(tmp)))
+        tmp = tile_put_sharded(tmp, tiles)
+        tmp, end = ipu_cycle_count(tmp)
+        tmp = tmp.array
+        for idx in tiles:
+            log["energy"] = log["energy"].at[idx].set(tmp[idx])
+
+        return log["matrices"], H_core, log["energy"], (start.array, end.array)
 
     return log["matrices"], H_core, log["energy"]
 
@@ -256,7 +284,7 @@ def init_dft_tensors_cpu(mol, opts, DIIS_iters=9):
 
     return state, n_electrons_half, E_nuc, N, L_inv, grid_weights, grid_coords, grid_AO
 
-def nanoDFT(mol, opts):
+def nanoDFT(mol, opts, profile_performance=None):
     # Init DFT tensors on CPU using PySCF.
     state, n_electrons_half, E_nuc, N, L_inv, _grid_weights, grid_coords, grid_AO = init_dft_tensors_cpu(mol, opts)
 
@@ -314,17 +342,22 @@ def nanoDFT(mol, opts):
 
         ERI = [nonzero_distinct_ERI, nonzero_indices]
         eri_in_axes = [0,0]
-    #jitted_nanoDFT = jax.jit(partial(_nanoDFT, opts=opts, mol=mol), backend=opts.backend)
+    # jitted_nanoDFT = jax.jit(partial(_nanoDFT, opts=opts, mol=mol), backend=opts.backend)
     jitted_nanoDFT = jax.pmap(partial(_nanoDFT, opts=opts, mol=mol), backend=opts.backend, 
-                        in_axes=(None, eri_in_axes, 0, 0),
+                        in_axes=(None, eri_in_axes, 0, 0, None),
                         axis_name="p")
-    print(grid_AO.shape, grid_weights.shape)
-    vals = jitted_nanoDFT(state, ERI, grid_AO, grid_weights)
-    logged_matrices, H_core, logged_energies = [np.asarray(a[0]).astype(np.float64) for a in vals] # Ensure CPU
+
+    vals = jitted_nanoDFT(state, ERI, grid_AO, grid_weights, profile_performance)
+
+    if profile_performance is not None:
+        logged_matrices, H_core, logged_energies, _ = [np.asarray(a[0]).astype(np.float64) for a in vals]
+        ipu_cycles_stamps = vals[3]
+    else:
+        logged_matrices, H_core, logged_energies = [np.asarray(a[0]).astype(np.float64) for a in vals] # Ensure CPU
 
     # It's cheap to compute energy/hlgap on CPU in float64 from the logged values/matrices.
     logged_E_xc = logged_energies[:, 3].copy()
-    print(logged_energies[:, 0] * HARTREE_TO_EV)
+    # print(logged_energies[:, 0] * HARTREE_TO_EV)
     density_matrices, diff_JKs, H = [logged_matrices[:, i] for i in range(3)]
     energies, hlgaps = np.zeros((opts.its, 5)), np.zeros(opts.its)
     for i in range(opts.its):
@@ -333,6 +366,10 @@ def nanoDFT(mol, opts):
     energies, logged_energies, hlgaps = [a * HARTREE_TO_EV for a in [energies, logged_energies, hlgaps]]
     mo_energy, mo_coeff = np.linalg.eigh(L_inv @ H[-1] @ L_inv.T)
     mo_coeff = L_inv.T @ mo_coeff
+
+    if profile_performance is not None:
+        return energies, (logged_energies, hlgaps, mo_energy, mo_coeff, grid_coords, _grid_weights), ipu_cycles_stamps
+
     return energies, (logged_energies, hlgaps, mo_energy, mo_coeff, grid_coords, _grid_weights)
 
 def DIIS(i, H, density_matrix, O, diis_history, opts):
@@ -610,8 +647,8 @@ def nanoDFT_options(
 
     from pyscf_ipu.experimental.device import has_ipu
     import os 
-    if has_ipu() and "JAX_IPU_USE_MODEL" in os.environ:
-        args.dense_ERI = True
+    # if has_ipu() and "JAX_IPU_USE_MODEL" in os.environ:
+    #     args.dense_ERI = True
     args = namedtuple('DFTOptionsImmutable',vars(args).keys())(**vars(args)) # make immutable
     if not args.float32:
         jax.config.update('jax_enable_x64', not float32)
