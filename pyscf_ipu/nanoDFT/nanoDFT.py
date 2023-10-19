@@ -140,22 +140,10 @@ def get_JK(density_matrix, ERI, dense_ERI, backend):
 
 def _nanoDFT(state, ERI, grid_AO, grid_weights, profile_performance, opts, mol):
 
-    # print("SHAPES:", ERI.shape, grid_AO.shape, grid_weights.shape)
-    # NOTE:
-    # - check if IPU
-    # - enclose the dummy part into some get_ipu_cycles_wrapper()
-
-    if profile_performance is not None:
-        from tessellate_ipu import tile_map, ipu_cycle_count, tile_put_sharded
+    if profile_performance is not None and opts.backend == "ipu":
         print("[INFO] Running nanoDFT with performance profiling.")
+        grid_weights, start = utils.get_ipu_cycles(grid_weights)
 
-        tmp = grid_weights[0:1]
-        tiles = tuple(range(len(tmp)))
-        tmp = tile_put_sharded(tmp, tiles)
-        tmp, start = ipu_cycle_count(tmp)
-        tmp = tmp.array
-        for idx in tiles:
-            grid_weights = grid_weights.at[idx].set(tmp[idx])
 
     # Utilize the IPUs MIMD parallism to compute the electron repulsion integrals (ERIs) in parallel.
     #if opts.backend == "ipu": state.ERI = electron_repulsion_integrals(state.input_floats, state.input_ints, mol, opts.threads_int, opts.intv)
@@ -174,14 +162,8 @@ def _nanoDFT(state, ERI, grid_AO, grid_weights, profile_performance, opts, mol):
     # Perform DFT iterations.
     log = jax.lax.fori_loop(0, opts.its, partial(nanoDFT_iteration, opts=opts, mol=mol), [state.density_matrix, V_xc, diff_JK, state.O, H_core, state.L_inv,  # all (N, N) matrices
                                                             state.E_nuc, state.mask, ERI, grid_weights, grid_AO, state.diis_history, log])[-1]
-    if profile_performance is not None:
-        tmp = log["energy"][0:1]
-        tiles = tuple(range(len(tmp)))
-        tmp = tile_put_sharded(tmp, tiles)
-        tmp, end = ipu_cycle_count(tmp)
-        tmp = tmp.array
-        for idx in tiles:
-            log["energy"] = log["energy"].at[idx].set(tmp[idx])
+    if profile_performance is not None and opts.backend == "ipu":
+        log["energy"], end = utils.get_ipu_cycles(log["energy"])
 
         return log["matrices"], H_core, log["energy"], (start.array, end.array)
 
@@ -349,7 +331,7 @@ def nanoDFT(mol, opts, profile_performance=None):
 
     vals = jitted_nanoDFT(state, ERI, grid_AO, grid_weights, profile_performance)
 
-    if profile_performance is not None:
+    if profile_performance is not None and opts.backend == "ipu":
         logged_matrices, H_core, logged_energies, _ = [np.asarray(a[0]).astype(np.float64) for a in vals]
         ipu_cycles_stamps = vals[3]
     else:
@@ -367,7 +349,7 @@ def nanoDFT(mol, opts, profile_performance=None):
     mo_energy, mo_coeff = np.linalg.eigh(L_inv @ H[-1] @ L_inv.T)
     mo_coeff = L_inv.T @ mo_coeff
 
-    if profile_performance is not None:
+    if profile_performance is not None and opts.backend == "ipu":
         return energies, (logged_energies, hlgaps, mo_energy, mo_coeff, grid_coords, _grid_weights), ipu_cycles_stamps
 
     return energies, (logged_energies, hlgaps, mo_energy, mo_coeff, grid_coords, _grid_weights)

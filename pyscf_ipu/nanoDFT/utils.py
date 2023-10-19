@@ -224,3 +224,18 @@ def save_plot(base_data_dir: str, molecule_name: str, iterations: int, _plot_tit
         writer.append_data(imageio.v2.imread(f'{images_subdir}num_error{i}.jpg'))
     writer.close()
     print("Numerical error visualisation saved in", gif_path)
+
+
+from tessellate_ipu import tile_map, ipu_cycle_count, tile_put_sharded
+from typing import List
+
+def get_ipu_cycles(data_to_be_sharded: List[float], num_items_to_be_sharded: int = 1) -> List[float]:
+    tmp = data_to_be_sharded[0:num_items_to_be_sharded]
+    tiles = tuple(range(len(tmp)))
+    tmp = tile_put_sharded(tmp, tiles)
+    tmp, cycles_count = ipu_cycle_count(tmp)
+    tmp = tmp.array
+    for idx in tiles:
+        data_to_be_sharded = data_to_be_sharded.at[idx].set(tmp[idx])
+
+    return data_to_be_sharded, cycles_count
