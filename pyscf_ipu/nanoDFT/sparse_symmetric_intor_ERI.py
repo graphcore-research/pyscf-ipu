@@ -33,41 +33,6 @@ compute_indices= create_ipu_tile_primitive(
         perf_estimate=100,
 )
 
-@partial(jax.jit, backend="ipu")
-def ipu_ijkl(nonzero_indices, symmetry, N):
-    size = nonzero_indices.shape[0]
-    total_threads = (1472-1) * 6 
-    remainder = size % total_threads
-
-    i, j, k, l = [nonzero_indices[:, i].astype(np.uint32) for i in range(4)] 
-    
-    if remainder != 0: 
-        i = jnp.pad(i, ((0, total_threads-remainder)))
-        j = jnp.pad(j, ((0, total_threads-remainder)))
-        k = jnp.pad(k, ((0, total_threads-remainder)))
-        l = jnp.pad(l, ((0, total_threads-remainder)))
-
-    i = i.reshape(total_threads, -1)
-    j = j.reshape(total_threads, -1)
-    k = k.reshape(total_threads, -1)
-    l = l.reshape(total_threads, -1)
-    
-    stop = i.shape[1]
-
-    tiles = tuple((np.arange(0,total_threads) % (1471) + 1).astype(np.uint32).tolist())
-    symmetry = tile_put_replicated(jnp.array(symmetry, dtype=jnp.uint32),   tiles) 
-    N        = tile_put_replicated(jnp.array(N, dtype=jnp.uint32),   tiles)
-    start    = tile_put_replicated(jnp.array(0, dtype=jnp.uint32),   tiles)
-    stop     = tile_put_replicated(jnp.array(stop, dtype=jnp.uint32),   tiles)
-
-    i = tile_put_sharded(i, tiles)
-    j = tile_put_sharded(j, tiles)
-    k = tile_put_sharded(k, tiles)
-    l = tile_put_sharded(l, tiles)
-    value = tile_map(compute_indices, i, j, k, l, symmetry, N, start, stop)
-
-    return value.array.reshape(-1)[:size]
-
 def num_repetitions_fast_4d(i, j, k, l, xnp=np, dtype=np.uint64):
     # compute: repetitions = 2^((i==j) + (k==l) + (k==i and l==j or k==j and l==i))
     repetitions = 2**(
@@ -363,23 +328,42 @@ def compute_diff_jk(dm, mol, nbatch, tolerance, backend):
             drep = num_repetitions_fast_4d(indices[:, 0], indices[:, 1], indices[:, 2], indices[:, 3], xnp=jnp, dtype=jnp.uint32)
             eris = eris / drep
 
+            input_size = indices.shape[0]
+            total_threads = (1472-1) * 6 
+            remainder = input_size % total_threads
+
+            if remainder != 0:
+                indices = jnp.pad(indices, ((0, total_threads-remainder), (0, 0)))
+            
+            indices = indices.reshape(total_threads, -1, 4)
+
+            si, sj, sk, sl = [indices[:, :, x].astype(np.uint32).reshape(total_threads, -1) for x in range(4)] 
+
+            input_tiles = tuple((np.arange(0,total_threads) % (1471) + 1).astype(np.uint32).tolist())
+            
+            input_N        = tile_put_replicated(jnp.array(N, dtype=jnp.uint32),   input_tiles)
+            input_start    = tile_put_replicated(jnp.array(0, dtype=jnp.uint32),   input_tiles)
+            input_stop     = tile_put_replicated(jnp.array(si.shape[1], dtype=jnp.uint32),   input_tiles)
+
+            si = tile_put_sharded(si, input_tiles)
+            sj = tile_put_sharded(sj, input_tiles)
+            sk = tile_put_sharded(sk, input_tiles)
+            sl = tile_put_sharded(sl, input_tiles)
+
             def foreach_symmetry(sym, vals):
                 # Generalized J/K computation: does J when symmetry is in range(0,8) and K when symmetry is in range(8,16)
                 # Trade-off: Using one function leads to smaller always-live memory.
                 is_K_matrix = (sym >= 8)
                 diff_JK = vals 
 
-                if backend == "cpu": dm_indices = cpu_ijkl(indices, sym+is_K_matrix*8, indices_func)  
-                else:                dm_indices = ipu_ijkl(indices, sym+is_K_matrix*8, N)  
+                if backend == "cpu": dm_indices = cpu_ijkl(indices, sym+is_K_matrix*8, indices_func)
+                else:                dm_indices = tile_map(compute_indices, si, sj, sk, sl, tile_put_replicated(jnp.array(sym+is_K_matrix*8, dtype=jnp.uint32), input_tiles) , input_N, input_start, input_stop).array.reshape(-1)[:input_size]
                 dm_values = jnp.take(dm, dm_indices, axis=0) 
-
-                print('indices.shape', indices.shape)
-                print('dm_values.shape', dm_values.shape)
-                print('eris.shape', eris.shape)
+                
                 dm_values = dm_values.at[:].mul( eris ) # this is prod, but re-use variable for inplace update. 
                 
-                if backend == "cpu": ss_indices = cpu_ijkl(indices, sym+8+is_K_matrix*8, indices_func) 
-                else:                ss_indices = ipu_ijkl(indices, sym+8+is_K_matrix*8, N) 
+                if backend == "cpu": ss_indices = cpu_ijkl(indices, sym+8+is_K_matrix*8, indices_func)
+                else:                ss_indices = tile_map(compute_indices, si, sj, sk, sl, tile_put_replicated(jnp.array(sym+8+is_K_matrix*8, dtype=jnp.uint32), input_tiles) , input_N, input_start, input_stop).array.reshape(-1)[:input_size]
                 diff_JK   = diff_JK + jax.ops.segment_sum(dm_values, ss_indices, N**2) * (-HYB_B3LYP/2)**is_K_matrix 
                 
                 return diff_JK
