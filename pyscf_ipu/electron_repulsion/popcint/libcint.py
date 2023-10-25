@@ -104,8 +104,7 @@ def ipu_make_loc(bas, key):
     #ao_loc = jnp.concatenate([jnp.zeros(1), jnp.cumsum(ao_loc[1:])])
     return ao_loc
 
-def getints2c(intor_name, N, atm, bas, env, shls_slice=None, comp=1, hermi=0,
-              ao_loc=None, cintopt=None, out=None):
+def getints2c(intor_name, N, atm, bas, env, shls_slice=None, comp=1, hermi=0, ao_loc=None, cintopt=None, out=None):
     natm = atm.shape[0]
     nbas = bas.shape[0]
     shls_slice = (0, nbas, 0, nbas)
@@ -126,6 +125,7 @@ def getints2c(intor_name, N, atm, bas, env, shls_slice=None, comp=1, hermi=0,
         mat = mat.astype(np.float32)
         env = env.astype(np.float32)
 
+    print(drv_name, intor_name)
     fn = getattr(libcgto, drv_name)
     fn(getattr(libcgto, intor_name), mat.ctypes.data_as(ctypes.c_void_p),
         ctypes.c_int(comp), ctypes.c_int(hermi),
@@ -357,7 +357,6 @@ def ipu_getints4c(intor_name, atm, bas, env, N, shls_slice=None, comp=1,
     return out
 
 
-
 def ipu_tile_map_getints4c(intor_name, atm, bas, env, N, shls_slice=None, comp=1,
             aosym='s1', ao_loc=None, cintopt=None, out=None, which_integral=-1):
     natm = atm.shape[0]
@@ -419,7 +418,6 @@ def ipu_tile_map_getints4c(intor_name, atm, bas, env, N, shls_slice=None, comp=1
     return out
 
 
-
 def ipu_intor2e(self, intor, N, comp=None, hermi=0, aosym='s1', out=None, shls_slice=None, grids=None, which_integral=-1, tile_map=False):
     ao_loc = make_loc(mol._bas, intor)
     if tile_map: 
@@ -449,8 +447,7 @@ if __name__ == "__main__":
     parser.add_argument("-C", action="store_true")
     args = parser.parse_args()
 
-    #if args.C:  mol = pyscf.gto.Mole(atom="C 0 0 0; C 0 0 1; ", basis=args.basis)
-    if args.C:  mol = pyscf.gto.Mole(atom="C 0 0 0;  ", basis=args.basis)
+    if args.C:  mol = pyscf.gto.Mole(atom="C 0 0 0; C 0 0 1; ", basis=args.basis)
     else:       mol = pyscf.gto.Mole(atom="H 0 0 0; H 0 0 1; ", basis=args.basis)
     mol.build()
     N = mol.nao_nr()
@@ -466,8 +463,21 @@ if __name__ == "__main__":
         error = np.max(np.abs(diff))
         print(str, error)
         import matplotlib.pyplot as plt 
-        fig, ax = plt.subplots()
-        plt.plot(us-truth)
+        fig, ax = plt.subplots(1,5, figsize=(20,6))
+        ax[0].plot(us-truth)
+        try: 
+            n = int(np.sqrt(us.shape[0]))
+            ax[1].imshow(np.abs(truth).reshape(n,n))
+            ax[1].set_title("TRUTH")
+            ax[2].imshow(np.abs(us).reshape(n,n))
+            ax[2].set_title("US")
+            ax[3].imshow(np.abs(us-truth).reshape(n,n))
+            ax[3].set_title("DIFF")
+            
+            ax[4].imshow(np.abs(us-truth).reshape(n,n)>1e-5)
+            ax[4].set_title("DIFF>1e-5")
+        except:
+            pass
         plt.savefig("diff.jpg")
     
         if error > 1e-5:
@@ -483,55 +493,55 @@ if __name__ == "__main__":
         print("\n[Nuclear Integral]")
         us    =  cpu_intor1e(mol, 'int1e_nuc', N, comp=1)
         truth =  mol.intor('int1e_nuc', comp=1)
-        test(us, truth, "CPU: \t")
+        test(truth, us, "CPU: \t")
         if not args.skipipu: 
             us    = np.asarray( ipu_intor1e(mol._atm, mol._bas, mol._env, INT1E_NUC,  N, 1))
-            test(us, truth, "IPU: \t")
+            test(truth, us, "IPU: \t")
 
     if args.kin or args.all: 
         print("\n[Kinetic Integral]")
         us    =  cpu_intor1e(mol, 'int1e_kin', N, comp=1)
         truth =  mol.intor('int1e_kin', comp=1)
-        test(us, truth, "CPU: \t")
+        test(truth, us, "CPU: \t")
         if not args.skipipu: 
             us =   np.asarray( ipu_intor1e(mol._atm, mol._bas, mol._env, INT1E_KIN,  N, 1))
-            test(us, truth, "IPU: \t")
+            test(truth, us, "IPU: \t")
  
     if args.ovlp or args.all:
         print("\n[Overlap Integral]")
         us    =  cpu_intor1e(mol, 'int1e_ovlp', N, comp=1)
         truth =  mol.intor('int1e_ovlp', comp=1)
-        test(us, truth, "CPU: \t")
+        test(truth, us, "CPU: \t")
         if not args.skipipu:
             us    = np.asarray( ipu_intor1e(mol._atm, mol._bas, mol._env, INT1E_OVLP,  N, 1))
-            test(us, truth, "IPU: \t")
+            test(truth, us, "IPU: \t")
 
     if args.nucgrad or args.all:
         print("\n[Grad Nuclear]")
         us    = - cpu_intor1e(mol, 'int1e_ipnuc', N, comp=3)
         truth = - mol.intor('int1e_ipnuc', comp=3)
-        test(us, truth, "CPU: \t")
+        test(truth, us, "CPU: \t")
         if not args.skipipu:
             us =  - np.transpose(np.asarray( ipu_intor1e(mol._atm, mol._bas, mol._env, INT1E_NUC_IP,  N, 3)), (0,2,1))
-            test(us, truth, "IPU: \t")
+            test(truth, us, "IPU: \t")
 
     if args.kingrad or args.all:
         print("\n[Grad Kinetic]")
         us    = - cpu_intor1e(mol, 'int1e_ipkin', N, comp=3)
         truth = - mol.intor('int1e_ipkin', comp=3)
-        test(us, truth, "CPU: \t")
+        test(truth, us, "CPU: \t")
         if not args.skipipu:
             us    =  - np.transpose(np.asarray( ipu_intor1e(mol._atm, mol._bas, mol._env, INT1E_KIN_IP,  N, 3)), (0,2,1))
-            test(us, truth, "IPU: \t")
+            test(truth, us, "IPU: \t")
 
     if args.ovlpgrad or args.all:
         print("\n[Grad Overlap]")
         us    = - cpu_intor1e(mol, 'int1e_ipovlp', N, comp=3)
         truth = - mol.intor('int1e_ipovlp', comp=3)
-        test(us, truth, "CPU: \t")
+        test(truth, us, "CPU: \t")
         if not args.skipipu:
             us    =  - np.transpose(np.asarray( ipu_intor1e(mol._atm, mol._bas, mol._env, INT1E_OVLP_IP,  N, 3)), (0,2,1))
-            test(us, truth, "IPU: \t")
+            test(truth, us, "IPU: \t")
         
     if args.eri or args.all: 
         print("\n[Electron Repulsion Integral]")

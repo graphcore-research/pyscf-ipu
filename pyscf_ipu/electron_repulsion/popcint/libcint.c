@@ -5,6 +5,7 @@ extern "C" {
 
 #include <stdlib.h>
 #include <math.h>
+#include <assert.h>
 
 #ifdef __POPC__ 
 #else
@@ -241,8 +242,6 @@ FINT CINTcgto_spinor(const FINT bas_id, const FINT *bas);
 
 void CINTgout1e_int1e_kin(dtype *gout, dtype *g, FINT *idx, CINTEnvVars *envs, FINT gout_empty);
 
-
-
 FINT CINTtot_pgto_spheric(const FINT *bas, const FINT nbas);
 FINT CINTtot_pgto_spinor(const FINT *bas, const FINT nbas);
 
@@ -441,20 +440,15 @@ FINT CINTg1e_ovlp(dtype *g, CINTEnvVars *envs);
 
 FINT CINTg1e_nuc(dtype *g, CINTEnvVars *envs, FINT nuc_id);
 
-void CINTnabla1i_1e(dtype *f, dtype *g,
-                    FINT li, FINT lj, FINT lk, CINTEnvVars *envs);
+void CINTnabla1i_1e(dtype *f, dtype *g, FINT li, FINT lj, FINT lk, CINTEnvVars *envs);
 
-void CINTnabla1j_1e(dtype *f, dtype *g,
-                    FINT li, FINT lj, FINT lk, CINTEnvVars *envs);
+void CINTnabla1j_1e(dtype *f, dtype *g, FINT li, FINT lj, FINT lk, CINTEnvVars *envs);
 
-void CINTnabla1k_1e(dtype *f, dtype *g,
-                    FINT li, FINT lj, FINT lk, CINTEnvVars *envs);
+void CINTnabla1k_1e(dtype *f, dtype *g, FINT li, FINT lj, FINT lk, CINTEnvVars *envs);
 
-void CINTx1i_1e(dtype *f, dtype *g, dtype ri[3],
-                FINT li, FINT lj, FINT lk, CINTEnvVars *envs);
+void CINTx1i_1e(dtype *f, dtype *g, dtype ri[3], FINT li, FINT lj, FINT lk, CINTEnvVars *envs);
 
-void CINTx1j_1e(dtype *f, dtype *g, dtype rj[3],
-                FINT li, FINT lj, FINT lk, CINTEnvVars *envs);
+void CINTx1j_1e(dtype *f, dtype *g, dtype rj[3], FINT li, FINT lj, FINT lk, CINTEnvVars *envs);
 
 void CINTx1k_1e(dtype *f, dtype *g, dtype rk[3],
                 FINT li, FINT lj, FINT lk, CINTEnvVars *envs);
@@ -567,8 +561,9 @@ dtype CINTsquare_dist(const dtype *r1, const dtype *r2);
 
 dtype CINTgto_norm(FINT n, dtype a);
 
-
-int malloc_size = 20480;
+//int malloc_size = 150000;
+int malloc_size = 25000*2;
+//int malloc_size = 10000;
 
 #ifdef __cplusplus 
 #define MALLOC_INSTACK(var, n) \
@@ -861,6 +856,7 @@ FINT CINT1e_loop(dtype *gctr, CINTEnvVars *envs, dtype *cache, FINT int1e_type) 
                              log_maxci, log_maxcj, envs->li_ceil, envs->lj_ceil,
                              i_prim, j_prim, SQUARE(envs->rirj), expcutoff, env)) {
                 printf("inside CINTset_pairdata\n");
+                assert(false);
                 return 0;
         }
         else{
@@ -1015,24 +1011,24 @@ CACHE_SIZE_T CINT1e_drv(dtype *out, FINT *dims, CINTEnvVars *envs,
 {
         if (print) printf("inside CINT1e_drv\n");
 
-        /*if (out == NULL) {// 
+        if (out == NULL) {// 
                 printf("out null\n");
-                //return 128; //int1e_cache_size(envs);
-        }*/
+                return int1e_cache_size(envs);
+        }
         FINT *x_ctr = envs->x_ctr;
         FINT nc = envs->nf * x_ctr[0] * x_ctr[1];
         FINT n_comp = envs->ncomp_e1 * envs->ncomp_tensor;
         //dtype *stack = NULL;
         MALLOC(dtype, stack);
-        /*if (cache == NULL) {
-                size_t cache_size = 128;//int1e_cache_size(envs);
+        if (cache == NULL) {
+                size_t cache_size = int1e_cache_size(envs);
                 #ifdef __cplusplus
                 //stack = new dtype[10000];
                 #else
                 stack = malloc(sizeof(dtype)*cache_size);
                 #endif
                 cache = stack;
-        }*/
+        }
         //dtype *gctr;
         //MALLOC_INSTACK(gctr, nc*n_comp);
         MALLOC(dtype, gctr);
@@ -1088,6 +1084,7 @@ CACHE_SIZE_T CINT1e_drv(dtype *out, FINT *dims, CINTEnvVars *envs,
 CACHE_SIZE_T CINT1e_spinor_drv(dtype *out, FINT *dims, CINTEnvVars *envs,
                        dtype *cache, void (*f_c2s)(dtype *opij, dtype *gctr, FINT *dims, CINTEnvVars *envs, dtype *cache), FINT int1e_type)
 {
+        assert(false);
         return 0;  // todo
         if (out == NULL) {
                 return int1e_cache_size(envs);
@@ -8398,18 +8395,19 @@ int CINTsr_rys_polyfits(int nroots, dtype x, dtype lower, dtype *u, dtype *w);
 int CINTrys_schmidt(int nroots, dtype x, dtype lower, dtype *roots, dtype *weights);
 int CINTlrys_schmidt(int nroots, dtype x, dtype lower, dtype *roots, dtype *weights);
 int CINTrys_laguerre(int n, dtype x, dtype lower, dtype *roots, dtype *weights);
-int CINTlrys_laguerre(int n, dtype x, dtype lower, dtype *roots, dtype *weights) {return 0; };
-int CINTrys_jacobi(int n, dtype x, dtype lower, dtype *roots, dtype *weights){ return 0; }
-int CINTlrys_jacobi(int n, dtype x, dtype lower, dtype *roots, dtype *weights){ return 0; }
-#ifdef HAVE_QUADMATH_H
-int CINTqrys_schmidt(int nroots, dtype x, dtype lower, dtype *roots, dtype *weights) {return 0; };
-int CINTqrys_laguerre(int n, dtype x, dtype lower, dtype *roots, dtype *weights){return 0;};
-int CINTqrys_jacobi(int n, dtype x, dtype lower, dtype *roots, dtype *weights){return 0; };
-#else
+int CINTlrys_laguerre(int n, dtype x, dtype lower, dtype *roots, dtype *weights);// { assert(false);return 0; };
+int CINTrys_jacobi(int n, dtype x, dtype lower, dtype *roots, dtype *weights);//{  assert(false);return 0; }
+int CINTlrys_jacobi(int n, dtype x, dtype lower, dtype *roots, dtype *weights);//{  assert(false);return 0; }
+
+/*#ifdef HAVE_QUADMATH_H // only get's called in float (not w/ double precision =O )
+int CINTqrys_schmidt(int nroots, dtype x, dtype lower, dtype *roots, dtype *weights) { assert(false); return 0; };
+int CINTqrys_laguerre(int n, dtype x, dtype lower, dtype *roots, dtype *weights){ assert(false);return 0;};
+int CINTqrys_jacobi(int n, dtype x, dtype lower, dtype *roots, dtype *weights){ assert(false);return 0; };
+#else*/
 #define CINTqrys_schmidt        CINTlrys_schmidt
 #define CINTqrys_laguerre       CINTlrys_laguerre
 #define CINTqrys_jacobi         CINTlrys_jacobi
-#endif
+//#endif
 
 void gamma_inc_like(dtype *f, dtype t, int m){}
 void lgamma_inc_like(dtype *f, dtype t, int m){}
@@ -8498,7 +8496,7 @@ void CINTinit_int1e_EnvVars(CINTEnvVars *envs,
         envs->g_stride_k = envs->g_size;
         envs->g_stride_l = envs->g_size;
 
-        /*assert(i_sh < SHLS_MAX);
+        assert(i_sh < SHLS_MAX);
         assert(j_sh < SHLS_MAX);
         assert(envs->i_l < ANG_MAX);
         assert(envs->j_l < ANG_MAX);
@@ -8506,7 +8504,7 @@ void CINTinit_int1e_EnvVars(CINTEnvVars *envs,
         assert(bas(ATOM_OF,j_sh) >= 0);
         assert(bas(ATOM_OF,i_sh) < natm);
         assert(bas(ATOM_OF,j_sh) < natm);
-        assert(envs->nrys_roots < MXRYSROOTS);*/
+        assert(envs->nrys_roots < MXRYSROOTS);
 }
 
 void CINTg1e_index_xyz(FINT *idx, CINTEnvVars *envs)
@@ -12279,7 +12277,7 @@ struct cart2sp_t {
 static struct cart2sp_t g_c2s[] = {
         {g_trans_cart2sph     ,g_trans_cart2jR      , g_trans_cart2jI      , g_trans_cart2jR      , g_trans_cart2jI      },
         {g_trans_cart2sph+1   ,g_trans_cart2jR+4    , g_trans_cart2jI+4    , g_trans_cart2jR+16   , g_trans_cart2jI+16   },
-        /*{g_trans_cart2sph+10  ,g_trans_cart2jR+40   , g_trans_cart2jI+40   , g_trans_cart2jR+88   , g_trans_cart2jI+88   },
+        {g_trans_cart2sph+10  ,g_trans_cart2jR+40   , g_trans_cart2jI+40   , g_trans_cart2jR+88   , g_trans_cart2jI+88   },
         {g_trans_cart2sph+40  ,g_trans_cart2jR+160  , g_trans_cart2jI+160  , g_trans_cart2jR+280  , g_trans_cart2jI+280  },
         {g_trans_cart2sph+110 ,g_trans_cart2jR+440  , g_trans_cart2jI+440  , g_trans_cart2jR+680  , g_trans_cart2jI+680  },
         {g_trans_cart2sph+245 ,g_trans_cart2jR+980  , g_trans_cart2jI+980  , g_trans_cart2jR+1400 , g_trans_cart2jI+1400 },
@@ -12292,7 +12290,7 @@ static struct cart2sp_t g_c2s[] = {
         {g_trans_cart2sph+6370,g_trans_cart2jR+25480, g_trans_cart2jI+25480, g_trans_cart2jR+29848, g_trans_cart2jI+29848},
         {g_trans_cart2sph+8645,  NULL, NULL, NULL, NULL},
         {g_trans_cart2sph+11480, NULL, NULL, NULL, NULL},
-        {g_trans_cart2sph+14960, NULL, NULL, NULL, NULL},*/
+        {g_trans_cart2sph+14960, NULL, NULL, NULL, NULL},
 };
 
 
@@ -12388,7 +12386,7 @@ static dtype *p_ket_cart2spheric_copy(dtype *gsph, dtype *gcart,
 
 static dtype *d_bra_cart2spheric(dtype *gsph, FINT nket, dtype *gcart, FINT l)
 {
-        return gsph; // NOT IMPLEMENTED YET, g_c2s takes too much memory for single tile. 
+        //return gsph; // NOT IMPLEMENTED YET, g_c2s takes too much memory for single tile. 
         dtype *coeff_c2s = g_c2s[2].cart2sph;
         dtype *pgsph = gsph;
         FINT i;
@@ -12409,7 +12407,7 @@ static dtype *d_bra_cart2spheric(dtype *gsph, FINT nket, dtype *gcart, FINT l)
 static dtype *d_ket_cart2spheric(dtype *gsph, dtype *gcart,
                                   FINT lds, FINT nbra, FINT l)
 {
-        return gsph; // NOT IMPLEMENTED YET, g_c2s takes too much memory. 
+        //return gsph; // NOT IMPLEMENTED YET, g_c2s takes too much memory. 
         dtype *coeff_c2s = g_c2s[2].cart2sph;
         dtype *pgsph = gsph;
         FINT i;
@@ -12437,7 +12435,7 @@ static dtype *d_ket_cart2spheric(dtype *gsph, dtype *gcart,
 
 static dtype *f_bra_cart2spheric(dtype *gsph, FINT nket, dtype *gcart, FINT l)
 {
-        return gsph; // Not implemented yet, g_c2s takes too much memory for single tile. 
+        //return gsph; // Not implemented yet, g_c2s takes too much memory for single tile. 
         dtype *coeff_c2s = g_c2s[3].cart2sph;
         dtype *pgsph = gsph;
         FINT i;
@@ -12466,7 +12464,7 @@ static dtype *f_bra_cart2spheric(dtype *gsph, FINT nket, dtype *gcart, FINT l)
 static dtype *f_ket_cart2spheric(dtype *gsph, dtype *gcart,
                                   FINT lds, FINT nbra, FINT l)
 {
-        return gsph; // Not implemented yet, g_c2s takes too much memory for single tile. 
+        //return gsph; // Not implemented yet, g_c2s takes too much memory for single tile. 
         dtype *coeff_c2s = g_c2s[3].cart2sph;
         dtype *pgsph = gsph;
         FINT i;
@@ -12506,7 +12504,7 @@ static dtype *f_ket_cart2spheric(dtype *gsph, dtype *gcart,
 
 static dtype *g_bra_cart2spheric(dtype *gsph, FINT nket, dtype *gcart, FINT l)
 {
-        return gsph; // Not implemented yet, g_c2s takes too much memory for single tile. 
+        //return gsph; // Not implemented yet, g_c2s takes too much memory for single tile. 
         dtype *coeff_c2s = g_c2s[4].cart2sph;
         dtype *pgsph = gsph;
         FINT i;
@@ -12547,7 +12545,7 @@ static dtype *g_bra_cart2spheric(dtype *gsph, FINT nket, dtype *gcart, FINT l)
 static dtype *g_ket_cart2spheric(dtype *gsph, dtype *gcart,
                                   FINT lds, FINT nbra, FINT l)
 {
-        return gsph; // Not implemented yet, g_c2s takes too much memory for single tile. 
+        //return gsph; // Not implemented yet, g_c2s takes too much memory for single tile. 
         dtype *coeff_c2s = g_c2s[4].cart2sph;
         dtype *pgsph = gsph;
         FINT i;
@@ -15813,6 +15811,7 @@ FINT CINTg0_1e_grids(dtype *g, dtype cutoff,
         dtype ubuf[MXRYSROOTS];
         dtype wbuf[MXRYSROOTS];
         dtype *u;
+        assert (false);
         return 0; 
         MALLOC_ALIGN8_INSTACK(u, GRID_BLKSIZE*nroots);
         dtype *rijrg;
@@ -15958,7 +15957,7 @@ FINT CINTg0_1e_grids(dtype *g, dtype cutoff,
         dtype *p1x, *p1y, *p1z;
         dtype *p2x, *p2y, *p2z;
         dtype *t2;
-        return 0; 
+        assert(false); return 0; 
         MALLOC_ALIGN8_INSTACK(t2, GRID_BLKSIZE*4);
         dtype *rirgx = t2 + GRID_BLKSIZE;
         dtype *rirgy = rirgx + GRID_BLKSIZE;
@@ -16295,7 +16294,7 @@ void CINTinit_int2e_EnvVars(CINTEnvVars *envs, FINT *ng, FINT *shls,
         envs->rys_order = rys_order;
         envs->nrys_roots = nrys_roots;
 
-        /*assert(i_sh < SHLS_MAX);
+        assert(i_sh < SHLS_MAX);
         assert(j_sh < SHLS_MAX);
         assert(k_sh < SHLS_MAX);
         assert(l_sh < SHLS_MAX);
@@ -16311,7 +16310,7 @@ void CINTinit_int2e_EnvVars(CINTEnvVars *envs, FINT *ng, FINT *shls,
         assert(bas(ATOM_OF,j_sh) < natm);
         assert(bas(ATOM_OF,k_sh) < natm);
         assert(bas(ATOM_OF,l_sh) < natm);
-        assert(rys_order < MXRYSROOTS);*/
+        assert(rys_order < MXRYSROOTS);
 
         FINT dli, dlj, dlk, dll;
         FINT ibase = envs->li_ceil > envs->lj_ceil;
@@ -20697,6 +20696,7 @@ FINT CINTg0_2e(dtype *g, dtype *rij, dtype *rkl, dtype cutoff, CINTEnvVars *envs
                 
                 
                 if (theta * x > cutoff || theta * x > EXPCUTOFF_SR) {
+                        assert(false);
                         return 0;
                 }
                 int rorder = envs->rys_order;
@@ -21230,6 +21230,7 @@ FINT CINT2e_loop_nopt(dtype *gctr, CINTEnvVars *envs, dtype *cache, FINT *empty)
         if (CINTset_pairdata(pdata_base, ai, aj, envs->ri, envs->rj,
                              log_maxci, log_maxcj, envs->li_ceil, envs->lj_ceil,
                              i_prim, j_prim, rr_ij, expcutoff, env)) {
+                assert(false);
                 return 0;
         }
         CINTOpt_log_max_pgto_coeff(log_maxck, ck, k_prim, k_ctr);
@@ -21945,6 +21946,8 @@ CACHE_SIZE_T CINT2e_drv(dtype *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt,
         size_t nc = nf * x_ctr[0] * x_ctr[1] * x_ctr[2] * x_ctr[3];
         FINT n_comp = envs->ncomp_e1 * envs->ncomp_e2 * envs->ncomp_tensor;
 
+        assert(out != NULL);
+
         /*if (out == NULL) { // warning
                 PAIRDATA_NON0IDX_SIZE(pdata_size);
                 size_t leng = envs->g_size*3*((1<<envs->gbits)+1);
@@ -21963,7 +21966,9 @@ CACHE_SIZE_T CINT2e_drv(dtype *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt,
         }*/
         //dtype stack[128];
         MALLOC(dtype, stack);
+        assert(cache!=NULL);
         /*dtype *stack = NULL;
+        
         if (cache == NULL) {
                 PAIRDATA_NON0IDX_SIZE(pdata_size);
                 size_t leng = envs->g_size*3*((1<<envs->gbits)+1);
@@ -21986,6 +21991,7 @@ CACHE_SIZE_T CINT2e_drv(dtype *out, FINT *dims, CINTEnvVars *envs, CINTOpt *opt,
 
         FINT n;
         FINT empty = 1;
+        assert(opt == NULL);
         /*if (opt != NULL) { // WARNING 
                 printf("ASD\n");
                 envs->opt = opt;
@@ -22040,6 +22046,7 @@ CACHE_SIZE_T CINT2e_spinor_drv(dtype *out, FINT *dims, CINTEnvVars *envs, CINTOp
                       dtype *cache, void (*f_e1_c2s)(), void (*f_e2_c2s)())
 #endif
 {
+        assert(false);
         return 0; 
         FINT *shls = envs->shls;
         FINT *bas = envs->bas;
@@ -26017,22 +26024,32 @@ typedef int QuadratureFunction(int n, dtype x, dtype lower, dtype *roots, dtype 
 #define CINTqrys_jacobi         CINTlrys_jacobi
 #endif
 
-int _CINT_polynomial_roots(dtype *roots, dtype *cs, int nroots){return 0;}
+int _CINT_polynomial_roots(dtype *roots, dtype *cs, int nroots){assert(false);return 0;}
+
+
 
 static int segment_solve(int n, dtype x, dtype lower, dtype *u, dtype *w,
                          dtype breakpoint, QuadratureFunction fn1, QuadratureFunction fn2)
 {
         int error;
+        //printf("%f", breakpoint);
         if (x <= breakpoint) {
+                //printf("a\n");
                 error = fn1(n, x, lower, u, w);
         } else {
+                printf("b\n");
+                assert(false);
                 error = fn2(n, x, lower, u, w);
         }
-        if (error) {
+        if (error) {// casting to float makes it return an error; great! 
+                printf("error\n");
+                assert(false);
                 error = CINTqrys_schmidt(n, x, lower, u, w);
         }
         return error;
 }
+
+#include "rys_wheeler.c"
 
 void CINTrys_roots(int nroots, dtype x, dtype *u, dtype *w)
 {
@@ -26058,8 +26075,10 @@ void CINTrys_roots(int nroots, dtype x, dtype *u, dtype *w)
         }
 
         int err;
-        //printf("nroots%d\n", nroots);
-        assert(nroots<=5);
+        if (nroots >= 6){
+                //printf("nroots%d\n", nroots);
+        }
+        //assert(nroots<=5);
 
         switch (nroots) {
         case 1:
@@ -26077,7 +26096,7 @@ void CINTrys_roots(int nroots, dtype x, dtype *u, dtype *w)
         case 5:
                 err = rys_root5(x, u, w);
                 break;
-        /*case 6: case 7:
+        case 6: case 7:
                 err = segment_solve(nroots, x, 0., u, w, 11, CINTrys_jacobi, CINTrys_schmidt);
                 break;
         case 8:
@@ -26094,7 +26113,22 @@ void CINTrys_roots(int nroots, dtype x, dtype *u, dtype *w)
                 break;
         default:
                 err = segment_solve(nroots, x, 0., u, w, 50, CINTqrys_jacobi, CINTqrys_laguerre);
-        */}
+        }
+
+
+        /*#ifdef HAVE_QUADMATH_H
+        printf("Has quadmath\n");
+        #else
+        printf("doesn't")
+        #endif*/
+
+
+        if (nroots >= 7){
+                //printf("nroots%d\n", nroots);
+                //assert(false);
+        }
+ 
+
         if (err) {
                 //fprintf(stderr, "rys_roots fails: nroots=%d x=%g\n",
                 //       nroots, x);
@@ -27945,10 +27979,13 @@ int GTOmax_cache_size(int (*intor)(), int *shls_slice, int ncenter,
         int i, n;
         int i0 = shls_slice[0];
         int i1 = shls_slice[1];
+        printf("ncenter=%d\n", ncenter);
         for (i = 1; i < ncenter; i++) {
+                printf("%d\n", i);
                 i0 = MIN(i0, shls_slice[i*2  ]);
                 i1 = MAX(i1, shls_slice[i*2+1]);
         }
+        printf("post\n");
         int shls[4];
         int cache_size = 0;
         for (i = i0; i < i1; i++) {
@@ -27962,6 +27999,8 @@ int GTOmax_cache_size(int (*intor)(), int *shls_slice, int ncenter,
         return cache_size;
 }
 
+
+//#include "../cpu_int2e_sph.cpp"
 
 #ifdef __cplusplus
 void GTOnr2e_fill_s1(int (*intor)(...), int (*fprescreen)(...),
@@ -28581,7 +28620,6 @@ void GTOint2c(int (*intor)(), dtype *mat, int comp, int hermi,
         const int njsh = jsh1 - jsh0;
         const size_t naoi = ao_loc[ish1] - ao_loc[ish0];
         const size_t naoj = ao_loc[jsh1] - ao_loc[jsh0];
-        const int cache_size = 128;//GTOmax_cache_size(intor, shls_slice, 2, atm, natm, bas, nbas, env);
 
 /*#ifdef __POPC__ 
 #pragma omp parallel
@@ -28594,26 +28632,24 @@ void GTOint2c(int (*intor)(), dtype *mat, int comp, int hermi,
         //dtype cache[128]; 
         dtype cache[malloc_size]; 
         #else
+        const int cache_size = 128;//GTOmax_cache_size(intor, shls_slice, 2, atm, natm, bas, nbas, env);
         dtype *cache = malloc(sizeof(dtype) * cache_size);
         #endif
+        
+        //int cache_size = GTOmax_cache_size(intor, shls_slice, 2, atm, natm, bas, nbas, env);
+        //printf("[cache_size=%d]\n\n", cache_size);
+        
 
 /*#ifdef __POPC__ 
 #else
 #pragma omp for schedule(dynamic, 4)
 #endif*/
 
-        /*printf("[-1] ");
-        for (int i = 0; i < 12; i++){
-                printf("%f ", mat[i]);
-        }
-        printf("\n");*/
-
-
 
         for (ij = 0; ij < nish*njsh; ij++) {
-                //printf("[%d / %d]\n", ij, nish*njsh);
                 ish = ij / njsh;
                 jsh = ij % njsh;
+                printf("[%d / %d] %d %d\n", ij, nish*njsh, ish, jsh);
                 if (hermi != PLAIN && ish > jsh) {
                         continue;
                 }
@@ -28628,6 +28664,7 @@ void GTOint2c(int (*intor)(), dtype *mat, int comp, int hermi,
                 i0 = ao_loc[ish] - ao_loc[ish0];
                 j0 = ao_loc[jsh] - ao_loc[jsh0];
 
+                //printf("%3f->", (mat+j0*naoi+i0)[0]);
                 (*intor)(mat+j0*naoi+i0, dims, shls, atm, natm, bas, nbas, env, opt, cache);
 
                 /*printf("[%d] ", j0*naoi+i0);
@@ -28636,6 +28673,11 @@ void GTOint2c(int (*intor)(), dtype *mat, int comp, int hermi,
                 }
                 printf("\n");
                 return; */
+
+                for (int i = 0; i < 12*12; i++){ 
+                        if (mat[i]!=0) printf("%3f", mat[i]); 
+                }
+                printf("\n");
 
                 //int1e_ipkin_sph(mat+j0*naoi+i0, dims, shls, atm, natm, bas, nbas, env, opt, cache);
                 //printf("%f\n", (mat+j0*naoi+i0)[0]);
