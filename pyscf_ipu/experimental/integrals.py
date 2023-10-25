@@ -6,89 +6,47 @@ from typing import Callable
 
 import jax.numpy as jnp
 import numpy as np
-from jax import lax, vmap, jit, tree_map
+from jax import jit, tree_map, vmap
 from jax.ops import segment_sum
-from jax.scipy.special import gammainc, gammaln
 
 from .basis import Basis
 from .orbital import batch_orbitals
 from .primitive import Primitive, product
-from .types import IntN, FloatN, FloatNxN, Float3, FloatNx3
-
-# Maximum value an individual component of the angular momentum lmn can take
-# Used for static ahead-of-time compilation of functions involving lmn.
-LMAX = 4
+from .special import binom, binom_factor, factorial, factorial2, gammanu
+from .types import Float3, FloatN, FloatNx3, FloatNxN
+from .units import LMAX
 
 """
-Special functions used in integral evaluation
-"""
+JAX implementation for integrals over Gaussian basis functions. Based upon the
+closed-form expressions derived in
 
+    Taketa, H., Huzinaga, S., & O-ohata, K. (1966). Gaussian-expansion methods for
+    molecular integrals. Journal of the physical society of Japan, 21(11), 2313-2324.
+    <https://doi.org/10.1143/JPSJ.21.2313>
 
-def factorial(n: IntN, nmax: int = LMAX) -> IntN:
-    def body_fun(i, val):
-        return val * jnp.where(i <= n, i, 1)
+Hereafter referred to as the "THO paper"
 
-    return lax.fori_loop(1, nmax + 1, body_fun, jnp.ones_like(n))
+Related work:
 
-
-def factorial2(n: IntN, nmax: int = 2 * LMAX) -> IntN:
-    def body_fun(i, val):
-        return val * jnp.where((i <= n) & (n % 2 == i % 2), i, 1)
-
-    return lax.fori_loop(1, nmax + 1, body_fun, jnp.ones_like(n))
-
-
-def binom(x: IntN, y: IntN, nmax: int = LMAX) -> IntN:
-    bang = partial(factorial, nmax=nmax)
-    c = x * bang(x - 1) / (bang(y) * bang(x - y))
-    return jnp.where(x == y, 1, c)
-
-
-def gammanu(nu: IntN, t: FloatN, epsilon: float = 1e-10) -> FloatN:
-    """
-    eq 2.11 from THO but simplified using SymPy and converted to jax
-
-        t, u = symbols("t u", real=True, positive=True)
-        nu = Symbol("nu", integer=True, nonnegative=True)
-
-        expr = simplify(integrate(u ** (2 * nu) * exp(-t * u**2), (u, 0, 1)))
-        f = lambdify((nu, t), expr, modules="scipy")
-        ?f
-
-    We evaulate this in log-space to avoid overflow/nan
-    """
-    t = jnp.maximum(t, epsilon)
-    x = nu + 0.5
-    gn = jnp.log(0.5) - x * jnp.log(t) + jnp.log(gammainc(x, t)) + gammaln(x)
-    return jnp.exp(gn)
-
-
-@partial(vmap, in_axes=(0, None, None, None, None))
-def binom_factor(s: IntN, i: int, j: int, pa: float, pb: float):
-    """
-    Eq. 15 from Augspurger JD, Dykstra CE. General quantum mechanical operators. An
+[1] Augspurger JD, Dykstra CE. General quantum mechanical operators. An
     open-ended approach for one-electron integrals with Gaussian bases. Journal of
     computational chemistry. 1990 Jan;11(1):105-11.
     <https://doi.org/10.1002/jcc.540110113>
-    """
 
-    def term(t):
-        return binom(i, s - t) * binom(j, t) * pa ** (i - s + t) * pb ** (j - t)
-
-    def body_fun(t, val):
-        mask = (t <= s) & (t >= (s - i)) & (t <= j)
-        return val + jnp.where(mask, term(t), 0.0)
-
-    return lax.fori_loop(0, LMAX + 1, body_fun, 0.0)
+[2] PyQuante: <https://github.com/rpmuller/pyquante2/>
+"""
 
 
 @partial(vmap, in_axes=(0, 0, 0, 0, None))
-def overlap_axis(i: int, j: int, pa: int, pb: int, alpha: float) -> float:
-    ii = jnp.arange(LMAX + 1)
-    out = binom_factor(2 * ii, i, j, pa, pb)
-    out *= factorial2(2 * ii - 1) / (2 * alpha) ** ii
-    mask = ii <= jnp.floor_divide(i + j, 2)
-    out = jnp.where(mask, out, 0.0)
+def overlap_axis(i: int, j: int, a: float, b: float, alpha: float) -> float:
+    idx = [(s, t) for s in range(LMAX + 1) for t in range(2 * s + 1)]
+    s, t = jnp.array(idx, dtype=jnp.uint32).T
+    out = binom(i, 2 * s - t) * binom(j, t)
+    out *= a ** (i - (2 * s - t)) * b ** (j - t)
+    out *= factorial2(2 * s - 1) / (2 * alpha) ** s
+
+    mask = (2 * s - i <= t) & (t <= j)
+    out = jnp.where(mask, out, 0)
     return jnp.sum(out)
 
 
@@ -167,7 +125,7 @@ def _nuclear_primitives(a: Primitive, b: Primitive, c: Float3):
         index = i - 2 * r - u
         g = (
             jnp.power(-1, i + u)
-            * binom_factor(i, l1, l2, pa, pb)
+            * jnp.take(binom_factor(l1, l2, pa, pb), i)
             * factorial(i)
             * jnp.power(cp, index - u)
             * jnp.power(epsilon, r + u)
@@ -239,7 +197,7 @@ def _eri_primitives(a: Primitive, b: Primitive, c: Primitive, d: Primitive) -> f
         # Note this should match THO Eq 3.5 but that seems to incorrectly show a
         # 1/(4 gamma) ^(i- 2r) term which is inconsistent with Eq 2.22.
         # Using (4 gamma)^(r - i) matches the reported expressions for H_L
-        u = factorial(i) * binom_factor(i, l1, l2, a, b)
+        u = factorial(i) * jnp.take(binom_factor(l1, l2, a, b, 2 * LMAX), i)
         v = factorial(r) * factorial(i - 2 * r) * (4 * gamma) ** (i - r)
         return u / v
 
@@ -257,6 +215,7 @@ def _eri_primitives(a: Primitive, b: Primitive, c: Primitive, d: Primitive) -> f
         return segment_sum(c, index, num_segments=4 * LMAX + 1)
 
     # Manual vmap over cartesian axes (x, y, z) as ran into possible bug.
+    # See https://github.com/graphcore-research/pyscf-ipu/issues/105
     args = [a.lmn, b.lmn, c.lmn, d.lmn, pa, pb, qc, qd, qp]
     Ci, Cj, Ck = [c_term(*[v.at[i].get() for v in args]) for i in range(3)]
 
@@ -320,7 +279,7 @@ def eri_basis_sparse(b: Basis):
         tree_map(lambda x: jnp.take(x, idx, axis=0), primitives) for idx in indices
     ]
     eris = cijkl * vmap_eri_primitives(*pijkl)
-    return segment_sum(eris, batch)
+    return segment_sum(eris, batch, num_segments=count + 1)
 
 
 def eri_basis(b: Basis):

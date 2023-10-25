@@ -5,7 +5,6 @@ import chex
 import numpy as np
 from periodictable import elements
 from py3Dmol import view
-from pyscf import gto
 
 from .types import FloatNx3, IntN
 from .units import to_angstrom, to_bohr
@@ -20,6 +19,9 @@ class Structure:
     def __post_init__(self):
         if not self.is_bohr:
             self.position = to_bohr(self.position)
+
+        # single atom case
+        self.position = np.atleast_2d(self.position)
 
     @property
     def num_atoms(self) -> int:
@@ -48,19 +50,6 @@ class Structure:
         return view(data=self.to_xyz(), style={"stick": {"radius": 0.06}})
 
 
-def to_pyscf(
-    structure: Structure, basis_name: str = "sto-3g", unit: str = "Bohr"
-) -> "gto.Mole":
-    mol = gto.Mole(unit=unit, spin=structure.num_electrons % 2, cart=True)
-    mol.atom = [
-        (symbol, pos)
-        for symbol, pos in zip(structure.atomic_symbol, structure.position)
-    ]
-    mol.basis = basis_name
-    mol.build(unit=unit)
-    return mol
-
-
 def molecule(name: str):
     name = name.lower()
 
@@ -87,3 +76,24 @@ def molecule(name: str):
         )
 
     raise NotImplementedError(f"No structure registered for: {name}")
+
+
+def nuclear_energy(structure: Structure) -> float:
+    """Nuclear electrostatic interaction energy
+
+    Evaluated by taking sum over all unique pairs of atom centers:
+
+        sum_{j > i} z_i z_j / |r_i - r_j|
+
+    where z_i is the charge of the ith atom (the atomic number).
+
+    Args:
+        structure (Structure): input structure
+
+    Returns:
+        float: the total nuclear repulsion energy
+    """
+    idx, jdx = np.triu_indices(structure.num_atoms, 1)
+    u = structure.atomic_number[idx] * structure.atomic_number[jdx]
+    rij = structure.position[idx, :] - structure.position[jdx, :]
+    return np.sum(u / np.linalg.norm(rij, axis=1))

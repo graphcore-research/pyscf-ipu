@@ -3,16 +3,17 @@ from typing import Optional
 
 import chex
 import jax.numpy as jnp
-from jax.scipy.special import gammaln
+import numpy as np
+from scipy.special import gammaln
 
 from .types import Float3, FloatN, FloatNx3, Int3
 
 
 @chex.dataclass
 class Primitive:
-    center: Float3 = jnp.zeros(3, dtype=jnp.float32)
+    center: Float3 = np.zeros(3, dtype=np.float32)
     alpha: float = 1.0
-    lmn: Int3 = jnp.zeros(3, dtype=jnp.int32)
+    lmn: Int3 = np.zeros(3, dtype=np.int32)
     norm: Optional[float] = None
 
     def __post_init__(self):
@@ -21,16 +22,16 @@ class Primitive:
 
     @property
     def angular_momentum(self) -> int:
-        return jnp.sum(self.lmn)
+        return np.sum(self.lmn)
 
     def __call__(self, pos: FloatNx3) -> FloatN:
         return eval_primitive(self, pos)
 
 
 def normalize(lmn: Int3, alpha: float) -> float:
-    L = jnp.sum(lmn)
+    L = np.sum(lmn)
     N = ((1 / 2) / alpha) ** (L + 3 / 2)
-    N *= jnp.exp(jnp.sum(gammaln(lmn + 1 / 2)))
+    N *= np.exp(np.sum(gammaln(lmn + 1 / 2)))
     return N**-0.5
 
 

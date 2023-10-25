@@ -1,3 +1,4 @@
+# Copyright (c) 2023 Graphcore Ltd. All rights reserved.
 # The functional definition in this file was ported to Python
 # from XCFun, which is Copyright Ulf Ekström and contributors 2009-2020
 # and provided under the Mozilla Public License (v2.0)
