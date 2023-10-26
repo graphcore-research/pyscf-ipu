@@ -601,7 +601,10 @@ def nanoDFT_options(
     if mol_str is None:
         exit(1)
 
-    print(f"Minimum interatomic distance: {utils.min_interatomic_distance(mol_str)}") # TODO: dies for --mol_str methane
+    m_i_d = utils.min_interatomic_distance(mol_str)
+    print(f"Minimum interatomic distance: {m_i_d}") # TODO: dies for --mol_str methane
+    if m_i_d < 0.7 or m_i_d > 1.8:
+        print("WARNING: the coordinates may be expressed in units other than angstrom")
 
     args = locals()
     mol_str = args["mol_str"]
