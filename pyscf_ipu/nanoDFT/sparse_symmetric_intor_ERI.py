@@ -150,7 +150,7 @@ int2e_sph_forloop = create_ipu_tile_primitive(
             perf_estimate=100,
     )
 
-def compute_diff_jk(dm, mol, nbatch, tolerance, ipu_ID, backend):
+def compute_diff_jk(dm, mol, nbatch, tolerance, ndevices, backend):
     dm = dm.reshape(-1)
     diff_JK = jnp.zeros(dm.shape)
     N = int(np.sqrt(dm.shape[0])) 
@@ -241,15 +241,13 @@ def compute_diff_jk(dm, mol, nbatch, tolerance, ipu_ID, backend):
 
     print('before [len(ijkl) for ijkl in input_ijkl]', [len(ijkl) for ijkl in input_ijkl])
 
-    ndevices = 16
-    pmap_remainders = []
     new_counts = [0]*len(counts)
     for tup_id in range(len(input_ijkl)):
         pmap_remainder = len(input_ijkl[tup_id]) % ndevices
         print('pmap_remainder', pmap_remainder)
         if pmap_remainder > 0:
-            input_ijkl[tup_id] += tuple([[-1, -1, -1, -1]]*pmap_remainder) # -1s are accounted for later after eri computation
-            new_counts[tup_id] = counts[tup_id]+pmap_remainder
+            input_ijkl[tup_id] += tuple([[-1, -1, -1, -1]]*(ndevices-pmap_remainder)) # -1s are accounted for later after eri computation
+            new_counts[tup_id] = counts[tup_id]+(ndevices-pmap_remainder)
     counts = tuple(new_counts)
 
     print('after [len(ijkl) for ijkl in input_ijkl]', [len(ijkl) for ijkl in input_ijkl])
@@ -274,15 +272,20 @@ def compute_diff_jk(dm, mol, nbatch, tolerance, ipu_ID, backend):
     tile_floats   = tile_put_replicated(input_floats, tiles)
     tile_ints     = tile_put_replicated(input_ints,   tiles)
 
-    # give each ipu and number "ipu_id"
+    # give each ipu and number "ipu_id" -- use jax.lax.axis_index('p') instead
     # pad work to be divisble by num_ipus 
     # use this to chunk up work below into 1/num_ipus 
     # after the sparse_einsum add together the density_matrices
 
     for i, (size, count) in enumerate(zip(sizes, counts)):
+        print('>>>', size, count)
+        slice_offset = (count//ndevices)*jax.lax.axis_index('p')
+        slice_count = count // ndevices
+        slice_ijkl = jax.lax.dynamic_slice(jnp.array(input_ijkl[i]), (slice_offset, 0), (slice_count, 4)) # shell indices should be computed outside and passed through pmap
+
         glen, nf = shapes[i]
         chunk_size  = num_tiles * num_threads
-        num_full_batches = count//chunk_size
+        num_full_batches = slice_count//chunk_size
 
         tiles         = tuple((np.arange(num_tiles*num_threads)%(num_tiles)+1).tolist())
         tile_g        = tile_put_replicated(jnp.empty(min(int(glen), 3888)+1), tiles)
@@ -293,7 +296,7 @@ def compute_diff_jk(dm, mol, nbatch, tolerance, ipu_ID, backend):
         def batched_compute(start, stop, chunk_size, tiles):
             assert (stop-start) < chunk_size or (stop-start) % chunk_size == 0
             num_batches = max(1, (stop-start)//chunk_size)
-            idx = np.array(input_ijkl[i][start:stop]).reshape(-1, num_batches, 4) # contains -1s for padding shells
+            idx = jnp.array(slice_ijkl[start:stop]).reshape(-1, num_batches, 4) # contains -1s for padding shells
             out , _, _, _= tile_map(int2e_sph_forloop,
                                     tile_floats[:len(tiles)],
                                     tile_ints[:len(tiles)],
@@ -304,16 +307,16 @@ def compute_diff_jk(dm, mol, nbatch, tolerance, ipu_ID, backend):
                                     tile_buf[:len(tiles)],
                                     tile_put_replicated(jnp.array(num_batches, dtype=jnp.uint32), tiles),
                                     integral_size[:len(tiles)])
-            return out.array.reshape(-1, size), np.maximum(idx.reshape(-1, 4), 0) # account for -1s, convert to 0s
+            return out.array.reshape(-1, size), jnp.maximum(idx.reshape(-1, 4), 0) # account for -1s, convert to 0s
 
         if num_full_batches > 0: f_out, f_idx = batched_compute(0, num_full_batches*chunk_size, chunk_size, tiles)
         else: f_out, f_idx = np.array([]).reshape(0, size), np.array([]).reshape(0, 4)
 
-        tiles         = tuple((np.arange(count-num_full_batches*chunk_size)%(num_tiles)+1).tolist())
-        out, idx      = batched_compute(num_full_batches*chunk_size, count, chunk_size, tiles)
+        tiles         = tuple((np.arange(slice_count-num_full_batches*chunk_size)%(num_tiles)+1).tolist())
+        out, idx      = batched_compute(num_full_batches*chunk_size, slice_count, chunk_size, tiles)
 
         all_eris.append(jnp.concatenate([f_out, out]))
-        all_indices.append(np.concatenate([f_idx, idx]).astype(np.uint8))
+        all_indices.append(jnp.concatenate([f_idx, idx])) #.astype(jnp.uint8))
 
     print('[a.shape for a in all_eris]', [a.shape for a in all_eris])
     print('[a.shape for a in all_indices]', [a.shape for a in all_indices])
@@ -391,8 +394,8 @@ def compute_diff_jk(dm, mol, nbatch, tolerance, ipu_ID, backend):
 
         total_diff_JK += diff_JK
 
-    return total_diff_JK
-    #return jax.lax.psum(total_diff_JK, axis="p")
+    # return total_diff_JK
+    return jax.lax.psum(total_diff_JK, axis_name="p")
 
 if __name__ == "__main__":
     import time 
