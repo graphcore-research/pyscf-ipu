@@ -7281,14 +7281,16 @@ public:
                 for (uint32_t i = 0; i < ipu_output.size(); i++) ipu_output[i] = 0;
 
                 for (uint32_t i = 0; i < ichunks; i++){
-                        float * eri = ipu_output.data() + i*isize;
-
                         int arr[] = {ipu_ij[0+i*4], ipu_ij[1+i*4], ipu_ij[2+i*4], ipu_ij[3+i*4]};
-                        const int* shls = arr;
+                        
+                        if (arr[0] >= 0 && arr[1] >= 0 && arr[2] >= 0 && arr[3] >= 0)
+                        {
+                                float * eri = ipu_output.data() + i*isize;
+                                const int* shls = arr;
+                                dtype *_eri = eri;
 
-                        dtype *_eri = eri;
-
-                        int2e_sph(eri, n_buf, NULL, shls, ao_loc, atm, n_atm, bas, n_bas, env, n_env, _eri, tile_g.data(), tile_idx.data(), tile_buf.data()) ;
+                                int2e_sph(eri, n_buf, NULL, shls, ao_loc, atm, n_atm, bas, n_bas, env, n_env, _eri, tile_g.data(), tile_idx.data(), tile_buf.data()) ;
+                        }
                 }
 
 

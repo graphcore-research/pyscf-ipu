@@ -135,7 +135,7 @@ def get_JK(density_matrix, ERI, dense_ERI, backend, mol, ipu_ID):
         #from pyscf_ipu.nanoDFT.sparse_symmetric_ERI import sparse_symmetric_einsum
         #diff_JK = sparse_symmetric_einsum(ERI[0], ERI[1], density_matrix, backend)
         from pyscf_ipu.nanoDFT.sparse_symmetric_intor_ERI import compute_diff_jk
-        diff_JK = compute_diff_jk(density_matrix, mol, 1, 1e-6, backend="ipu")
+        diff_JK = compute_diff_jk(density_matrix, mol, 1, 1e-6, ipu_ID=ipu_ID, backend="ipu")
         
     diff_JK = diff_JK.reshape(N, N)
 
