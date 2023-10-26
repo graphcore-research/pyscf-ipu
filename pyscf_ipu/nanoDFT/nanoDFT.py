@@ -40,7 +40,7 @@ def energy(density_matrix, H_core, diff_JK, E_xc, E_nuc, _np=jax.numpy):
 def nanoDFT_iteration(i, vals, opts, mol):
     """Each call updates density_matrix attempting to minimize energy(density_matrix, ... ). """
     density_matrix, V_xc, diff_JK, O, H_core, L_inv                 = vals[:6]                  # All (N, N) matrices
-    E_nuc, occupancy, ERI, grid_weights, grid_AO, diis_history, log = vals[6:]                  # Varying types/shapes.
+    E_nuc, occupancy, ERI, grid_weights, grid_AO, diis_history, ipu_ID, log = vals[6:]                  # Varying types/shapes.
 
     if opts.v: 
         print("---------- MEMORY CONSUMPTION ----------")
@@ -71,7 +71,7 @@ def nanoDFT_iteration(i, vals, opts, mol):
     # Step 3: Use result from eigenproblem to update density_matrix.
     density_matrix = (eigvects*occupancy*2) @ eigvects.T                                        # (N, N)
     E_xc, V_xc     = exchange_correlation(density_matrix, grid_AO, grid_weights)                # float (N, N)
-    diff_JK        = get_JK(density_matrix, ERI, opts.dense_ERI, opts.backend)                  # (N, N) (N, N)
+    diff_JK        = get_JK(density_matrix, ERI, opts.dense_ERI, opts.backend, mol, ipu_ID)     # (N, N) (N, N)
 
     # Log SCF matrices and energies (not used by DFT algorithm).
     #log["matrices"] = log["matrices"].at[i].set(jnp.stack((density_matrix, J, K, H)))           # (iterations, 4, N, N)
@@ -99,7 +99,8 @@ def nanoDFT_iteration(i, vals, opts, mol):
 
         jax.debug.callback(host_callback, vals[:-1] + [E_xc, eigvects, H], i)
 
-    return [density_matrix, V_xc, diff_JK, O, H_core, L_inv, E_nuc, occupancy, ERI, grid_weights, grid_AO, diis_history, log]
+    return [density_matrix, V_xc, diff_JK, O, H_core, L_inv, E_nuc, occupancy, ERI, 
+            grid_weights, grid_AO, diis_history, ipu_ID, log]
 
 
 def exchange_correlation(density_matrix, grid_AO, grid_weights):
@@ -122,7 +123,7 @@ def exchange_correlation(density_matrix, grid_AO, grid_weights):
     V_xc = V_xc + V_xc.T                                                                        # (N, N)
     return E_xc, V_xc                                                                           # (float) (N, N)
 
-def get_JK(density_matrix, ERI, dense_ERI, backend):
+def get_JK(density_matrix, ERI, dense_ERI, backend, mol, ipu_ID):
     """Computes the (N, N) matrices J and K. Density matrix is (N, N) and ERI is (N, N, N, N).  """
     N = density_matrix.shape[0]
 
@@ -131,14 +132,16 @@ def get_JK(density_matrix, ERI, dense_ERI, backend):
         K = jnp.einsum('ijkl,jk->il', ERI, density_matrix)                                       # (N, N)
         diff_JK = J - (K / 2 * HYB_B3LYP)
     else:
-        from pyscf_ipu.nanoDFT.sparse_symmetric_ERI import sparse_symmetric_einsum
-        diff_JK = sparse_symmetric_einsum(ERI[0], ERI[1], density_matrix, backend)
+        #from pyscf_ipu.nanoDFT.sparse_symmetric_ERI import sparse_symmetric_einsum
+        #diff_JK = sparse_symmetric_einsum(ERI[0], ERI[1], density_matrix, backend)
+        from pyscf_ipu.nanoDFT.sparse_symmetric_intor_ERI import compute_diff_jk
+        diff_JK = compute_diff_jk(density_matrix, mol, 1, 1e-6, backend="ipu")
         
     diff_JK = diff_JK.reshape(N, N)
 
     return diff_JK
 
-def _nanoDFT(state, ERI, grid_AO, grid_weights, opts, mol):
+def _nanoDFT(state, ERI, grid_AO, grid_weights, ipu_ID, opts, mol):
     # Utilize the IPUs MIMD parallism to compute the electron repulsion integrals (ERIs) in parallel.
     #if opts.backend == "ipu": state.ERI = electron_repulsion_integrals(state.input_floats, state.input_ints, mol, opts.threads_int, opts.intv)
     #else: pass # Compute on CPU.
@@ -146,7 +149,7 @@ def _nanoDFT(state, ERI, grid_AO, grid_weights, opts, mol):
 
     # Precompute the remaining tensors.
     E_xc, V_xc = exchange_correlation(state.density_matrix, grid_AO, grid_weights) # float (N, N)
-    diff_JK    = get_JK(state.density_matrix, ERI, opts.dense_ERI, opts.backend)                      # (N, N) (N, N)
+    diff_JK    = get_JK(state.density_matrix, ERI, opts.dense_ERI, opts.backend, mol, ipu_ID)                      # (N, N) (N, N)
     H_core     = state.kinetic + state.nuclear                                           # (N, N)
 
     # Log matrices from all DFT iterations (not used by DFT algorithm).
@@ -155,7 +158,7 @@ def _nanoDFT(state, ERI, grid_AO, grid_weights, opts, mol):
 
     # Perform DFT iterations.
     log = jax.lax.fori_loop(0, opts.its, partial(nanoDFT_iteration, opts=opts, mol=mol), [state.density_matrix, V_xc, diff_JK, state.O, H_core, state.L_inv,  # all (N, N) matrices
-                                                            state.E_nuc, state.mask, ERI, grid_weights, grid_AO, state.diis_history, log])[-1]
+                                                            state.E_nuc, state.mask, ERI, grid_weights, grid_AO, state.diis_history, ipu_ID, log])[-1]
 
     return log["matrices"], H_core, log["energy"]
 
@@ -315,11 +318,12 @@ def nanoDFT(mol, opts):
         ERI = [nonzero_distinct_ERI, nonzero_indices]
         eri_in_axes = [0,0]
     #jitted_nanoDFT = jax.jit(partial(_nanoDFT, opts=opts, mol=mol), backend=opts.backend)
+    ipu_IDs = np.arange(opts.ndevices)
     jitted_nanoDFT = jax.pmap(partial(_nanoDFT, opts=opts, mol=mol), backend=opts.backend, 
-                        in_axes=(None, eri_in_axes, 0, 0),
+                        in_axes=(None, eri_in_axes, 0, 0, 0),
                         axis_name="p")
     print(grid_AO.shape, grid_weights.shape)
-    vals = jitted_nanoDFT(state, ERI, grid_AO, grid_weights)
+    vals = jitted_nanoDFT(state, ERI, grid_AO, grid_weights, ipu_IDs)
     logged_matrices, H_core, logged_energies = [np.asarray(a[0]).astype(np.float64) for a in vals] # Ensure CPU
 
     # It's cheap to compute energy/hlgap on CPU in float64 from the logged values/matrices.
@@ -610,8 +614,8 @@ def nanoDFT_options(
 
     from pyscf_ipu.experimental.device import has_ipu
     import os 
-    if has_ipu() and "JAX_IPU_USE_MODEL" in os.environ:
-        args.dense_ERI = True
+    #if has_ipu() and "JAX_IPU_USE_MODEL" in os.environ:
+    #    args.dense_ERI = True
     args = namedtuple('DFTOptionsImmutable',vars(args).keys())(**vars(args)) # make immutable
     if not args.float32:
         jax.config.update('jax_enable_x64', not float32)

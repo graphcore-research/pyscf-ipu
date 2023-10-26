@@ -140,6 +140,16 @@ def get_shapes(input_ijkl, bas):
 
     return len, nf
 
+vertex_filename = osp.join(osp.dirname(__file__), "intor_int2e_sph.cpp")
+int2e_sph_forloop = create_ipu_tile_primitive(
+            "poplar_int2e_sph_forloop",
+            "poplar_int2e_sph_forloop",
+            inputs=["ipu_floats", "ipu_ints", "ipu_ij", "ipu_output", "tile_g", "tile_idx", "tile_buf", "chunks", "integral_size"],
+            outputs={"ipu_output": 3, "tile_g": 4, "tile_idx": 5, "tile_buf": 6},
+            gp_filename=vertex_filename,
+            perf_estimate=100,
+    )
+
 def compute_diff_jk(dm, mol, nbatch, tolerance, backend):
     dm = dm.reshape(-1)
     diff_JK = jnp.zeros(dm.shape)
@@ -231,15 +241,7 @@ def compute_diff_jk(dm, mol, nbatch, tolerance, backend):
     shapes = tuple([get_shapes(input_ijkl[i], bas) for i in range(len(sizes))])
 
     # Load vertex using TileJax.
-    vertex_filename = osp.join(osp.dirname(__file__), "intor_int2e_sph.cpp")
-    int2e_sph_forloop = create_ipu_tile_primitive(
-                "poplar_int2e_sph_forloop",
-                "poplar_int2e_sph_forloop",
-                inputs=["ipu_floats", "ipu_ints", "ipu_ij", "ipu_output", "tile_g", "tile_idx", "tile_buf", "chunks", "integral_size"],
-                outputs={"ipu_output": 3, "tile_g": 4, "tile_idx": 5, "tile_buf": 6},
-                gp_filename=vertex_filename,
-                perf_estimate=100,
-        )
+    
 
     all_eris = []
     all_indices = []
@@ -255,6 +257,11 @@ def compute_diff_jk(dm, mol, nbatch, tolerance, backend):
 
     tile_floats   = tile_put_replicated(input_floats, tiles)
     tile_ints     = tile_put_replicated(input_ints,   tiles)
+
+    # give each ipu and number "ipu_id"
+    # pad work to be divisble by num_ipus 
+    # use this to chunk up work below into 1/num_ipus 
+    # after the sparse_einsum add together the density_matrices
 
     for i, (size, count) in enumerate(zip(sizes, counts)):
         glen, nf = shapes[i]
@@ -369,6 +376,7 @@ def compute_diff_jk(dm, mol, nbatch, tolerance, backend):
         total_diff_JK += diff_JK
 
     return total_diff_JK
+    #return jax.lax.psum(total_diff_JK, axis="p")
 
 if __name__ == "__main__":
     import time 
