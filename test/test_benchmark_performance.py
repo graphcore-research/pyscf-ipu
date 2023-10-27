@@ -1,13 +1,15 @@
-from subprocess import call, Popen
-import os
-import pytest
-import numpy as np
+from subprocess import Popen, call
 import jax
+import numpy as np
+import pytest
+from tessellate_ipu import (
+    ipu_cycle_count,
+    tile_map,
+    tile_put_replicated,
+    tile_put_sharded,
+) 
+from pyscf_ipu.nanoDFT.nanoDFT import build_mol, nanoDFT, nanoDFT_options
 
-from pyscf_ipu.nanoDFT.nanoDFT import nanoDFT_options, nanoDFT, build_mol
-
-from tessellate_ipu import tile_map, tile_put_replicated, tile_put_sharded
-from tessellate_ipu import ipu_cycle_count
 
 
 # def test_basic_demonstration():
@@ -39,11 +41,7 @@ from tessellate_ipu import ipu_cycle_count
 @pytest.mark.parametrize("molecule", ["methane", "benzene"])
 def test_dense_eri(molecule):
 
-    opts, mol_str = nanoDFT_options(
-        float32 = True,
-        mol_str=molecule,
-        backend="ipu"
-    )
+    opts, mol_str = nanoDFT_options(float32 = True, mol_str=molecule, backend="ipu")
     mol = build_mol(mol_str, opts.basis)
 
     _, _, ipu_cycles_stamps = nanoDFT(mol, opts, profile_performance=True)
@@ -55,13 +53,13 @@ def test_dense_eri(molecule):
     diff = (end - start)[0][0][0]
     print(
         "----------------------------------------------------------------------------"
-        )
+    )
     print("                                Diff cycle count:", diff)
     print("                            Diff cycle count [M]:", diff/1e6)
     print("Estimated time of execution on Bow-IPU [seconds]:", diff/(1.85*1e9))
     print(
         "----------------------------------------------------------------------------"
-        )
+    )
 
     assert True
 
@@ -75,7 +73,7 @@ def test_sparse_eri(molecule):
         mol_str=molecule,
         backend="ipu",
         dense_ERI=False,
-        eri_threshold=1e-9
+        eri_threshold=1e-9,
     )
     mol = build_mol(mol_str, opts.basis)
 
