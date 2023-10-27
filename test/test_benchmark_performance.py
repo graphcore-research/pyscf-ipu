@@ -1,3 +1,4 @@
+# Copyright (c) 2023 Graphcore Ltd. All rights reserved.
 from subprocess import Popen, call
 import jax
 import numpy as np
@@ -11,30 +12,31 @@ from tessellate_ipu import (
 from pyscf_ipu.nanoDFT.nanoDFT import build_mol, nanoDFT, nanoDFT_options
 
 
+@pytest.mark.skip(reason="No IPU in CI.")
+@pytest.mark.ipu
+def test_basic_demonstration():
+    dummy = np.random.rand(2,3).astype(np.float32)
+    dummier = np.random.rand(2,3).astype(np.float32)
 
-# def test_basic_demonstration():
-#     dummy = np.random.rand(2,3).astype(np.float32)
-#     dummier = np.random.rand(2,3).astype(np.float32)
+    @jax.jit
+    def jitted_inner_test(dummy, dummier):
+        tiles = tuple(range(len(dummy)))
+        dummy = tile_put_sharded(dummy, tiles)
+        tiles = tuple(range(len(dummier)))
+        dummier = tile_put_sharded(dummier, tiles)
 
-#     @jax.jit
-#     def jitted_inner_test(dummy, dummier):
-#         tiles = tuple(range(len(dummy)))
-#         dummy = tile_put_sharded(dummy, tiles)
-#         tiles = tuple(range(len(dummier)))
-#         dummier = tile_put_sharded(dummier, tiles)
+        dummy, dummier, start = ipu_cycle_count(dummy, dummier)
+        out = tile_map(jax.lax.add_p, dummy, dummier)
+        out, end = ipu_cycle_count(out)
 
-#         dummy, dummier, start = ipu_cycle_count(dummy, dummier)
-#         out = tile_map(jax.lax.add_p, dummy, dummier)
-#         out, end = ipu_cycle_count(out)
+        return out, start, end
 
-#         return out, start, end
+    _, start, end = jitted_inner_test(dummy, dummier)
+    print("Start cycle count:", start, start.shape)
+    print("End cycle count:", end, end.shape)
+    print("Diff cycle count:", end.array - start.array)
 
-#     _, start, end = jitted_inner_test(dummy, dummier)
-#     print("Start cycle count:", start, start.shape)
-#     print("End cycle count:", end, end.shape)
-#     print("Diff cycle count:", end.array - start.array)
-
-#     assert True
+    assert True
 
 @pytest.mark.skip(reason="No IPU in CI.")
 @pytest.mark.ipu
