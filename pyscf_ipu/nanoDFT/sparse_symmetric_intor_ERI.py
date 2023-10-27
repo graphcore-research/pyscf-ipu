@@ -456,12 +456,13 @@ if __name__ == "__main__":
 
     # ------------------------------------ #
 
-    diff_JK = jax.jit(compute_diff_jk, backend=backend, static_argnames=['mol', 'nbatch', 'tolerance', 'backend'])(dm, mol, args.batches, args.itol, args.backend)
+    def pmap_wrapper(dummy_axis, dm, mol, nbatch, tolerance, ndevices, backend):
+        return compute_diff_jk(dm, mol, nbatch, tolerance, ndevices, backend)
+
+    diff_JK = jax.pmap(pmap_wrapper, in_axes=(0, None, None, None, None, None, None), static_broadcasted_argnums=(2, 3, 4, 5, 6), backend=backend, axis_name="p")(np.arange(args.nipu), dm, mol, args.batches, args.itol, args.nipu, args.backend) 
 
     # ------------------------------------ #
-
-    # diff_JK = jax.pmap(sparse_symmetric_einsum, in_axes=(0,0,None,None), static_broadcasted_argnums=(3,), backend=backend, axis_name="p")(nonzero_distinct_ERI, nonzero_indices, dm, args.backend) 
-
+    
     if args.skip: 
         exit()
     if args.nipu > 1:
