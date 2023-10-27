@@ -245,9 +245,11 @@ def compute_diff_jk(dm, mol, nbatch, tolerance, ndevices, backend):
     for tup_id in range(len(input_ijkl)):
         pmap_remainder = len(input_ijkl[tup_id]) % ndevices
         print('pmap_remainder', pmap_remainder)
+        padding = 0
         if pmap_remainder > 0:
             input_ijkl[tup_id] += tuple([[-1, -1, -1, -1]]*(ndevices-pmap_remainder)) # -1s are accounted for later after eri computation
-            new_counts[tup_id] = counts[tup_id]+(ndevices-pmap_remainder)
+            padding = (ndevices-pmap_remainder)
+        new_counts[tup_id] = counts[tup_id]+padding
     counts = tuple(new_counts)
 
     print('after [len(ijkl) for ijkl in input_ijkl]', [len(ijkl) for ijkl in input_ijkl])
