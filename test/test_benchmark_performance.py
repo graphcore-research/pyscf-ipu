@@ -11,10 +11,11 @@ from tessellate_ipu import (
     tile_put_sharded,
 )
 
+from pyscf_ipu.experimental.device import has_ipu, ipu_func
 from pyscf_ipu.nanoDFT.nanoDFT import build_mol, nanoDFT, nanoDFT_options
 
 
-@pytest.mark.skip(reason="No IPU in CI.")
+@pytest.mark.skipif(not has_ipu(), reason="Skipping ipu test!")
 @pytest.mark.ipu
 def test_basic_demonstration():
     dummy = np.random.rand(2,3).astype(np.float32)
@@ -40,7 +41,7 @@ def test_basic_demonstration():
 
     assert True
 
-@pytest.mark.skip(reason="No IPU in CI.")
+@pytest.mark.skipif(not has_ipu(), reason="Skipping ipu test!")
 @pytest.mark.ipu
 @pytest.mark.parametrize("molecule", ["methane", "benzene"])
 def test_dense_eri(molecule):
