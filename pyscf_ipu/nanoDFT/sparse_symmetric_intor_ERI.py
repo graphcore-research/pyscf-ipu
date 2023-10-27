@@ -162,8 +162,6 @@ def compute_diff_jk(dm, mol, nbatch, tolerance, ndevices, backend):
     ao_loc          = np.cumsum(np.concatenate([np.zeros(1), (bas[:,1]*2+1) * bas[:,3] ])).astype(np.int32)
     n_ao_loc        = np.prod(ao_loc.shape)
 
-    n_env = np.prod(env.shape) # TODO: Try to remove this. 
-
     # Step 1. Compute indices where ERI is non-zero due to geometry (pre-screening). 
     # Below computes: np.max([ERI[a,b,a,b] for a,b in zip(tril_idx[0], tril_idx[1])])
     ERI_s8 = mol.intor("int2e_sph", aosym="s8") # TODO: make custom libcint code compute this. 
@@ -273,11 +271,6 @@ def compute_diff_jk(dm, mol, nbatch, tolerance, ndevices, backend):
 
     tile_floats   = tile_put_replicated(input_floats, tiles)
     tile_ints     = tile_put_replicated(input_ints,   tiles)
-
-    # give each ipu and number "ipu_id" -- use jax.lax.axis_index('p') instead
-    # pad work to be divisble by num_ipus 
-    # use this to chunk up work below into 1/num_ipus 
-    # after the sparse_einsum add together the density_matrices
 
     for i, (size, count) in enumerate(zip(sizes, counts)):
         print('>>>', size, count)
@@ -462,7 +455,7 @@ if __name__ == "__main__":
     diff_JK = jax.pmap(pmap_wrapper, in_axes=(0, None, None, None, None, None, None), static_broadcasted_argnums=(2, 3, 4, 5, 6), backend=backend, axis_name="p")(np.arange(args.nipu), dm, mol, args.batches, args.itol, args.nipu, args.backend) 
 
     # ------------------------------------ #
-    
+
     if args.skip: 
         exit()
     if args.nipu > 1:
