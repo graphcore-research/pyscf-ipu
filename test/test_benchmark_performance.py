@@ -62,7 +62,7 @@ def test_dense_eri(molecule):
     assert True
 
 
-@pytest.mark.skip(reason="No IPU in CI.")
+@pytest.mark.skipif(not has_ipu(), reason="Skipping ipu test!")
 @pytest.mark.ipu
 @pytest.mark.parametrize("molecule", ["methane", "benzene", "c20"])
 def test_sparse_eri(molecule):
