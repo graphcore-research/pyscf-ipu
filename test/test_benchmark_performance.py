@@ -91,12 +91,12 @@ def test_sparse_eri(molecule):
     diff = (end - start)[0][0][0]
     print(
         "----------------------------------------------------------------------------"
-        )
+    )
     print("                                Diff cycle count:", diff)
     print("                            Diff cycle count [M]:", diff / 1e6)
     print("Estimated time of execution on Bow-IPU [seconds]:", diff / (1.85 * 1e9))
     print(
         "----------------------------------------------------------------------------"
-        )
+    )
 
     assert True
