@@ -1,9 +1,9 @@
 # Copyright (c) 2023 Graphcore Ltd. All rights reserved.
 from subprocess import Popen, call
+
 import jax
 import numpy as np
 import pytest
-
 from tessellate_ipu import (
     ipu_cycle_count,
     tile_map,
@@ -41,11 +41,11 @@ def test_basic_demonstration():
 
     assert True
 
+
 @pytest.mark.skipif(not has_ipu(), reason="Skipping ipu test!")
 @pytest.mark.ipu
 @pytest.mark.parametrize("molecule", ["methane", "benzene"])
 def test_dense_eri(molecule):
-
     opts, mol_str = nanoDFT_options(float32=True, mol_str=molecule, backend="ipu")
     mol = build_mol(mol_str, opts.basis)
 
@@ -72,7 +72,6 @@ def test_dense_eri(molecule):
 @pytest.mark.ipu
 @pytest.mark.parametrize("molecule", ["methane", "benzene", "c20"])
 def test_sparse_eri(molecule):
-
     opts, mol_str = nanoDFT_options(
         float32=True,
         mol_str=molecule,
