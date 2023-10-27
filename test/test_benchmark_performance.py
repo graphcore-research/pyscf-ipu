@@ -1,17 +1,14 @@
 # Copyright (c) 2023 Graphcore Ltd. All rights reserved.
-from subprocess import Popen, call
-
 import jax
 import numpy as np
 import pytest
 from tessellate_ipu import (
     ipu_cycle_count,
     tile_map,
-    tile_put_replicated,
     tile_put_sharded,
 )
 
-from pyscf_ipu.experimental.device import has_ipu, ipu_func
+from pyscf_ipu.experimental.device import has_ipu
 from pyscf_ipu.nanoDFT.nanoDFT import build_mol, nanoDFT, nanoDFT_options
 
 
