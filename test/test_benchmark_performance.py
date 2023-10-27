@@ -36,7 +36,7 @@ from pyscf_ipu.nanoDFT.nanoDFT import build_mol, nanoDFT, nanoDFT_options
 
 #     assert True
 
-# @pytest.mark.skip(reason="No IPU in CI.")
+@pytest.mark.skip(reason="No IPU in CI.")
 @pytest.mark.ipu
 @pytest.mark.parametrize("molecule", ["methane", "benzene"])
 def test_dense_eri(molecule):
@@ -63,7 +63,7 @@ def test_dense_eri(molecule):
 
     assert True
 
-# @pytest.mark.skip(reason="No IPU in CI.")
+@pytest.mark.skip(reason="No IPU in CI.")
 @pytest.mark.ipu
 @pytest.mark.parametrize("molecule", ["methane", "benzene", "c20"])
 def test_sparse_eri(molecule):
