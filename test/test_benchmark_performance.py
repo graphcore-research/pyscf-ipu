@@ -18,8 +18,8 @@ from pyscf_ipu.nanoDFT.nanoDFT import build_mol, nanoDFT, nanoDFT_options
 @pytest.mark.skipif(not has_ipu(), reason="Skipping ipu test!")
 @pytest.mark.ipu
 def test_basic_demonstration():
-    dummy = np.random.rand(2,3).astype(np.float32)
-    dummier = np.random.rand(2,3).astype(np.float32)
+    dummy = np.random.rand(2, 3).astype(np.float32)
+    dummier = np.random.rand(2, 3).astype(np.float32)
 
     @jax.jit
     def jitted_inner_test(dummy, dummier):
@@ -46,7 +46,7 @@ def test_basic_demonstration():
 @pytest.mark.parametrize("molecule", ["methane", "benzene"])
 def test_dense_eri(molecule):
 
-    opts, mol_str = nanoDFT_options(float32 = True, mol_str=molecule, backend="ipu")
+    opts, mol_str = nanoDFT_options(float32=True, mol_str=molecule, backend="ipu")
     mol = build_mol(mol_str, opts.basis)
 
     _, _, ipu_cycles_stamps = nanoDFT(mol, opts, profile_performance=True)
@@ -60,8 +60,8 @@ def test_dense_eri(molecule):
         "----------------------------------------------------------------------------"
     )
     print("                                Diff cycle count:", diff)
-    print("                            Diff cycle count [M]:", diff/1e6)
-    print("Estimated time of execution on Bow-IPU [seconds]:", diff/(1.85*1e9))
+    print("                            Diff cycle count [M]:", diff / 1e6)
+    print("Estimated time of execution on Bow-IPU [seconds]:", diff / (1.85*1e9))
     print(
         "----------------------------------------------------------------------------"
     )
@@ -93,8 +93,8 @@ def test_sparse_eri(molecule):
         "----------------------------------------------------------------------------"
         )
     print("                                Diff cycle count:", diff)
-    print("                            Diff cycle count [M]:", diff/1e6)
-    print("Estimated time of execution on Bow-IPU [seconds]:", diff/(1.85*1e9))
+    print("                            Diff cycle count [M]:", diff / 1e6)
+    print("Estimated time of execution on Bow-IPU [seconds]:", diff / (1.85*1e9))
     print(
         "----------------------------------------------------------------------------"
         )
