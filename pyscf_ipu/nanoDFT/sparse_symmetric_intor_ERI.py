@@ -140,11 +140,11 @@ def get_shapes(input_ijkl, bas):
 
     return len, nf
 
-vertex_filename = osp.join(osp.dirname(__file__), "intor_int2e_sph.cpp")
+vertex_filename = osp.join(osp.dirname(__file__), "intor_int2e_sph_condensed.cpp")
 int2e_sph_forloop = create_ipu_tile_primitive(
             "poplar_int2e_sph_forloop",
             "poplar_int2e_sph_forloop",
-            inputs=["ipu_floats", "ipu_ints", "ipu_ij", "ipu_output", "tile_g", "tile_idx", "tile_buf", "chunks", "integral_size"],
+            inputs=["ipu_floats", "ipu_ints", "ipu_ij", "ipu_output", "tile_g", "tile_idx", "tile_buf", "chunks", "integral_size", "gctr_buf"],
             outputs={"ipu_output": 3, "tile_g": 4, "tile_idx": 5, "tile_buf": 6},
             gp_filename=vertex_filename,
             perf_estimate=100,
@@ -287,6 +287,7 @@ def compute_diff_jk(dm, mol, nbatch, tolerance, ndevices, backend):
         tile_idx      = tile_put_replicated(jnp.empty(max(256, min(int(nf*3), 3888)+1), dtype=jnp.int32), tiles)
         tile_buf      = tile_put_replicated(jnp.empty(1080*4+1), tiles)
         integral_size = tile_put_replicated(jnp.array(size, dtype=jnp.uint32), tiles)
+        tile_gctr_buf = tile_put_replicated(jnp.empty((1296+1), dtype=jnp.float32), tiles) # condensed version only
         
         def batched_compute(start, stop, chunk_size, tiles):
             assert (stop-start) < chunk_size or (stop-start) % chunk_size == 0
@@ -301,7 +302,8 @@ def compute_diff_jk(dm, mol, nbatch, tolerance, ndevices, backend):
                                     tile_idx[:len(tiles)],
                                     tile_buf[:len(tiles)],
                                     tile_put_replicated(jnp.array(num_batches, dtype=jnp.uint32), tiles),
-                                    integral_size[:len(tiles)])
+                                    integral_size[:len(tiles)],
+                                    tile_gctr_buf[:len(tiles)])
             return out.array.reshape(-1, size), jnp.maximum(idx.reshape(-1, 4), 0) # account for -1s, convert to 0s
 
         if num_full_batches > 0: f_out, f_idx = batched_compute(0, num_full_batches*chunk_size, chunk_size, tiles)
