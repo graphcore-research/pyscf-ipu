@@ -139,6 +139,8 @@ def get_JK(density_matrix, ERI, dense_ERI, backend):
     return diff_JK
 
 def _nanoDFT(state, ERI, grid_AO, grid_weights, opts, mol):
+    if opts.backend == "ipu": grid_weights, start = utils.get_ipu_cycles(grid_weights)
+
     # Utilize the IPUs MIMD parallism to compute the electron repulsion integrals (ERIs) in parallel.
     #if opts.backend == "ipu": state.ERI = electron_repulsion_integrals(state.input_floats, state.input_ints, mol, opts.threads_int, opts.intv)
     #else: pass # Compute on CPU.
@@ -157,7 +159,12 @@ def _nanoDFT(state, ERI, grid_AO, grid_weights, opts, mol):
     log = jax.lax.fori_loop(0, opts.its, partial(nanoDFT_iteration, opts=opts, mol=mol), [state.density_matrix, V_xc, diff_JK, state.O, H_core, state.L_inv,  # all (N, N) matrices
                                                             state.E_nuc, state.mask, ERI, grid_weights, grid_AO, state.diis_history, log])[-1]
 
-    return log["matrices"], H_core, log["energy"]
+    cycles = -1
+    if opts.backend == "ipu": 
+        log["energy"], stop = utils.get_ipu_cycles(log["energy"])
+        cycles = (stop.array-start.array)[0,0]
+
+    return log["matrices"], H_core, log["energy"], cycles 
 
 
 FloatN = Float[Array, "N"]
@@ -320,7 +327,8 @@ def nanoDFT(mol, opts):
                         axis_name="p")
     print(grid_AO.shape, grid_weights.shape)
     vals = jitted_nanoDFT(state, ERI, grid_AO, grid_weights)
-    logged_matrices, H_core, logged_energies = [np.asarray(a[0]).astype(np.float64) for a in vals] # Ensure CPU
+    logged_matrices, H_core, logged_energies, cycles = [np.asarray(a[0]).astype(np.float64) for a in vals] # Ensure CPU
+    if opts.backend == "ipu": print("Cycle Count: ", cycles/10**6, "[M]")
 
     # It's cheap to compute energy/hlgap on CPU in float64 from the logged values/matrices.
     logged_E_xc = logged_energies[:, 3].copy()
