@@ -240,10 +240,11 @@ def save_plot(base_data_dir: str, molecule_name: str, iterations: int, _plot_tit
     print("Numerical error visualisation saved in", gif_path)
 
 
-from tessellate_ipu import tile_map, ipu_cycle_count, tile_put_sharded
-from typing import List
+
 
 def get_ipu_cycles(data_to_be_sharded: List[float], num_items_to_be_sharded: int = 1) -> List[float]:
+    from tessellate_ipu import tile_map, ipu_cycle_count, tile_put_sharded
+    from typing import List
     tmp = data_to_be_sharded[0:num_items_to_be_sharded]
     tiles = tuple(range(len(tmp)))
     tmp = tile_put_sharded(tmp, tiles)
