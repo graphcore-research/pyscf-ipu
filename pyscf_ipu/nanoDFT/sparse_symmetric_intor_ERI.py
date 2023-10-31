@@ -6,7 +6,7 @@ import jax
 import jax.numpy as jnp 
 import os.path as osp
 from tessellate_ipu import create_ipu_tile_primitive, ipu_cycle_count, tile_map, tile_put_sharded, tile_put_replicated
-from functools import partial 
+from functools import partial, lru_cache
 from icecream import ic
 from tqdm import tqdm
 jax.config.update('jax_platform_name', "cpu")
@@ -66,6 +66,110 @@ def num_repetitions_fast_4d(i, j, k, l, xnp=np, dtype=np.uint64):
         (1- xnp.equal(k,j) * xnp.equal(l,i))).astype(dtype))
     )
     return repetitions
+
+# gen_shells is designed to be called multiple times to simplify the rest of the code, but compute shells only once (lru_cache)
+@lru_cache(maxsize=None) # cache results
+def gen_shells(mol, tolerance, ndevices):
+    N = mol.nao_nr()
+    bas = mol._bas
+    n_bas = bas.shape[0]
+    ao_loc = np.cumsum(np.concatenate([np.zeros(1), (bas[:,1]*2+1) * bas[:,3] ])).astype(np.int32)
+
+    # Step 1. Compute up to n(n+1)/2 considered indices (O(N^2))
+    if tolerance > 0:
+        # Compute indices where ERI is non-zero due to geometry (pre-screening). 
+        # Below computes: np.max([ERI[a,b,a,b] for a,b in zip(tril_idx[0], tril_idx[1])])
+        ERI_s8 = mol.intor("int2e_sph", aosym="s8") # TODO: make custom libcint code compute this. 
+        lst_abab = np.zeros((N*(N+1)//2), dtype=np.float32)
+        lst_ab   = np.zeros((N*(N+1)//2, 2), dtype=np.int32)
+        tril_idx = np.tril_indices(N)
+        for c, (a, b) in tqdm(enumerate(zip(tril_idx[0], tril_idx[1]))):
+            index_ab_s8 = a*(a+1)//2 + b
+            index_s8 = index_ab_s8*(index_ab_s8+3)//2
+            abab = np.abs(ERI_s8[index_s8])
+            lst_abab[c] = abab
+            lst_ab[c, :] = (a, b)
+        abab_max = np.max(lst_abab)
+        considered_indices = set([(a,b) for abab, (a, b) in tqdm(zip(lst_abab, lst_ab)) if abab*abab_max >= tolerance**2])
+    else:
+        lst_ab   = np.zeros((N*(N+1)//2, 2), dtype=np.int32)
+        tril_idx = np.tril_indices(N)
+        considered_indices = set([(a, b) for a, b in zip(tril_idx[0], tril_idx[1])])
+    print('n_bas', n_bas)
+    print('ao_loc', ao_loc)
+    
+    # Step 2: Remove zeros by orthogonality and match indices with shells. 
+    # Precompute Fill input_ijkl and output_sizes with the necessary indices.
+    ortho_pattern =  np.array([(i+3)%5!=0 for i in range(N)]) # hardcoded
+    n_upper_bound = (n_bas*(n_bas-1))**2
+    input_ijkl    = np.zeros((n_upper_bound, 4), dtype=np.int32)
+    output_sizes  = np.zeros((n_upper_bound, 5))
+
+    num_calls = 0
+
+    for i in tqdm(range(n_bas), desc="Computing shells"): # consider all shells << all ijkl 
+        for j in range(i+1):
+            for k in range(i, n_bas):
+                for l in range(k+1):
+                    di, dj, dk, dl = [ao_loc[z+1] - ao_loc[z] for z in [i,j,k,l]]
+
+                    found_nonzero = False
+                    # check i,j boxes
+                    for bi in range(ao_loc[i], ao_loc[i+1]):
+                        for bj in range(ao_loc[j], ao_loc[j+1]):
+                            if (bi, bj) in considered_indices: # if ij box is considered
+                                # check if kl pairs are considered
+                                for bk in range(ao_loc[k], ao_loc[k+1]):
+                                    if bk>=bi: # apply symmetry - tril fade vertical
+                                        mla = ao_loc[l]
+                                        if bk == bi:
+                                            mla = max(bj, ao_loc[l]) # apply symmetry - tril fade horizontal
+                                        for bl in range(mla, ao_loc[l+1]):
+                                            if (bk, bl) in considered_indices:
+                                                # apply grid pattern to find final nonzeros
+                                                if False and not ortho_pattern[bi] ^ ortho_pattern[bj] ^ ortho_pattern[bk] ^ ortho_pattern[bl]:
+                                                    found_nonzero = True
+                                                    break
+                                                else: 
+                                                    found_nonzero = True
+                                                    break
+                                    if found_nonzero: break
+                            if found_nonzero: break
+                        if found_nonzero: break
+                    if not found_nonzero: continue 
+
+                    input_ijkl[num_calls] = [i, j, k, l]
+                    output_sizes[num_calls] = [di, dj, dk, dl, di*dj*dk*dl]
+                    num_calls += 1
+
+    input_ijkl    = input_ijkl[:num_calls, :]
+    output_sizes  = output_sizes[:num_calls, :]
+
+    sizes, counts = [tuple(out.astype(np.int32).tolist()) for out in np.unique(output_sizes[:, -1], return_counts=True)]
+    
+    input_ijkl    = input_ijkl[np.argsort(output_sizes[:, -1])]
+    input_ijkl = [tuple(map(tuple, input_ijkl[start_index:start_index+count])) for start_index, count in zip(np.cumsum(np.concatenate([[0], counts[:-1]])), counts)]
+
+    print('before [len(ijkl) for ijkl in input_ijkl]', [len(ijkl) for ijkl in input_ijkl])
+
+    new_counts = [0]*len(counts)
+    for tup_id in range(len(input_ijkl)):
+        pmap_remainder = len(input_ijkl[tup_id]) % ndevices
+        print('pmap_remainder', pmap_remainder)
+        padding = 0
+        if pmap_remainder > 0:
+            input_ijkl[tup_id] += tuple([[-1, -1, -1, -1]]*(ndevices-pmap_remainder)) # -1s are accounted for later after eri computation
+            padding = (ndevices-pmap_remainder)
+        new_counts[tup_id] = counts[tup_id]+padding
+    counts = tuple(new_counts)
+
+    print('after [len(ijkl) for ijkl in input_ijkl]', [len(ijkl) for ijkl in input_ijkl])
+
+    input_ijkl = tuple(input_ijkl)
+
+    shapes = tuple([get_shapes(input_ijkl[i], bas) for i in range(len(sizes))])
+
+    return input_ijkl, sizes, counts, shapes
 
 def get_shapes(input_ijkl, bas):
     i_sh, j_sh, k_sh, l_sh  = input_ijkl[0]
@@ -150,7 +254,7 @@ int2e_sph_forloop = create_ipu_tile_primitive(
             perf_estimate=100,
     )
 
-def compute_diff_jk(dm, mol, nbatch, tolerance, ndevices, backend):
+def compute_diff_jk(input_ijkl_slice, dm, mol, nbatch, tolerance, ndevices, backend):
     dm = dm.reshape(-1)
     diff_JK = jnp.zeros(dm.shape)
     N = int(np.sqrt(dm.shape[0])) 
@@ -162,100 +266,12 @@ def compute_diff_jk(dm, mol, nbatch, tolerance, ndevices, backend):
     ao_loc          = np.cumsum(np.concatenate([np.zeros(1), (bas[:,1]*2+1) * bas[:,3] ])).astype(np.int32)
     n_ao_loc        = np.prod(ao_loc.shape)
 
-    # Step 1. Compute indices where ERI is non-zero due to geometry (pre-screening). 
-    # Below computes: np.max([ERI[a,b,a,b] for a,b in zip(tril_idx[0], tril_idx[1])])
-    ERI_s8 = mol.intor("int2e_sph", aosym="s8") # TODO: make custom libcint code compute this. 
-    lst_abab = np.zeros((N*(N+1)//2), dtype=np.float32)
-    lst_ab   = np.zeros((N*(N+1)//2, 2), dtype=np.int32)
-    tril_idx = np.tril_indices(N)
-    for c, (a, b) in tqdm(enumerate(zip(tril_idx[0], tril_idx[1]))):
-        index_ab_s8 = a*(a+1)//2 + b
-        index_s8 = index_ab_s8*(index_ab_s8+3)//2
-        abab = np.abs(ERI_s8[index_s8])
-        lst_abab[c] = abab
-        lst_ab[c, :] = (a, b)
-    abab_max = np.max(lst_abab)
-    considered_indices = set([(a,b) for abab, (a, b) in tqdm(zip(lst_abab, lst_ab)) if abab*abab_max >= tolerance**2])
-    print('n_bas', n_bas)
-    print('ao_loc', ao_loc)
-
-    # Step 2: Remove zeros by orthogonality and match indices with shells. 
-    # Precompute Fill input_ijkl and output_sizes with the necessary indices.
-    n_upper_bound = (n_bas*(n_bas-1))**2
-    input_ijkl    = np.zeros((n_upper_bound, 4), dtype=np.int32)
-    output_sizes  = np.zeros((n_upper_bound, 5))
-
-    ortho_pattern =  np.array([(i+3)%5!=0 for i in range(N)]) # hardcoded
-    num_calls = 0
-    
-    for i in tqdm(range(n_bas)): # consider all shells << all ijkl 
-        for j in range(i+1):
-            for k in range(i, n_bas):
-                for l in range(k+1):
-                    di, dj, dk, dl = [ao_loc[z+1] - ao_loc[z] for z in [i,j,k,l]]
-
-                    found_nonzero = False
-                    # check i,j boxes
-                    for bi in range(ao_loc[i], ao_loc[i+1]):
-                        for bj in range(ao_loc[j], ao_loc[j+1]):
-                            if (bi, bj) in considered_indices: # if ij box is considered
-                                # check if kl pairs are considered
-                                for bk in range(ao_loc[k], ao_loc[k+1]):
-                                    if bk>=bi: # apply symmetry - tril fade vertical
-                                        mla = ao_loc[l]
-                                        if bk == bi:
-                                            mla = max(bj, ao_loc[l]) # apply symmetry - tril fade horizontal
-                                        for bl in range(mla, ao_loc[l+1]):
-                                            if (bk, bl) in considered_indices:
-                                                # apply grid pattern to find final nonzeros
-                                                if False and not ortho_pattern[bi] ^ ortho_pattern[bj] ^ ortho_pattern[bk] ^ ortho_pattern[bl]:
-                                                    found_nonzero = True
-                                                    break
-                                                else: 
-                                                    found_nonzero = True
-                                                    break
-                                    if found_nonzero: break
-                            if found_nonzero: break
-                        if found_nonzero: break
-                    if not found_nonzero: continue 
-
-                    input_ijkl[num_calls] = [i, j, k, l]
-                    output_sizes[num_calls] = [di, dj, dk, dl, di*dj*dk*dl]
-                    num_calls += 1
-
-    input_ijkl    = input_ijkl[:num_calls, :]
-    output_sizes  = output_sizes[:num_calls, :]
-
     # Prepare IPU inputs.
     # Merge all int/float inputs in seperate arrays.
     input_floats  = env.reshape(1, -1)
     input_ints    = np.hstack([0, 0, n_atm, n_bas, 0, n_ao_loc, ao_loc.reshape(-1), atm.reshape(-1), bas.reshape(-1)]) # todo 0s not used (n_buf, n_eri, n_env)
 
-    sizes, counts = [tuple(out.astype(np.int32).tolist()) for out in np.unique(output_sizes[:, -1], return_counts=True)]
-    
-    input_ijkl    = input_ijkl[np.argsort(output_sizes[:, -1])]
-    input_ijkl = [tuple(map(tuple, input_ijkl[start_index:start_index+count])) for start_index, count in zip(np.cumsum(np.concatenate([[0], counts[:-1]])), counts)]
-    
-
-    print('before [len(ijkl) for ijkl in input_ijkl]', [len(ijkl) for ijkl in input_ijkl])
-
-    new_counts = [0]*len(counts)
-    for tup_id in range(len(input_ijkl)):
-        pmap_remainder = len(input_ijkl[tup_id]) % ndevices
-        print('pmap_remainder', pmap_remainder)
-        padding = 0
-        if pmap_remainder > 0:
-            input_ijkl[tup_id] += tuple([[-1, -1, -1, -1]]*(ndevices-pmap_remainder)) # -1s are accounted for later after eri computation
-            padding = (ndevices-pmap_remainder)
-        new_counts[tup_id] = counts[tup_id]+padding
-    counts = tuple(new_counts)
-
-    print('after [len(ijkl) for ijkl in input_ijkl]', [len(ijkl) for ijkl in input_ijkl])
-
-    input_ijkl = tuple(input_ijkl)
-
-    shapes = tuple([get_shapes(input_ijkl[i], bas) for i in range(len(sizes))])
-    
+    input_ijkl, sizes, counts, shapes = gen_shells(mol, tolerance, ndevices)
 
     all_eris = []
     all_indices = []
@@ -266,17 +282,21 @@ def compute_diff_jk(dm, mol, nbatch, tolerance, ndevices, backend):
     num_tiles = NUM_TILES-1
     num_threads = 6
 
+    num_calls = np.sum(counts)
     if num_calls < num_tiles:  tiles = tuple((np.arange(num_calls)+1).tolist())
     else:                      tiles = tuple((np.arange(num_tiles*num_threads)%(num_tiles)+1).tolist())
 
     tile_floats   = tile_put_replicated(input_floats, tiles)
     tile_ints     = tile_put_replicated(input_ints,   tiles)
 
+    slice_indices = np.cumsum([0]+[c*4//ndevices for c in counts])
+    print('slice_indices', slice_indices)
+
     for i, (size, count) in enumerate(zip(sizes, counts)):
         print('>>>', size, count)
         slice_offset = (count//ndevices)*jax.lax.axis_index('p')
         slice_count = count // ndevices
-        slice_ijkl = jax.lax.dynamic_slice(jnp.array(input_ijkl[i]), (slice_offset, 0), (slice_count, 4)) # shell indices should be computed outside and passed through pmap
+        slice_ijkl = input_ijkl_slice[slice_indices[i]:slice_indices[i+1]].reshape(-1, 4)
 
         glen, nf = shapes[i]
         chunk_size  = num_tiles * num_threads
@@ -451,10 +471,10 @@ if __name__ == "__main__":
 
     # ------------------------------------ #
 
-    def pmap_wrapper(dummy_axis, dm, mol, nbatch, tolerance, ndevices, backend):
-        return compute_diff_jk(dm, mol, nbatch, tolerance, ndevices, backend)
+    input_ijkl, sizes, counts, shapes = gen_shells(mol, args.itol, args.nipu)
+    sliced_input_ijkl = np.concatenate([np.array(ijkl, dtype=int).reshape(args.nipu, -1) for ijkl in input_ijkl], axis=-1)
 
-    diff_JK = jax.pmap(pmap_wrapper, in_axes=(0, None, None, None, None, None, None), static_broadcasted_argnums=(2, 3, 4, 5, 6), backend=backend, axis_name="p")(np.arange(args.nipu), dm, mol, args.batches, args.itol, args.nipu, args.backend) 
+    diff_JK = jax.pmap(compute_diff_jk, in_axes=(0, None, None, None, None, None, None), static_broadcasted_argnums=(2, 3, 4, 5, 6), backend=backend, axis_name="p")(sliced_input_ijkl, dm, mol, args.batches, args.itol, args.nipu, args.backend) 
 
     # ------------------------------------ #
 
