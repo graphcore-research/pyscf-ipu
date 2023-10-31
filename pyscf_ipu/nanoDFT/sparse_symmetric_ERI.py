@@ -110,7 +110,7 @@ def sparse_symmetric_einsum(nonzero_distinct_ERI, nonzero_indices, dm, backend):
     #dm_scaled  = dm*multiplier
     #dm         = tile_put_replicated(dm, tiles)
     print(dm.shape)
-    dm = dm.reshape(2, 450)
+    #dm = dm.reshape(2, 450)
     diff_JK    = tile_put_replicated(diff_JK, tiles=tiles)
 
     N         = tile_put_replicated(jnp.array(N,        dtype=jnp.uint32),   tiles)
@@ -123,7 +123,8 @@ def sparse_symmetric_einsum(nonzero_distinct_ERI, nonzero_indices, dm, backend):
             # Step 1: dm_indices = ipu_ijkl(indices, symmetry+is_K_matrix*8, N).reshape(-1, 1)
             nonzero_indices_i = nonzero_indices[:, i] 
             dm_indices        = tile_map(compute_indices[symmetry + is_K_matrix*8], outshape, nonzero_indices_i, N, start, stop)
-            dm_indices = tile_put_sharded(dm_indices.array-first_half*step, tiles)
+            #dm_indices = tile_put_sharded(dm_indices.array-first_half*step, tiles)
+            dm_indices = tile_put_sharded(dm_indices.array, tiles)
 
             # Step 2: dm_values = jnp.take(dm, indices, axis=0) 
             dm_values = tile_map( jax.lax.gather_p,
@@ -162,12 +163,12 @@ def sparse_symmetric_einsum(nonzero_distinct_ERI, nonzero_indices, dm, backend):
         #tile_shard_dm 
         # // may add a 10x here. 
 
-        first_half = i < (batches//2)
+        #first_half = i < (batches//2)
         step = dm.shape[0]//2
-        print(first_half, step)
+        #print(first_half, step)
 
-        _dm_scaled = tile_put_replicated(dm[first_half]*multiplier, tiles)
-        _dm        = tile_put_replicated(dm[first_half], tiles)
+        _dm_scaled = tile_put_replicated(dm*multiplier, tiles)
+        _dm        = tile_put_replicated(dm, tiles)
         #diff_JK   = tile_put_replicated(diff_JK, tiles=tiles)
 
         # this basically uses the same floats 16 times; 
