@@ -9,6 +9,7 @@ from tessellate_ipu import create_ipu_tile_primitive, ipu_cycle_count, tile_map,
 from functools import partial, lru_cache
 from icecream import ic
 from tqdm import tqdm
+
 jax.config.update('jax_platform_name', "cpu")
 #jax.config.update('jax_enable_x64', True) 
 HYB_B3LYP = 0.2
@@ -69,7 +70,7 @@ def num_repetitions_fast_4d(i, j, k, l, xnp=np, dtype=np.uint64):
 
 # gen_shells is designed to be called multiple times to simplify the rest of the code, but compute shells only once (lru_cache)
 @lru_cache(maxsize=None) # cache results
-def gen_shells(mol, tolerance, ndevices):
+def gen_shells(mol, tolerance, ndevices, fast_shells=True):
     N = mol.nao_nr()
     bas = mol._bas
     n_bas = bas.shape[0]
@@ -90,60 +91,77 @@ def gen_shells(mol, tolerance, ndevices):
             lst_abab[c] = abab
             lst_ab[c, :] = (a, b)
         abab_max = np.max(lst_abab)
-        considered_indices = set([(a,b) for abab, (a, b) in tqdm(zip(lst_abab, lst_ab)) if abab*abab_max >= tolerance**2])
+        considered_indices_list = [(a,b) for abab, (a, b) in tqdm(zip(lst_abab, lst_ab)) if abab*abab_max >= tolerance**2]
+        considered_indices_array = np.array(considered_indices_list)
+        considered_indices = set(considered_indices_list)
     else:
         lst_ab   = np.zeros((N*(N+1)//2, 2), dtype=np.int32)
         tril_idx = np.tril_indices(N)
-        considered_indices = set([(a, b) for a, b in zip(tril_idx[0], tril_idx[1])])
+        considered_indices_list = [(a, b) for a, b in zip(tril_idx[0], tril_idx[1])]
+        considered_indices_array = np.array(considered_indices_list)
+        considered_indices = set(considered_indices_list)
     print('n_bas', n_bas)
     print('ao_loc', ao_loc)
-    
-    # Step 2: Remove zeros by orthogonality and match indices with shells. 
-    # Precompute Fill input_ijkl and output_sizes with the necessary indices.
-    ortho_pattern =  np.array([(i+3)%5!=0 for i in range(N)]) # hardcoded
-    n_upper_bound = (n_bas*(n_bas-1))**2
-    input_ijkl    = np.zeros((n_upper_bound, 4), dtype=np.int32)
-    output_sizes  = np.zeros((n_upper_bound, 5))
 
-    num_calls = 0
+    if fast_shells:
+        import cpp_shell_gen
+        print('Computing shells', end=' ')
+        test_input_ijkl, test_output_sizes, num_calls = cpp_shell_gen.compute_indices(n_bas, ao_loc, considered_indices)
+        print('done.')
+        print(test_input_ijkl.shape)
+        print(test_output_sizes.shape)
+        
+        input_ijkl    = test_input_ijkl[np.any(test_input_ijkl>=0, axis=1)] #test_input_ijkl[:num_calls, :]
+        output_sizes  = test_output_sizes[np.any(test_output_sizes>=0, axis=1)] #test_output_sizes[:num_calls, :]
+        assert input_ijkl.shape[0] == num_calls, (input_ijkl.shape[0], num_calls)
+        assert output_sizes.shape[0] == num_calls, (output_sizes.shape[0], num_calls)
+    else:
+        # Step 2: Remove zeros by orthogonality and match indices with shells. 
+        # Precompute Fill input_ijkl and output_sizes with the necessary indices.
+        ortho_pattern =  np.array([(i+3)%5!=0 for i in range(N)]) # hardcoded
+        n_upper_bound = (n_bas*(n_bas-1))**2
+        input_ijkl    = np.zeros((n_upper_bound, 4), dtype=np.int32)
+        output_sizes  = np.zeros((n_upper_bound, 5))
 
-    for i in tqdm(range(n_bas), desc="Computing shells"): # consider all shells << all ijkl 
-        for j in range(i+1):
-            for k in range(i, n_bas):
-                for l in range(k+1):
-                    di, dj, dk, dl = [ao_loc[z+1] - ao_loc[z] for z in [i,j,k,l]]
+        num_calls = 0
 
-                    found_nonzero = False
-                    # check i,j boxes
-                    for bi in range(ao_loc[i], ao_loc[i+1]):
-                        for bj in range(ao_loc[j], ao_loc[j+1]):
-                            if (bi, bj) in considered_indices: # if ij box is considered
-                                # check if kl pairs are considered
-                                for bk in range(ao_loc[k], ao_loc[k+1]):
-                                    if bk>=bi: # apply symmetry - tril fade vertical
-                                        mla = ao_loc[l]
-                                        if bk == bi:
-                                            mla = max(bj, ao_loc[l]) # apply symmetry - tril fade horizontal
-                                        for bl in range(mla, ao_loc[l+1]):
-                                            if (bk, bl) in considered_indices:
-                                                # apply grid pattern to find final nonzeros
-                                                if False and not ortho_pattern[bi] ^ ortho_pattern[bj] ^ ortho_pattern[bk] ^ ortho_pattern[bl]:
-                                                    found_nonzero = True
-                                                    break
-                                                else: 
-                                                    found_nonzero = True
-                                                    break
-                                    if found_nonzero: break
+        for i in tqdm(range(n_bas), desc="Computing shells"): # consider all shells << all ijkl 
+            for j in range(i+1):
+                for k in range(i, n_bas):
+                    for l in range(k+1):
+                        di, dj, dk, dl = [ao_loc[z+1] - ao_loc[z] for z in [i,j,k,l]]
+
+                        found_nonzero = False
+                        # check i,j boxes
+                        for bi in range(ao_loc[i], ao_loc[i+1]):
+                            for bj in range(ao_loc[j], ao_loc[j+1]):
+                                if (bi, bj) in considered_indices: # if ij box is considered
+                                    # check if kl pairs are considered
+                                    for bk in range(ao_loc[k], ao_loc[k+1]):
+                                        if bk>=bi: # apply symmetry - tril fade vertical
+                                            mla = ao_loc[l]
+                                            if bk == bi:
+                                                mla = max(bj, ao_loc[l]) # apply symmetry - tril fade horizontal
+                                            for bl in range(mla, ao_loc[l+1]):
+                                                if (bk, bl) in considered_indices:
+                                                    # apply grid pattern to find final nonzeros
+                                                    if False and not ortho_pattern[bi] ^ ortho_pattern[bj] ^ ortho_pattern[bk] ^ ortho_pattern[bl]:
+                                                        found_nonzero = True
+                                                        break
+                                                    else: 
+                                                        found_nonzero = True
+                                                        break
+                                        if found_nonzero: break
+                                if found_nonzero: break
                             if found_nonzero: break
-                        if found_nonzero: break
-                    if not found_nonzero: continue 
+                        if not found_nonzero: continue 
 
-                    input_ijkl[num_calls] = [i, j, k, l]
-                    output_sizes[num_calls] = [di, dj, dk, dl, di*dj*dk*dl]
-                    num_calls += 1
+                        input_ijkl[num_calls] = [i, j, k, l]
+                        output_sizes[num_calls] = [di, dj, dk, dl, di*dj*dk*dl]
+                        num_calls += 1
 
-    input_ijkl    = input_ijkl[:num_calls, :]
-    output_sizes  = output_sizes[:num_calls, :]
+        input_ijkl    = input_ijkl[:num_calls, :]
+        output_sizes  = output_sizes[:num_calls, :]
 
     sizes, counts = [tuple(out.astype(np.int32).tolist()) for out in np.unique(output_sizes[:, -1], return_counts=True)]
     
@@ -427,6 +445,7 @@ if __name__ == "__main__":
     parser.add_argument('-skip', action="store_true") 
     parser.add_argument('-itol', default=1e-9, type=float)
     parser.add_argument('-basis', default="6-311G", type=str)
+    parser.add_argument('-fast_shells', action="store_true")
     
     args = parser.parse_args()
     backend = args.backend 
@@ -471,7 +490,7 @@ if __name__ == "__main__":
 
     # ------------------------------------ #
 
-    input_ijkl, sizes, counts, shapes = gen_shells(mol, args.itol, args.nipu)
+    input_ijkl, sizes, counts, shapes = gen_shells(mol, args.itol, args.nipu, fast_shells=args.fast_shells)
     sliced_input_ijkl = np.concatenate([np.array(ijkl, dtype=int).reshape(args.nipu, -1) for ijkl in input_ijkl], axis=-1)
 
     diff_JK = jax.pmap(compute_diff_jk, in_axes=(0, None, None, None, None, None, None), static_broadcasted_argnums=(2, 3, 4, 5, 6), backend=backend, axis_name="p")(sliced_input_ijkl, dm, mol, args.batches, args.itol, args.nipu, args.backend) 

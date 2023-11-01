@@ -320,7 +320,7 @@ def nanoDFT(mol, opts):
         ERI = [nonzero_distinct_ERI, nonzero_indices]
         eri_in_axes = [0,0]
     
-    input_ijkl, _, _, _ = gen_shells(mol, opts.screen_tol, nipu)
+    input_ijkl, _, _, _ = gen_shells(mol, opts.screen_tol, nipu, fast_shells=opts.fast_shells)
     grid_ijkl = np.concatenate([np.array(ijkl, dtype=int).reshape(nipu, -1) for ijkl in input_ijkl], axis=-1)
     
     #jitted_nanoDFT = jax.jit(partial(_nanoDFT, opts=opts, mol=mol), backend=opts.backend)
@@ -577,7 +577,8 @@ def nanoDFT_options(
         profile: bool = False, # if we only want profile exit after IPU finishes.
         vis_num_error: bool = False,
         molecule_name: str = None,
-        screen_tol: float = 1e-9
+        screen_tol: float = 1e-9,
+        fast_shells: bool = False
 ):
     """
     nanoDFT
