@@ -260,7 +260,7 @@ def get_shapes(input_ijkl, bas):
 
     len = leng + lenl + lenk + lenj + leni + len0
 
-    return len, nf
+    return len, nf, nc
 
 vertex_filename = osp.join(osp.dirname(__file__), "intor_int2e_sph_condensed.cpp")
 int2e_sph_forloop = create_ipu_tile_primitive(
@@ -289,7 +289,7 @@ def compute_diff_jk(input_ijkl_slice, dm, mol, nbatch, tolerance, ndevices, back
     input_floats  = env.reshape(1, -1)
     input_ints    = np.hstack([0, 0, n_atm, n_bas, 0, n_ao_loc, ao_loc.reshape(-1), atm.reshape(-1), bas.reshape(-1)]) # todo 0s not used (n_buf, n_eri, n_env)
 
-    input_ijkl, sizes, counts, shapes = gen_shells(mol, tolerance, ndevices)
+    input_ijkl, sizes, counts, shapes = gen_shells(mol, tolerance, ndevices, fast_shells=True)
 
     all_eris = []
     all_indices = []
@@ -316,16 +316,16 @@ def compute_diff_jk(input_ijkl_slice, dm, mol, nbatch, tolerance, ndevices, back
         slice_count = count // ndevices
         slice_ijkl = input_ijkl_slice[slice_indices[i]:slice_indices[i+1]].reshape(-1, 4)
 
-        glen, nf = shapes[i]
+        glen, nf, nc = shapes[i]
         chunk_size  = num_tiles * num_threads
         num_full_batches = slice_count//chunk_size
 
         tiles         = tuple((np.arange(num_tiles*num_threads)%(num_tiles)+1).tolist())
         tile_g        = tile_put_replicated(jnp.empty(min(int(glen), 3888)+1), tiles)
-        tile_idx      = tile_put_replicated(jnp.empty(max(256, min(int(nf*3), 3888)+1), dtype=jnp.int32), tiles)
-        tile_buf      = tile_put_replicated(jnp.empty(1080*4+1), tiles)
+        tile_idx      = tile_put_replicated(jnp.empty(256, dtype=jnp.int32), tiles) # condensed version only # sto3g, 631g
+        tile_buf      = tile_put_replicated(jnp.empty(81), tiles) # condensed version only # sto3g, 631g
         integral_size = tile_put_replicated(jnp.array(size, dtype=jnp.uint32), tiles)
-        tile_gctr_buf = tile_put_replicated(jnp.empty((1296+1), dtype=jnp.float32), tiles) # condensed version only
+        tile_gctr_buf = tile_put_replicated(jnp.empty((81+1), dtype=jnp.float32), tiles) # condensed version only # sto3g, 631g
         
         def batched_compute(start, stop, chunk_size, tiles):
             assert (stop-start) < chunk_size or (stop-start) % chunk_size == 0
