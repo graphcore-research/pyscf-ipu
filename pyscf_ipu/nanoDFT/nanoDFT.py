@@ -13,7 +13,9 @@ from pyscf_ipu.nanoDFT import utils
 from pyscf_ipu.exchange_correlation.b3lyp import b3lyp
 from pyscf_ipu.electron_repulsion.direct  import (prepare_electron_repulsion_integrals, electron_repulsion_integrals, ipu_einsum)
 
-HARTREE_TO_EV = 27.2114079527
+from pyscf_ipu.nanoDFT.sparse_symmetric_intor_ERI import compute_diff_jk, gen_shells
+
+HARTREE_TO_EV = 1 #27.2114079527
 EPSILON_B3LYP = 1e-20
 HYB_B3LYP = 0.2
 
@@ -39,8 +41,8 @@ def energy(density_matrix, H_core, diff_JK, E_xc, E_nuc, _np=jax.numpy):
 
 def nanoDFT_iteration(i, vals, opts, mol):
     """Each call updates density_matrix attempting to minimize energy(density_matrix, ... ). """
-    density_matrix, V_xc, diff_JK, O, H_core, L_inv                 = vals[:6]                  # All (N, N) matrices
-    E_nuc, occupancy, ERI, grid_weights, grid_AO, diis_history, log = vals[6:]                  # Varying types/shapes.
+    density_matrix, V_xc, diff_JK, O, H_core, L_inv                            = vals[:6]                  # All (N, N) matrices
+    E_nuc, occupancy, ERI, batched_grid_weights, batched_grid_AO, shell_ijkl, diis_history, log = vals[6:]                  # Varying types/shapes.
 
     if opts.v: 
         print("---------- MEMORY CONSUMPTION ----------")
@@ -70,8 +72,9 @@ def nanoDFT_iteration(i, vals, opts, mol):
 
     # Step 3: Use result from eigenproblem to update density_matrix.
     density_matrix = (eigvects*occupancy*2) @ eigvects.T                                        # (N, N)
-    E_xc, V_xc     = exchange_correlation(density_matrix, grid_AO, grid_weights)                # float (N, N)
-    diff_JK        = get_JK(density_matrix, ERI, opts.dense_ERI, opts.backend)                  # (N, N) (N, N)
+    # E_xc, V_xc     = exchange_correlation(density_matrix, grid_AO, grid_weights)                # float (N, N)
+    E_xc, V_xc, _, _, _ = jax.lax.fori_loop(0, opts.batches_grid, foreach_exchange_correlation_batch, (0, V_xc, density_matrix, batched_grid_AO, batched_grid_weights))
+    diff_JK        = get_JK(shell_ijkl, density_matrix, ERI, opts.dense_ERI, opts.screen_tol, opts.backend, mol, opts.batches_einsum, opts.ndevices)     # (N, N) (N, N)
 
     # Log SCF matrices and energies (not used by DFT algorithm).
     #log["matrices"] = log["matrices"].at[i].set(jnp.stack((density_matrix, J, K, H)))           # (iterations, 4, N, N)
@@ -89,7 +92,7 @@ def nanoDFT_iteration(i, vals, opts, mol):
 
         def host_callback(data, i):
             # labels are adjusted to the `data` that will be passed to the callback - keep that in mind when passing different list of tensors
-            labels = ["density_matrix", "V_xc", "diff_JK", "O", "H_core", "L_inv", "E_nuc", "occupancy", "ERI", "grid_weights", "grid_AO", "diis_history", "E_xc", "eigvects", "H"]
+            labels = ["density_matrix", "V_xc", "diff_JK", "O", "H_core", "L_inv", "E_nuc", "occupancy", "ERI", "batched_grid_weights", "batched_grid_AO", "shell_ijkl", "diis_history", "E_xc", "eigvects", "H"]
             for l, d  in zip(labels, data):
                 if l == "diis_history" or l == "ERI":
                     for idx, arr in enumerate(d):
@@ -99,7 +102,8 @@ def nanoDFT_iteration(i, vals, opts, mol):
 
         jax.debug.callback(host_callback, vals[:-1] + [E_xc, eigvects, H], i)
 
-    return [density_matrix, V_xc, diff_JK, O, H_core, L_inv, E_nuc, occupancy, ERI, grid_weights, grid_AO, diis_history, log]
+    return [density_matrix, V_xc, diff_JK, O, H_core, L_inv, E_nuc, occupancy, ERI, 
+            batched_grid_weights, batched_grid_AO, shell_ijkl, diis_history, log]
 
 
 def exchange_correlation(density_matrix, grid_AO, grid_weights):
@@ -122,31 +126,55 @@ def exchange_correlation(density_matrix, grid_AO, grid_weights):
     V_xc = V_xc + V_xc.T                                                                        # (N, N)
     return E_xc, V_xc                                                                           # (float) (N, N)
 
-def get_JK(density_matrix, ERI, dense_ERI, backend):
+def get_JK(shell_ijkl, density_matrix, ERI, dense_ERI, tolerance, backend, mol, nbatches, ndevices):
     """Computes the (N, N) matrices J and K. Density matrix is (N, N) and ERI is (N, N, N, N).  """
     N = density_matrix.shape[0]
 
-    if dense_ERI: 
+    if False: #dense_ERI: 
         J = jnp.einsum('ijkl,ji->kl', ERI, density_matrix)                                       # (N, N)
         K = jnp.einsum('ijkl,jk->il', ERI, density_matrix)                                       # (N, N)
         diff_JK = J - (K / 2 * HYB_B3LYP)
     else:
-        from pyscf_ipu.nanoDFT.sparse_symmetric_ERI import sparse_symmetric_einsum
-        diff_JK = sparse_symmetric_einsum(ERI[0], ERI[1], density_matrix, backend)
+        #from pyscf_ipu.nanoDFT.sparse_symmetric_ERI import sparse_symmetric_einsum
+        #diff_JK = sparse_symmetric_einsum(ERI[0], ERI[1], density_matrix, backend)
+        
+        diff_JK, cycles = compute_diff_jk(shell_ijkl, density_matrix, mol, nbatches, tolerance, ndevices=ndevices, backend="ipu")
         
     diff_JK = diff_JK.reshape(N, N)
 
     return diff_JK
 
-def _nanoDFT(state, ERI, grid_AO, grid_weights, opts, mol):
+def foreach_exchange_correlation_batch(i, vals):
+    E_xc, V_xc, dm, ao, w = vals
+    crt_grid_AO = ao[i]
+    crt_weights = w[i]
+    crt_grid_AO = jnp.transpose(crt_grid_AO, (1,0,2))
+    crt_E_xc, crt_V_xc = exchange_correlation(dm, crt_grid_AO, crt_weights) # float (N, N)
+    E_xc += crt_E_xc
+    V_xc += crt_V_xc
+    return (E_xc, V_xc, dm, ao, w)
+
+def _nanoDFT(state, ERI, grid_AO, grid_weights, shell_ijkl, opts, mol):
+    # if opts.backend == "ipu": grid_weights, start = utils.get_ipu_cycles(grid_weights)
+
     # Utilize the IPUs MIMD parallism to compute the electron repulsion integrals (ERIs) in parallel.
     #if opts.backend == "ipu": state.ERI = electron_repulsion_integrals(state.input_floats, state.input_ints, mol, opts.threads_int, opts.intv)
     #else: pass # Compute on CPU.
-    grid_AO = jnp.transpose(grid_AO, (1,0,2)) # (padded_gsize/16, 4, N) -> (4, pgsize, N)
+    # grid_AO = jnp.transpose(grid_AO, (1,0,2)) # (padded_gsize/16, 4, N) -> (4, pgsize, N)
+
+    E_xc = jnp.zeros(1)
+    V_xc = jnp.zeros(state.density_matrix.shape)
+
+    batched_grid_AO = grid_AO.reshape(opts.batches_grid, -1, grid_AO.shape[-2], grid_AO.shape[-1])
+    batched_grid_weights = grid_weights.reshape(opts.batches_grid, -1)
 
     # Precompute the remaining tensors.
-    E_xc, V_xc = exchange_correlation(state.density_matrix, grid_AO, grid_weights) # float (N, N)
-    diff_JK    = get_JK(state.density_matrix, ERI, opts.dense_ERI, opts.backend)                      # (N, N) (N, N)
+
+    E_xc, V_xc, _, _, _ = jax.lax.fori_loop(0, opts.batches_grid, foreach_exchange_correlation_batch, (E_xc, V_xc, state.density_matrix, batched_grid_AO, batched_grid_weights))
+
+    # grid_AO = jnp.transpose(grid_AO, (1,0,2)) # (padded_gsize/16, 4, N) -> (4, pgsize, N)
+
+    diff_JK    = get_JK(shell_ijkl, state.density_matrix, ERI, opts.dense_ERI, opts.screen_tol, opts.backend, mol, opts.batches_einsum, opts.ndevices)                      # (N, N) (N, N)
     H_core     = state.kinetic + state.nuclear                                           # (N, N)
 
     # Log matrices from all DFT iterations (not used by DFT algorithm).
@@ -155,9 +183,14 @@ def _nanoDFT(state, ERI, grid_AO, grid_weights, opts, mol):
 
     # Perform DFT iterations.
     log = jax.lax.fori_loop(0, opts.its, partial(nanoDFT_iteration, opts=opts, mol=mol), [state.density_matrix, V_xc, diff_JK, state.O, H_core, state.L_inv,  # all (N, N) matrices
-                                                            state.E_nuc, state.mask, ERI, grid_weights, grid_AO, state.diis_history, log])[-1]
+                                                            state.E_nuc, state.mask, ERI, batched_grid_weights, batched_grid_AO, shell_ijkl, state.diis_history, log])[-1]
 
-    return log["matrices"], H_core, log["energy"]
+    # cycles = -1
+    # if opts.backend == "ipu": 
+    #     log["energy"], stop = utils.get_ipu_cycles(log["energy"])
+    #     cycles = (stop.array-start.array)[0,0]
+
+    return log["matrices"], H_core, log["energy"], 0 #cycles 
 
 
 FloatN = Float[Array, "N"]
@@ -215,22 +248,31 @@ def init_dft_tensors_cpu(mol, opts, DIIS_iters=9):
     grids            = pyscf.dft.gen_grid.Grids(mol)
     grids.level      = opts.level
     grids.build()
+
     grid_weights    = grids.weights                                 # (grid_size,) = (45624,) for C6H6
     coord_str       = 'GTOval_cart_deriv1' if mol.cart else 'GTOval_sph_deriv1'
     grid_AO         = mol.eval_gto(coord_str, grids.coords, 4)      # (4, grid_size, N) = (4, 45624, 9) for C6H6.
+    
     if opts.ao_threshold > 0.0:
         grid_AO[np.abs(grid_AO)<opts.ao_threshold] = 0
         sparsity_mask = np.where(np.all(grid_AO == 0, axis=0), 0, 1)
         sparse_rows = np.where(np.all(sparsity_mask == 0, axis=1), 0, 1).reshape(-1, 1)
+        print('grid_AO.shape', grid_AO.shape)
+        print('sparsity_mask.shape', sparsity_mask.shape)
         print(f"axis=( ,  ) sparsity in grid_AO: {np.sum(grid_AO==0) / grid_AO.size:.4f}")
         print(f"axis=(0,  ) sparsity in grid_AO: {np.sum(sparsity_mask==0) / sparsity_mask.size:.4f}")
         print(f"axis=(0, 2) sparsity in grid_AO: {np.sum(sparse_rows==0) / sparse_rows.size:.4f}")
+        print(f"axis=( ,  ) sparsity in grid_weights: {np.sum(grid_weights==0) / grid_weights.size:.4f}")
         grid_AO = jnp.delete(grid_AO, jnp.where(sparse_rows == 0)[0], axis=1)
         grid_weights = jnp.delete(grid_weights, jnp.where(sparse_rows == 0)[0], axis=0)
         grid_coords = jnp.delete(grids.coords, jnp.where(sparse_rows == 0)[0], axis=0)
     else:
         grid_coords = grids.coords
     density_matrix  = pyscf.scf.hf.init_guess_by_minao(mol)         # (N,N)=(66,66) for C6H6.
+    
+    if opts.fp16_grid:
+        # reduce grid_AO memory by half
+        grid_AO = grid_AO.astype(np.float16)
 
     # TODO(): Add integral math formulas for kinetic/nuclear/O/ERI.
     kinetic         = mol.intor_symmetric('int1e_kin')              # (N,N)
@@ -264,12 +306,16 @@ def nanoDFT(mol, opts):
     grid_weights = _grid_weights
     gsize = grid_AO.shape[0]
 
-    remainder = gsize % opts.ndevices
+    num_grid_shards = (opts.ndevices * opts.batches_grid)
+
+    remainder = gsize % num_grid_shards
     if remainder != 0: 
-        grid_AO = jnp.pad(grid_AO, ((0,remainder), (0,0), (0,0)) )
-        grid_weights = jnp.pad(grid_weights, ((0,remainder)) )
+        grid_AO = jnp.pad(grid_AO, ((0,num_grid_shards-remainder), (0,0), (0,0)) )
+        grid_weights = jnp.pad(grid_weights, ((0,num_grid_shards-remainder)) )
     grid_AO = grid_AO.reshape(opts.ndevices, -1, 4, N)
     grid_weights = grid_weights.reshape(opts.ndevices, -1)
+
+    nipu = opts.ndevices
 
     # Run DFT algorithm (can be hardware accelerated).
     if opts.dense_ERI: 
@@ -281,46 +327,53 @@ def nanoDFT(mol, opts):
         ERI[below_thr] = 0.0
         ic(ERI.size, np.sum(below_thr), np.sum(below_thr)/ERI.size)
     else: 
-        from pyscf_ipu.nanoDFT.sparse_symmetric_ERI import get_i_j, num_repetitions_fast
-        distinct_ERI         = mol.intor("int2e_sph", aosym="s8")
-        print(distinct_ERI.size)
-        below_thr = np.abs(distinct_ERI) <= opts.eri_threshold
-        distinct_ERI[below_thr] = 0.0
-        ic(distinct_ERI.size, np.sum(below_thr), np.sum(below_thr)/distinct_ERI.size)
-        nonzero_indices      = np.nonzero(distinct_ERI)[0].astype(np.uint64)
-        nonzero_distinct_ERI = distinct_ERI[nonzero_indices].astype(np.float32)
+    #     from pyscf_ipu.nanoDFT.sparse_symmetric_ERI import get_i_j, num_repetitions_fast
+    #     distinct_ERI         = mol.intor("int2e_sph", aosym="s8")
+    #     print(distinct_ERI.size)
+    #     below_thr = np.abs(distinct_ERI) <= opts.eri_threshold
+    #     distinct_ERI[below_thr] = 0.0
+    #     ic(distinct_ERI.size, np.sum(below_thr), np.sum(below_thr)/distinct_ERI.size)
+    #     nonzero_indices      = np.nonzero(distinct_ERI)[0].astype(np.uint64)
+    #     nonzero_distinct_ERI = distinct_ERI[nonzero_indices].astype(np.float32)
 
-        ij, kl               = get_i_j(nonzero_indices)
-        rep                  = num_repetitions_fast(ij, kl)
-        nonzero_distinct_ERI = nonzero_distinct_ERI / rep
-        batches  = int(opts.batches) # perhaps make 10 batches? 
-        nipu = opts.ndevices
-        remainder = nonzero_indices.shape[0] % (nipu*batches)
+    #     ij, kl               = get_i_j(nonzero_indices)
+    #     rep                  = num_repetitions_fast(ij, kl)
+    #     nonzero_distinct_ERI = nonzero_distinct_ERI / rep
+    #     batches  = int(opts.batches) # perhaps make 10 batches? 
+    #     nipu = opts.ndevices
+    #     remainder = nonzero_indices.shape[0] % (nipu*batches)
 
-        if remainder != 0:
-            print(nipu*batches-remainder, ij.shape)
-            ij = np.pad(ij, ((0,nipu*batches-remainder)))
-            kl = np.pad(kl, ((0,nipu*batches-remainder)))
-            nonzero_distinct_ERI = np.pad(nonzero_distinct_ERI, (0,nipu*batches-remainder))
+    #     if remainder != 0:
+    #         print(nipu*batches-remainder, ij.shape)
+    #         ij = np.pad(ij, ((0,nipu*batches-remainder)))
+    #         kl = np.pad(kl, ((0,nipu*batches-remainder)))
+    #         nonzero_distinct_ERI = np.pad(nonzero_distinct_ERI, (0,nipu*batches-remainder))
 
-        ij = ij.reshape(nipu, batches, -1)
-        kl = kl.reshape(nipu, batches, -1)
-        nonzero_distinct_ERI = nonzero_distinct_ERI.reshape(nipu, batches, -1)
+    #     ij = ij.reshape(nipu, batches, -1)
+    #     kl = kl.reshape(nipu, batches, -1)
+    #     nonzero_distinct_ERI = nonzero_distinct_ERI.reshape(nipu, batches, -1)
 
-        i, j = get_i_j(ij.reshape(-1))
-        k, l = get_i_j(kl.reshape(-1))
-        nonzero_indices = np.vstack([i,j,k,l]).T.reshape(nipu, batches, -1, 4).astype(np.int16)
-        nonzero_indices = jax.lax.bitcast_convert_type(nonzero_indices, np.float16)
+    #     i, j = get_i_j(ij.reshape(-1))
+    #     k, l = get_i_j(kl.reshape(-1))
+    #     nonzero_indices = np.vstack([i,j,k,l]).T.reshape(nipu, batches, -1, 4).astype(np.int16)
+    #     nonzero_indices = jax.lax.bitcast_convert_type(nonzero_indices, np.float16)
 
-        ERI = [nonzero_distinct_ERI, nonzero_indices]
+    #     ERI = [nonzero_distinct_ERI, nonzero_indices]
+    #     eri_in_axes = [0,0]
+        ERI = [np.ones((nipu, 1)), np.ones((nipu, 1))]
         eri_in_axes = [0,0]
+    
+    input_ijkl, _, _, _ = gen_shells(mol, opts.screen_tol, nipu, fast_shells=opts.fast_shells)
+    shell_ijkl = np.concatenate([np.array(ijkl, dtype=int).reshape(nipu, -1) for ijkl in input_ijkl], axis=-1)
+    
     #jitted_nanoDFT = jax.jit(partial(_nanoDFT, opts=opts, mol=mol), backend=opts.backend)
     jitted_nanoDFT = jax.pmap(partial(_nanoDFT, opts=opts, mol=mol), backend=opts.backend, 
-                        in_axes=(None, eri_in_axes, 0, 0),
+                        in_axes=(None, eri_in_axes, 0, 0, 0),
                         axis_name="p")
     print(grid_AO.shape, grid_weights.shape)
-    vals = jitted_nanoDFT(state, ERI, grid_AO, grid_weights)
-    logged_matrices, H_core, logged_energies = [np.asarray(a[0]).astype(np.float64) for a in vals] # Ensure CPU
+    vals = jitted_nanoDFT(state, ERI, grid_AO, grid_weights, shell_ijkl)
+    logged_matrices, H_core, logged_energies, cycles = [np.asarray(a[0]).astype(np.float64) for a in vals] # Ensure CPU
+    if opts.backend == "ipu": print("Cycle Count: ", cycles/10**6, "[M]")
 
     # It's cheap to compute energy/hlgap on CPU in float64 from the logged values/matrices.
     logged_E_xc = logged_energies[:, 3].copy()
@@ -561,13 +614,17 @@ def nanoDFT_options(
         structure_optimization: bool = False, # AKA gradient descent on energy wrt nuclei
         eri_threshold : float = 0.0,
         ao_threshold: float = 0.0,
-        batches: int = 32,
+        batches_einsum: int = 32,
+        batches_grid: int = 32,
         ndevices: int = 1, 
         dense_ERI: bool = False,        
         v: bool = False, # verbose 
         profile: bool = False, # if we only want profile exit after IPU finishes.
         vis_num_error: bool = False,
-        molecule_name: str = None
+        molecule_name: str = None,
+        screen_tol: float = 1e-9,
+        fast_shells: bool = False,
+        fp16_grid: bool = False
 ):
     """
     nanoDFT
@@ -610,8 +667,8 @@ def nanoDFT_options(
 
     from pyscf_ipu.experimental.device import has_ipu
     import os 
-    if has_ipu() and "JAX_IPU_USE_MODEL" in os.environ:
-        args.dense_ERI = True
+    #if has_ipu() and "JAX_IPU_USE_MODEL" in os.environ:
+    #    args.dense_ERI = True
     args = namedtuple('DFTOptionsImmutable',vars(args).keys())(**vars(args)) # make immutable
     if not args.float32:
         jax.config.update('jax_enable_x64', not float32)
