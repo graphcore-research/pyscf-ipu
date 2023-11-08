@@ -9,6 +9,8 @@ from tessellate_ipu import create_ipu_tile_primitive, ipu_cycle_count, tile_map,
 from functools import partial, lru_cache
 from icecream import ic
 from tqdm import tqdm
+import utils
+from utils import process_mol_str
 
 jax.config.update('jax_platform_name', "cpu")
 #jax.config.update('jax_enable_x64', True) 
@@ -273,6 +275,8 @@ int2e_sph_forloop = create_ipu_tile_primitive(
     )
 
 def compute_diff_jk(input_ijkl_slice, dm, mol, nbatch, tolerance, ndevices, backend):
+    # if backend == "ipu": dm, start = utils.get_ipu_cycles(dm)
+
     dm = dm.reshape(-1)
     diff_JK = jnp.zeros(dm.shape)
     N = int(np.sqrt(dm.shape[0])) 
@@ -430,7 +434,17 @@ def compute_diff_jk(input_ijkl_slice, dm, mol, nbatch, tolerance, ndevices, back
         total_diff_JK += diff_JK
 
     # return total_diff_JK
-    return jax.lax.psum(total_diff_JK, axis_name="p")
+
+    jk_psum = jax.lax.psum(total_diff_JK, axis_name="p")
+
+    # cycles = -1
+    # if backend == "ipu": 
+    #     jk_psum, stop = utils.get_ipu_cycles(jk_psum)
+    #     cycles = (stop.array-start.array)[0,0]
+
+    # return jk_psum, cycles
+
+    return jk_psum, 0
 
 if __name__ == "__main__":
     import time 
@@ -456,7 +470,8 @@ if __name__ == "__main__":
 
     start = time.time()
 
-    mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*j} {1.54*i};" for i in range(natm) for j in range(natm)), basis=args.basis) 
+    # mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*j} {1.54*i};" for i in range(natm) for j in range(natm)), basis=args.basis) 
+    mol = pyscf.gto.Mole(atom=process_mol_str('bench10'), basis=args.basis)
     #mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*j} {1.54*i};" for i in range(natm) for j in range(natm))) # sto-3g by default
     # mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*j} {1.54*i};" for i in range(1) for j in range(2)), basis="sto3g") 
     #mol = pyscf.gto.Mole(atom="".join(f"C 0 {1.54*j} {1.54*i};" for i in range(natm) for j in range(natm)), basis="sto3g") 
@@ -493,7 +508,8 @@ if __name__ == "__main__":
     input_ijkl, sizes, counts, shapes = gen_shells(mol, args.itol, args.nipu, fast_shells=args.fast_shells)
     sliced_input_ijkl = np.concatenate([np.array(ijkl, dtype=int).reshape(args.nipu, -1) for ijkl in input_ijkl], axis=-1)
 
-    diff_JK = jax.pmap(compute_diff_jk, in_axes=(0, None, None, None, None, None, None), static_broadcasted_argnums=(2, 3, 4, 5, 6), backend=backend, axis_name="p")(sliced_input_ijkl, dm, mol, args.batches, args.itol, args.nipu, args.backend) 
+    diff_JK, cycles = jax.pmap(compute_diff_jk, in_axes=(0, None, None, None, None, None, None), static_broadcasted_argnums=(2, 3, 4, 5, 6), backend=backend, axis_name="p")(sliced_input_ijkl, dm, mol, args.batches, args.itol, args.nipu, args.backend) 
+    if backend == "ipu": print("Cycle Count: ", cycles/10**6, "[M]")
 
     # ------------------------------------ #
 
