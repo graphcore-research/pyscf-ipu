@@ -22,7 +22,7 @@ std::tuple<py::array_t<int>, py::array_t<int>, int> compute_indices(int n_bas, p
     py::buffer_info ao_loc_info = ao_loc_array.request();
     int* ao_loc_ptr = static_cast<int*>(ao_loc_info.ptr);
 
-    py::ssize_t n_upper_bound = (n_bas * (n_bas) / 2) * (n_bas * (n_bas - 1) / 2);
+    py::ssize_t n_upper_bound = (py::ssize_t)(n_bas * (n_bas) / 2) * (n_bas * (n_bas - 1) / 2);
     // py::print(n_upper_bound);
     auto input_ijkl_array = py::array_t<int>({n_upper_bound, (py::ssize_t)4});
     input_ijkl_array[py::make_tuple(py::ellipsis())] = -1;
