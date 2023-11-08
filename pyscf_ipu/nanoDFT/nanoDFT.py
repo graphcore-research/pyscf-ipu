@@ -269,6 +269,10 @@ def init_dft_tensors_cpu(mol, opts, DIIS_iters=9):
     else:
         grid_coords = grids.coords
     density_matrix  = pyscf.scf.hf.init_guess_by_minao(mol)         # (N,N)=(66,66) for C6H6.
+    
+    if opts.fp16_grid:
+        # reduce grid_AO memory by half
+        grid_AO = grid_AO.astype(np.float16)
 
     # TODO(): Add integral math formulas for kinetic/nuclear/O/ERI.
     kinetic         = mol.intor_symmetric('int1e_kin')              # (N,N)
@@ -619,7 +623,8 @@ def nanoDFT_options(
         vis_num_error: bool = False,
         molecule_name: str = None,
         screen_tol: float = 1e-9,
-        fast_shells: bool = False
+        fast_shells: bool = False,
+        fp16_grid: bool = False
 ):
     """
     nanoDFT
