@@ -1,5 +1,7 @@
 :red_circle: :warning: **Experimental and non-official Graphcore product** :warning: :red_circle:
 
+[![arXiv](https://img.shields.io/badge/arXiv-2311.01135-b31b1b.svg)](https://arxiv.org/abs/2311.01135)
+[![QM1B figshare+](https://img.shields.io/badge/figshare%2B-24459376-blue)](https://doi.org/10.25452/figshare.plus.24459376)
 [![notebook-tests](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/notebooks.yaml/badge.svg)](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/notebooks.yaml)
 [![nanoDFT CLI](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/cli.yaml/badge.svg)](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/cli.yaml)
 [![unit tests](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/unittest.yaml/badge.svg)](https://github.com/graphcore-research/pyscf-ipu/actions/workflows/unittest.yaml)
@@ -114,3 +116,16 @@ The library is built on top of the following main dependencies:
 | [pyscf](https://github.com/pyscf/pyscf) | Python-based Simulations of Chemistry Framework | [Apache License 2.0](https://github.com/pyscf/pyscf/blob/master/LICENSE) |
 | [libcint](https://github.com/sunqm/libcint/) | Open source library for analytical Gaussian integrals | [BSD 2-Clause “Simplified” License](https://github.com/sunqm/libcint/blob/master/LICENSE) |
 | [xcauto](https://github.com/dftlibs/xcauto) | Arbitrary order exchange-correlation functional derivatives | [MPL-2.0 license](https://github.com/dftlibs/xcauto/blob/master/LICENSE) |
+
+
+## Cite
+Please use the following citation for the pyscf-ipu project:
+
+```
+@inproceedings{mathiasen2023qm1b,
+  title={Generating QM1B with PySCF $ \_ $\{$$\backslash$text $\{$IPU$\}$$\}$ $},
+  author={Mathiasen, Alexander and Helal, Hatem and Klaeser, Kerstin and Balanca, Paul and Dean, Josef and Luschi, Carlo and Beaini, Dominique and Fitzgibbon, Andrew William and Masters, Dominic},
+  booktitle={Thirty-seventh Conference on Neural Information Processing Systems Datasets and Benchmarks Track},
+  year={2023}
+}
+```
