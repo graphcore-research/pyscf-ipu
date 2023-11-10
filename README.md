@@ -53,7 +53,7 @@ Additional notebooks in [notebooks](notebooks) demonstrate other aspects of the 
 
 PySCF on IPU requires Python 3.8, [JAX IPU experimental](https://github.com/graphcore-research/jax-experimental), [TessellateIPU library](https://github.com/graphcore-research/tessellate-ipu) and [Graphcore Poplar SDK 3.2](https://www.graphcore.ai/downloads).
 
-We recommend upgrading `pip` to the latest stable release to prepare your enviroment.
+We recommend upgrading `pip` to the latest stable release to prepare your environment.
 ```bash
 pip install -U pip
 ```
@@ -61,7 +61,7 @@ pip install -U pip
 This project is currently under active development. 
 For CPU simulations, we recommend installing `pyscf-ipu` from latest `main` branch as:
 ```bash
-pip install pyscf-ipu@git+https://github.com/graphcore-research/pyscf-ipu
+pip install pyscf-ipu[cpu]@git+https://github.com/graphcore-research/pyscf-ipu
 ```
 
 and on IPU equipped machines:
