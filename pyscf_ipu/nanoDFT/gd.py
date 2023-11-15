@@ -11,27 +11,27 @@ from pyscf_ipu.exchange_correlation.b3lyp import b3lyp, vxc_b3lyp
 from tqdm import tqdm 
 
 HARTREE_TO_EV, EPSILON_B3LYP, HYB_B3LYP = 27.2114079527, 1e-20, 0.2
+def orth(x): return jnp.linalg.qr(x)[0]
 
-def dm_energy(density_matrix, state):
-    #eigvects       = L_inv.T @ jnp.linalg.qr( L_inv @ density_matrix @ L_inv.T)[0]       
-    eigvects       = state.L_inv.T @ jnp.linalg.eigh(state.L_inv @ density_matrix @ state.L_inv.T)[1]
-    density_matrix = 2 * (eigvects * state.mask) @ eigvects.T # 'state.mask' does eigvects[:, :n_electrons//2] jit-ably. 
-    E_xc           = exchange_correlation(density_matrix, state.grid_AO, state.grid_weights)              
-    diff_JK        = get_JK(density_matrix, state.ERI)                
-    return jnp.sum(density_matrix * (state.H_core + diff_JK/2)) + E_xc + state.E_nuc, density_matrix
+def dm_energy(weights: NxK, state):
+    eigvects: NxK       = state.L_inv.T @ orth(weights)                           
+    density_matrix: NxN = 2 * eigvects @ eigvects.T 
+    E_xc: float         = exchange_correlation(density_matrix, state.grid_AO, state.grid_weights)              
+    diff_JK: NxN        = get_JK(density_matrix, state.ERI)                
+    energy: float       = jnp.sum(density_matrix * (state.H_core + diff_JK/2)) + E_xc + state.E_nuc
+    return energy, density_matrix
 
-def exchange_correlation(density_matrix, grid_AO, grid_weights):
-    grid_AO_dm = grid_AO[0] @ density_matrix                                                    
-    grid_AO_dm = jnp.expand_dims(grid_AO_dm, axis=0)                                            
-    mult       = grid_AO_dm * grid_AO 
-    rho        = jnp.sum(mult, axis=2)                
-    E_xc       = b3lyp(rho, EPSILON_B3LYP)                                              
-    E_xc       = jnp.sum(rho[0] * grid_weights * E_xc)
+def exchange_correlation(density_matrix: NxN, grid_AO: _4xGsizexN, grid_weights: gsize):
+    grid_AO_dm: _1xGsizexN = jnp.expand_dims(grid_AO[0] @ density_matrix)    # O(gsize N^2) flops and gsizeN reads.                                                                               
+    mult: _4xGsizexN       = grid_AO_dm * grid_AO 
+    rho: _4xGsize          = jnp.sum(mult, axis=2)                
+    E_xc: Gsize            = b3lyp(rho, EPSILON_B3LYP)                                              
+    E_xc: float            = jnp.sum(rho[0] * grid_weights * E_xc)
     return E_xc 
 
-def get_JK(density_matrix, ERI):
-    J = jnp.einsum('ijkl,ji->kl', ERI, density_matrix) 
-    K = jnp.einsum('ijkl,jk->il', ERI, density_matrix) 
+def get_JK(density_matrix: NxN, ERI: NxNxNxN):
+    J: (N, N) = jnp.einsum('ijkl,ji->kl', ERI, density_matrix) 
+    K: (N, N) = jnp.einsum('ijkl,jk->il', ERI, density_matrix)
     return J - (K / 2 * HYB_B3LYP)
 
 def nanoDFT(mol_str, opts, pyscf_E):
