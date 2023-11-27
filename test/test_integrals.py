@@ -78,10 +78,12 @@ def test_water_kinetic(basis_name):
     assert_allclose(actual, expect, atol=1e-4)
 
 
-def test_nuclear():
+@pytest.mark.parametrize("recompile", ["first", "cached"])
+def test_nuclear(recompile):
     # PyQuante test case for nuclear attraction integral
     p = Primitive()
     c = jnp.zeros(3)
+
     assert_allclose(nuclear_primitives(p, p, c), -1.595769, atol=1e-5)
 
     # Reproduce the nuclear attraction matrix for H2 using STO-3G basis set
@@ -141,13 +143,18 @@ def is_mem_limited():
     return total_mem_gib < 10
 
 
-@pytest.mark.parametrize("sparse", [True, False])
+@pytest.mark.parametrize("sparsity", ["sparse", "dense"])
 @pytest.mark.skipif(is_mem_limited(), reason="Not enough host memory!")
-def test_water_eri(sparse):
+def test_water_eri(sparsity):
+    sparse = sparsity == "sparse"
+
     basis_name = "sto-3g"
     h2o = molecule("water")
     basis = basisset(h2o, basis_name)
-    actual = eri_basis_sparse(basis) if sparse else eri_basis(basis)
+    if sparse:
+        actual = eri_basis_sparse(basis)
+    else:
+        actual = eri_basis(basis)
     aosym = "s8" if sparse else "s1"
     expect = to_pyscf(h2o, basis_name=basis_name).intor("int2e_cart", aosym=aosym)
     assert_allclose(actual, expect, atol=1e-4)
