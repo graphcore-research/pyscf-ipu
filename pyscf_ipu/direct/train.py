@@ -79,7 +79,7 @@ def nao(atom, basis):
     return m.nao_nr()//2
 
 def batched_state(mol_str, opts, bs, wiggle_num=0, 
-                  do_pyscf=True, extrapolate=False, validation=False,
+                  do_pyscf=True, validation=False,
                   pad_electrons=40, 
                   pad_diff_ERIs=50000,
                   pad_distinct_ERIs=200000,
@@ -101,20 +101,15 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
     for i in range(bs-1):
         if opts.benzene: 
             x = p 
-            x[2] += np.random.normal(0, opts.wiggle_var*(1+ (extrapolate and i > bs//2)), (1))
+            x[2] += np.random.normal(0, opts.wiggle_var, (1))
         else: 
             x = p + np.random.normal(0, opts.wiggle_var, (3))
-
-            if extrapolate and i > bs//2: 
-                x = p + np.random.normal(0, opts.wiggle_var, (3))
 
         mol_str[wiggle_num][1] = (x[0], x[1], x[2])
 
         # when profiling create fake molecule to skip waiting
-        if i == 0 or not opts.prof:
-            stateB = init_dft(mol_str, opts, c, w, do_pyscf=do_pyscf and i < 2, state=state,
-                              pad_electrons=pad_electrons)
-        
+        if i == 0 or not opts.prof: stateB = init_dft(mol_str, opts, c, w, do_pyscf=do_pyscf and i < 2, state=state, pad_electrons=pad_electrons)
+
         states.append(stateB)
 
     state = cats(states)
@@ -349,7 +344,7 @@ def nanoDFT(mol_str, opts):
                 return len(self.mol_strs)*self.num_epochs
 
             def __getitem__(self, idx):
-                return batched_state(self.mol_strs[idx%len(self.mol_strs)], self.opts, self.opts.bs, wiggle_num=0, do_pyscf=self.validation, extrapolate=False, validation=False)
+                return batched_state(self.mol_strs[idx%len(self.mol_strs)], self.opts, self.opts.bs, wiggle_num=0, do_pyscf=self.validation, validation=False)
         
         qm9 = OnTheFlyQM9(opts, train=True)
         train_dataloader = DataLoader(qm9, batch_size=1, pin_memory=True, shuffle=False, drop_last=True, num_workers=5, prefetch_factor=2, collate_fn=lambda x: x[0])
