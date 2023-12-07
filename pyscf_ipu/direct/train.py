@@ -11,12 +11,13 @@ import time
 from transformer import transformer, transformer_init
 import pandas as pd 
 
-# [ ] add train loss
 # [ ] (algo) may get transformer to be 4x faster by fixing AO_grid stuff; 
 # [ ] (algo) can speed up dataloader by re-using AO_grid init (and ERI etc). 
 # [ ] (opt/ml) the learning rate schedule is weird when we do multiple steps per batch 
 # [ ] (opt/ml) validate with 10 molecules, not just 1. 
 # [ ] add dropout/dropres/...
+
+# [ ] 
 
 cfg, HARTREE_TO_EV, EPSILON_B3LYP, HYB_B3LYP = None, 27.2114079527, 1e-20, 0.2
 
@@ -121,13 +122,14 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
         water2_xyz = np.array([mol_str[i][1] for i in range(3,6)])
 
     for i in range(bs-1):
-        if opts.benzene: 
+        '''if opts.benzene: 
             x = p 
             x[2] += np.random.normal(0, opts.wiggle_var, (1))
         else: 
             x = p + np.random.normal(0, opts.wiggle_var, (3))
 
-        if len(x) > 1: mol_str[wiggle_num][1] = (x[0], x[1], x[2])
+        if not opts.water: 
+            mol_str[wiggle_num][1] = (x[0], x[1], x[2])'''
 
         if opts.waters:  # rotate second water molecule 
             rotation_matrix = np.linalg.qr(np.random.normal(size=(3,3)))[0]
@@ -357,10 +359,8 @@ def nanoDFT(mol_str, opts):
             arg2 = step_num * warmup_steps ** -1.5
             return d_model ** -0.5 * np.min(arg1, arg2)
 
-        # problem: loss improves, then, at some point, it starts decreasing. 
-        # obs:     happens with attention output and mlp output! 
-        # obs:     adam/sgd/adabelief  ? [ ] 
-        # obs:     tiny/small/medium
+        # [ ] todo: add loss schedule. 
+        # [ ] todo: train on qm9 instead of water (how do we rotate there?). 
 
         adam = optax.adam(learning_rate=opts.lr, b1=0.9, b2=0.98, eps=1e-9)
         #adam = optax.adabelief(opts.lr)
@@ -372,7 +372,7 @@ def nanoDFT(mol_str, opts):
             # dataloader is very keen on throwing segfaults (e.g. using jnp in dataloader throws segfaul). 
             # problem: second epoch always gives segfault. 
             # hacky fix; make __len__ = real_length*num_epochs and __getitem__ do idx%real_num_examples 
-            def __init__(self, opts, nao=294, train=True, num_epochs=1000):
+            def __init__(self, opts, nao=294, train=True, num_epochs=10**9):
                 # only take molecules with use {CNOFH}, nao=nao and spin=0.
                 df = pd.read_pickle("alchemy/processed_atom_9.pickle") # spin=0 and only CNOFH molecules 
                 if nao != -1: df = df[df["nao"]==nao] 
@@ -457,34 +457,45 @@ def nanoDFT(mol_str, opts):
     t0, load_time, train_time, val_time = time.time(), 0, 0, 0
 
     # training loop (epochs are handled inside dataloader due to segfault). 
+    states = []
     for iteration, state in enumerate(pbar):
         load_time, t0 = time.time()-t0, time.time()
 
         # idea: [ ] do gradient accumulation last 16 iterations. 
-        for j in range(16):
+        states = states[-opts.grad_acc:] + [state] 
+        accumulated_grad = None
+        print(len(states))
+        for j, state in enumerate(states):
             if j == 0: _t0 =time.time()
-            w, vals, density_matrix, _W, adam_state = update(w, state, adam_state)
+            #w, vals, density_matrix, _W, adam_state = update(w, state, adam_state)
+            (val, (vals, E_xc, density_matrix, _W)), grad = vandg(w, state, opts.normal, opts.nn)
             if j == 0: time_step1 = time.time()-_t0
             step += 1 
-            if not opts.nn: 
-                str = "error=" + "".join(["%.7f "%(vals[i]*HARTREE_TO_EV-state.pyscf_E[i]) for i in range(2)]) + " [eV]"
-                str += "pyscf=%.7f us=%.7f"%(state.pyscf_E[0]/HARTREE_TO_EV, vals[0])
-                pbar.set_description(str)
+            accumulated_grad = grad if accumulated_grad is None else jax.tree_map(lambda x, y: x + y, accumulated_grad, grad)
 
-            else: 
-                #pbar.set_description("train=".join(["%.5f"%i for i in vals[:2]]) + "[Ha] lr=%5e"%custom_schedule(step) + valid_str + "time=%.1f %.1f %.1f %.1f"%(load_time, time_step1, train_time, val_time))
-                pbar.set_description("train=".join(["%.5f"%i for i in vals[:2]]) + "[Ha] "+ valid_str + "time=%.1f %.1f %.1f %.1f"%(load_time, time_step1, train_time, val_time))
+        accumulated_grad = jax.tree_map(lambda x: x / len(states), accumulated_grad)
+        updates, adam_state = adam.update(accumulated_grad, adam_state)
+        w = optax.apply_updates(w, updates)
 
-            if opts.wandb: 
-                dct = {}
-                for i in range(0, opts.bs):
-                    if not opts.nn: 
-                        dct['train_l%i'%i ] = np.abs(vals[i]*HARTREE_TO_EV-state.pyscf_E[i])
-                        dct['train_pyscf%i'%i ] = np.abs(state.pyscf_E[i])
-                    dct['train_E%i'%i ] = np.abs(vals[i]*HARTREE_TO_EV)
-                    dct['img/dm%i'%i] = wandb.Image(np.expand_dims(density_matrix[i], axis=-1))
-                    dct['img/W%i'%i] = wandb.Image(np.expand_dims(_W[i], axis=-1))
-                wandb.log(dct)
+        if not opts.nn: 
+            str = "error=" + "".join(["%.7f "%(vals[i]*HARTREE_TO_EV-state.pyscf_E[i]) for i in range(2)]) + " [eV]"
+            str += "pyscf=%.7f us=%.7f"%(state.pyscf_E[0]/HARTREE_TO_EV, vals[0])
+            pbar.set_description(str)
+
+        else: 
+            #pbar.set_description("train=".join(["%.5f"%i for i in vals[:2]]) + "[Ha] lr=%5e"%custom_schedule(step) + valid_str + "time=%.1f %.1f %.1f %.1f"%(load_time, time_step1, train_time, val_time))
+            pbar.set_description("train=".join(["%.5f"%i for i in vals[:2]]) + "[Ha] "+ valid_str + "time=%.1f %.1f %.1f %.1f"%(load_time, time_step1, train_time, val_time))
+
+        if opts.wandb: 
+            dct = {}
+            for i in range(0, opts.bs):
+                if not opts.nn: 
+                    dct['train_l%i'%i ] = np.abs(vals[i]*HARTREE_TO_EV-state.pyscf_E[i])
+                    dct['train_pyscf%i'%i ] = np.abs(state.pyscf_E[i])
+                dct['train_E%i'%i ] = np.abs(vals[i]*HARTREE_TO_EV)
+                dct['img/dm%i'%i] = wandb.Image(np.expand_dims(density_matrix[i], axis=-1))
+                dct['img/W%i'%i] = wandb.Image(np.expand_dims(_W[i], axis=-1))
+            wandb.log(dct)
 
                 
         train_time, t0 = time.time()-t0, time.time() 
@@ -675,14 +686,6 @@ def gen_grid_partition(coords, atom_coords, natm, atm_dist, elements,
             c += 1
     #print("\t", time.time()-t0)
     return pbecke
-
-from functools import partial 
-@partial(jax.jit, backend="gpu", static_argnums=(2,3))
-def f(gm2, gp2, natm, ngrids, ix, jx):
-    pbecke = jnp.ones((natm, ngrids))  # [natom, ngrid]
-    pbecke = pbecke.at[ix].mul(gm2)
-    pbecke = pbecke.at[jx].mul(gp2)
-    return pbecke 
 
 
 def get_partition(
@@ -1086,6 +1089,7 @@ if __name__ == "__main__":
     parser.add_argument('-steps',   type=int,   default=100000)
     parser.add_argument('-bs',      type=int,   default=8)
     parser.add_argument('-val_bs',  type=int,   default=8)
+    parser.add_argument('-grad_acc',  type=int,   default=16)
 
     parser.add_argument('-normal',     action="store_true") 
     parser.add_argument('-wandb',      action="store_true") 
