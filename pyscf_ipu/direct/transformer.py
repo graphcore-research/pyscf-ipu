@@ -57,7 +57,6 @@ def transformer_init(
     total_params += np.prod(params.embeddings.shape)
     print("%26s %26s %26s"%("params.embeddings",params.embeddings.shape, np.prod(params.embeddings.shape)))
 
-
     # For transformer layers
     params.layers = []
     for i in range(n_layers):
@@ -109,7 +108,7 @@ def transformer(cfg, params, x: jnp.ndarray, position: jnp.ndarray, H_core: jnp.
     # Apply the transformer layers
     for layer in params.layers:
         # Layer-normalize embeddings
-        #t1 = vmap(standardize)(embeddings)
+        t1 = vmap(standardize)(embeddings)
         t1 = elementwise_linear(layer.norm_self_attn, x)   # L x Dm
 
         L, Dm = t1.shape
@@ -128,7 +127,7 @@ def transformer(cfg, params, x: jnp.ndarray, position: jnp.ndarray, H_core: jnp.
         x = x + (attn @ v).reshape(L, Dm)
 
         # Layer-normalize embeddings
-        #t2 = vmap(standardize)(embeddings)
+        t2 = vmap(standardize)(embeddings)
         t2 = elementwise_linear(layer.norm_ff, x)          # L x Dm
 
         # Feedforward fully connected
@@ -139,7 +138,7 @@ def transformer(cfg, params, x: jnp.ndarray, position: jnp.ndarray, H_core: jnp.
         # Add this layer's contribution into embeddings
         x = x + t2
 
-    return score #attn #linear(params.output, embeddings)                # L x n_vocab 
+    return score 
 
 
 import types
@@ -157,11 +156,11 @@ class ParamsDict(types.SimpleNamespace):
         super().__init__(**kwargs)
 
     def tree_flatten(self):
-        return jax.tree_flatten(self.__dict__, lambda a: a is not self.__dict__) # only flatten one step
+        return jax.tree_util.tree_flatten(self.__dict__, lambda a: a is not self.__dict__) # only flatten one step
 
     @classmethod
     def tree_unflatten(cls, aux, values):
-        return ParamsDict(**jax.tree_unflatten(aux, values))
+        return ParamsDict(**jax.tree_util.tree_unflatten(aux, values))
 
     def toJSON(self):
         return json.dumps(self, default=lambda o: o.__dict__, 

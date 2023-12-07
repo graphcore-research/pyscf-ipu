@@ -102,9 +102,12 @@ def __lda(rho): return -jnp.exp(1/3*jnp.log(rho) - 0.30305460484554375)
 CLIP_RHO_MIN  = 1e-10
 CLIP_RHO_MAX  = 1e15
 
-def b3lyp(rho, EPSILON_B3LYP=0):
+def _b3lyp(rho, EPSILON_B3LYP=0):
     rho0     = jnp.clip(rho[0], CLIP_RHO_MIN, CLIP_RHO_MAX)
     norms    = jnp.linalg.norm(rho[1:4]*2+CLIP_RHO_MIN, axis=0).T**2+EPSILON_B3LYP
+    return __lda(rho0)*0.08 + (__vwn(rho0)*0.19 + __b88(rho0, norms)*0.72 + __lyp(rho0, norms)*0.81) / rho0
+
+def b3lyp(rho0, norms, EPSILON_B3LYP=0):
     return __lda(rho0)*0.08 + (__vwn(rho0)*0.19 + __b88(rho0, norms)*0.72 + __lyp(rho0, norms)*0.81) / rho0
 
 

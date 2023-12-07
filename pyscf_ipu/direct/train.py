@@ -5,11 +5,19 @@ import numpy as np
 import pyscf
 import optax
 from icecream import ic
-from exchange_correlation.b3lyp import b3lyp, vxc_b3lyp
+from exchange_correlation.b3lyp import b3lyp, _b3lyp, vxc_b3lyp
 from tqdm import tqdm 
 import time 
 from transformer import transformer, transformer_init
 import pandas as pd 
+
+
+# [ ] add train loss
+# [ ] (algo) may get transformer to be 4x faster by fixing AO_grid stuff; 
+# [ ] (algo) can speed up dataloader by re-using AO_grid init (and ERI etc). 
+# [ ] (opt/ml) the learning rate schedule is weird when we do multiple steps per batch 
+# [ ] (opt/ml) validate with 10 molecules, not just 1. 
+# [ ] add dropout/dropres/...
 
 cfg, HARTREE_TO_EV, EPSILON_B3LYP, HYB_B3LYP = None, 27.2114079527, 1e-20, 0.2
 
@@ -20,11 +28,11 @@ B, BxNxN, BxNxK = None, None, None
 # Only need to recompute: L_inv, grid_AO, grid_weights, H_core, ERI and E_nuc. 
 def dm_energy(W: BxNxK, state, normal, nn): 
     if nn: 
-        W = jnp.mean(jax.vmap(transformer, in_axes=(None, None, 0, 0, 0), out_axes=(0))(cfg, W, state.ao_types, state.pos, state.H_core) , axis=1) 
+        W = jnp.mean(jax.vmap(transformer, in_axes=(None, None, 0, 0, 0), out_axes=(0))(cfg, \
+            W, state.ao_types, state.pos, state.H_core) , axis=1) 
         W = W @ state.init
-
-    L_inv_Q: BxNxN        = state.L_inv_T @ jnp.linalg.qr(W)[0]                 # O(B*N*K^2) FLOP O(B*N*K) FLOP/FLIO
-    density_matrix: BxNxN = 2 * L_inv_Q @ T(L_inv_Q)                            # O(B*N*K^2) FLOP/FLIO 
+    L_inv_Q: BxNxN        = state.L_inv_T @ jnp.linalg.qr(W)[0]      # O(B*N*K^2) FLOP O(B*N*K) FLOP/FLIO
+    density_matrix: BxNxN = 2 * (L_inv_Q*state.mask) @ T(L_inv_Q)                            # O(B*N*K^2) FLOP/FLIO 
     E_xc: B               = exchange_correlation(density_matrix, state, normal) # O(B*gsize*N^2) FLOP O(gsize*N^2) FLIO
     diff_JK: BxNxN        = JK(density_matrix, state, normal)                   # O(B*num_ERIs) FLOP O(num_ERIs) FLIO
     energies: B           = E_xc + state.E_nuc + jnp.sum((density_matrix * (state.H_core + diff_JK/2)).reshape(W.shape[0], -1), axis=-1) 
@@ -36,26 +44,20 @@ def sparse_mult(values, dm, state, gsize):
     prod = in_*values[:, None]
     return jax.ops.segment_sum(prod, state.rows, gsize)
 
-def exchange_correlation(density_matrix, state, normal):
+def exchange_correlation(density_matrix: BxNxN, state, normal):
     _, _, gsize, N = state.grid_AO.shape
     B = density_matrix.shape[0]
     if normal: 
         grid_AO_dm = (state.grid_AO[:, 0] @ density_matrix)         # (B,gsize,N) @ (B, N, N) = O(B gsize N^2)
         rho        = jnp.sum(grid_AO_dm * state.grid_AO, axis=3)    # (B,1,gsize,N) * (B,4,gsize,N) = O(B gsize N)
     else:    
-        main       = state.main_grid_AO @ density_matrix            # (1, gsize, N) @ (B, N, N) = O(B gsize N^2) FLOPs and O(gsize*N + N^2 +B * gsize * N) FLIOs 
-        correction = jax.vmap(sparse_mult, in_axes=(0,0,None, None))(state.sparse_diffs_grid_AO, density_matrix, state, gsize)
+        main: BxGsizexN       = state.main_grid_AO @ density_matrix            # (1, gsize, N) @ (B, N, N) = O(B gsize N^2) FLOPs and O(gsize*N + N^2 +B * gsize * N) FLIOs 
+        correction: BxGsizexN = jax.vmap(sparse_mult, in_axes=(0,0,None, None))(state.sparse_diffs_grid_AO, density_matrix, state, gsize)
+        rho_a = jnp.einsum("bpij,bqij->bpi", state.grid_AO, main.reshape(B,1,gsize,N)) 
+        rho_b = jnp.einsum("bpij,bqij->bpi", state.grid_AO, correction.reshape(B,1,gsize,N))
+        rho = rho_a - rho_b
 
-        # subtract before/after einsum. 
-        if True:
-            grid_AO_dm = (main - correction).reshape(B, 1, gsize, N)    # (B * gsize * N)
-            rho        = jnp.einsum("bpij,bqij->bpi", state.grid_AO, grid_AO_dm)
-        else: 
-            rho_a = jnp.einsum("bpij,bqij->bpi", state.grid_AO, main.reshape(B,1,gsize,N)) 
-            rho_b = jnp.einsum("bpij,bqij->bpi", state.grid_AO, correction.reshape(B,1,gsize,N))
-            rho = rho_a - rho_b
-
-    E_xc       = jax.vmap(b3lyp, in_axes=(0,None))(rho, EPSILON_B3LYP).reshape(B, gsize)
+    E_xc       = jax.vmap(_b3lyp, in_axes=(0, None))(rho, EPSILON_B3LYP).reshape(B, gsize)
     E_xc       = jnp.sum(rho[:, 0] * state.grid_weights * E_xc, axis=-1).reshape(B)
     return E_xc 
 
@@ -66,9 +68,6 @@ def JK(density_matrix, state, normal):
         diff_JK = J - K / 2 * HYB_B3LYP
     else: 
         from sparse_symmetric_ERI import sparse_symmetric_einsum
-        # batched =>   flops = reads  
-        #diff_JK = jax.vmap(sparse_symmetric_einsum, in_axes=(0, 0, 0))(state.nonzero_distinct_ERI, state.nonzero_indices, density_matrix)
-        # first + correction_remaining =>  floats = reads*batch_size 
         diff_JK: BxNxN = jax.vmap(sparse_symmetric_einsum, in_axes=(None, None, 0))(state.nonzero_distinct_ERI[0], state.nonzero_indices[0], density_matrix)
         diff_JK: BxNxN = diff_JK - jax.vmap(sparse_symmetric_einsum, in_axes=(0, None, 0))(state.diffs_ERI, state.indxs, density_matrix)
  
@@ -79,22 +78,42 @@ def nao(atom, basis):
     m.build()
     return m.nao_nr()//2
 
-def batched_state(mol_str, opts, bs, wiggle_num=0, do_pyscf=True): 
+def batched_state(mol_str, opts, bs, wiggle_num=0, 
+                  do_pyscf=True, extrapolate=False, validation=False,
+                  pad_electrons=40, 
+                  pad_diff_ERIs=50000,
+                  pad_distinct_ERIs=200000,
+                  pad_grid_AO=22000,
+                  pad_nonzero_distinct_ERI=200000,
+                  pad_sparse_diff_grid=200000, 
+                  ): 
+    if opts.wandb: import wandb 
+    #pad_electrons, pad_diff_ERIs, pad_distinct_ERIs, pad_grid_AO, pad_nonzero_distinct_ERI, pad_sparse_diff_grid = \
+    #    -1, -1, -1, -1, -1, -1
     t0 = time.time()
-    state = init_dft(mol_str, opts, do_pyscf=do_pyscf)
+    state = init_dft(mol_str, opts, do_pyscf=do_pyscf, pad_electrons=pad_electrons)
     c, w = state.grid_coords, state.grid_weights
-
     
     np.random.seed(42)
     p = np.array(mol_str[0][1])
     states = [state]
-    for i in tqdm(range(bs-1)):
-        x = p + np.random.normal(0, opts.wiggle_var, (3))
+    #for i in tqdm(range(bs-1)):
+    for i in range(bs-1):
+        if opts.benzene: 
+            x = p 
+            x[2] += np.random.normal(0, opts.wiggle_var*(1+ (extrapolate and i > bs//2)), (1))
+        else: 
+            x = p + np.random.normal(0, opts.wiggle_var, (3))
+
+            if extrapolate and i > bs//2: 
+                x = p + np.random.normal(0, opts.wiggle_var, (3))
+
         mol_str[wiggle_num][1] = (x[0], x[1], x[2])
 
         # when profiling create fake molecule to skip waiting
-        if i == 0 or not opts.prof: 
-            stateB = init_dft(mol_str, opts, c, w, do_pyscf=do_pyscf and i < 5)
+        if i == 0 or not opts.prof:
+            stateB = init_dft(mol_str, opts, c, w, do_pyscf=do_pyscf and i < 2, state=state,
+                              pad_electrons=pad_electrons)
         
         states.append(stateB)
 
@@ -103,7 +122,7 @@ def batched_state(mol_str, opts, bs, wiggle_num=0, do_pyscf=True):
 
     # Compute ERI sparsity. 
     nonzero = []
-    for e,i in zip(state.nonzero_distinct_ERI, state.nonzero_indices):
+    for e, i in zip(state.nonzero_distinct_ERI, state.nonzero_indices):
         abs = np.abs(e)
         indxs = abs < opts.eri_threshold #1e-10 
         e[indxs] = 0 
@@ -146,6 +165,7 @@ def batched_state(mol_str, opts, bs, wiggle_num=0, do_pyscf=True):
         main_grid_AO   = state.grid_AO[:1]
         diffs_grid_AO  = main_grid_AO - state.grid_AO
         rows, cols = np.nonzero(np.max(diffs_grid_AO[:, 0]!=0, axis=0))
+
         sparse_diffs_grid_AO = diffs_grid_AO[:, 0, rows,cols]
 
         # use the same sparsity pattern across a batch.
@@ -164,7 +184,19 @@ def batched_state(mol_str, opts, bs, wiggle_num=0, do_pyscf=True):
         diff_ERIs = diff_ERIs.reshape(bs, batches, -1)
         diff_indxs = diff_indxs.reshape(batches, -1, 4)
 
-        state.indxs=diff_indxs
+        if pad_diff_ERIs == -1: 
+            state.indxs=diff_indxs
+            state.diffs_ERI=diff_ERIs
+        else: 
+            # pad ERIs with 0 and indices with -1 so they point to 0. 
+            assert diff_indxs.shape[1] == diff_ERIs.shape[2]
+            pad = pad_diff_ERIs - diff_indxs.shape[1]
+            assert pad > 0 
+            state.indxs     = np.pad(diff_indxs, ((0,0), (0, pad), (0, 0)), 'constant', constant_values=(-1))
+            state.diffs_ERI = np.pad(diff_ERIs,  ((0,0), (0, 0),   (0, pad))) # pad zeros 
+
+            if opts.wandb: wandb.log({"pad_diff_ERIs": pad/diff_ERIs.shape[2]})
+
         state.rows=rows
         state.cols=cols
 
@@ -172,11 +204,45 @@ def batched_state(mol_str, opts, bs, wiggle_num=0, do_pyscf=True):
 
         state.sparse_diffs_grid_AO = sparse_diffs_grid_AO
         state.diffs_grid_AO = diffs_grid_AO
-        state.diffs_ERI=diff_ERIs
+
+        if pad_sparse_diff_grid != -1: 
+            assert state.sparse_diffs_grid_AO.shape[1] == state.rows.shape[0]
+            assert state.sparse_diffs_grid_AO.shape[1] == state.cols.shape[0]
+            pad = pad_sparse_diff_grid - state.rows.shape[0]
+            assert pad >= 0 
+            state.rows = np.pad(state.rows, (0,pad))
+            state.cols = np.pad(state.cols, (0,pad))
+            state.sparse_diffs_grid_AO = np.pad(state.sparse_diffs_grid_AO, ((0,0),(0,pad)))
+
+            if opts.wandb: wandb.log({"pad_sparse_diff_grid": pad/state.sparse_diffs_grid_AO.shape[1]})
 
         #state.grid_AO = state.grid_AO[:1]
         state.nonzero_distinct_ERI = state.nonzero_distinct_ERI[:1]
         state.nonzero_indices = np.expand_dims(state.nonzero_indices, axis=0)
+        if pad_distinct_ERIs != -1: 
+            assert state.nonzero_distinct_ERI.shape[2] == state.nonzero_indices.shape[2]
+            pad = pad_distinct_ERIs - state.nonzero_distinct_ERI.shape[2]
+            assert pad > 0, (pad_distinct_ERIs, state.nonzero_distinct_ERI.shape[2])
+            state.nonzero_indices      = np.pad(state.nonzero_indices,      ((0,0), (0,0), (0, pad), (0,0)), 'constant', constant_values=(-1))
+            state.nonzero_distinct_ERI = np.pad(state.nonzero_distinct_ERI, ((0,0), (0,0),  (0, pad))) # pad zeros 
+
+            if opts.wandb: wandb.log({"pad_distinct_ERIs": pad/state.nonzero_distinct_ERI.shape[2]})
+
+        if pad_grid_AO != -1: 
+            assert state.grid_AO.shape[2] == state.grid_weights.shape[1]
+            assert state.grid_AO.shape[2] == state.grid_coords.shape[1]
+            assert state.grid_AO.shape[2] == state.main_grid_AO.shape[1]
+            assert state.grid_AO.shape[2] == state.diffs_grid_AO.shape[2]
+            pad = pad_grid_AO - state.grid_AO.shape[2]
+            assert pad > 0
+            state.grid_AO      = np.pad(state.grid_AO, ((0,0),(0,0), (0,pad), (0,0)))
+            state.grid_weights = np.pad(state.grid_weights, ((0,0),(0,pad)))
+            state.grid_coords  = np.pad(state.grid_coords, ((0,0),(0,pad),(0,0)))
+            state.main_grid_AO = np.pad(state.main_grid_AO, ((0,0),(0,pad),(0,0)))
+            state.diffs_grid_AO = np.pad(state.diffs_grid_AO, ((0,0),(0,0),(0,pad),(0,0)))
+
+            if opts.wandb: wandb.log({"pad_grid_AO": pad/state.grid_AO.shape[2]})
+
 
         indxs = np.abs(state.nonzero_distinct_ERI ) > 1e-9 
         state.nonzero_distinct_ERI = state.nonzero_distinct_ERI[indxs]
@@ -190,13 +256,17 @@ def batched_state(mol_str, opts, bs, wiggle_num=0, do_pyscf=True):
         state.nonzero_distinct_ERI = state.nonzero_distinct_ERI.reshape(1, batches, -1)
         state.nonzero_indices = state.nonzero_indices.reshape(1, batches, -1, 4)
 
-    print("batch: ", time.time()-t0)
+        if pad_nonzero_distinct_ERI != -1: 
+            assert state.nonzero_distinct_ERI.shape[2] == state.nonzero_indices.shape[2]
+            pad = pad_nonzero_distinct_ERI - state.nonzero_distinct_ERI.shape[2]
+            assert pad >= 0, (pad_nonzero_distinct_ERI, state.nonzero_distinct_ERI.shape[2])
+            state.nonzero_distinct_ERI = np.pad(state.nonzero_distinct_ERI, ((0,0),(0,0),(0,pad)))
+            state.nonzero_indices = np.pad(state.nonzero_indices, ((0,0),(0,0),(0,pad), (0,0)), 'constant', constant_values=(-1))
+
+            if opts.wandb: wandb.log({"pad_grid_AO": pad/state.grid_AO.shape[2]})
+
+
     return state 
-
-
-# todo: wiggle asynch each 10 steps or so. 
-def wiggle(state): # idea: keep bs=64 state, but add say another 64 wiggles which change. 
-    pass 
 
 
 def nanoDFT(mol_str, opts):
@@ -205,23 +275,9 @@ def nanoDFT(mol_str, opts):
     # This consists of DFT tensors initialized with PySCF/CPU.
     np.random.seed(42)
 
-
-    # Step 1. 
-    # Take benzene; randomly sample first carbon. 
-    # Get model generalize to new randomly sampled carbons. 
-    #
-    # Step 2. 
-    # Change benzene to have CNOF. 
-    # Do single atom wiggles on CNOF, get model to generalize to simultaneous wiggles. 
-    # 
-    # Step 3/4. Scale grid-size and basis set. 
-
-    # Data Creation / Data loader 
-    # [ ] Move to dataloader; whenever a new data point is ready, use that. 
-    # [ ] Consider pre-compute/load. 
-    # [ ] Consider 'wiggle' function which generate new wiggle datapoints in state. 
-    val_state = batched_state(mol_str[0], opts, opts.val_bs, do_pyscf=True) 
-    states    = [batched_state(mol_str[0], opts, opts.bs, do_pyscf=True)] + [batched_state(mol_str[i], opts, opts.bs, do_pyscf=False)  for i in range(opts.states-1)]
+    if opts.wandb: 
+        import wandb 
+        wandb.init(project='ndft')
 
     rnd_key = jax.random.PRNGKey(42)
     n_vocab = nao("C", opts.basis) + nao("N", opts.basis) + \
@@ -265,51 +321,108 @@ def nanoDFT(mol_str, opts):
             arg2 = step_num * warmup_steps ** -1.5
             return d_model ** -0.5 * min(arg1, arg2)
 
-        optimizer = optax.adam(learning_rate=lambda step: custom_schedule(step, d_model=d_model, warmup_steps=4000),
+        optimizer = optax.adam(learning_rate = opts.lr,#)lambda step: custom_schedule(step, d_model=d_model, warmup_steps=4000),
                        b1=0.9, b2=0.98, eps=1e-9)
 
         adam = optax.adam(opts.lr)
         w = params 
+
+        from torch.utils.data import DataLoader, Dataset
+        class OnTheFlyQM9(Dataset):
+            # prepares dft tensors with pyscf "on the fly". 
+            # dataloader is very keen on throwing segfaults (e.g. using jnp in dataloader throws segfaul). 
+            # problem: second epoch always gives segfault. 
+            # hacky fix; make __len__ = real_length*num_epochs and __getitem__ do idx%real_num_examples 
+            def __init__(self, opts, nao=294, train=True, num_epochs=1000):
+                # only take molecules with use {CNOFH}, nao=nao and spin=0.
+                df = pd.read_pickle("alchemy/processed_atom_9.pickle") # spin=0 and only CNOFH molecules 
+                if nao != -1: df = df[df["nao"]==nao] 
+                df = df.sample(frac=1).reset_index(drop=True)
+
+                if train: self.mol_strs = df["pyscf"].values[:-10]
+                else: self.mol_strs = df["pyscf"].values[-10:]
+                self.num_epochs = num_epochs
+                self.opts = opts 
+                self.validation = not train 
+
+            def __len__(self):
+                return len(self.mol_strs)*self.num_epochs
+
+            def __getitem__(self, idx):
+                return batched_state(self.mol_strs[idx%len(self.mol_strs)], self.opts, self.opts.bs, wiggle_num=0, do_pyscf=self.validation, extrapolate=False, validation=False)
+        
+        qm9 = OnTheFlyQM9(opts, train=True)
+        train_dataloader = DataLoader(qm9, batch_size=1, pin_memory=True, shuffle=False, drop_last=True, num_workers=5, prefetch_factor=2, collate_fn=lambda x: x[0])
+        pbar = tqdm(train_dataloader)
+        val_qm9 = OnTheFlyQM9(opts, train=False)
+
     else: 
+        states    = [batched_state(mol_str[0], opts, opts.bs, do_pyscf=True)] + [batched_state(mol_str[i], opts, opts.bs, do_pyscf=False)  for i in range(opts.states-1)]
+        class DummyIterator:
+            def __init__(self, item): self.item = item
+            def __iter__(self): return self
+            def __next__(self): return self.item
+        train_dataloader = DummyIterator(states[0])
+        pbar = tqdm(train_dataloader)
         w = states[0].init 
         adam = optax.adabelief(opts.lr)
+        summary(states[0])
 
     vandg = jax.jit(jax.value_and_grad(dm_energy, has_aux=True), backend=opts.backend, static_argnames=("normal", 'nn'))
     valf = jax.jit(dm_energy, backend=opts.backend, static_argnames=("normal", 'nn'))
-
-    # Build initializers for params
     adam_state = adam.init(w)
 
-    min_val = 0 
-    min_dm  = 0 
+    if opts.wandb: wandb.log({'total_params': total_params, 'batch_size': opts.bs, 'lr': opts.lr })
 
-    pbar = tqdm(range(opts.steps))
-
-    summary(states[0])
-
-    mins = np.ones(opts.bs) * 1e6
-    if opts.wandb: 
-        import wandb 
-        wandb.init(project='ndft')
-        wandb.log({'total_params': total_params})
-
-    print("jitting...")
-    t0 = time.time()
-    (val, (vals, E_xc, density_matrix)), grad = vandg(w, states[0], opts.normal, opts.nn)
-    print("done!", time.time()-t0)
-
-    
     def update(w, state, adam_state): 
+        print("rejitting... (if this is printed more than once something is wrong!)")
         (val, (vals, E_xc, density_matrix)), grad = vandg(w, state, opts.normal, opts.nn)
         updates, adam_state = adam.update(grad, adam_state)
         w = optax.apply_updates(w, updates)
         return w, vals, density_matrix, adam_state
-
     update = jax.jit(update, backend=opts.backend)
 
-    for i in pbar:
-        state = states[i%opts.states]
-        w, vals, density_matrix, adam_state = update(w, state, adam_state)
+    min_val, min_dm, mins, val_state, valid_str, step = 0, 0, np.ones(opts.bs)*1e6, None, "", 0
+    t0, load_time, train_time, val_time = time.time(), 0, 0, 0
+
+    # training loop (epochs are handled inside dataloader due to segfault). 
+    for i, state in enumerate(pbar):
+        load_time, t0 = time.time()-t0, time.time()
+
+        for j in range(16):
+            if j == 0: _t0 =time.time()
+            w, vals, density_matrix, adam_state = update(w, state, adam_state)
+            if j == 0: time_step1 = time.time()-_t0
+            step += 1 
+            if not opts.nn: 
+                str = "error=" + "".join(["%.7f "%(vals[i]*HARTREE_TO_EV-state.pyscf_E[i]) for i in range(2)]) + " [eV]"
+                pbar.set_description(str)
+            else: 
+                pbar.set_description("train=".join(["%.5f"%i for i in vals[:2]]) + " " + valid_str + "time=%.1f %.1f %.1f %.1f"%(load_time, time_step1, train_time, val_time))
+
+        train_time, t0 = time.time()-t0, time.time() 
+
+        if opts.nn:# and i % 5 == 0: 
+            if val_state is None: val_state = val_qm9[0]
+            _, (valid_vals, _, _) = valf(w, val_state, opts.normal, opts.nn)
+            valid_str = "val_error=" + "".join(["%.7f "%(valid_vals[i]*HARTREE_TO_EV-val_state.pyscf_E[i]) for i in range(0, 3)]) + " [eV]"
+            if opts.wandb: 
+                dct = {}
+                for i in range(0, opts.val_bs):
+                    dct['valid_l%i'%i ] = valid_vals[i]*HARTREE_TO_EV-val_state.pyscf_E[i]
+                dct["lr"] = custom_schedule(step, d_model, 4000)
+                wandb.log(dct)
+
+        valid_time, t0 = time.time()-t0, time.time()
+        continue 
+
+        # move to train loop; this is done inside dataloader multithreaded
+        '''if opts.wandb and i < 6: 
+            from plot import create_rdkit_mol
+            import wandb 
+            str = [mol_str[j][0] for j in range(len(mol_str))]
+            pos = np.concatenate([np.array(mol_str[j][1]).reshape(1, 3) for j in range(len(mol_str))])
+            wandb.log({"%s_mol_%i"%({True: "valid", False: "train"}[validation], i): create_rdkit_mol(str, pos) })'''
 
         # valid
         if i % 10 == 0 and opts.nn: 
@@ -339,6 +452,8 @@ def nanoDFT(mol_str, opts):
             #str += "E_xc=" + "".join(["%.7f "%(E_xc[i]*HARTREE_TO_EV) for i in range(opts.bs)]) + " [eV]"
             try:
                 mins = np.minimum(mins, np.abs(vals*HARTREE_TO_EV - state.pyscf_E[:, 0]))
+                if np.max(mins) < 1e-5: 
+                    break
                 str += " best=" + "".join(["%.7f "%(mins[i]) for i in range(2)]) + " [eV]"
             except:
                 pass
@@ -367,6 +482,7 @@ def nanoDFT(mol_str, opts):
 import chex
 @chex.dataclass
 class IterationState:
+    mask: np.array
     init: np.array
     E_nuc: np.array
     L_inv: np.array
@@ -424,23 +540,13 @@ def original_becke(g):
   g = (3 - g**2) * g * .5
   return g
 
-def get_partition(
-  mol,
-  atom_coords,
-  atom_grids_tab,
-  radii_adjust=treutler_atomic_radii_adjust,
-  atomic_radii=radi.BRAGG_RADII,
-  becke_scheme=original_becke,
-  concat=True
-):
-  atm_dist = inter_distance(atom_coords)  # [natom, natom]
-
-  def gen_grid_partition(coords):
+def gen_grid_partition(coords, atom_coords, natm, atm_dist, elements, 
+                       atomic_radii,  becke_scheme=original_becke,):
     ngrids = coords.shape[0]
     dc = coords[None] - atom_coords[:, None]
     grid_dist = np.sqrt(np.einsum('ijk,ijk->ij', dc, dc))  # [natom, ngrid]
 
-    ix, jx = np.tril_indices(mol.natm, k=-1)
+    ix, jx = np.tril_indices(natm, k=-1)
 
     natm, ngrid = grid_dist.shape 
     #g_ = -1 / atm_dist.reshape(natm, natm, 1) * (grid_dist.reshape(1, natm, ngrid) - grid_dist.reshape(natm, 1, ngrid))
@@ -449,7 +555,7 @@ def get_partition(
 
     def pbecke_g(i, j):
       g = g_[i, j]
-      charges = [elements_proton(x) for x in mol.elements]
+      charges = [elements_proton(x) for x in elements]
       rad = np.sqrt(atomic_radii[charges]) + 1e-200
       rr = rad.reshape(-1, 1) * (1. / rad)
       a = .25 * (rr.T - rr)
@@ -466,32 +572,65 @@ def get_partition(
     gp2 = (1+g)/2
     gm2 = (1-g)/2
 
-    pbecke = jnp.ones((mol.natm, ngrids))  # [natom, ngrid]
+    t0 = time.time()
+    #pbecke = f(gm2, gp2, natm, ngrids, ix, jx )
+    pbecke = np.ones((natm, ngrids))  
+    c = 0 
+    # this goes up to n choose two 
+    for i in range(natm): 
+        for j in range(i): 
+            pbecke[i] *= gm2[c]
+            pbecke[j] *= gp2[c]
+            c += 1
+    #print("\t", time.time()-t0)
+    return pbecke
+
+from functools import partial 
+@partial(jax.jit, backend="gpu", static_argnums=(2,3))
+def f(gm2, gp2, natm, ngrids, ix, jx):
+    pbecke = jnp.ones((natm, ngrids))  # [natom, ngrid]
     pbecke = pbecke.at[ix].mul(gm2)
     pbecke = pbecke.at[jx].mul(gp2)
+    return pbecke 
 
-    return pbecke
+
+def get_partition(
+  mol,
+  atom_coords,
+  atom_grids_tab,
+  radii_adjust=treutler_atomic_radii_adjust,
+  atomic_radii=radi.BRAGG_RADII,
+  becke_scheme=original_becke,
+  concat=True, state=None
+):
+  t0 = time.time()
+  atm_dist = inter_distance(atom_coords)  # [natom, natom]
 
   coords_all = []
   weights_all = []
+
+  # [ ] consider another grid? 
   for ia in range(mol.natm):
     coords, vol = atom_grids_tab[mol.atom_symbol(ia)]
     coords = coords + atom_coords[ia]  # [ngrid, 3]
-    pbecke = gen_grid_partition(coords)  # [natom, ngrid]
-    weights = vol * pbecke[ia] / jnp.sum(pbecke, axis=0) 
+    pbecke  = gen_grid_partition(coords, atom_coords, mol.natm, atm_dist, mol.elements, atomic_radii)  # [natom, ngrid]
+    weights = vol * pbecke[ia] / np.sum(pbecke, axis=0) 
     coords_all.append(coords)
     weights_all.append(weights)
 
   if concat:
-    coords_all = jnp.vstack(coords_all)
-    weights_all = jnp.hstack(weights_all)
+    coords_all = np.vstack(coords_all)
+    weights_all = np.hstack(weights_all)
+
+  coords = (coords_all, weights_all)
   return coords_all, weights_all
 
 
 class DifferentiableGrids(gen_grid.Grids):
   """Differentiable alternative to the original pyscf.gen_grid.Grids."""
 
-  def build(self, atom_coords) :
+  def build(self, atom_coords, state=None) :
+    t0 = time.time()
     mol = self.mol
 
     atom_grids_tab = self.gen_atomic_grids(
@@ -505,7 +644,9 @@ class DifferentiableGrids(gen_grid.Grids):
       treutler_atomic_radii_adjust,
        self.atomic_radii,
       original_becke,
+      state=state,
     )
+
     self.coords = coords
     self.weights = weights 
     return coords, weights
@@ -522,7 +663,8 @@ def grids_from_pyscf_mol(
   return grids, weights
 
 
-def init_dft(mol_str, opts, _coords=None, _weights=None, first=False, do_pyscf=True):
+def init_dft(mol_str, opts, _coords=None, _weights=None, first=False, do_pyscf=True, state=None, pad_electrons=-1):
+    #t0 = time.time()
     mol = build_mol(mol_str, opts.basis)
     if do_pyscf: pyscf_E, pyscf_hlgap, pycsf_forces = reference(mol_str, opts)
     else:        pyscf_E, pyscf_hlgap, pyscf_forces = np.zeros(1), np.zeros(1), np.zeros(1)
@@ -536,7 +678,7 @@ def init_dft(mol_str, opts, _coords=None, _weights=None, first=False, do_pyscf=T
     grids            = DifferentiableGrids(mol)
     grids.level      = opts.level
     #grids.build()
-    grids.build(np.concatenate([np.array(a[1]).reshape(1, 3) for a in mol._atom]))
+    grids.build(np.concatenate([np.array(a[1]).reshape(1, 3) for a in mol._atom]), state=state)
 
     grid_weights    = grids.weights                                 # (grid_size,) = (45624,) for C6H6
     grid_coords     = grids.coords
@@ -549,7 +691,15 @@ def init_dft(mol_str, opts, _coords=None, _weights=None, first=False, do_pyscf=T
     O               = mol.intor_symmetric('int1e_ovlp')             # (N,N)
     L               = np.linalg.cholesky(O)
     L_inv           = np.linalg.inv(L)          # (N,N)
-    init = np.eye(N)[:, :n_electrons_half] 
+
+    if pad_electrons == -1: 
+        init = np.eye(N)[:, :n_electrons_half] 
+        mask = np.ones((1, n_electrons_half))
+    else: 
+        assert pad_electrons > n_electrons_half
+        init = np.eye(N)[:, :pad_electrons] 
+        mask = np.zeros((1, pad_electrons))
+        mask[:, :n_electrons_half] = 1
 
     if opts.normal: 
         ERI = mol.intor("int2e_sph")
@@ -616,23 +766,23 @@ def init_dft(mol_str, opts, _coords=None, _weights=None, first=False, do_pyscf=T
         pos=e(pos),
         ao_types=e(ao_types),
         init = e(init), 
-                           E_nuc=e(E_nuc), 
-                           ERI=e(ERI),  
-                           nonzero_distinct_ERI=[nonzero_distinct_ERI],
-                           nonzero_indices=[0],
-                           H_core=e(nuclear+kinetic),
-                           L_inv=e(L_inv), 
-                           L_inv_T = e(L_inv.T),
-                           grid_AO=e(grid_AO), 
-                           grid_weights=e(grid_weights), 
-                           grid_coords=e(grid_coords),
-                           pyscf_E=e(pyscf_E[-1:]), 
-                           N=e(mol.nao_nr()),
-                           )
+        E_nuc=e(E_nuc), 
+        ERI=e(ERI),  
+        nonzero_distinct_ERI=[nonzero_distinct_ERI],
+        nonzero_indices=[0],
+        H_core=e(nuclear+kinetic),
+        L_inv=e(L_inv), 
+        L_inv_T = e(L_inv.T),
+        grid_AO=e(grid_AO), 
+        grid_weights=e(grid_weights), 
+        grid_coords=e(grid_coords),
+        pyscf_E=e(pyscf_E[-1:]), 
+        N=e(mol.nao_nr()),
+        mask=e(mask),
+    )
 
 
     return state
-
 
 
 def summary(state): 
@@ -842,29 +992,34 @@ if __name__ == "__main__":
     parser.add_argument('-backend', type=str,   default="cpu") 
     parser.add_argument('-lr',      type=float, default=2.5e-4)
     parser.add_argument('-steps',   type=int,   default=100000)
-    parser.add_argument('-bs',      type=int,   default=2)
-    parser.add_argument('-val_bs',  type=int,   default=4)
+    parser.add_argument('-bs',      type=int,   default=8)
+    parser.add_argument('-val_bs',  type=int,   default=8)
 
     parser.add_argument('-normal',     action="store_true") 
     parser.add_argument('-wandb',      action="store_true") 
     parser.add_argument('-prof',      action="store_true") 
     parser.add_argument('-visualize',  action="store_true") 
     parser.add_argument('-skip',       action="store_true", help="skip pyscf test case") 
-    parser.add_argument('-repeats',  type=int, default=1, help="times to repeat molecule")  
 
     # dataset 
     parser.add_argument('-benzene',        action="store_true") 
+    parser.add_argument('-hydrogens',        action="store_true") 
+    parser.add_argument('-water',        action="store_true") 
+    parser.add_argument('-waters',        action="store_true") 
     parser.add_argument('-states',         type=int,   default=1)
-    parser.add_argument('-wiggle_var',     type=float,   default=1.0, help="wiggle N(0, wiggle_var)")
+    parser.add_argument('-wiggle_var',     type=float,   default=0.3, help="wiggle N(0, wiggle_var)")
     parser.add_argument('-eri_threshold',  type=float,   default=1e-10, help="loss function threshold only")
 
     # models 
-    parser.add_argument('-nn',         action="store_true", help="train nn, defaults to GD") 
+    parser.add_argument('-nn',       action="store_true", help="train nn, defaults to GD") 
     parser.add_argument('-tiny',     action="store_true") 
-    parser.add_argument('-small',     action="store_true") 
+    parser.add_argument('-small',    action="store_true") 
     parser.add_argument('-base',     action="store_true") 
     opts = parser.parse_args()
     if opts.tiny or opts.small or opts.base: opts.nn = True 
+
+    args_dict = vars(opts)
+    print(args_dict)
 
     if True: 
         df = pd.read_pickle("alchemy/atom_9.pickle")
@@ -887,6 +1042,30 @@ if __name__ == "__main__":
                 ["H", ( 3.2000,  1.2124, 0.0000)],
                 ["H", ( 1.9500,  3.3775, 0.0000)]
             ]]
+    # hydrogens 
+    if opts.hydrogens: 
+        mol_strs = [[
+                ["H", ( 0.0000,  0.0000, 0.0000)],
+                ["H", ( 1.4000,  0.0000, 0.0000)],
+            ]]
+    if opts.water: 
+        mol_strs = [[
+                ["O", ( 0.0000,  0.0000, 0.0000)],
+                ["H", ( 0.0000,  1.4000, 0.0000)],
+                ["H", ( 1.4000,  0.0000, 0.0000)],
+            ]]
+    if opts.waters: 
+        mol_strs = [[
+            ["O",(-0.1858140, -1.1749469,  0.7662596)],
+            ["H",(-0.1285513, -0.8984365,  1.6808606)],
+            ["H",(-0.0582782, -0.3702550,  0.2638279)],
+            ["O",( 0.1747051,  1.1050002, -0.7244430)],
+            ["H",(-0.5650842,  1.3134964, -1.2949455)],
+            ["H",( 0.9282185,  1.0652990, -1.3134026)], ]]
+
+
+
+        
 
     nanoDFT_E, (nanoDFT_hlgap, mo_energy, mo_coeff, grid_coords, grid_weights, dm, H) = nanoDFT(mol_strs, opts)
 

@@ -7,23 +7,18 @@ from functools import partial
 from icecream import ic
 HYB_B3LYP = 0.2
 
-@partial(jax.jit, backend="cpu")
 def get_i_j(val):
-    import jax.numpy as np 
     i = (np.sqrt(1 + 8*val.astype(np.uint64)) - 1)//2 # no need for floor, integer division acts as floor. 
     j = (((val - i) - (i**2 - val))//2)
     return i, j
 
 def ijkl(value, symmetry, N, f):
-    import jax.numpy as np 
     i, j, k, l = value[0].astype(np.uint32), value[1].astype(np.uint32), value[2].astype(np.uint32), value[3].astype(np.uint32)
     return f(i,j,k,l,symmetry,N)
 ijkl = jax.vmap(ijkl, in_axes=(0, None, None, None))
 
 
-@partial(jax.jit, backend="cpu")
 def num_repetitions_fast(ij, kl):
-    import jax.numpy as np
     i, j = get_i_j(ij)
     k, l = get_i_j(kl)
 
