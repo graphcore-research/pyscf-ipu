@@ -101,12 +101,15 @@ def transformer(cfg, params, x: jnp.ndarray, position: jnp.ndarray, H_core: jnp.
 
     embeddings = cfg.lambda_e * params.embeddings[x, :]  # L x Dm
 
+    all_pairs = jnp.linalg.norm( position.reshape(1, -1, 3) - position.reshape(-1, 1, 3), axis=-1)
+
     # Add (learned) positional encodings
-    x = jnp.concatenate([embeddings[:, :-3], position], -1) 
+    x = jnp.concatenate([embeddings[:, :-3], position*10], -1) # seems positions ignored, scale larger (nn has to learn unit anyway)
+    #x = embeddings
     L, dm = x.shape
 
     # Apply the transformer layers
-    for layer in params.layers:
+    for layer_num, layer in enumerate(params.layers):
         # Layer-normalize embeddings
         t1 = vmap(standardize)(embeddings)
         t1 = elementwise_linear(layer.norm_self_attn, x)   # L x Dm
@@ -120,10 +123,12 @@ def transformer(cfg, params, x: jnp.ndarray, position: jnp.ndarray, H_core: jnp.
         v = jnp.transpose(qkv[:, 2*Dm:3*Dm].reshape(L, nheads, Dm//nheads), (1, 0, 2))
         score = (q @ jnp.transpose(k, (0, 2, 1))) / math.sqrt(Dm)
 
-        if layer == 0:  # doesn't look like it helps 
+        # do like graphformer and append position here? 
+        if layer_num < 6:  # doesn't look like it helps 
             score += H_core
+            score += all_pairs
 
-        attn     = jax.nn.softmax(score, axis=1)
+        attn     = jax.nn.softmax(score , axis=1) 
         x = x + (attn @ v).reshape(L, Dm)
 
         # Layer-normalize embeddings
@@ -138,7 +143,9 @@ def transformer(cfg, params, x: jnp.ndarray, position: jnp.ndarray, H_core: jnp.
         # Add this layer's contribution into embeddings
         x = x + t2
 
-    return score 
+    return score[0] # take first head 
+    #print(score.shape, x.shape, x[:L,:L].shape)
+    #return x[:L, :L] #score 
 
 
 import types
