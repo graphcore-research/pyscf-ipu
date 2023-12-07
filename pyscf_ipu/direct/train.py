@@ -88,8 +88,12 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
                   pad_sparse_diff_grid=200000, 
                   ): 
     if opts.wandb: import wandb 
-    #pad_electrons, pad_diff_ERIs, pad_distinct_ERIs, pad_grid_AO, pad_nonzero_distinct_ERI, pad_sparse_diff_grid = \
-    #    -1, -1, -1, -1, -1, -1
+
+    # don't pad for individual molecules like benzene 
+    if opts.benzene: 
+        pad_electrons, pad_diff_ERIs, pad_distinct_ERIs, pad_grid_AO, pad_nonzero_distinct_ERI, pad_sparse_diff_grid = \
+            -1, -1, -1, -1, -1, -1
+
     t0 = time.time()
     state = init_dft(mol_str, opts, do_pyscf=do_pyscf, pad_electrons=pad_electrons)
     c, w = state.grid_coords, state.grid_weights
@@ -339,6 +343,22 @@ def nanoDFT(mol_str, opts):
                 self.num_epochs = num_epochs
                 self.opts = opts 
                 self.validation = not train 
+
+                self.bezene = [[
+                    ["C", ( 0.0000,  0.0000, 0.0000)],
+                    ["C", ( 1.4000,  0.0000, 0.0000)],
+                    ["C", ( 2.1000,  1.2124, 0.0000)],
+                    ["C", ( 1.4000,  2.4249, 0.0000)],
+                    ["C", ( 0.0000,  2.4249, 0.0000)],
+                    ["C", (-0.7000,  1.2124, 0.0000)],
+                    ["H", (-0.5500, -0.9526, 0.0000)],
+                    ["H", (-0.5500,  3.3775, 0.0000)],
+                    ["H", ( 1.9500, -0.9526, 0.0000)], 
+                    ["H", (-1.8000,  1.2124, 0.0000)],
+                    ["H", ( 3.2000,  1.2124, 0.0000)],
+                    ["H", ( 1.9500,  3.3775, 0.0000)]
+                ]]
+
 
             def __len__(self):
                 return len(self.mol_strs)*self.num_epochs
