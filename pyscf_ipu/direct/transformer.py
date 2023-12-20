@@ -12,6 +12,7 @@ def rand(rng, f, shape, **kwargs):
     return rng, f(rng1, shape, **kwargs)
 
 def linear_init_uniform(rng: jax.random.KeyArray, in_features: int, out_features: int):
+    # todo: init as kaparthy
     params = ParamsDict()
     rnd_range = 1 / in_features**0.5
     rng, params.weight = rand( rng, jax.random.uniform, (in_features, out_features), minval=-rnd_range, maxval=rnd_range,)
@@ -57,6 +58,10 @@ def transformer_init(
     total_params += np.prod(params.embeddings.shape)
     print("%26s %26s %26s"%("params.embeddings",params.embeddings.shape, np.prod(params.embeddings.shape)))
 
+    rng, params.project_positions, shape = linear_init_uniform(rng, 12, d_model)
+    total_params += np.prod(shape)
+    print("%26s %26s %26s"%("params.project_positions",shape, np.prod(shape)))
+
     # For transformer layers
     params.layers = []
     for i in range(n_layers):
@@ -101,10 +106,16 @@ def transformer(cfg, params, x: jnp.ndarray, position: jnp.ndarray, H_core: jnp.
 
     embeddings = cfg.lambda_e * params.embeddings[x, :]  # L x Dm
 
-    all_pairs = jnp.linalg.norm( position.reshape(1, -1, 3) - position.reshape(-1, 1, 3), axis=-1)
+    all_pairs = jnp.linalg.norm(position.reshape(1, -1, 3) - position.reshape(-1, 1, 3), axis=-1)
+
+    # inspired by 3d point cloud transformers; 
+    # nspired by andrew: use trigonometric functions as feature transformations 
+    position = jnp.concatenate([position, jnp.cos(position), jnp.sin(position), jnp.tanh(position)], axis=1) #(N,3) -> (N,12)
+    positions = linear(params.project_positions, position)                         # L x Dm*4
 
     # Add (learned) positional encodings
-    x = jnp.concatenate([embeddings[:, :-3], position*10], -1) # seems positions ignored, scale larger (nn has to learn unit anyway)
+    #x = jnp.concatenate([embeddings[:, :-3], position], -1) 
+    x = embeddings + positions
     #x = embeddings
     L, dm = x.shape
 
@@ -124,9 +135,9 @@ def transformer(cfg, params, x: jnp.ndarray, position: jnp.ndarray, H_core: jnp.
         score = (q @ jnp.transpose(k, (0, 2, 1))) / math.sqrt(Dm)
 
         # do like graphformer and append position here? 
-        if layer_num < 6:  # doesn't look like it helps 
-            score += H_core
-            score += all_pairs
+        #if layer_num < 6:  # doesn't look like it helps 
+        #    score += H_core
+        #    score += all_pairs
 
         attn     = jax.nn.softmax(score , axis=1) 
         x = x + (attn @ v).reshape(L, Dm)
@@ -144,8 +155,6 @@ def transformer(cfg, params, x: jnp.ndarray, position: jnp.ndarray, H_core: jnp.
         x = x + t2
 
     return score[0] # take first head 
-    #print(score.shape, x.shape, x[:L,:L].shape)
-    #return x[:L, :L] #score 
 
 
 import types
@@ -196,4 +205,5 @@ class ParamsDict(types.SimpleNamespace):
 
     def items(self, path = ''):
         yield from self.labels_aux(path, self)
+
 

@@ -10,14 +10,7 @@ from tqdm import tqdm
 import time 
 from transformer import transformer, transformer_init
 import pandas as pd 
-
-# [ ] (algo) may get transformer to be 4x faster by fixing AO_grid stuff; 
-# [ ] (algo) can speed up dataloader by re-using AO_grid init (and ERI etc). 
-# [ ] (opt/ml) the learning rate schedule is weird when we do multiple steps per batch 
-# [ ] (opt/ml) validate with 10 molecules, not just 1. 
-# [ ] add dropout/dropres/...
-
-# [ ] 
+import math 
 
 cfg, HARTREE_TO_EV, EPSILON_B3LYP, HYB_B3LYP = None, 27.2114079527, 1e-20, 0.2
 
@@ -30,13 +23,14 @@ def dm_energy(W: BxNxK, state, normal, nn):
     if nn: 
         W = jax.vmap(transformer, in_axes=(None, None, 0, 0, 0), out_axes=(0))(cfg, \
             W, state.ao_types, state.pos, state.H_core)
-        W = W @ state.init
-    L_inv_Q: BxNxN        = state.L_inv_T @ jnp.linalg.qr(W)[0]      # O(B*N*K^2) FLOP O(B*N*K) FLOP/FLIO
+    # using eigh + H_core + L_inv made training more stable. 
+    # todo: investigate whether subset is sufficient (e.g. H_core+qr) or we need all. 
+    L_inv_Q: BxNxN        = state.L_inv_T @ jnp.linalg.eigh(state.L_inv @ (state.H_core + W) @ state.L_inv_T)[1]      # O(B*N*K^2) FLOP O(B*N*K) FLOP/FLIO
     density_matrix: BxNxN = 2 * (L_inv_Q*state.mask) @ T(L_inv_Q)                            # O(B*N*K^2) FLOP/FLIO 
     E_xc: B               = exchange_correlation(density_matrix, state, normal) # O(B*gsize*N^2) FLOP O(gsize*N^2) FLIO
     diff_JK: BxNxN        = JK(density_matrix, state, normal)                   # O(B*num_ERIs) FLOP O(num_ERIs) FLIO
     energies: B           = E_xc + state.E_nuc + jnp.sum((density_matrix * (state.H_core + diff_JK/2)).reshape(W.shape[0], -1), axis=-1) 
-    energy: float         = jnp.sum(energies)
+    energy: float         = jnp.sum(energies) 
     return energy, (energies, E_xc, density_matrix, W)
 
 def sparse_mult(values, dm, state, gsize):
@@ -80,10 +74,10 @@ def nao(atom, basis):
 
 def batched_state(mol_str, opts, bs, wiggle_num=0, 
                   do_pyscf=True, validation=False,
-                  pad_electrons=40, 
+                  pad_electrons=45, 
                   pad_diff_ERIs=50000,
-                  pad_distinct_ERIs=200000,
-                  pad_grid_AO=22000,
+                  pad_distinct_ERIs=120000,
+                  pad_grid_AO=25000,
                   pad_nonzero_distinct_ERI=200000,
                   pad_sparse_diff_grid=200000, 
                   mol_idx=42,
@@ -103,6 +97,23 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
         pad_nonzero_distinct_ERI = 20000
         pad_sparse_diff_grid = 20000 
 
+    if opts.qm9: 
+        pad_electrons=45
+        pad_diff_ERIs=120000
+        pad_distinct_ERIs=400000
+        pad_grid_AO=50000
+        pad_nonzero_distinct_ERI=400000
+        pad_sparse_diff_grid=400000
+
+    if opts.alanine: 
+        multiplier = 1.2 
+        pad_electrons=70
+        pad_diff_ERIs=int(180000*1.2)
+        pad_distinct_ERIs=int(600000*1.2)
+        pad_grid_AO=int(70000*1.2)
+        pad_nonzero_distinct_ERI=int(600000*1.2)
+        pad_sparse_diff_grid=int(1000000*1.2)
+
     if opts.waters: 
         pad_diff_ERIs, pad_distinct_ERIs, pad_grid_AO, pad_nonzero_distinct_ERI, pad_sparse_diff_grid = [a//3 for a in [ pad_diff_ERIs , pad_distinct_ERIs , pad_grid_AO , pad_nonzero_distinct_ERI , pad_sparse_diff_grid ]]
 
@@ -113,7 +124,7 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
     state = init_dft(mol_str, opts, do_pyscf=do_pyscf, pad_electrons=pad_electrons)
     c, w = state.grid_coords, state.grid_weights
     
-    # make sure we do different rotation; prev all worker did same rotation! 
+    # Set seed to ensure different rotation; initially all workers did same rotation! 
     np.random.seed(mol_idx)
     p = np.array(mol_str[0][1])
     states = [state]
@@ -121,17 +132,43 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
         water1_xyz = np.array([mol_str[i][1] for i in range(0,3)])
         water2_xyz = np.array([mol_str[i][1] for i in range(3,6)])
 
-    for i in range(bs-1):
-        '''if opts.benzene: 
-            x = p 
-            x[2] += np.random.normal(0, opts.wiggle_var, (1))
-        else: 
-            x = p + np.random.normal(0, opts.wiggle_var, (3))
+    if opts.qm9: 
+        atoms = np.array([mol_str[i][1] for i in range(0,3)])
 
-        if not opts.water: 
-            mol_str[wiggle_num][1] = (x[0], x[1], x[2])'''
+    for iteration in range(bs-1):
 
-        if opts.waters:  # rotate second water molecule 
+        if opts.alanine: 
+            from rdkit import Chem
+            from rdkit.Chem import AllChem
+            pdb_file = 'alanine.pdb'
+            molecule = Chem.MolFromPDBFile(pdb_file, removeHs=False)
+            # tried reading from pdb_block; caused parallel dataloader pickle to break. 
+            AllChem.EmbedMolecule(molecule)
+            AllChem.UFFOptimizeMolecule(molecule)
+            phi_atoms = [4, 6, 8, 14]  # indices for phi dihedral
+            psi_atoms = [6, 8, 14, 16]  # indices for psi dihedral'''
+
+            def xyz(atom): return np.array([atom.x, atom.y, atom.z]).reshape(1, 3)
+            def get_atom_positions(mol):
+                conf = mol.GetConformer()
+                return np.concatenate([xyz(conf.GetAtomPosition(i)) for i in range(mol.GetNumAtoms())], axis=0)
+
+            str = [mol_str[j][0] for j in range(len(mol_str))]
+            pos = np.concatenate([np.array(mol_str[j][1]).reshape(1, 3) for j in range(len(mol_str))])
+
+            # todo: explore larger space than 10 degree on a single bond! 
+            angle = float(np.random.uniform(0, 10, 1)) - 5 
+            AllChem.SetDihedralDeg(molecule.GetConformer(), *psi_atoms, angle)
+            pos = get_atom_positions(molecule)
+
+            for j in range(22): mol_str[j][1] = tuple(pos[j])
+
+            if iteration == 0: 
+                from plot import create_rdkit_mol
+                import wandb 
+                wandb.log({"mol_valid=%s_angle=%f"%(validation, angle): create_rdkit_mol(str, pos[:21]) })
+
+        if opts.waters:  # todo: rotate both water molecules and draw x=phi, y=psi. 
             rotation_matrix = np.linalg.qr(np.random.normal(size=(3,3)))[0]
             center = water2_xyz.mean(axis=0)
             water_xyz = np.dot(water2_xyz - center, rotation_matrix) + center
@@ -140,15 +177,34 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
             mol_str[4][1] = tuple(water_xyz[1])
             mol_str[5][1] = tuple(water_xyz[2])
 
-            if opts.wandb and i == 0: 
+            if opts.wandb and iteration == 0: 
                 from plot import create_rdkit_mol
                 import wandb 
                 str = [mol_str[j][0] for j in range(len(mol_str))]
                 pos = np.concatenate([np.array(mol_str[j][1]).reshape(1, 3) for j in range(len(mol_str))])
-                wandb.log({"%s_mol_%i"%({True: "valid", False: "train"}[validation], i): create_rdkit_mol(str, pos) })
+                wandb.log({"%s_mol_%i"%({True: "valid", False: "train"}[validation], iteration): create_rdkit_mol(str, pos) })
+
+        elif opts.qm9: 
+            # todo: find dihedral to rotate over similar to alanine dipeptide. 
+
+            # rotate first three atoms around their center of mass 
+            # this may break molecule; may need to do this around a bond or smth
+            #rotation_matrix = np.linalg.qr(np.random.normal(size=(3,3)))[0]
+            #center = atoms.mean(axis=0)
+            #rotated_atoms = np.dot(atoms - center, rotation_matrix) + center
+            mol_str[0][1] = tuple(atoms[0] + np.random.normal(0, opts.wiggle_var, (3)))
+            mol_str[1][1] = tuple(atoms[1] + np.random.normal(0, opts.wiggle_var, (3)))
+            mol_str[2][1] = tuple(atoms[2] + np.random.normal(0, opts.wiggle_var, (3)))
+
+            if opts.wandb and iteration == 0: 
+                from plot import create_rdkit_mol
+                import wandb 
+                str = [mol_str[j][0] for j in range(len(mol_str))]
+                pos = np.concatenate([np.array(mol_str[j][1]).reshape(1, 3) for j in range(len(mol_str))])
+                wandb.log({"%s_mol_%i"%({True: "valid", False: "train"}[validation], iteration): create_rdkit_mol(str, pos) })
 
         # when profiling create fake molecule to skip waiting
-        if i == 0 or not opts.prof: stateB = init_dft(mol_str, opts, c, w, do_pyscf=do_pyscf and i < 2, state=state, pad_electrons=pad_electrons)
+        if iteration == 0 or not opts.prof: stateB = init_dft(mol_str, opts, c, w, do_pyscf=do_pyscf and iteration < 3, state=state, pad_electrons=pad_electrons)
 
         states.append(stateB)
 
@@ -229,7 +285,7 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
             # pad ERIs with 0 and indices with -1 so they point to 0. 
             assert diff_indxs.shape[1] == diff_ERIs.shape[2]
             pad = pad_diff_ERIs - diff_indxs.shape[1]
-            assert pad > 0 
+            assert pad > 0, (pad_diff_ERIs, diff_indxs.shape[1])
             state.indxs     = np.pad(diff_indxs, ((0,0), (0, pad), (0, 0)), 'constant', constant_values=(-1))
             state.diffs_ERI = np.pad(diff_ERIs,  ((0,0), (0, 0),   (0, pad))) # pad zeros 
 
@@ -247,7 +303,7 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
             assert state.sparse_diffs_grid_AO.shape[1] == state.rows.shape[0]
             assert state.sparse_diffs_grid_AO.shape[1] == state.cols.shape[0]
             pad = pad_sparse_diff_grid - state.rows.shape[0]
-            assert pad >= 0 
+            assert pad >= 0, (pad_sparse_diff_grid, state.rows.shape[0])
             state.rows = np.pad(state.rows, (0,pad))
             state.cols = np.pad(state.cols, (0,pad))
             state.sparse_diffs_grid_AO = np.pad(state.sparse_diffs_grid_AO, ((0,0),(0,pad)))
@@ -272,7 +328,7 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
             assert state.grid_AO.shape[2] == state.main_grid_AO.shape[1]
             assert state.grid_AO.shape[2] == state.diffs_grid_AO.shape[2]
             pad = pad_grid_AO - state.grid_AO.shape[2]
-            assert pad > 0
+            assert pad > 0, (pad_grid_AO, state.grid_AO.shape[2])
             state.grid_AO      = np.pad(state.grid_AO, ((0,0),(0,0), (0,pad), (0,0)))
             state.grid_weights = np.pad(state.grid_weights, ((0,0),(0,pad)))
             state.grid_coords  = np.pad(state.grid_coords, ((0,0),(0,pad),(0,0)))
@@ -304,7 +360,8 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
             if opts.wandb: wandb.log({"pad_grid_AO": pad/state.grid_AO.shape[2]})
 
 
-    return state 
+    import copy 
+    return copy.deepcopy(state)
 
 
 def nanoDFT(mol_str, opts):
@@ -315,7 +372,10 @@ def nanoDFT(mol_str, opts):
 
     if opts.wandb: 
         import wandb 
-        wandb.init(project='ndft')
+        if opts.alanine:
+            wandb.init(project='ndft_alanine')
+        else: 
+            wandb.init(project='ndft')
 
     rnd_key = jax.random.PRNGKey(42)
     n_vocab = nao("C", opts.basis) + nao("N", opts.basis) + \
@@ -328,19 +388,36 @@ def nanoDFT(mol_str, opts):
     DeiT-Ti N/A 192 3 12 5M 224 2536
     DeiT-S N/A 384 6 12 22M 224 940
     DeiT-B ViT-B 768 12 12 86M 224 292
+    Parameters Layers dmodel
+    117M 12 768
+    345M 24 1024
+    762M 36 1280
+    1542M 48 1600
     '''
     if opts.tiny:  # 5M 
         d_model= 192
         n_heads = 6
         n_layers = 12
-    elif opts.small:
+    if opts.small:
         d_model= 384
         n_heads = 6
         n_layers = 12
-    elif opts.base: 
+    if opts.base: 
         d_model= 768
         n_heads = 12
         n_layers = 12
+    if opts.medium: 
+        d_model= 1024
+        n_heads = 12
+        n_layers = 24
+    if opts.large: 
+        d_model= 1280
+        n_heads = 12
+        n_layers = 36
+    if opts.xlarge: 
+        d_model= 1600
+        n_heads = 12
+        n_layers = 48
 
     if opts.nn: 
         rnd_key, cfg, params, total_params = transformer_init(
@@ -354,16 +431,28 @@ def nanoDFT(mol_str, opts):
 
     if opts.nn: 
         #https://arxiv.org/pdf/1706.03762.pdf see 5.3 optimizer 
-        def custom_schedule(step_num: int, warmup_steps=4000*3):
-            arg1 = step_num ** -0.5
-            arg2 = step_num * warmup_steps ** -1.5
-            return d_model ** -0.5 * np.min(arg1, arg2)
+        
+        # try to mimic karpathy as closely as possible ;) 
+        # https://github.com/karpathy/nanoGPT/blob/master/train.py 
+        # still differs on 
+        # [ ] weight initialization 
 
-        # [ ] todo: add loss schedule. 
-        # [ ] todo: train on qm9 instead of water (how do we rotate there?). 
+        def custom_schedule(it, learning_rate=opts.lr, min_lr=opts.lr/10, warmup_iters=2000, lr_decay_iters=600000):
+            if it < warmup_iters: return learning_rate * it / warmup_iters
+            if it > lr_decay_iters: return min_lr
+            decay_ratio = (it - warmup_iters) / (lr_decay_iters - warmup_iters)
+            assert 0 <= decay_ratio <= 1
+            coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio)) 
+            return min_lr + coeff * (learning_rate - min_lr)
 
-        adam = optax.adam(learning_rate=opts.lr, b1=0.9, b2=0.98, eps=1e-9)
-        #adam = optax.adabelief(opts.lr)
+        adam = optax.chain(
+            optax.clip_by_global_norm(1),
+            optax.scale_by_adam(b1=0.9, b2=0.95, eps=1e-12),
+            optax.add_decayed_weights(0.1),#, configure_decay_mask(params)),
+            optax.scale_by_schedule(custom_schedule),
+            optax.scale(-1),
+        )
+
         w = params 
 
         from torch.utils.data import DataLoader, Dataset
@@ -409,6 +498,7 @@ def nanoDFT(mol_str, opts):
 
                 if opts.benzene: self.mol_strs = [self.benzene]
                 if opts.waters: self.mol_strs = [self.waters]
+                if opts.alanine: self.mol_strs = mol_str
 
                 if train: self.bs = opts.bs 
                 else: self.bs = opts.val_bs
@@ -420,7 +510,10 @@ def nanoDFT(mol_str, opts):
                 return batched_state(self.mol_strs[idx%len(self.mol_strs)], self.opts, self.bs, wiggle_num=0, do_pyscf=self.validation, validation=False, mol_idx=idx)
         
         qm9 = OnTheFlyQM9(opts, train=True)
-        train_dataloader = DataLoader(qm9, batch_size=1, pin_memory=True, shuffle=False, drop_last=True, num_workers=5, prefetch_factor=2, collate_fn=lambda x: x[0])
+        if opts.workers != 0: 
+            train_dataloader = DataLoader(qm9, batch_size=1, pin_memory=True, shuffle=False, drop_last=True, num_workers=opts.workers, prefetch_factor=2, collate_fn=lambda x: x[0])
+        else: 
+            train_dataloader = DataLoader(qm9, batch_size=1, pin_memory=True, shuffle=False, drop_last=True, num_workers=opts.workers,  collate_fn=lambda x: x[0])
         pbar = tqdm(train_dataloader)
         val_qm9 = OnTheFlyQM9(opts, train=False)
 
@@ -444,128 +537,80 @@ def nanoDFT(mol_str, opts):
         if not opts.nn: total_params = -1 
         wandb.log({'total_params': total_params, 'batch_size': opts.bs, 'lr': opts.lr })
 
-    def update(w, state, adam_state): 
-        print("jitting... (if this is printed more than once something is wrong!)")
-        (val, (vals, E_xc, density_matrix, W)), grad = vandg(w, state, opts.normal, opts.nn)
-        updates, adam_state = adam.update(grad, adam_state)
-        w = optax.apply_updates(w, updates)
-        return w, vals, density_matrix, W, adam_state
-    update = jax.jit(update, backend=opts.backend)
-
 
     min_val, min_dm, mins, val_state, valid_str, step = 0, 0, np.ones(opts.bs)*1e6, None, "", 0
-    t0, load_time, train_time, val_time = time.time(), 0, 0, 0
+    t0, load_time, train_time, val_time, plot_time = time.time(), 0, 0, 0, 0
 
-    # training loop (epochs are handled inside dataloader due to segfault). 
     states = []
     for iteration, state in enumerate(pbar):
+        if iteration == 0: summary(state) 
+        dct = {}
+        dct["iteraton"] = iteration 
         load_time, t0 = time.time()-t0, time.time()
 
-        # idea: [ ] do gradient accumulation last 16 iterations. 
         states = states[-opts.grad_acc:] + [state] 
         accumulated_grad = None
-        print(len(states))
+
+        if len(states) < 50: print(len(states))
+        
         for j, state in enumerate(states):
             if j == 0: _t0 =time.time()
-            #w, vals, density_matrix, _W, adam_state = update(w, state, adam_state)
             (val, (vals, E_xc, density_matrix, _W)), grad = vandg(w, state, opts.normal, opts.nn)
             if j == 0: time_step1 = time.time()-_t0
-            step += 1 
             accumulated_grad = grad if accumulated_grad is None else jax.tree_map(lambda x, y: x + y, accumulated_grad, grad)
 
-        accumulated_grad = jax.tree_map(lambda x: x / len(states), accumulated_grad)
-        updates, adam_state = adam.update(accumulated_grad, adam_state)
+        # scale by global batch size. 
+        global_batch_size = len(states)*opts.bs
+        wandb.log({"global_batch_size": global_batch_size})
+        accumulated_grad = jax.tree_map(lambda x: x / global_batch_size, accumulated_grad)
+
+        # plot grad norm 
+        if iteration % 10 == 0: 
+            for k,v in accumulated_grad.items(): dct[k + "_norm"] = np.linalg.norm(v .reshape(-1) ) 
+
+        updates, adam_state = adam.update(accumulated_grad, adam_state, params)
         w = optax.apply_updates(w, updates)
+        train_time, t0 = time.time()-t0, time.time() 
 
         if not opts.nn: 
             str = "error=" + "".join(["%.7f "%(vals[i]*HARTREE_TO_EV-state.pyscf_E[i]) for i in range(2)]) + " [eV]"
             str += "pyscf=%.7f us=%.7f"%(state.pyscf_E[0]/HARTREE_TO_EV, vals[0])
-            pbar.set_description(str)
-
         else: 
-            #pbar.set_description("train=".join(["%.5f"%i for i in vals[:2]]) + "[Ha] lr=%5e"%custom_schedule(step) + valid_str + "time=%.1f %.1f %.1f %.1f"%(load_time, time_step1, train_time, val_time))
-            pbar.set_description("train=".join(["%.5f"%i for i in vals[:2]]) + "[Ha] "+ valid_str + "time=%.1f %.1f %.1f %.1f"%(load_time, time_step1, train_time, val_time))
+            pbar.set_description("train=".join(["%.5f"%i for i in vals[:2]]) + "[Ha] "+ valid_str + "time=%.1f %.1f %.1f %.1f %.1f"%(load_time, time_step1, train_time, val_time, plot_time))
 
-        if opts.wandb: 
-            dct = {}
-            for i in range(0, opts.bs):
+        if opts.wandb:
+            dct["time_load"]  = load_time 
+            dct["time_step1"]  = time_step1
+            dct["time_train"]  = train_time
+            dct["time_val"]  = val_time 
+            plot_iteration = iteration % 10 == 0
+            for i in range(0, 2):
                 if not opts.nn: 
                     dct['train_l%i'%i ] = np.abs(vals[i]*HARTREE_TO_EV-state.pyscf_E[i])
                     dct['train_pyscf%i'%i ] = np.abs(state.pyscf_E[i])
                 dct['train_E%i'%i ] = np.abs(vals[i]*HARTREE_TO_EV)
-                dct['img/dm%i'%i] = wandb.Image(np.expand_dims(density_matrix[i], axis=-1))
-                dct['img/W%i'%i] = wandb.Image(np.expand_dims(_W[i], axis=-1))
-            wandb.log(dct)
+                if plot_iteration: 
+                    dct['img/dm%i'%i] = wandb.Image(np.expand_dims(density_matrix[i], axis=-1))
+                    dct['img/W%i'%i] = wandb.Image(np.expand_dims(_W[i], axis=-1))
 
-                
-        train_time, t0 = time.time()-t0, time.time() 
+        plot_time, t0 = time.time()-t0, time.time() 
 
         if opts.nn:# and i % 5 == 0: 
             if val_state is None: val_state = val_qm9[0]
             _, (valid_vals, _, vdensity_matrix, vW) = valf(w, val_state, opts.normal, opts.nn)
-            valid_str = "val_error=" + "".join(["%.7f "%(valid_vals[i]*HARTREE_TO_EV-val_state.pyscf_E[i]) for i in range(0, 3)]) + " [eV]"
+            lr = custom_schedule(iteration)
+            valid_str = "lr=%.3e"%lr + "val_error=" + "".join(["%.4f "%(valid_vals[i]*HARTREE_TO_EV-val_state.pyscf_E[i]) for i in range(0, 3)]) + " [eV]"
             if opts.wandb: 
-                dct = {}
                 for i in range(0, opts.val_bs):
                     dct['valid_l%i'%i ] = np.abs(valid_vals[i]*HARTREE_TO_EV-val_state.pyscf_E[i])
                     dct['valid_E%i'%i ] = np.abs(valid_vals[i]*HARTREE_TO_EV)
                     dct['valid_pyscf%i'%i ] = np.abs(val_state.pyscf_E[i])
                     dct['img/val_dm%i'%i] = wandb.Image(np.expand_dims(vdensity_matrix[i], axis=-1))
                     dct['img/val_W%i'%i] = wandb.Image(np.expand_dims(vW[i], axis=-1))
-                #dct["lr"] = custom_schedule(step)
-                wandb.log(dct)
+                dct["scheduled_lr"] = custom_schedule(iteration)
 
+        wandb.log(dct)
         valid_time, t0 = time.time()-t0, time.time()
-        continue 
-
-        # move to train loop; this is done inside dataloader multithreaded
-        '''if opts.wandb and i < 6: 
-            from plot import create_rdkit_mol
-            import wandb 
-            str = [mol_str[j][0] for j in range(len(mol_str))]
-            pos = np.concatenate([np.array(mol_str[j][1]).reshape(1, 3) for j in range(len(mol_str))])
-            wandb.log({"%s_mol_%i"%({True: "valid", False: "train"}[validation], i): create_rdkit_mol(str, pos) })'''
-
-        # valid
-        if i % 10 == 0 and opts.nn: 
-            _, (valid_vals, _, _) = valf(w, val_state, opts.normal, opts.nn)
-            print("validation:")
-            str = "error=" + "".join(["%.7f "%(valid_vals[i]*HARTREE_TO_EV-val_state.pyscf_E[i]) for i in range(1, opts.val_bs)]) + " [eV]"
-            print(str)
-            print()
-            if opts.wandb: 
-                dct = {}
-                for i in range(1, opts.val_bs):
-                    dct['valid_l%i'%i ] = valid_vals[i]*HARTREE_TO_EV-val_state.pyscf_E[i]
-                wandb.log(dct)
-
-        if opts.nn and opts.wandb and i > 0: 
-            current_lr = custom_schedule(i, d_model, 4000)
-            wandb.log({'lr': current_lr})
-
-        if opts.bs == 1: pbar.set_description("error=%.7f [eV] (%.7f %.7f) "%(np.mean(val*HARTREE_TO_EV-state.pyscf_E), val*HARTREE_TO_EV, state.pyscf_E))
-        else: 
-            if opts.wandb: 
-                wandb.log(
-                    {'l1': vals[0]*HARTREE_TO_EV-state.pyscf_E[0], 
-                    'l2': vals[1]*HARTREE_TO_EV-state.pyscf_E[1]})
-
-            str = "error=" + "".join(["%.7f "%(vals[i]*HARTREE_TO_EV-state.pyscf_E[i]) for i in range(2)]) + " [eV]"
-            #str += "E_xc=" + "".join(["%.7f "%(E_xc[i]*HARTREE_TO_EV) for i in range(opts.bs)]) + " [eV]"
-            try:
-                mins = np.minimum(mins, np.abs(vals*HARTREE_TO_EV - state.pyscf_E[:, 0]))
-                if np.max(mins) < 1e-5: 
-                    break
-                str += " best=" + "".join(["%.7f "%(mins[i]) for i in range(2)]) + " [eV]"
-            except:
-                pass
-            pbar.set_description(str)
-        if i == 0: print("")
-        
-        if val < min_val: 
-            min_val = val 
-            min_dm = density_matrix
-
 
     val, density_matrix = min_val, min_dm
 
@@ -790,7 +835,7 @@ def init_dft(mol_str, opts, _coords=None, _weights=None, first=False, do_pyscf=T
         init = np.eye(N)[:, :n_electrons_half] 
         mask = np.ones((1, n_electrons_half))
     else: 
-        assert pad_electrons > n_electrons_half
+        assert pad_electrons > n_electrons_half, (pad_electrons, n_electrons_half)
         init = np.eye(N)[:, :pad_electrons] 
         mask = np.zeros((1, pad_electrons))
         mask[:, :n_electrons_half] = 1
@@ -848,7 +893,7 @@ def init_dft(mol_str, opts, _coords=None, _weights=None, first=False, do_pyscf=T
         else: raise Exception()
     ao_types = np.array(types)
     pos = np.concatenate(pos)
-    
+
     state = IterationState(
         diffs_ERI = np.zeros((1,1)),
         main_grid_AO = np.zeros((1,1)),
@@ -933,8 +978,6 @@ def cats(dcs):
     }
     # Create a new dataclass instance with the concatenated fields
     return IterationState(**concatenated_fields)
-
-
 
 def grad_elec(weight, grid_AO, eri, s1, h1aos, natm, aoslices, mask, mo_energy, mo_coeff, mol, dm, H):
     # Electronic part of RHF/RKS gradients
@@ -1025,7 +1068,7 @@ def pyscf_reference(mol_str, opts):
         pyscf_energies.append(envs["e_tot"]*HARTREE_TO_EV)
         hl_gap_hartree = np.abs(envs["mo_energy"][homo] - envs["mo_energy"][lumo]) * HARTREE_TO_EV
         pyscf_hlgaps.append(hl_gap_hartree)
-        print("\rPYSCF: ", pyscf_energies[-1] , "[eV]", end="")
+        print("PYSCF: ", pyscf_energies[-1] , "[eV]")
     mf.callback = callback
     mf.kernel()
     print("")
@@ -1103,8 +1146,11 @@ if __name__ == "__main__":
     parser.add_argument('-hydrogens',        action="store_true") 
     parser.add_argument('-water',        action="store_true") 
     parser.add_argument('-waters',        action="store_true") 
+    parser.add_argument('-alanine',        action="store_true") 
     parser.add_argument('-states',         type=int,   default=1)
-    parser.add_argument('-wiggle_var',     type=float,   default=0.3, help="wiggle N(0, wiggle_var)")
+    parser.add_argument('-workers',        type=int,   default=5) # set to 0 for faster pyscf precompute. 
+        # do noise schedule, start small slowly increase 
+    parser.add_argument('-wiggle_var',     type=float,   default=0.05, help="wiggle N(0, wiggle_var), bondlength=1.5/30")
     parser.add_argument('-eri_threshold',  type=float,   default=1e-10, help="loss function threshold only")
 
     # models 
@@ -1112,6 +1158,9 @@ if __name__ == "__main__":
     parser.add_argument('-tiny',     action="store_true") 
     parser.add_argument('-small',    action="store_true") 
     parser.add_argument('-base',     action="store_true") 
+    parser.add_argument('-medium',     action="store_true") 
+    parser.add_argument('-large',     action="store_true") 
+    parser.add_argument('-xlarge',     action="store_true") 
     opts = parser.parse_args()
     if opts.tiny or opts.small or opts.base: opts.nn = True 
 
@@ -1159,6 +1208,33 @@ if __name__ == "__main__":
             ["O",    ( 1.369,  0.146, -0.395)],
             ["H",    ( 1.894,  0.486,  0.335)],
             ["H",    ( 0.451,  0.165, -0.083)]]]
+
+    elif opts.alanine: 
+        mol_strs = [[
+            ["H", ( 2.000 ,  1.000,  -0.000)],
+            ["C", ( 2.000 ,  2.090,   0.000)],
+            ["H", ( 1.486 ,  2.454,   0.890)],
+            ["H", ( 1.486 ,  2.454,  -0.890)],
+            ["C", ( 3.427 ,  2.641,  -0.000)],
+            ["O", ( 4.391 ,  1.877,  -0.000)],
+            ["N", ( 3.555 ,  3.970,  -0.000)],
+            ["H", ( 2.733 ,  4.556,  -0.000)],
+            ["C", ( 4.853 ,  4.614,  -0.000)], # carbon alpha 
+            ["H", ( 5.408 ,  4.316,   0.890)], # hydrogne attached to carbon alpha 
+            ["C", ( 5.661 ,  4.221,  -1.232)], # carbon beta 
+            ["H", ( 5.123 ,  4.521,  -2.131)], # hydrogens attached to carbon beta 
+            ["H", ( 6.630 ,  4.719,  -1.206)], # hydrogens attached to carbon beta 
+            ["H", ( 5.809 ,  3.141,  -1.241)], # hydrogens attached to carbon beta 
+            ["C", ( 4.713 ,  6.129,   0.000)],
+            ["O", ( 3.601 ,  6.653,   0.000)],
+            ["N", ( 5.846 ,  6.835,   0.000)],
+            ["H", ( 6.737 ,  6.359,  -0.000)],
+            ["C", ( 5.846 ,  8.284,   0.000)],
+            ["H", ( 4.819 ,  8.648,   0.000)],
+            ["H", ( 6.360 ,  8.648,   0.890)],
+            ["H", ( 6.360 ,  8.648,  -0.890)],
+        ]]
+
 
     nanoDFT_E, (nanoDFT_hlgap, mo_energy, mo_coeff, grid_coords, grid_weights, dm, H) = nanoDFT(mol_strs, opts)
 
