@@ -144,7 +144,7 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
             molecule = Chem.MolFromPDBFile(pdb_file, removeHs=False)
             # tried reading from pdb_block; caused parallel dataloader pickle to break. 
             AllChem.EmbedMolecule(molecule)
-            AllChem.UFFOptimizeMolecule(molecule)
+            #AllChem.UFFOptimizeMolecule(molecule)
             phi_atoms = [4, 6, 8, 14]  # indices for phi dihedral
             psi_atoms = [6, 8, 14, 16]  # indices for psi dihedral'''
 
@@ -163,10 +163,10 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
 
             for j in range(22): mol_str[j][1] = tuple(pos[j])
 
-            if iteration == 0: 
+            if iteration == 0 and opts.wandb: 
                 from plot import create_rdkit_mol
                 import wandb 
-                wandb.log({"mol_valid=%s_angle=%f"%(validation, angle): create_rdkit_mol(str, pos[:21]) })
+                wandb.log({"mol_valid=%s_angle=%f"%(validation, angle): create_rdkit_mol(str, pos[:22]) })
 
         if opts.waters:  # todo: rotate both water molecules and draw x=phi, y=psi. 
             rotation_matrix = np.linalg.qr(np.random.normal(size=(3,3)))[0]
@@ -408,7 +408,7 @@ def nanoDFT(mol_str, opts):
         n_layers = 12
     if opts.medium: 
         d_model= 1024
-        n_heads = 12
+        n_heads = 16
         n_layers = 24
     if opts.large: 
         d_model= 1280
@@ -428,6 +428,8 @@ def nanoDFT(mol_str, opts):
             n_heads =n_heads,
             d_ff    =d_model*4,
         )
+
+        if opts.wandb: wandb.log({"total_parameters": total_params })
 
     if opts.nn: 
         #https://arxiv.org/pdf/1706.03762.pdf see 5.3 optimizer 
@@ -561,8 +563,8 @@ def nanoDFT(mol_str, opts):
 
         # scale by global batch size. 
         global_batch_size = len(states)*opts.bs
-        wandb.log({"global_batch_size": global_batch_size})
         accumulated_grad = jax.tree_map(lambda x: x / global_batch_size, accumulated_grad)
+        if opts.wandb: wandb.log({"global_batch_size": global_batch_size})
 
         # plot grad norm 
         if iteration % 10 == 0: 
