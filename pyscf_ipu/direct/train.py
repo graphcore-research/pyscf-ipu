@@ -166,7 +166,7 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
             if iteration == 0 and opts.wandb: 
                 from plot import create_rdkit_mol
                 import wandb 
-                wandb.log({"mol_valid=%s_angle=%f"%(validation, angle): create_rdkit_mol(str, pos[:22]) })
+                wandb.log({"mol_valid=%s"%validation: create_rdkit_mol(str, pos) })
 
         if opts.waters:  # todo: rotate both water molecules and draw x=phi, y=psi. 
             rotation_matrix = np.linalg.qr(np.random.normal(size=(3,3)))[0]
