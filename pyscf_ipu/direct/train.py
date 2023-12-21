@@ -88,7 +88,6 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
     if not opts.nn:  
         pad_electrons, pad_diff_ERIs, pad_distinct_ERIs, pad_grid_AO, pad_nonzero_distinct_ERI, pad_sparse_diff_grid = \
             -1, -1, -1, -1, -1, -1
-
     if opts.benzene and opts.nn: pad_electrons = 30
     if opts.hydrogens:
         pad_diff_ERIs = 5000
@@ -96,7 +95,6 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
         pad_grid_AO = 2200
         pad_nonzero_distinct_ERI = 20000
         pad_sparse_diff_grid = 20000 
-
     if opts.qm9: 
         pad_electrons=45
         pad_diff_ERIs=120000
@@ -104,15 +102,15 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
         pad_grid_AO=50000
         pad_nonzero_distinct_ERI=400000
         pad_sparse_diff_grid=400000
-
     if opts.alanine: 
+        # todo: (adam) the ERI padding may change when rotating molecule more! 
         multiplier = 1.2 
-        pad_electrons=70
-        pad_diff_ERIs=int(180000*1.2)
-        pad_distinct_ERIs=int(600000*1.2)
-        pad_grid_AO=int(70000*1.2)
-        pad_nonzero_distinct_ERI=int(600000*1.2)
-        pad_sparse_diff_grid=int(1000000*1.2)
+        pad_electrons = 70
+        pad_diff_ERIs = int(180000*1.2)
+        pad_distinct_ERIs = int(600000)
+        pad_grid_AO = int(70000*1.2/4)
+        pad_nonzero_distinct_ERI = int(600000*1.2)
+        pad_sparse_diff_grid =int(1000000*1.2)
 
     if opts.waters: 
         pad_diff_ERIs, pad_distinct_ERIs, pad_grid_AO, pad_nonzero_distinct_ERI, pad_sparse_diff_grid = [a//3 for a in [ pad_diff_ERIs , pad_distinct_ERIs , pad_grid_AO , pad_nonzero_distinct_ERI , pad_sparse_diff_grid ]]
@@ -120,14 +118,8 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
     mol = build_mol(mol_str, opts.basis)
     pad_electrons = min(pad_electrons, mol.nao_nr())
 
-    t0 = time.time()
-    state = init_dft(mol_str, opts, do_pyscf=do_pyscf, pad_electrons=pad_electrons)
-    c, w = state.grid_coords, state.grid_weights
-    
     # Set seed to ensure different rotation; initially all workers did same rotation! 
     np.random.seed(mol_idx)
-    p = np.array(mol_str[0][1])
-    states = [state]
     if opts.waters: 
         water1_xyz = np.array([mol_str[i][1] for i in range(0,3)])
         water2_xyz = np.array([mol_str[i][1] for i in range(3,6)])
@@ -135,7 +127,12 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
     if opts.qm9: 
         atoms = np.array([mol_str[i][1] for i in range(0,3)])
 
-    for iteration in range(bs-1):
+    if opts.alanine:
+        phi, psi = [float(a) for a in np.random.uniform(0, 360, 2)]
+        angles = []
+
+    states = []
+    for iteration in range(bs):
 
         if opts.alanine: 
             from rdkit import Chem
@@ -156,12 +153,16 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
             str = [mol_str[j][0] for j in range(len(mol_str))]
             pos = np.concatenate([np.array(mol_str[j][1]).reshape(1, 3) for j in range(len(mol_str))])
 
-            # todo: explore larger space than 10 degree on a single bond! 
-            angle = float(np.random.uniform(0, 10, 1)) - 5 
-            AllChem.SetDihedralDeg(molecule.GetConformer(), *psi_atoms, angle)
+            # todo: save=wandb.log({"pair": angle1, angle2, NN_energy ) (rotation, NN_energy) for train/val molecule (for val also save PySCF energy)
+            # only saving angles (angle not necessarily paired up with energy)
+            AllChem.SetDihedralDeg(molecule.GetConformer(), *phi_atoms, phi)
+            angle = psi + float(np.random.uniform(0, opts.rotate_deg, 1)) # perhaps add 45 and mod 360? 
+            angle = angle % 360 
+            AllChem.SetDihedralDeg(molecule.GetConformer(), *psi_atoms, angle )
             pos = get_atom_positions(molecule)
+            angles.append((phi, angle))
 
-            for j in range(22): mol_str[j][1] = tuple(pos[j])
+            for j in range(len(mol_str)): mol_str[j][1] = tuple(pos[j])
 
             if iteration == 0 and opts.wandb: 
                 from plot import create_rdkit_mol
@@ -203,11 +204,21 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
                 pos = np.concatenate([np.array(mol_str[j][1]).reshape(1, 3) for j in range(len(mol_str))])
                 wandb.log({"%s_mol_%i"%({True: "valid", False: "train"}[validation], iteration): create_rdkit_mol(str, pos) })
 
-        # when profiling create fake molecule to skip waiting
-        if iteration == 0 or not opts.prof: stateB = init_dft(mol_str, opts, c, w, do_pyscf=do_pyscf and iteration < 3, state=state, pad_electrons=pad_electrons)
+        if iteration == 0: 
+            state = init_dft(mol_str, opts, do_pyscf=do_pyscf, pad_electrons=pad_electrons)
+            c, w = state.grid_coords, state.grid_weights
+        elif iteration <= 1 or not opts.prof:  # when profiling create fake molecule to skip waiting
+            state = init_dft(mol_str, opts, c, w, do_pyscf=do_pyscf and iteration < 3, state=state, pad_electrons=pad_electrons)
 
-        states.append(stateB)
+        states.append(state)
 
+    # If we add energy here we get plot basically!
+    if opts.alanine and opts.wandb: 
+        for phi, psi in angles: 
+            if not validation: 
+                wandb.log({"phi_train": phi , "psi_train": psi})
+            else: 
+                wandb.log({"phi_valid": phi, "psi_valid": psi})
     state = cats(states)
     N = state.N[0]
 
@@ -323,6 +334,7 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
             if opts.wandb: wandb.log({"pad_distinct_ERIs": pad/state.nonzero_distinct_ERI.shape[2]})
 
         if pad_grid_AO != -1: 
+            prev_size = state.grid_AO.shape[2]
             assert state.grid_AO.shape[2] == state.grid_weights.shape[1]
             assert state.grid_AO.shape[2] == state.grid_coords.shape[1]
             assert state.grid_AO.shape[2] == state.main_grid_AO.shape[1]
@@ -335,7 +347,11 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
             state.main_grid_AO = np.pad(state.main_grid_AO, ((0,0),(0,pad),(0,0)))
             state.diffs_grid_AO = np.pad(state.diffs_grid_AO, ((0,0),(0,0),(0,pad),(0,0)))
 
-            if opts.wandb: wandb.log({"pad_grid_AO": pad/state.grid_AO.shape[2]})
+            if opts.wandb: 
+                wandb.log({"pad_grid_AO": pad/state.grid_AO.shape[2], 
+                           "pad_grid_AO_prev": prev_size,
+                           "pad_grid_AO_pad": pad,
+                           "pad_grid_AO_target": pad_grid_AO})
 
 
         indxs = np.abs(state.nonzero_distinct_ERI ) > 1e-9 
@@ -1154,6 +1170,7 @@ if __name__ == "__main__":
         # do noise schedule, start small slowly increase 
     parser.add_argument('-wiggle_var',     type=float,   default=0.05, help="wiggle N(0, wiggle_var), bondlength=1.5/30")
     parser.add_argument('-eri_threshold',  type=float,   default=1e-10, help="loss function threshold only")
+    parser.add_argument('-rotate_deg',     type=float,   default=90, help="how many degrees to rotate")
 
     # models 
     parser.add_argument('-nn',       action="store_true", help="train nn, defaults to GD") 
