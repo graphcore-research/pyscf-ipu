@@ -119,10 +119,9 @@ def transformer(cfg, params, x: jnp.ndarray, position: jnp.ndarray, H_core: jnp.
     #x = embeddings
     L, dm = x.shape
 
-    # Apply the transformer layers
-    for layer_num, layer in enumerate(params.layers):
+    def block(x, layer_num, layers):
         # Layer-normalize embeddings
-        t1 = vmap(standardize)(embeddings)
+        x = vmap(standardize)(x)
         t1 = elementwise_linear(layer.norm_self_attn, x)   # L x Dm
 
         L, Dm = t1.shape
@@ -153,7 +152,14 @@ def transformer(cfg, params, x: jnp.ndarray, position: jnp.ndarray, H_core: jnp.
 
         # Add this layer's contribution into embeddings
         x = x + t2
+        return x, score 
 
+
+    # Apply the transformer layers
+    # todo: cut jit time by making this jax.lax.foriloop
+    for layer_num, layer in enumerate(params.layers):
+        x, score = jax.checkpoint(block)(x, layer_num, layer)
+        
     return score[0] # take first head 
 
 
@@ -206,4 +212,14 @@ class ParamsDict(types.SimpleNamespace):
     def items(self, path = ''):
         yield from self.labels_aux(path, self)
 
+    def to_float32(self):
+        def convert_to_float32(x):
+            if isinstance(x, jnp.ndarray) and x.dtype == jnp.float64:
+                return x.astype(jnp.float32)
+            return x
+
+        # Create a new ParamsDict instance with converted arrays
+        new_dict = jax.tree_map(convert_to_float32, self.__dict__)
+        return ParamsDict(**new_dict)
+        self.__dict__ = jax.tree_map(convert_to_float32, self.__dict__)
 
