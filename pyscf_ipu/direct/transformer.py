@@ -154,14 +154,13 @@ def transformer(cfg, params, x: jnp.ndarray, position: jnp.ndarray, H_core: jnp.
         x = x + t2
         return x, score 
 
-
     # Apply the transformer layers
     # todo: cut jit time by making this jax.lax.foriloop
     for layer_num, layer in enumerate(params.layers):
-        x, score = jax.checkpoint(block)(x, layer_num, layer)
+        if layer_num % 2 == 0: x, score = jax.checkpoint(block)(x, layer_num, layer)
+        else: x, score = block(x, layer_num, layer)
         
     return score[0] # take first head 
-
 
 import types
 import json

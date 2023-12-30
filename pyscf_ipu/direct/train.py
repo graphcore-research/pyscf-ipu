@@ -83,8 +83,6 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
                   pad_sparse_diff_grid=200000, 
                   mol_idx=42,
                   ): 
-    if opts.wandb: import wandb 
-
     # pad molecule if using nn. 
     if not opts.nn:  
         pad_electrons, pad_diff_ERIs, pad_distinct_ERIs, pad_grid_AO, pad_nonzero_distinct_ERI, pad_sparse_diff_grid = \
@@ -110,7 +108,7 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
         # todo: (adam) the ERI padding may change when rotating molecule more! 
         pad_electrons = 70
         # padding is estimated/printed when running; copy those numbers to the list below. 
-        padding_estimate = [ 210745, 219043,   18084, 193830, 1105268]
+        padding_estimate = [210745, 219043,   18084, 193830, 1105268]
         # add 10% 
         padding_estimate = [int(a*1.1) for a in padding_estimate]
         # name variables correctly 
@@ -168,10 +166,10 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
 
             for j in range(len(mol_str)): mol_str[j][1] = tuple(pos[j])
 
-            if iteration == 0 and opts.wandb: 
+            '''if iteration == 0 and opts.wandb: 
                 from plot import create_rdkit_mol
                 import wandb 
-                wandb.log({"mol_valid=%s"%validation: create_rdkit_mol(str, pos) })
+                wandb.log({"mol_valid=%s"%validation: create_rdkit_mol(str, pos) })'''
 
         if opts.waters:  # todo: rotate both water molecules and draw x=phi, y=psi. 
             rotation_matrix = np.linalg.qr(np.random.normal(size=(3,3)))[0]
@@ -182,12 +180,12 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
             mol_str[4][1] = tuple(water_xyz[1])
             mol_str[5][1] = tuple(water_xyz[2])
 
-            if opts.wandb and iteration == 0: 
+            '''if opts.wandb and iteration == 0: 
                 from plot import create_rdkit_mol
                 import wandb 
                 str = [mol_str[j][0] for j in range(len(mol_str))]
                 pos = np.concatenate([np.array(mol_str[j][1]).reshape(1, 3) for j in range(len(mol_str))])
-                wandb.log({"%s_mol_%i"%({True: "valid", False: "train"}[validation], iteration): create_rdkit_mol(str, pos) })
+                wandb.log({"%s_mol_%i"%({True: "valid", False: "train"}[validation], iteration): create_rdkit_mol(str, pos) })'''
 
         elif opts.qm9: 
             # todo: find dihedral to rotate over similar to alanine dipeptide. 
@@ -201,12 +199,12 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
             mol_str[1][1] = tuple(atoms[1] + np.random.normal(0, opts.wiggle_var, (3)))
             mol_str[2][1] = tuple(atoms[2] + np.random.normal(0, opts.wiggle_var, (3)))
 
-            if opts.wandb and iteration == 0: 
+            '''if opts.wandb and iteration == 0: 
                 from plot import create_rdkit_mol
                 import wandb 
                 str = [mol_str[j][0] for j in range(len(mol_str))]
                 pos = np.concatenate([np.array(mol_str[j][1]).reshape(1, 3) for j in range(len(mol_str))])
-                wandb.log({"%s_mol_%i"%({True: "valid", False: "train"}[validation], iteration): create_rdkit_mol(str, pos) })
+                wandb.log({"%s_mol_%i"%({True: "valid", False: "train"}[validation], iteration): create_rdkit_mol(str, pos) })'''
 
         if iteration == 0: 
             state = init_dft(mol_str, opts, do_pyscf=do_pyscf, pad_electrons=pad_electrons)
@@ -219,12 +217,12 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
     # If we add energy here we get plot basically!
     # todo: save and store in training loop, then we can match with energy 
     # can't get to work in wandb, but can just use download api and the plot. 
-    if opts.alanine and opts.wandb: 
+    '''if opts.alanine and opts.wandb: 
         for phi, psi in angles: 
             if not validation: 
                 wandb.log({"phi_train": phi , "psi_train": psi})
             else: 
-                wandb.log({"phi_valid": phi, "psi_valid": psi})
+                wandb.log({"phi_valid": phi, "psi_valid": psi})'''
     state = cats(states)
     N = state.N[0]
 
@@ -306,7 +304,7 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
             state.indxs     = np.pad(diff_indxs, ((0,0), (0, pad), (0, 0)), 'constant', constant_values=(-1))
             state.diffs_ERI = np.pad(diff_ERIs,  ((0,0), (0, 0),   (0, pad))) # pad zeros 
 
-            if opts.wandb: wandb.log({"pad_diff_ERIs": pad/diff_ERIs.shape[2]})
+            #if opts.wandb: wandb.log({"pad_diff_ERIs": pad/diff_ERIs.shape[2]})
 
         state.rows=rows
         state.cols=cols
@@ -326,7 +324,7 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
             state.cols = np.pad(state.cols, (0,pad))
             state.sparse_diffs_grid_AO = np.pad(state.sparse_diffs_grid_AO, ((0,0),(0,pad)))
 
-            if opts.wandb: wandb.log({"pad_sparse_diff_grid": pad/state.sparse_diffs_grid_AO.shape[1]})
+            #if opts.wandb: wandb.log({"pad_sparse_diff_grid": pad/state.sparse_diffs_grid_AO.shape[1]})
 
         #state.grid_AO = state.grid_AO[:1]
         state.nonzero_distinct_ERI = state.nonzero_distinct_ERI[:1]
@@ -339,7 +337,7 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
             state.nonzero_indices      = np.pad(state.nonzero_indices,      ((0,0), (0,0), (0, pad), (0,0)), 'constant', constant_values=(-1))
             state.nonzero_distinct_ERI = np.pad(state.nonzero_distinct_ERI, ((0,0), (0,0),  (0, pad))) # pad zeros 
 
-            if opts.wandb: wandb.log({"pad_distinct_ERIs": pad/state.nonzero_distinct_ERI.shape[2]})
+            #if opts.wandb: wandb.log({"pad_distinct_ERIs": pad/state.nonzero_distinct_ERI.shape[2]})
 
         if pad_grid_AO != -1: 
             max_pad_grid_AO = state.grid_AO.shape[2]
@@ -357,11 +355,11 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
             state.main_grid_AO = np.pad(state.main_grid_AO, ((0,0),(0,pad),(0,0)))
             state.diffs_grid_AO = np.pad(state.diffs_grid_AO, ((0,0),(0,0),(0,pad),(0,0)))
 
-            if opts.wandb: 
-                wandb.log({"pad_grid_AO": pad/state.grid_AO.shape[2], 
-                           "pad_grid_AO_prev": prev_size,
-                           "pad_grid_AO_pad": pad,
-                           "pad_grid_AO_target": pad_grid_AO})
+            #if opts.wandb: 
+            #    wandb.log({"pad_grid_AO": pad/state.grid_AO.shape[2], 
+            #               "pad_grid_AO_prev": prev_size,
+            #               "pad_grid_AO_pad": pad,
+            #               "pad_grid_AO_target": pad_grid_AO})
 
 
         indxs = np.abs(state.nonzero_distinct_ERI ) > 1e-9 
@@ -385,10 +383,8 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
             state.nonzero_distinct_ERI = np.pad(state.nonzero_distinct_ERI, ((0,0),(0,0),(0,pad)))
             state.nonzero_indices = np.pad(state.nonzero_indices, ((0,0),(0,0),(0,pad), (0,0)), 'constant', constant_values=(-1))
 
-            if opts.wandb: wandb.log({"pad_grid_AO": pad/state.grid_AO.shape[2]})
+            #if opts.wandb: wandb.log({"pad_grid_AO": pad/state.grid_AO.shape[2]})
 
-    #import copy 
-    #return copy.deepcopy(state)
     state.pad_sizes = np.array([
         max_pad_diff_ERIs, max_pad_distinct_ERIs, max_pad_grid_AO, 
         max_pad_nonzero_distinct_ERI, max_pad_sparse_diff_grid])
@@ -461,7 +457,6 @@ def nanoDFT(mol_str, opts):
         )
         params = params.to_float32()
 
-        if opts.wandb: wandb.log({"total_parameters": total_params })
 
     if opts.nn: 
         #https://arxiv.org/pdf/1706.03762.pdf see 5.3 optimizer 
@@ -583,7 +578,7 @@ def nanoDFT(mol_str, opts):
 
     @partial(jax.jit, backend=opts.backend)
     def update(w, adam_state, accumulated_grad):
-        accumulated_grad = jax.tree_map(lambda x: x / global_batch_size, accumulated_grad)
+        accumulated_grad = jax.tree_map(lambda x: x / opts.bs, accumulated_grad)
         updates, adam_state = adam.update(accumulated_grad, adam_state, w)
         w = optax.apply_updates(w, updates)
         return w, adam_state
@@ -612,7 +607,6 @@ def nanoDFT(mol_str, opts):
         load_time, t0 = time.time()-t0, time.time()
 
         states = states[-opts.grad_acc+1:] + [state] 
-        accumulated_grad = None
 
         if len(states) < 50: print(len(states))
         
@@ -622,13 +616,14 @@ def nanoDFT(mol_str, opts):
             (val, (vals, E_xc, density_matrix, _W)), grad = vandg(w, state, opts.normal, opts.nn)
             print(",", end="", flush=True)
             if j == 0: time_step1 = time.time()-_t0
-            accumulated_grad = grad if accumulated_grad is None else jax.tree_map(lambda x, y: x + y, accumulated_grad, grad)
+
+            w, adam_state = update(w, adam_state, grad)
+
+        # todo: rename
+        global_batch_size = len(states)*opts.bs
+        if opts.wandb: dct["global_batch_size"] = global_batch_size
 
         train_time, t0 = time.time()-t0, time.time() 
-        # scale by global batch size. 
-        global_batch_size = len(states)*opts.bs
-        if opts.wandb: wandb.log({"global_batch_size": global_batch_size})
-        w, adam_state = update(w, adam_state, accumulated_grad)
 
         # plot grad norm 
         #if iteration % 10 == 0: 
@@ -658,7 +653,7 @@ def nanoDFT(mol_str, opts):
 
         plot_time, t0 = time.time()-t0, time.time() 
 
-        if opts.nn:# and iteration % 10 == 0: 
+        if opts.nn and (iteration < 1000 or iteration % 10 == 0): 
             if val_state is None: val_state = jax.device_put(val_qm9[0])
             _, (valid_vals, _, vdensity_matrix, vW) = valf(w, val_state, opts.normal, opts.nn)
             lr = custom_schedule(iteration)
@@ -1225,11 +1220,11 @@ if __name__ == "__main__":
     parser.add_argument('-tiny',     action="store_true") 
     parser.add_argument('-small',    action="store_true") 
     parser.add_argument('-base',     action="store_true") 
-    parser.add_argument('-medium',     action="store_true") 
-    parser.add_argument('-large',     action="store_true") 
-    parser.add_argument('-xlarge',     action="store_true") 
+    parser.add_argument('-medium',   action="store_true") 
+    parser.add_argument('-large',    action="store_true") 
+    parser.add_argument('-xlarge',   action="store_true") 
     opts = parser.parse_args()
-    if opts.tiny or opts.small or opts.base: opts.nn = True 
+    if opts.tiny or opts.small or opts.base or opts.large or opts.xlarge: opts.nn = True 
 
     args_dict = vars(opts)
     print(args_dict)
