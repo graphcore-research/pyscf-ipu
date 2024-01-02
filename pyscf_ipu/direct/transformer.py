@@ -111,26 +111,23 @@ def transformer(cfg, params, x: jnp.ndarray, position: jnp.ndarray, H_core: jnp.
     # inspired by 3d point cloud transformers; 
     # nspired by andrew: use trigonometric functions as feature transformations 
     position = jnp.concatenate([position, jnp.cos(position), jnp.sin(position), jnp.tanh(position)], axis=1) #(N,3) -> (N,12)
-    positions = linear(params.project_positions, position)                         # L x Dm*4
+    positions = linear(params.project_positions, position)                         # L x Dm
 
     # Add (learned) positional encodings
-    #x = jnp.concatenate([embeddings[:, :-3], position], -1) 
-    x = embeddings + positions
-    #x = embeddings
-    L, dm = x.shape
+    x = embeddings + positions                                                     #  L x Dm 
+    L, Dm = x.shape
+    nheads = cfg.heads
+    
+    def block(x, layer_num, layer):
+        # Layer-normalize 
+        t1 = vmap(standardize)(x)                           # L x Dm 
+        t1 = elementwise_linear(layer.norm_self_attn, t1)   # L x Dm
 
-    def block(x, layer_num, layers):
-        # Layer-normalize embeddings
-        x = vmap(standardize)(x)
-        t1 = elementwise_linear(layer.norm_self_attn, x)   # L x Dm
-
-        L, Dm = t1.shape
-        nheads = cfg.heads
-        qkv     = linear(layer.kqv, t1)#.reshape(L, Dm, 3)
-        #q, k, v = [qkv[:, :, i].reshape(nheads, L, Dm//nheads) for i in range(3)] 
-        q = jnp.transpose(qkv[:, 0*Dm:1*Dm].reshape(L, nheads, Dm//nheads), (1, 0, 2))
-        k = jnp.transpose(qkv[:, 1*Dm:2*Dm].reshape(L, nheads, Dm//nheads), (1, 0, 2))
-        v = jnp.transpose(qkv[:, 2*Dm:3*Dm].reshape(L, nheads, Dm//nheads), (1, 0, 2))
+        qkv     = linear(layer.kqv, t1)
+        q,k,v = jnp.split(qkv, 3, axis=1)
+        q = jnp.transpose(q.reshape(L, nheads, Dm//nheads), (1, 0, 2))
+        k = jnp.transpose(k.reshape(L, nheads, Dm//nheads), (1, 0, 2))
+        v = jnp.transpose(v.reshape(L, nheads, Dm//nheads), (1, 0, 2))
         score = (q @ jnp.transpose(k, (0, 2, 1))) / math.sqrt(Dm)
 
         # do like graphformer and append position here? 
@@ -141,26 +138,28 @@ def transformer(cfg, params, x: jnp.ndarray, position: jnp.ndarray, H_core: jnp.
         attn     = jax.nn.softmax(score , axis=1) 
         x = x + (attn @ v).reshape(L, Dm)
 
-        # Layer-normalize embeddings
-        t2 = vmap(standardize)(embeddings)
-        t2 = elementwise_linear(layer.norm_ff, x)          # L x Dm
+        # Layer-normalize 
+        t2 = vmap(standardize)(x)
+        t2 = elementwise_linear(layer.norm_ff, t2)          # L x Dm
 
         # Feedforward fully connected
         t2 = linear(layer.ffn1, t2)                         # L x Dm*4
         t2 = jax.nn.gelu(t2)
         t2 = linear(layer.ffn2, t2)                         # L x Dm
 
-        # Add this layer's contribution into embeddings
+        # Residual connection 
         x = x + t2
         return x, score 
 
     # Apply the transformer layers
     # todo: cut jit time by making this jax.lax.foriloop
     for layer_num, layer in enumerate(params.layers):
-        if layer_num % 2 == 0: x, score = jax.checkpoint(block)(x, layer_num, layer)
-        else: x, score = block(x, layer_num, layer)
+        x, score = jax.checkpoint(block)(x, layer_num, layer)
         
-    return score[0] # take first head 
+    # todo: if this isn't symmetric eigh gives imaginary eigenvalues? (bad)
+    M = score[0] # take first attention head 
+    #M = (M + M.T)/2 # make symmetric! 
+    return M 
 
 import types
 import json
@@ -222,3 +221,120 @@ class ParamsDict(types.SimpleNamespace):
         return ParamsDict(**new_dict)
         self.__dict__ = jax.tree_map(convert_to_float32, self.__dict__)
 
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    # DFT options 
+    parser.add_argument('-basis',   type=str,   default="sto3g")  
+    parser.add_argument('-level',   type=int,   default=0)
+
+    # GD options 
+    parser.add_argument('-backend', type=str,       default="cpu") 
+    parser.add_argument('-lr',      type=float,     default=2.5e-4)
+    parser.add_argument('-steps',   type=int,       default=100000)
+    parser.add_argument('-bs',      type=int,       default=8)
+    parser.add_argument('-val_bs',      type=int,   default=8)
+    parser.add_argument('-mol_repeats',  type=int,  default=16) # How many time to optimize wrt each molecule. 
+
+    # energy computation speedups 
+    parser.add_argument('-foriloop',  action="store_true") # whether to use jax.lax.foriloop for sparse_symmetric_eri (faster compile time but slower training. )
+    parser.add_argument('-xc_f32',   action="store_true") 
+    parser.add_argument('-eri_f32',  action="store_true") 
+    parser.add_argument('-eri_bs',  type=int, default=8) 
+
+    parser.add_argument('-normal',     action="store_true") 
+    parser.add_argument('-wandb',      action="store_true") 
+    parser.add_argument('-prof',       action="store_true") 
+    parser.add_argument('-visualize',  action="store_true") 
+    parser.add_argument('-skip',       action="store_true", help="skip pyscf test case") 
+
+    # dataset 
+    parser.add_argument('-qm9',        action="store_true") 
+    parser.add_argument('-benzene',        action="store_true") 
+    parser.add_argument('-hydrogens',        action="store_true") 
+    parser.add_argument('-water',        action="store_true") 
+    parser.add_argument('-waters',        action="store_true") 
+    parser.add_argument('-alanine',        action="store_true") 
+    parser.add_argument('-states',         type=int,   default=1)
+    parser.add_argument('-workers',        type=int,   default=5) 
+    parser.add_argument('-precompute',        action="store_true")  # precompute labels; only run once for data{set/augmentation}.
+        # do noise schedule, start small slowly increase 
+    parser.add_argument('-wiggle_var',     type=float,   default=0.05, help="wiggle N(0, wiggle_var), bondlength=1.5/30")
+    parser.add_argument('-eri_threshold',  type=float,   default=1e-10, help="loss function threshold only")
+    parser.add_argument('-rotate_deg',     type=float,   default=90, help="how many degrees to rotate")
+
+    # models 
+    parser.add_argument('-nn',       action="store_true", help="train nn, defaults to GD") 
+    parser.add_argument('-tiny',     action="store_true") 
+    parser.add_argument('-small',    action="store_true") 
+    parser.add_argument('-base',     action="store_true") 
+    parser.add_argument('-medium',   action="store_true") 
+    parser.add_argument('-large',    action="store_true") 
+    parser.add_argument('-xlarge',   action="store_true") 
+    opts = parser.parse_args()
+    
+    # initialize model 
+    # transformer tiny 5M 
+    d_model= 192
+    n_heads = 6
+    n_layers = 12
+
+    from train import nao
+    rnd_key = jax.random.PRNGKey(42)
+    n_vocab = nao("C", opts.basis) + nao("N", opts.basis) + \
+              nao("O", opts.basis) + nao("F", opts.basis) + \
+              nao("H", opts.basis) 
+
+    rnd_key, cfg, params, total_params = transformer_init(
+        rnd_key,
+        n_vocab,
+        d_model =d_model,
+        n_layers=n_layers,
+        n_heads =n_heads,
+        d_ff    =d_model*4,
+    )
+
+
+    # compute dummy output 
+    from train import batched_state, summary
+    opts.alanine = True 
+    alanine = [ ["H", ( 2.000 ,  1.000,  -0.000)], ["C", ( 2.000 ,  2.090,   0.000)], ["H", ( 1.486 ,  2.454,   0.890)], ["H", ( 1.486 ,  2.454,  -0.890)],
+            ["C", ( 3.427 ,  2.641,  -0.000)], ["O", ( 4.391 ,  1.877,  -0.000)], ["N", ( 3.555 ,  3.970,  -0.000)], ["H", ( 2.733 ,  4.556,  -0.000)],
+            ["C", ( 4.853 ,  4.614,  -0.000)], ["H", ( 5.408 ,  4.316,   0.890)], ["C", ( 5.661 ,  4.221,  -1.232)], ["H", ( 5.123 ,  4.521,  -2.131)], 
+            ["H", ( 6.630 ,  4.719,  -1.206)], ["H", ( 5.809 ,  3.141,  -1.241)], ["C", ( 4.713 ,  6.129,   0.000)], ["O", ( 3.601 ,  6.653,   0.000)],
+            ["N", ( 5.846 ,  6.835,   0.000)], ["H", ( 6.737 ,  6.359,  -0.000)], ["C", ( 5.846 ,  8.284,   0.000)], ["H", ( 4.819 ,  8.648,   0.000)],
+            ["H", ( 6.360 ,  8.648,   0.890)], ["H", ( 6.360 ,  8.648,  -0.890)], ]
+    state = batched_state(alanine, opts, opts.bs, \
+                    wiggle_num=0, do_pyscf=False, validation=False, \
+                    extrapolate=False, mol_idx=0)
+    summary(state)
+    
+    output = jax.jit(jax.vmap(transformer, in_axes=(None, None, 0, 0, 0), out_axes=(0)), 
+                    static_argnums=(0,),
+                    backend="cpu")(cfg, \
+            params, state.ao_types, state.pos.astype(jnp.float32), state.H_core.astype(jnp.float32))
+
+            
+    print(np.sum(output)) # 162.58726108305348
+
+
+    # store model 
+    import pickle 
+    pickle.dump(params, open("checkpoints/example.pickle", "wb")) 
+
+    # reload model 
+    new_params = pickle.load(open("checkpoints/example.pickle", "rb"))
+
+    # check that output remains the same 
+    new_output = jax.jit(jax.vmap(transformer, in_axes=(None, None, 0, 0, 0), out_axes=(0)), 
+                    static_argnums=(0,),
+                    backend="cpu")(cfg, \
+            new_params, state.ao_types, state.pos.astype(jnp.float32), state.H_core.astype(jnp.float32))
+
+    assert np.allclose(output, new_output)
+    print("TEST CASE PASSED!")
+
+
+    
