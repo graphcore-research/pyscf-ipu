@@ -174,6 +174,7 @@ def transformer(cfg, params, x: jnp.ndarray, position: jnp.ndarray, H_core: jnp.
     qkv   = linear(layer.kqv, t1)
     q,k,v = jnp.split(qkv, 3, axis=1)
     q     = jnp.transpose(q.reshape(L, nheads, Dm//nheads), (1, 0, 2))
+    k     = q 
     #v = jnp.transpose(v.reshape(L, nheads, Dm//nheads), (1, 0, 2))
     score = (q @ jnp.transpose(k, (0, 2, 1))) / math.sqrt(Dm*nheads) # symmetric: initial loss goes from 1200 to 980 (qm9). 
         
