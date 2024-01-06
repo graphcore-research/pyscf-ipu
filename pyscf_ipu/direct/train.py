@@ -15,6 +15,8 @@ import pandas as pd
 import math 
 from functools import partial 
 import pickle 
+import random 
+random.seed(42)
 
 cfg, HARTREE_TO_EV, EPSILON_B3LYP, HYB_B3LYP = None, 27.2114079527, 1e-20, 0.2
 
@@ -25,8 +27,8 @@ B, BxNxN, BxNxK = None, None, None
 # Only need to recompute: L_inv, grid_AO, grid_weights, H_core, ERI and E_nuc. 
 def dm_energy(W: BxNxK, state, normal, nn): 
     if nn: 
-        W = jax.vmap(transformer, in_axes=(None, None, 0, 0, 0), out_axes=(0))(cfg, \
-            W, state.ao_types, state.pos.astype(jnp.float32), state.H_core.astype(jnp.float32))
+        W = jax.vmap(transformer, in_axes=(None, None, 0, 0, 0, 0), out_axes=(0))(cfg, \
+            W, state.ao_types, state.pos.astype(jnp.float32), state.H_core.astype(jnp.float32), state.L_inv.astype(jnp.float32))
     
     W = W.astype(jnp.float64)
     # we can interpret state.H_core + W as hamiltonian, and predict hlgap from these! 
@@ -54,6 +56,7 @@ def exchange_correlation(density_matrix: BxNxN, state, normal, xc_f32):
         if False:
             main: BxGsizexN       = state.main_grid_AO @ density_matrix            # (1, gsize, N) @ (B, N, N) = O(B gsize N^2) FLOPs and O(gsize*N + N^2 +B * gsize * N) FLIOs 
             correction: BxGsizexN = jax.vmap(sparse_mult, in_axes=(0,0,None, None))(state.sparse_diffs_grid_AO, density_matrix, state, gsize)
+            # todo: remove state.grid_AO w/ sparsity tricks => reduce memory 10x. 
             rho_a = jnp.einsum("bpij,bqij->bpi", state.grid_AO, main.reshape(B,1,gsize,N)) 
             rho_b = jnp.einsum("bpij,bqij->bpi", state.grid_AO, correction.reshape(B,1,gsize,N))
             rho = rho_a - rho_b
@@ -122,6 +125,8 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
                   pad_sparse_diff_grid=200000, 
                   mol_idx=42,
                   ): 
+
+    do_print = False
     # pad molecule if using nn. 
     if not opts.nn:  
         pad_electrons, pad_diff_ERIs, pad_distinct_ERIs, pad_grid_AO, pad_nonzero_distinct_ERI, pad_sparse_diff_grid = \
@@ -145,9 +150,22 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
         pad_nonzero_distinct_ERI=400000
         pad_sparse_diff_grid=400000'''
         #padding_estimate = [37426, 149710, 17010, 140122, 138369] 
-        padding_estimate = [48330, 163222, 17034, 159361, 139505]
-        padding_estimate = [int(a*1.1) for a in padding_estimate] 
+
+        # idea: 
+        # train w/o atom pertubation until convergence, then 1, then 2, then 3. 
+
+        padding_estimate = [48330, 163222, 17034, 159361, 139505] 
+
+        if opts.nperturb == 2 or opts.nperturb == 1: padding_estimate = [int(a*2.1) for a in padding_estimate] 
+        else: padding_estimate = [int(a*1.1) for a in padding_estimate] 
+
+
         pad_diff_ERIs, pad_distinct_ERIs, pad_grid_AO, pad_nonzero_distinct_ERI, pad_sparse_diff_grid = padding_estimate
+
+        if opts.basis == "def2-svp":
+            # disable padding temporarily 
+            max_pad_electrons, max_pad_diff_ERIs, max_pad_distinct_ERIs, max_pad_grid_AO, max_pad_nonzero_distinct_ERI, max_pad_sparse_diff_grid = \
+            -1, -1, -1, -1, -1, -1
 
     if opts.alanine: 
         # todo: (adam) the ERI padding may change when rotating molecule more! 
@@ -178,9 +196,10 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
         water2_xyz = np.array([mol_str[i][1] for i in range(3,6)])
 
     if opts.qm9: 
-        atoms = np.array([mol_str[i][1] for i in range(0,3)])
-        # pick random atom to permute (of the first 9 heavy ones)
-        atom_num = int(np.random.uniform(0, 8))
+        # pick random atom to perturb (of the first 9 heavy ones)
+        atom_num1, atom_num2, atom_num3 = random.sample(range(9), 3)
+        atoms = np.array([mol_str[i][1] for i in range(0,10)])
+        atom_type = [mol_str[i][0] for i in range(0,10)]
 
     if opts.alanine:
         # train on [-180, 180], validate [-180, 180] extrapolate [-360, 360]\[180, -180]
@@ -191,6 +210,28 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
             phi, psi = [float(a) for a in np.random.uniform(0, 180, 2)]
 
         angles = []
+
+    # Combinatorics of atom substitutions (n_electrons has to be even). 
+    # P      := single atom modification, n_electrons remain even (C-> O, O->C, N->F, F->N)
+    # B1, B2 := single atom modification, n_electrons becomes odd (C->{N,F}, O->{N,F}, N->{O,C}, F->{O,C})
+    I  = {"C":"C", "O":"O", "F":"F", "N":"N"}
+    P  = {"C": "O", "O":"C", "F":"N", "N":"F"}
+    B1 = {"C":"N", "O":"N", "F":"O", "N":"O"}
+    B2 = {"C":"F", "O":"F", "F":"C", "N":"C"}
+
+    if opts.nperturb == 3:
+        allowed_pertubations=[
+            (I,I,I), (I,I,P), (I,P,I), (I,P,P), (P,I,I), (P,I,P), (P,P,I), (P,P,P),
+            (I,B1,B2), (B1,I,B2), (B1,B2,I), (I,B2,B1), (B2,I,B1), (B2,B1,I), (P,B1,B2), (B1,P,B2), (B1,B2,P), (P,B2,B1), (B2,P,B1), (B2,B1,P),
+            (I,B1,B1), (B1,I,B1), (B1,B1,I), (I,B1,B1), (B1,I,B1), (B1,B1,I), (P,B1,B1), (B1,P,B1), (B1,B1,P), (P,B1,B1), (B1,P,B1), (B1,B1,P),
+            (I,B2,B2), (B2,I,B2), (B2,B2,I), (I,B2,B2), (B2,I,B2), (B2,B2,I), (P,B2,B2), (B2,P,B2), (B2,B2,P), (P,B2,B2), (B2,P,B2), (B2,B2,P),
+        ]
+    if opts.nperturb == 2:
+        allowed_pertubations=[ (I, I, I), (I, I, P), (I, P, I), (I, P, P), (I, B1, B1), (I, B1, B2), (I, B2, B1), (I, B2, B2), ]
+    if opts.nperturb == 1:
+        allowed_pertubations=[ (I, I, I), (I, I, P), ]*10
+
+    if opts.nperturb: random.shuffle(allowed_pertubations)
 
     states = []
     for iteration in range(bs):
@@ -253,49 +294,42 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
                 wandb.log({"%s_mol_%i"%({True: "valid", False: "train"}[validation], iteration): create_rdkit_mol(str, pos) })'''
 
         elif opts.qm9: 
-            # todo: find dihedral to rotate over similar to alanine dipeptide. 
-            # broken; rotate first three atoms around their center of mass 
-            # this breaks molecule; should use dihedral angle as done with the dipeptide. 
-            #rotation_matrix = np.linalg.qr(np.random.normal(size=(3,3)))[0]
-            #center = atoms.mean(axis=0)
-            #rotated_atoms = np.dot(atoms - center, rotation_matrix) + center
-
-            # for extrapolation, do even more. 
-
-            if iteration == 0 and (validation or extrapolate):
-                pass 
+            if iteration == 0 and (validation or extrapolate): pass 
             else: 
-                #mol_str[0][1] = tuple(atoms[0] + np.random.normal(0, opts.wiggle_var, (3)))
-                mol_str[atom_num][1] = tuple(atoms[atom_num] + np.random.normal(0, opts.wiggle_var, (3)))
-            #mol_str[1][1] = tuple(atoms[1] + np.random.normal(0, opts.wiggle_var, (3)))
-            #mol_str[2][1] = tuple(atoms[2] + np.random.normal(0, opts.wiggle_var, (3)))
+                s = mol_str[atom_num1][0]+ mol_str[atom_num2][0]+ mol_str[atom_num3][0]
 
-            '''if opts.wandb and iteration == 0: 
-                from plot import create_rdkit_mol
-                import wandb 
-                str = [mol_str[j][0] for j in range(len(mol_str))]
-                pos = np.concatenate([np.array(mol_str[j][1]).reshape(1, 3) for j in range(len(mol_str))])
-                wandb.log({"%s_mol_%i"%({True: "valid", False: "train"}[validation], iteration): create_rdkit_mol(str, pos) })'''
+                # for small stuff, wiggle a single atom a bit.
+                if opts.nperturb <= 1: mol_str[atom_num3][1] = tuple(atoms[atom_num3] + np.random.normal(0, opts.wiggle_var, (3)))
+
+                # assuming all atoms are non-hydrogen; if wrong don't do any pertubations. 
+                if opts.nperturb > 0 and mol_str[atom_num1][0] != "H" and mol_str[atom_num2][0] != "H" and mol_str[atom_num3][0] != "H": 
+                    A,B,C = allowed_pertubations[iteration]
+                    mol_str[atom_num1][0] = A[atom_type[atom_num1]]
+                    mol_str[atom_num2][0] = B[atom_type[atom_num2]]
+                    mol_str[atom_num3][0] = C[atom_type[atom_num3]]
+
+                s += "->" + mol_str[atom_num1][0]+ mol_str[atom_num2][0]+ mol_str[atom_num3][0]
+                if do_print: print(iteration, s)
+
+                # -nperturb 2 is a lot slower; changing self.prune=False roughly doubles AO matrices. 
 
         if iteration == 0: 
             state = init_dft(mol_str, opts, do_pyscf=do_pyscf, pad_electrons=pad_electrons)
             c, w = state.grid_coords, state.grid_weights
         elif iteration <= 1 or not opts.prof:  # when profiling create fake molecule to skip waiting
             state = init_dft(mol_str, opts, c, w, do_pyscf=do_pyscf and iteration < 3, state=state, pad_electrons=pad_electrons)
+            
 
         states.append(state)
 
-    # If we add energy here we get plot basically!
-    # todo: save and store in training loop, then we can match with energy 
-    # can't get to work in wandb, but can just use download api and the plot. 
-    '''if opts.alanine and opts.wandb: 
-        for phi, psi in angles: 
-            if not validation: 
-                wandb.log({"phi_train": phi , "psi_train": psi})
-            else: 
-                wandb.log({"phi_valid": phi, "psi_valid": psi})'''
+    if do_print: print("cat states")
+
     state = cats(states)
     N = state.N[0]
+
+    if do_print: print("get sparsity") 
+
+    #_nonzero = None 
 
     # Compute ERI sparsity. 
     nonzero = []
@@ -305,19 +339,26 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
         e[indxs] = 0 
         nonzero.append(np.nonzero(e)[0])
 
+        #_nonzero = indxs if _nonzero is None else np.logical_or(_nonzero, indxs)
+
+
     # Merge nonzero indices and prepare (ij, kl).
     # rep is the number of repetitions we include in the sparse representation. 
-    #nonzero_indices = np.union1d(nonzero[0], nonzero[1])  
+    if do_print: print("union") # bottleneck for def2-svp. todo: fix above logical_or trick to do faster. 
     union = nonzero[0]
-    for i in range(1, len(nonzero)):
+    for i in range(1, len(nonzero)): # this takes 12s/it for def2-svp. 
         union = np.union1d(union, nonzero[i])
     nonzero_indices = union 
+    #exit()
+
+
     from sparse_symmetric_ERI import get_i_j, num_repetitions_fast
     ij, kl               = get_i_j(nonzero_indices)
     rep                  = num_repetitions_fast(ij, kl)
 
     batches = opts.eri_bs
     es = []
+    if do_print: print("pad") 
     for e,i in zip(state.nonzero_distinct_ERI, state.nonzero_indices):
         nonzero_distinct_ERI = e[nonzero_indices] / rep
         remainder            = nonzero_indices.shape[0] % (batches)
@@ -328,6 +369,7 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
 
     state.nonzero_distinct_ERI = np.concatenate([np.expand_dims(a, axis=0) for a in es])
 
+    if do_print: print("pad ijkl indices")
     i, j = get_i_j(ij.reshape(-1))
     k, l = get_i_j(kl.reshape(-1))
 
@@ -342,6 +384,7 @@ def batched_state(mol_str, opts, bs, wiggle_num=0,
     # batching (w/ same sparsity pattern across batch) allows precomputing all {ss,dm}_indices instead of computing in sparse_sym_eri every iteration. 
     # function below does this. 
     # todo: consider removing, didn't get expecting 3x (only 5%; not sure if additional memory/complication justifies).
+    if do_print: print("precompute indices. ")
     from sparse_symmetric_ERI import precompute_indices
 
     if opts.normal: diff_state = None 
@@ -507,6 +550,8 @@ def nanoDFT(mol_str, opts):
             run = wandb.init(project='ndft')
         opts.name = run.name
 
+        wandb.log(vars(opts))
+
     else:
         opts.name = "%i"%time.time()
 
@@ -578,20 +623,8 @@ def nanoDFT(mol_str, opts):
         # [ ] weight initialization 
 
         def custom_schedule(it, learning_rate=opts.lr, min_lr=opts.lr/10, warmup_iters=2000, lr_decay_iters=600000): # 600k/30 = 20k; so hit mi
-            #return learning_rate * it / warmup_iters # to allow jax jit? 
-            # allow jax jit 
-            '''if it < warmup_iters: return learning_rate * it / warmup_iters # linearly increase until hit warmup iters. 
-            if it > lr_decay_iters: return min_lr      # after decay (600k iterations) go to 10x lower 
-
-            # in between, decay learning rate using this function; this is from 2k steps to 600k steps 
-            decay_ratio = (it - warmup_iters) / (lr_decay_iters - warmup_iters)
-            assert 0 <= decay_ratio <= 1
-            coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio)) 
-            return min_lr + coeff * (learning_rate - min_lr)'''
-            #if it < warmup_iters: return learning_rate * it / warmup_iters
             cond1 = (it < warmup_iters) * learning_rate * it / warmup_iters
             cond2 = (it > lr_decay_iters) * min_lr
-
             decay_ratio = (it - warmup_iters) / (lr_decay_iters - warmup_iters)
             coeff = 0.5 * (1.0 + jnp.cos(jnp.pi * decay_ratio)) 
             cond3 = (it >= warmup_iters) * (it <= lr_decay_iters) * (min_lr + coeff * (learning_rate - min_lr))
@@ -600,7 +633,7 @@ def nanoDFT(mol_str, opts):
         adam = optax.chain(
             optax.clip_by_global_norm(1),
             optax.scale_by_adam(b1=0.9, b2=0.95, eps=1e-12),
-            optax.add_decayed_weights(0.1),#, configure_decay_mask(params)),
+            optax.add_decayed_weights(0.1),
             optax.scale_by_schedule(custom_schedule),
             optax.scale(-1),
         )
@@ -615,9 +648,18 @@ def nanoDFT(mol_str, opts):
             # problem: second epoch always gives segfault. 
             # hacky fix; make __len__ = real_length*num_epochs and __getitem__ do idx%real_num_examples 
             def __init__(self, opts, nao=294, train=True, num_epochs=10**9, extrapolate=False):
-                # only take molecules with use {CNOFH}, nao=nao and spin=0.
-                df = pd.read_pickle("alchemy/processed_atom_9.pickle") # spin=0 and only CNOFH molecules 
-                if nao != -1: df = df[df["nao"]==nao] 
+                
+                if opts.qh9: 
+                    df = pd.read_pickle("qh9/qh9stable_processed_shuffled.pickle")
+                    if nao != -1: df = df[df["N_sto3g"]==55] 
+                    print(df.shape)
+                else: 
+                    # only take molecules with use {CNOFH}, nao=nao and spin=0.
+                    #qm9
+                    df = pd.read_pickle("alchemy/processed_atom_9.pickle") # spin=0 and only CNOFH molecules 
+                    if nao != -1: df = df[df["nao"]==nao] 
+
+
                 # df.sample is not deterministic; moved to pre-processing, so file is shuffled already. 
                 # this shuffling is important, because it makes the last 10 samples iid (used for validation)
                 #df = df.sample(frac=1).reset_index(drop=True) # is this deterministic? 
@@ -684,6 +726,17 @@ def nanoDFT(mol_str, opts):
         else:                 train_dataloader = DataLoader(qm9, batch_size=1, pin_memory=True, shuffle=False, drop_last=True, num_workers=opts.workers,  collate_fn=lambda x: x[0])
         pbar = tqdm(train_dataloader)
 
+        if opts.test_dataloader:
+
+            t0 = time.time()
+            for iteration, state in enumerate(pbar):
+                    if iteration == 0: summary(state) 
+                    print(time.time()-t0)
+                    t0 = time.time()
+                    print(state.pad_sizes.reshape(1, -1))
+
+            exit()
+
         
     else: 
         states    = [batched_state(mol_str[0], opts, opts.bs, do_pyscf=True)] + [batched_state(mol_str[i], opts, opts.bs, do_pyscf=False)  for i in range(opts.states-1)]
@@ -711,7 +764,8 @@ def nanoDFT(mol_str, opts):
 
     @partial(jax.jit, backend=opts.backend)
     def update(w, adam_state, accumulated_grad):
-        accumulated_grad = jax.tree_map(lambda x: x / opts.bs, accumulated_grad)
+        if opts.grad_acc: accumulated_grad = jax.tree_map(lambda x: x / (opts.bs * opts.mol_repeats), accumulated_grad)
+        else: accumulated_grad = jax.tree_map(lambda x: x / opts.bs, accumulated_grad)
         updates, adam_state = adam.update(accumulated_grad, adam_state, w)
         w = optax.apply_updates(w, updates)
         return w, adam_state
@@ -722,9 +776,11 @@ def nanoDFT(mol_str, opts):
 
     min_val, min_dm, mins, valid_str, step, val_state, ext_state = 0, 0, np.ones(opts.bs)*1e6, "", 0, None, None
     t0, load_time, train_time, val_time, plot_time = time.time(), 0, 0, 0, 0
+    accumulated_grad = None 
 
     paddings = []
     states   = []
+
     for iteration, state in enumerate(pbar):
         if iteration == 0: summary(state) 
         state = jax.device_put(state) 
@@ -741,6 +797,7 @@ def nanoDFT(mol_str, opts):
         states.append(state)
         if len(states) > opts.mol_repeats: states.pop(0)
 
+        if opts.shuffle: random.shuffle(states) # 
 
         load_time, t0 = time.time()-t0, time.time()
         if opts.checkpoint != -1 and iteration % opts.checkpoint == 0: # and iteration > 0:
@@ -761,7 +818,6 @@ def nanoDFT(mol_str, opts):
             save_time, t0 = time.time()-t0, time.time()
 
 
-
         if len(states) < 50: print(len(states))
         
         for j, state in enumerate(states):
@@ -771,8 +827,15 @@ def nanoDFT(mol_str, opts):
             print(",", end="", flush=True)
             if j == 0: time_step1 = time.time()-_t0
 
-            # todo: have hyper parameter that accumulates gradient or takes step? 
-            w, adam_state = update(w, adam_state, grad)
+            if opts.grad_acc == 0 or len(states) < opts.mol_repeats: 
+                w, adam_state = update(w, adam_state, grad)
+            else:  
+                accumulated_grad = grad if accumulated_grad is None else jax.tree_map(lambda x, y: x + y, accumulated_grad, grad)
+                if j % opts.grad_acc == 0 and j > 0: # we assume opts.grad_acc divides opts.mol_repeats; prev was basically grad_acc=0 or grad_acc=mol_repeats, can now do hybrid. 
+                    w, adam_state = update(w, adam_state, grad)
+                    accumulated_grad = None 
+                    print("#", end="", flush=True)
+
 
         # todo: rename
         global_batch_size = len(states)*opts.bs
@@ -983,7 +1046,6 @@ def get_partition(
   coords_all = []
   weights_all = []
 
-  # [ ] consider another grid? 
   for ia in range(mol.natm):
     coords, vol = atom_grids_tab[mol.atom_symbol(ia)]
     coords = coords + atom_coords[ia]  # [ngrid, 3]
@@ -1008,7 +1070,9 @@ class DifferentiableGrids(gen_grid.Grids):
     mol = self.mol
 
     atom_grids_tab = self.gen_atomic_grids(
-      mol, self.atom_grid, self.radi_method, self.level, self.prune
+      mol, self.atom_grid, self.radi_method, self.level, 
+      self.prune, 
+      #False, # WARNING: disabling self.prune; this makes sizes of C,N,O,F all a bit larger, but the same ; allow atom substitution 
     )
 
     coords, weights = get_partition(
@@ -1038,6 +1102,7 @@ def grids_from_pyscf_mol(
 
 
 def init_dft(mol_str, opts, _coords=None, _weights=None, first=False, do_pyscf=True, state=None, pad_electrons=-1):
+    do_print = False 
     #t0 = time.time()
     mol = build_mol(mol_str, opts.basis)
     if do_pyscf: pyscf_E, pyscf_hlgap, pycsf_forces = reference(mol_str, opts)
@@ -1048,6 +1113,8 @@ def init_dft(mol_str, opts, _coords=None, _weights=None, first=False, do_pyscf=T
     E_nuc            = mol.energy_nuc()                             # float = 202.4065 [Hartree] for C6H6. TODO(): Port to jax.
 
     from pyscf import dft
+    if do_print: print("grid", end="", flush=True)
+
     #grids            = pyscf.dft.gen_grid.Grids(mol)
     grids            = DifferentiableGrids(mol)
     grids.level      = opts.level
@@ -1058,6 +1125,8 @@ def init_dft(mol_str, opts, _coords=None, _weights=None, first=False, do_pyscf=T
     grid_coords     = grids.coords
     coord_str       = 'GTOval_cart_deriv1' if mol.cart else 'GTOval_sph_deriv1'
     grid_AO         = mol.eval_gto(coord_str, grids.coords, 4)      # (4, grid_size, N) = (4, 45624, 9) for C6H6.
+
+    if do_print: print("int1e", end="", flush=True)
 
     # TODO(): Add integral math formulas for kinetic/nuclear/O/ERI.
     kinetic         = mol.intor_symmetric('int1e_kin')              # (N,N)
@@ -1083,10 +1152,14 @@ def init_dft(mol_str, opts, _coords=None, _weights=None, first=False, do_pyscf=T
         eri_threshold = 0
         batches       = 1
         nipu          = 1
+
+        # todo: rewrite int2e_sph to only recompute changing atomic orbitals (will be N times faster). 
+        if do_print: print("int2e",end ="", flush=True)
         nonzero_distinct_ERI = mol.intor("int2e_sph", aosym="s8")
         #ERI = [nonzero_distinct_ERI, nonzero_indices]
         #ERI = ERI 
         ERI = np.zeros(1)
+        if do_print: print(nonzero_distinct_ERI.shape, nonzero_distinct_ERI.nbytes/10**9)
         #ERI = mol.intor("int2e_sph")
         
     def e(x): return np.expand_dims(x, axis=0)
@@ -1373,6 +1446,8 @@ if __name__ == "__main__":
     parser.add_argument('-bs',      type=int,       default=8)
     parser.add_argument('-val_bs',      type=int,   default=8)
     parser.add_argument('-mol_repeats',  type=int,  default=16) # How many time to optimize wrt each molecule. 
+    parser.add_argument('-grad_acc', type=int, default=0) # integer, deciding how many steps to accumulate. 
+    parser.add_argument('-shuffle',  action="store_true") # whether to to shuffle the window of states each step. 
 
     # energy computation speedups 
     parser.add_argument('-foriloop',  action="store_true") # whether to use jax.lax.foriloop for sparse_symmetric_eri (faster compile time but slower training. )
@@ -1387,7 +1462,9 @@ if __name__ == "__main__":
     parser.add_argument('-skip',       action="store_true", help="skip pyscf test case") 
 
     # dataset 
+    parser.add_argument('-nperturb',  type=int, default=1, help="how many atoms to perturb (supports 1,2,3)") 
     parser.add_argument('-qm9',        action="store_true") 
+    parser.add_argument('-qh9',        action="store_true") 
     parser.add_argument('-benzene',        action="store_true") 
     parser.add_argument('-hydrogens',        action="store_true") 
     parser.add_argument('-water',        action="store_true") 
@@ -1400,6 +1477,7 @@ if __name__ == "__main__":
     parser.add_argument('-wiggle_var',     type=float,   default=0.05, help="wiggle N(0, wiggle_var), bondlength=1.5/30")
     parser.add_argument('-eri_threshold',  type=float,   default=1e-10, help="loss function threshold only")
     parser.add_argument('-rotate_deg',     type=float,   default=90, help="how many degrees to rotate")
+    parser.add_argument('-test_dataloader',     action="store_true", help="no training, just test/loop through dataloader. ")
 
     # models 
     parser.add_argument('-nn',       action="store_true", help="train nn, defaults to GD") 
@@ -1415,8 +1493,11 @@ if __name__ == "__main__":
     opts = parser.parse_args()
     if opts.tiny or opts.small or opts.base or opts.large or opts.xlarge: opts.nn = True 
 
+    assert opts.mol_repeats % opts.grad_acc == 0, "mol_repeats needs to be a multiple of grad_acc (gradient accumulation)."
+
     args_dict = vars(opts)
     print(args_dict)
+
 
     if opts.qm9: 
         df = pd.read_pickle("alchemy/atom_9.pickle")
