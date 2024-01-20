@@ -58,7 +58,7 @@ def transformer_init(
     total_params += np.prod(params.embeddings.shape)
     print("%26s %26s %26s"%("params.embeddings",params.embeddings.shape, np.prod(params.embeddings.shape)))
 
-    rng, params.project_positions, shape = linear_init_uniform(rng, 123, d_model)
+    rng, params.project_positions, shape = linear_init_uniform(rng, 12, d_model)
     total_params += np.prod(shape)
     print("%26s %26s %26s"%("params.project_positions",shape, np.prod(shape)))
 
@@ -95,32 +95,23 @@ def transformer_init(
 
 
 @partial(jax.jit, static_argnums=0)
-def transformer(cfg, params, x: jnp.ndarray, position: jnp.ndarray, H_core: jnp.ndarray, L_inv):
+def transformer(cfg, params, x: jnp.ndarray, position: jnp.ndarray, H_core: jnp.ndarray):
     """
     cfg: Config, from transformer_init, holds hyperparameters
     params: Current transformer parameters, initialized in init
     x: 1D array of L integers, representing the input sequence
     output: L x n_vocab logits
     """
+    L, = x.shape # x is just 1D. Vmap/pmap will handle batching
+
     embeddings = cfg.lambda_e * params.embeddings[x, :]  # L x Dm
-    L, Dm      = embeddings.shape
 
-    # Roughly get f( {R@ri+t}_i ) = f( {r_i}_i )
-    position = position - jnp.mean(position, axis=0).reshape(1, 3) # makes jnp.mean(position, axis=0) = [0,0,0]
-    cov      = jnp.cov(position.T)
-    eigvects = jnp.linalg.eigh(cov)[1] 
-    position = position @ eigvects # makes jnp.cov(positions.T)=jnp.eye(3) 
+    all_pairs = jnp.linalg.norm(position.reshape(1, -1, 3) - position.reshape(-1, 1, 3), axis=-1)
 
-    # Mix of sin/cos and 3d point cloud transformers. 
-    #position = jnp.concatenate([position, jnp.cos(position), jnp.sin(position), jnp.tanh(position)], axis=1) #(N,3) -> (N,12)
-    position = jnp.concatenate([position] +  \
-                                [jnp.cos(position*f/20*2*np.pi) for f in range(20)] + \
-                                [jnp.sin(position*f/20*2*np.pi) for f in range(20)], 
-                                axis=1) #(N,3) -> (N,3+60+60) = (N, 123)
+    # inspired by 3d point cloud transformers; 
+    # nspired by andrew: use trigonometric functions as feature transformations 
+    position = jnp.concatenate([position, jnp.cos(position), jnp.sin(position), jnp.tanh(position)], axis=1) #(N,3) -> (N,12)
     positions = linear(params.project_positions, position)                         # L x Dm
-    del position 
-    all_pairs = jnp.linalg.norm(positions.reshape(1, -1, Dm) - positions.reshape(-1, 1, Dm), axis=-1)  
-    all_pairs = all_pairs / jnp.max(all_pairs)
 
     # Add (learned) positional encodings
     x = embeddings + positions                                                     #  L x Dm 
@@ -137,13 +128,12 @@ def transformer(cfg, params, x: jnp.ndarray, position: jnp.ndarray, H_core: jnp.
         q = jnp.transpose(q.reshape(L, nheads, Dm//nheads), (1, 0, 2))
         k = jnp.transpose(k.reshape(L, nheads, Dm//nheads), (1, 0, 2))
         v = jnp.transpose(v.reshape(L, nheads, Dm//nheads), (1, 0, 2))
-        score = (q @ jnp.transpose(k, (0, 2, 1))) / math.sqrt(Dm//nheads) 
+        score = (q @ jnp.transpose(k, (0, 2, 1))) / math.sqrt(Dm)
 
-        if True:  # todo: why does this improve loss from ~1000 to ~300 first step (qm9). 
-            score += H_core
-            #score += all_pairs # => NaNs for some reason 
-            #score += L_inv
-            score += L_inv @ H_core @ L_inv.T  
+        # do like graphformer and append position here? 
+        #if layer_num < 6:  # doesn't look like it helps 
+        #    score += H_core
+        #    score += all_pairs
 
         attn     = jax.nn.softmax(score , axis=1) 
         x = x + (attn @ v).reshape(L, Dm)
@@ -159,26 +149,16 @@ def transformer(cfg, params, x: jnp.ndarray, position: jnp.ndarray, H_core: jnp.
 
         # Residual connection 
         x = x + t2
-        return x
+        return x, score 
 
     # Apply the transformer layers
     # todo: cut jit time by making this jax.lax.foriloop
-    for layer_num, layer in enumerate(params.layers[:-1]):
-        x = jax.checkpoint(block)(x, layer_num, layer)
-
-    layer = params.layers[-1]
-    # Prediction is last attention (without nhead = 1), and q=k so score is symmetric! 
-    nheads = 1 
-    t1    = vmap(standardize)(x)                           # L x Dm 
-    t1    = elementwise_linear(layer.norm_self_attn, t1)   # L x Dm
-    qkv   = linear(layer.kqv, t1)
-    q,k,v = jnp.split(qkv, 3, axis=1)
-    q     = jnp.transpose(q.reshape(L, nheads, Dm//nheads), (1, 0, 2))
-    k     = q 
-    #v = jnp.transpose(v.reshape(L, nheads, Dm//nheads), (1, 0, 2))
-    score = (q @ jnp.transpose(k, (0, 2, 1))) / math.sqrt(Dm*nheads) # symmetric: initial loss goes from 1200 to 980 (qm9). 
+    for layer_num, layer in enumerate(params.layers):
+        x, score = jax.checkpoint(block)(x, layer_num, layer)
         
-    M = score[0] 
+    # todo: if this isn't symmetric eigh gives imaginary eigenvalues? (bad)
+    M = score[0] # take first attention head 
+    #M = (M + M.T)/2 # make symmetric! 
     return M 
 
 import types
@@ -294,7 +274,7 @@ if __name__ == "__main__":
     parser.add_argument('-large',    action="store_true") 
     parser.add_argument('-xlarge',   action="store_true") 
     opts = parser.parse_args()
-
+    
     # initialize model 
     # transformer tiny 5M 
     d_model= 192
@@ -331,10 +311,10 @@ if __name__ == "__main__":
                     extrapolate=False, mol_idx=0)
     summary(state)
     
-    output = jax.jit(jax.vmap(transformer, in_axes=(None, None, 0, 0, 0, 0), out_axes=(0)), 
+    output = jax.jit(jax.vmap(transformer, in_axes=(None, None, 0, 0, 0), out_axes=(0)), 
                     static_argnums=(0,),
                     backend="cpu")(cfg, \
-            params, state.ao_types, state.pos.astype(jnp.float32), state.H_core.astype(jnp.float32), state.L_inv.astype(jnp.float32))
+            params, state.ao_types, state.pos.astype(jnp.float32), state.H_core.astype(jnp.float32))
 
             
     print(np.sum(output)) # 162.58726108305348
@@ -348,10 +328,10 @@ if __name__ == "__main__":
     new_params = pickle.load(open("checkpoints/example.pickle", "rb"))
 
     # check that output remains the same 
-    new_output = jax.jit(jax.vmap(transformer, in_axes=(None, None, 0, 0, 0, 0), out_axes=(0)), 
+    new_output = jax.jit(jax.vmap(transformer, in_axes=(None, None, 0, 0, 0), out_axes=(0)), 
                     static_argnums=(0,),
                     backend="cpu")(cfg, \
-            new_params, state.ao_types, state.pos.astype(jnp.float32), state.H_core.astype(jnp.float32), state.L_inv.astype(jnp.float32))
+            new_params, state.ao_types, state.pos.astype(jnp.float32), state.H_core.astype(jnp.float32))
 
     assert np.allclose(output, new_output)
     print("TEST CASE PASSED!")
