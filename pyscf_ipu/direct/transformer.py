@@ -74,6 +74,10 @@ def transformer_init(
         total_params += np.prod(shape) # omitting bias in calculation for now
         print("%26s %26s %26s"%("layer%i.kqv"%i, shape, np.prod(shape)))
 
+        rng, layer.c_proj, shape = linear_init_uniform(rng, d_model, d_model)
+        total_params += np.prod(shape) # omitting bias in calculation for now
+        print("%26s %26s %26s"%("layer%i.c_proj"%i, shape, np.prod(shape)))
+
         layer.norm_ff = elementwise_linear_init_identity(d_model)
         total_params += np.prod(d_model*2)
         print("%26s %26s %26s"%("layer%i.norm_ff"%i, (d_model,2), np.prod((d_model, 2))))
@@ -95,7 +99,7 @@ def transformer_init(
 
 
 @partial(jax.jit, static_argnums=0)
-def transformer(cfg, params, x: jnp.ndarray, position: jnp.ndarray, H_core: jnp.ndarray, L_inv):
+def transformer(cfg, params, x: jnp.ndarray, pos: jnp.ndarray, H_core: jnp.ndarray, L_inv, dm_init,diff_JK, V_xc, H_init):
     """
     cfg: Config, from transformer_init, holds hyperparameters
     params: Current transformer parameters, initialized in init
@@ -104,49 +108,55 @@ def transformer(cfg, params, x: jnp.ndarray, position: jnp.ndarray, H_core: jnp.
     """
     embeddings = cfg.lambda_e * params.embeddings[x, :]  # L x Dm
     L, Dm      = embeddings.shape
+    nheads     = cfg.heads
 
+    # todo: apply the same translation/rotation to hamiltonian. 
     # Roughly get f( {R@ri+t}_i ) = f( {r_i}_i )
-    position = position - jnp.mean(position, axis=0).reshape(1, 3) # makes jnp.mean(position, axis=0) = [0,0,0]
-    cov      = jnp.cov(position.T)
+    pos      = pos - jnp.mean(pos, axis=0).reshape(1, 3) # makes jnp.mean(position, axis=0) = [0,0,0]
+    cov      = jnp.cov(pos.T)
     eigvects = jnp.linalg.eigh(cov)[1] 
-    position = position @ eigvects # makes jnp.cov(positions.T)=jnp.eye(3) 
+    pos      = pos @ eigvects # makes jnp.cov(pos.T)=jnp.eye(3) 
 
     # Mix of sin/cos and 3d point cloud transformers. 
-    #position = jnp.concatenate([position, jnp.cos(position), jnp.sin(position), jnp.tanh(position)], axis=1) #(N,3) -> (N,12)
-    position = jnp.concatenate([position] +  \
-                                [jnp.cos(position*f/20*2*np.pi) for f in range(20)] + \
-                                [jnp.sin(position*f/20*2*np.pi) for f in range(20)], 
+    pos = jnp.concatenate([pos] +  \
+                                [jnp.cos(pos*f/20*2*np.pi) for f in range(20)] + \
+                                [jnp.sin(pos*f/20*2*np.pi) for f in range(20)], 
                                 axis=1) #(N,3) -> (N,3+60+60) = (N, 123)
-    positions = linear(params.project_positions, position)                         # L x Dm
-    del position 
-    all_pairs = jnp.linalg.norm(positions.reshape(1, -1, Dm) - positions.reshape(-1, 1, Dm), axis=-1)  
-    all_pairs = all_pairs / jnp.max(all_pairs)
-
-    # Add (learned) positional encodings
-    x = embeddings + positions                                                     #  L x Dm 
-    L, Dm = x.shape
-    nheads = cfg.heads
+    pos = linear(params.project_positions, pos)                         # L x Dm
+    all_pairs_dot = pos.reshape(-1, Dm) @ pos.reshape(-1, Dm).T  # this is L x L 
+    x = embeddings + pos                                                     #  L x Dm 
     
     def block(x, layer_num, layer):
         # Layer-normalize 
         t1 = vmap(standardize)(x)                           # L x Dm 
         t1 = elementwise_linear(layer.norm_self_attn, t1)   # L x Dm
 
-        qkv     = linear(layer.kqv, t1)
-        q,k,v = jnp.split(qkv, 3, axis=1)
-        q = jnp.transpose(q.reshape(L, nheads, Dm//nheads), (1, 0, 2))
+        qkv     = linear(layer.kqv, t1)                     # L x 3*Dm
+        q,k,v = jnp.split(qkv, 3, axis=1)                   # (L x Dm,)*3
+        q = jnp.transpose(q.reshape(L, nheads, Dm//nheads), (1, 0, 2)) # nheads x L x Dm//nheads
         k = jnp.transpose(k.reshape(L, nheads, Dm//nheads), (1, 0, 2))
         v = jnp.transpose(v.reshape(L, nheads, Dm//nheads), (1, 0, 2))
-        score = (q @ jnp.transpose(k, (0, 2, 1))) / math.sqrt(Dm//nheads) 
 
-        if True:  # todo: why does this improve loss from ~1000 to ~300 first step (qm9). 
-            score += H_core
-            #score += all_pairs # => NaNs for some reason 
-            #score += L_inv
-            score += L_inv @ H_core @ L_inv.T  
+        score = (q @ jnp.transpose(k, (0, 2, 1)))  
+        score = score 
+        score = score / math.sqrt(Dm/nheads)                # B x L x L 
 
-        attn     = jax.nn.softmax(score , axis=1) 
-        x = x + (attn @ v).reshape(L, Dm)
+        # quantum biased attention 
+        if True:  
+            score = score.at[:2].add( H_core / jnp.max(jnp.abs(H_core)) )
+            score  = score.at[2:4].add( all_pairs_dot / jnp.max(jnp.abs(all_pairs_dot)) )
+            M = L_inv @ H_core @ L_inv.T   
+            score  = score.at[4:6].add(  M / jnp.max(jnp.abs(M)) )
+            score = score.at[6:8].add( dm_init / jnp.max(jnp.abs(dm_init))) 
+            score = score.at[8:10].add(diff_JK / jnp.max(jnp.abs(diff_JK)))
+            score = score.at[10:12].add(V_xc / jnp.max(jnp.abs(V_xc)))
+            score = score.at[12:14].add(H_init / jnp.max(jnp.abs(H_init)))
+
+        attn = jax.nn.softmax(score, axis=1) 
+        y = attn @ v 
+        y = y.swapaxes(0,1).reshape(L, Dm)  
+        y = linear(layer.c_proj, y)
+        x = x + y 
 
         # Layer-normalize 
         t2 = vmap(standardize)(x)
@@ -161,10 +171,11 @@ def transformer(cfg, params, x: jnp.ndarray, position: jnp.ndarray, H_core: jnp.
         x = x + t2
         return x
 
-    # Apply the transformer layers
-    # todo: cut jit time by making this jax.lax.foriloop
+    # Apply all but the last transformer block. 
+    # todo: cut jit time wth jax.lax.foriloop
     for layer_num, layer in enumerate(params.layers[:-1]):
         x = jax.checkpoint(block)(x, layer_num, layer)
+        #x = block(x, layer_num, layer)
 
     layer = params.layers[-1]
     # Prediction is last attention (without nhead = 1), and q=k so score is symmetric! 
@@ -176,7 +187,7 @@ def transformer(cfg, params, x: jnp.ndarray, position: jnp.ndarray, H_core: jnp.
     q     = jnp.transpose(q.reshape(L, nheads, Dm//nheads), (1, 0, 2))
     k     = q 
     #v = jnp.transpose(v.reshape(L, nheads, Dm//nheads), (1, 0, 2))
-    score = (q @ jnp.transpose(k, (0, 2, 1))) / math.sqrt(Dm*nheads) # symmetric: initial loss goes from 1200 to 980 (qm9). 
+    score = (q @ jnp.transpose(k, (0, 2, 1))) / math.sqrt(Dm*nheads) 
         
     M = score[0] 
     return M 
@@ -239,8 +250,18 @@ class ParamsDict(types.SimpleNamespace):
         # Create a new ParamsDict instance with converted arrays
         new_dict = jax.tree_map(convert_to_float32, self.__dict__)
         return ParamsDict(**new_dict)
-        self.__dict__ = jax.tree_map(convert_to_float32, self.__dict__)
+        #self.__dict__ = jax.tree_map(convert_to_float32, self.__dict__)
 
+    def to_float64(self):
+        def convert_to_float64(x):
+            if isinstance(x, jnp.ndarray) and x.dtype == jnp.float32:
+                return x.astype(jnp.float64)
+            return x
+
+        # Create a new ParamsDict instance with converted arrays
+        new_dict = jax.tree_map(convert_to_float64, self.__dict__)
+        return ParamsDict(**new_dict)
+        #self.__dict__ = jax.tree_map(convert_to_float64, self.__dict__)
 
 
 if __name__ == "__main__":
